@@ -1686,13 +1686,13 @@
                 Atualizar por Drive
               </button>
 
-              <!-- DROPDOWN DE MATÉRIA & AFECÇÃO / DOENÇA -->
+              <!-- DROPDOWN DE AFECÇÃO / TÓPICO DENTRO DA MATÉRIA -->
               <div class="dropdown-filter-container">
                 <button class="dropdown-trigger-btn" id="fcSubjectDropdownBtn" onclick="toggleFcSubjectDropdown()">
-                  <span>📚 Matéria: <strong id="fcCurrentFilterLabel" style="color: var(--neon);">Todas as Doenças</strong></span> ▾
+                  <span>🔬 Tópico: <strong id="fcCurrentFilterLabel" style="color: var(--neon);">Todas as Doenças</strong></span> ▾
                 </button>
                 <div class="dropdown-menu-list" id="fcSubjectDropdownMenu">
-                  <!-- Gerado dinamicamente: Matéria -> Doenças específicas -->
+                  <!-- Gerado dinamicamente: Doenças da Matéria Ativa -->
                 </div>
               </div>
             </div>
@@ -1705,6 +1705,47 @@
                 ✍️ Resposta Escrita (IA)
               </button>
             </div>
+          </div>
+
+          <!-- BARRA DE SELEÇÃO DE MATÉRIA -->
+          <div class="subject-study-pills-bar" id="fcSubjectPillsBar" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border);"></div>
+
+          <!-- CARD DA MATÉRIA ATIVA COM BOTÃO DE REDUNDÂNCIA DA MATÉRIA -->
+          <div class="active-subject-header-card" id="fcActiveSubjectCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(0, 229, 255, 0.15); color: var(--neon); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISCIPLINA ATIVA</span>
+                  <h3 id="fcActiveSubjectTitle" style="font-size: 15px; margin: 0; font-weight: 700;">Integração de Sistemas Humanos 2</h3>
+                </div>
+                <div id="fcActiveSubjectMeta" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
+                  8 aulas sincronizadas • 4 flashcards prontos
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <!-- BOTÃO DE REDUNDÂNCIA DA MATÉRIA (NÃO NO CARD DO FLASHCARD!) -->
+                <button class="btn-outline-action" id="btnFcSubjectRedundancy" onclick="auditCurrentSubjectRedundancy()" title="Auditar redundâncias e sobreposição de conteúdo nesta matéria">
+                  🛡️ Auditoria de Redundância
+                </button>
+                <button class="btn-outline-action danger" onclick="deleteCurrentSubjectData()" title="Excluir materiais e flashcards desta matéria">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  Excluir Matéria
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- BANNER DE PENDÊNCIA DE GERAÇÃO EM FLASHCARDS -->
+          <div class="pending-generation-banner" id="fcPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 22px; margin-bottom: 20px; text-align: center;">
+            <div style="font-size: 15px; font-weight: 700; color: #ffaa00; margin-bottom: 6px;">
+              ⚡ Aulas Disponíveis • Geração de Flashcards Pendente
+            </div>
+            <p id="fcPendingDesc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; max-width: 540px; margin-left: auto; margin-right: auto;">
+              Os materiais desta disciplina estão prontos na sua sessão. Clique abaixo para gerar os Flashcards e Quizzes sob demanda com a IA.
+            </p>
+            <button class="btn-outline-action primary" onclick="generateQuestionsForCurrentSubject()" style="padding: 10px 22px; font-size: 13px; font-weight: 700; display: inline-flex; margin: 0 auto;">
+              ⚡ Gerar Flashcards com IA desta Matéria
+            </button>
           </div>
 
           <!-- Empty State -->
@@ -1721,24 +1762,6 @@
 
           <!-- Container do Card -->
           <div id="flashcardDeck" style="display: none;">
-            
-            <!-- Banner de Alerta de Redundância (>= 50%) -->
-            <div id="fcRedundancyAlert" class="redundancy-alert-card" style="display: none;">
-              <div class="redundancy-alert-info">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span id="fcRedundancyMsg">Item com 60% de similaridade matemática detectada.</span>
-              </div>
-              <div class="redundancy-actions">
-                <button class="btn-outline-action danger" onclick="deleteCurrentCard()" title="Remover item redundante da base">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                  Excluir
-                </button>
-                <button id="fcStarBtn" class="btn-outline-action star" onclick="toggleStarCurrentCard()" title="Favoritar para manter na base">
-                  <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  <span id="fcStarLabel">Favoritar</span>
-                </button>
-              </div>
-            </div>
 
             <div class="flashcard-wrapper" id="flashcardBox">
               <div class="flashcard-flip-target">
@@ -1795,14 +1818,57 @@
 
         <!-- 3. ABA QUIZZES -->
         <section id="tab-quizzes" class="tab-section">
-          <div class="study-toolbar">
-            <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              + Upload de Material para Quizzes
-            </button>
-            <button class="btn-outline-action" onclick="openDriveModal()">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              Atualizar por Drive
+          <div class="study-toolbar" style="flex-wrap: wrap; gap: 10px; justify-content: space-between;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                + Upload de Material para Quizzes
+              </button>
+              <button class="btn-outline-action" onclick="openDriveModal()">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Atualizar por Drive
+              </button>
+            </div>
+          </div>
+
+          <!-- BARRA DE SELEÇÃO DE MATÉRIA EM QUIZZES -->
+          <div class="subject-study-pills-bar" id="qzSubjectPillsBar" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border);"></div>
+
+          <!-- CARD DA MATÉRIA ATIVA EM QUIZZES COM BOTÃO DE REDUNDÂNCIA DA MATÉRIA -->
+          <div class="active-subject-header-card" id="qzActiveSubjectCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(0, 229, 255, 0.15); color: var(--neon); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISCIPLINA ATIVA</span>
+                  <h3 id="qzActiveSubjectTitle" style="font-size: 15px; margin: 0; font-weight: 700;">Integração de Sistemas Humanos 2</h3>
+                </div>
+                <div id="qzActiveSubjectMeta" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
+                  8 aulas sincronizadas • 4 quizzes disponíveis
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <!-- BOTÃO DE REDUNDÂNCIA DA MATÉRIA (NÃO NO CARD DO QUIZ!) -->
+                <button class="btn-outline-action" id="btnQzSubjectRedundancy" onclick="auditCurrentSubjectRedundancy()" title="Auditar redundâncias e similaridades de conteúdo nesta matéria">
+                  🛡️ Auditoria de Redundância
+                </button>
+                <button class="btn-outline-action danger" onclick="deleteCurrentSubjectData()" title="Excluir materiais e quizzes desta matéria">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  Excluir Matéria
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- BANNER DE PENDÊNCIA DE GERAÇÃO EM QUIZZES -->
+          <div class="pending-generation-banner" id="qzPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 22px; margin-bottom: 20px; text-align: center;">
+            <div style="font-size: 15px; font-weight: 700; color: #ffaa00; margin-bottom: 6px;">
+              ⚡ Aulas Disponíveis • Geração de Quizzes Pendente
+            </div>
+            <p id="qzPendingDesc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; max-width: 540px; margin-left: auto; margin-right: auto;">
+              Os materiais desta disciplina estão prontos na sua sessão. Clique abaixo para gerar os Quizzes sob demanda com a IA.
+            </p>
+            <button class="btn-outline-action primary" onclick="generateQuestionsForCurrentSubject()" style="padding: 10px 22px; font-size: 13px; font-weight: 700; display: inline-flex; margin: 0 auto;">
+              ⚡ Gerar Quizzes com IA desta Matéria
             </button>
           </div>
 
@@ -1812,7 +1878,7 @@
               <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <h3>Nenhum Quiz Disponível</h3>
-            <p>Os quizzes são sincronizados automaticamente com seus Flashcards ou criados a partir do upload de apostilas e resumos.</p>
+            <p>Selecione uma matéria acima ou faça upload de novos materiais para gerar quizzes de fixação.</p>
             <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
               Fazer Upload de Conteúdo
             </button>
@@ -2370,6 +2436,21 @@
   </div>
 
   <!-- =========================================================
+       MODAL DE AUDITORIA DE REDUNDÂNCIA DA MATÉRIA
+       ========================================================= -->
+  <div class="modal-overlay" id="subjectRedundancyModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 600px;">
+      <div class="modal-head">
+        <h2>🛡️ Auditoria de Redundância da Matéria</h2>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="subjectRedundancyContent" style="margin-top: 8px;"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
        MODAL DE UPLOAD DE MATERIAL DO ESTUDANTE
        ========================================================= -->
   <div class="modal-overlay" id="uploadMaterialModal" onclick="closeModals(event)">
@@ -2723,6 +2804,49 @@
     let studyMode = 'traditional';
     let currentDiseaseFilter = 'all';
 
+    // GERENCIAMENTO DE MATÉRIAS, DIVISÃO DE ESTUDO & STATUS DE GERAÇÃO
+    let currentStudySubject = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+    let subjectGenerationStatus = {
+      'Integração de Sistemas Humanos 2 (Dermatologia)': {
+        status: 'ready',
+        materialsCount: 8,
+        questionsCount: 5
+      }
+    };
+
+    function getAvailableStudySubjects() {
+      const set = new Set();
+      Object.keys(subjectGenerationStatus).forEach(s => { if (s) set.add(s); });
+      if (Array.isArray(chatDriveMaterials)) {
+        chatDriveMaterials.forEach(m => { if (m.subject) set.add(m.subject); });
+      }
+      if (Array.isArray(sharedQuestionsBank)) {
+        sharedQuestionsBank.forEach(q => { if (q.subject) set.add(q.subject); });
+      }
+      const arr = Array.from(set).filter(Boolean);
+      return arr.length > 0 ? arr : ['Integração de Sistemas Humanos 2 (Dermatologia)'];
+    }
+
+    function ensureCurrentSubjectValid() {
+      const list = getAvailableStudySubjects();
+      if (!currentStudySubject || !list.includes(currentStudySubject)) {
+        currentStudySubject = list[0] || '';
+      }
+    }
+
+    function selectStudySubject(subjectName) {
+      currentStudySubject = subjectName;
+      currentDiseaseFilter = 'all';
+      currentCardIndex = 0;
+      updateSubjectFilterMenus();
+      renderSharedStudyItems();
+    }
+
+    function openSubjectInTab(subjectName, tabId) {
+      selectStudySubject(subjectName);
+      navigateTab(tabId);
+    }
+
     function setStudyMode(mode) {
       studyMode = mode;
       document.getElementById('btnModeTraditional').classList.toggle('active', mode === 'traditional');
@@ -2743,20 +2867,117 @@
     }
 
     function getFilteredQuestions() {
-      if (currentDiseaseFilter === 'all') {
-        return sharedQuestionsBank;
+      ensureCurrentSubjectValid();
+      let list = sharedQuestionsBank;
+      if (currentStudySubject) {
+        list = list.filter(q => q.subject === currentStudySubject);
       }
-      return sharedQuestionsBank.filter(q => (q.disease === currentDiseaseFilter) || (q.subject && q.subject.includes(currentDiseaseFilter)));
+      if (currentDiseaseFilter && currentDiseaseFilter !== 'all') {
+        list = list.filter(q => (q.disease === currentDiseaseFilter) || (q.subject && q.subject.includes(currentDiseaseFilter)));
+      }
+      return list;
     }
 
     function renderSharedStudyItems() {
-      const filtered = getFilteredQuestions();
-      const hasItems = filtered.length > 0;
+      ensureCurrentSubjectValid();
 
+      const availableSubjects = getAvailableStudySubjects();
+      const currentStatus = subjectGenerationStatus[currentStudySubject] || { status: 'ready', materialsCount: 0, questionsCount: 0 };
+      const isPending = currentStatus.status === 'pending';
+
+      // 1. Renderiza os pills de matérias nas abas Flashcards e Quizzes
+      ['fcSubjectPillsBar', 'qzSubjectPillsBar'].forEach(barId => {
+        const bar = document.getElementById(barId);
+        if (!bar) return;
+        if (availableSubjects.length <= 1 && availableSubjects[0] === '') {
+          bar.innerHTML = '';
+          bar.style.display = 'none';
+          return;
+        }
+        bar.style.display = 'flex';
+        bar.innerHTML = availableSubjects.map(subj => {
+          const isActive = subj === currentStudySubject;
+          const statusObj = subjectGenerationStatus[subj] || {};
+          const isSubjPending = statusObj.status === 'pending';
+          const qCount = sharedQuestionsBank.filter(q => q.subject === subj).length;
+          const matCount = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === subj).length : 0) || statusObj.materialsCount || 0;
+
+          return `
+            <button class="btn-outline-action ${isActive ? 'active' : ''}" 
+                    style="border-radius: 20px; font-size: 11px; padding: 6px 14px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; ${isActive ? 'border-color: var(--neon); background: rgba(0, 229, 255, 0.12);' : ''}" 
+                    onclick="selectStudySubject('${subj.replace(/'/g, "\\'")}')">
+              <span>${isSubjPending ? '⚡' : '📚'} ${subj}</span>
+              <span style="font-size: 10px; opacity: 0.75; font-weight: 600;">
+                ${isSubjPending ? `(${matCount} aulas • Pendente)` : `(${qCount} cards)`}
+              </span>
+            </button>
+          `;
+        }).join('');
+      });
+
+      // 2. Renderiza Card de Cabeçalho da Matéria Ativa (com botão de Redundância e Exclusão)
+      const qCount = sharedQuestionsBank.filter(q => q.subject === currentStudySubject).length;
+      const matCount = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === currentStudySubject).length : 0) || currentStatus.materialsCount || 0;
+
+      const fcActiveCard = document.getElementById('fcActiveSubjectCard');
+      const qzActiveCard = document.getElementById('qzActiveSubjectCard');
+      const fcActiveTitle = document.getElementById('fcActiveSubjectTitle');
+      const qzActiveTitle = document.getElementById('qzActiveSubjectTitle');
+      const fcActiveMeta = document.getElementById('fcActiveSubjectMeta');
+      const qzActiveMeta = document.getElementById('qzActiveSubjectMeta');
+
+      if (currentStudySubject) {
+        if (fcActiveCard) fcActiveCard.style.display = 'block';
+        if (qzActiveCard) qzActiveCard.style.display = 'block';
+        if (fcActiveTitle) fcActiveTitle.textContent = currentStudySubject;
+        if (qzActiveTitle) qzActiveTitle.textContent = currentStudySubject;
+        
+        const metaText = isPending
+          ? `📁 ${matCount} ${matCount === 1 ? 'aula disponível' : 'aulas disponíveis'} • ⚡ Geração de questões pendente sob demanda`
+          : `📁 ${matCount} ${matCount === 1 ? 'aula sincronizada' : 'aulas sincronizadas'} • 🎯 ${qCount} ${qCount === 1 ? 'questão pronta' : 'questões prontas'}`;
+        if (fcActiveMeta) fcActiveMeta.textContent = metaText;
+        if (qzActiveMeta) qzActiveMeta.textContent = metaText;
+      } else {
+        if (fcActiveCard) fcActiveCard.style.display = 'none';
+        if (qzActiveCard) qzActiveCard.style.display = 'none';
+      }
+
+      // 3. Controle de Banner Pendente vs Decks
+      const fcPendingBanner = document.getElementById('fcPendingBanner');
+      const qzPendingBanner = document.getElementById('qzPendingBanner');
+      const fcPendingDesc = document.getElementById('fcPendingDesc');
+      const qzPendingDesc = document.getElementById('qzPendingDesc');
       const fcEmpty = document.getElementById('flashcardsEmptyState');
       const fcDeck = document.getElementById('flashcardDeck');
       const qzEmpty = document.getElementById('quizzesEmptyState');
       const qzDeck = document.getElementById('quizDeck');
+
+      if (isPending) {
+        if (fcPendingBanner) {
+          fcPendingBanner.style.display = 'block';
+          if (fcPendingDesc) {
+            fcPendingDesc.textContent = `A matéria "${currentStudySubject}" possui ${matCount} aulas no Drive salvas na sua sessão. Clique abaixo para gerar Flashcards sob demanda com IA.`;
+          }
+        }
+        if (qzPendingBanner) {
+          qzPendingBanner.style.display = 'block';
+          if (qzPendingDesc) {
+            qzPendingDesc.textContent = `A matéria "${currentStudySubject}" possui ${matCount} aulas no Drive salvas na sua sessão. Clique abaixo para gerar Quizzes sob demanda com IA.`;
+          }
+        }
+        if (fcDeck) fcDeck.style.display = 'none';
+        if (fcEmpty) fcEmpty.style.display = 'none';
+        if (qzDeck) qzDeck.style.display = 'none';
+        if (qzEmpty) qzEmpty.style.display = 'none';
+        return;
+      }
+
+      if (fcPendingBanner) fcPendingBanner.style.display = 'none';
+      if (qzPendingBanner) qzPendingBanner.style.display = 'none';
+
+      // 4. Questões filtradas da matéria ativa
+      const filtered = getFilteredQuestions();
+      const hasItems = filtered.length > 0;
 
       if (fcEmpty) fcEmpty.style.display = hasItems ? 'none' : 'flex';
       if (fcDeck) fcDeck.style.display = hasItems ? 'block' : 'none';
@@ -2786,20 +3007,10 @@
       if (frontEl) frontEl.textContent = item.question;
       if (backEl) backEl.innerHTML = item.answer;
 
-      // Banner de Redundância (>= 50%)
-      const redAlert = document.getElementById('fcRedundancyAlert');
       const starBtn = document.getElementById('fcStarBtn');
       const starLabel = document.getElementById('fcStarLabel');
-
-      if (item.isRedundant) {
-        if (redAlert) redAlert.style.display = 'flex';
-        const msgEl = document.getElementById('fcRedundancyMsg');
-        if (msgEl) msgEl.textContent = `⚠️ Redundância detectada (${item.redundancyScore}% semelhante a "${item.matchedText?.slice(0, 35)}...")`;
-        if (starBtn) starBtn.classList.toggle('starred', !!item.isStarred);
-        if (starLabel) starLabel.textContent = item.isStarred ? 'Favoritado ⭐' : 'Favoritar';
-      } else {
-        if (redAlert) redAlert.style.display = 'none';
-      }
+      if (starBtn) starBtn.classList.toggle('starred', !!item.isStarred);
+      if (starLabel) starLabel.textContent = item.isStarred ? 'Favoritado ⭐' : 'Favoritar';
       
       const fcBox = document.getElementById('flashcardBox');
       if (fcBox) fcBox.classList.remove('flipped');
@@ -2819,7 +3030,7 @@
       renderSharedStudyItems();
       renderSceBars();
       updateSubjectFilterMenus();
-      showToast('🗑️ Item excluído da base.');
+      showToast('🗑️ Flashcard excluído.');
     }
 
     function toggleStarCurrentCard() {
@@ -2828,7 +3039,7 @@
       const item = list[currentCardIndex];
       item.isStarred = !item.isStarred;
       updateCardDisplay(list);
-      showToast(item.isStarred ? '⭐ Item favoritado para manter na base!' : 'Item desfavoritado.');
+      showToast(item.isStarred ? '⭐ Item favoritado!' : 'Item desfavoritado.');
     }
 
     function flipCardManual() {
@@ -2873,20 +3084,18 @@
         const quizBox = document.createElement('div');
         quizBox.className = 'quiz-box';
         quizBox.innerHTML = `
-          ${item.isRedundant ? `
-            <div class="redundancy-alert-card" style="margin-bottom: 8px;">
-              <div class="redundancy-alert-info">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span>Redundância detectada (${item.redundancyScore}%)</span>
-              </div>
-              <div class="redundancy-actions">
-                <button class="btn-outline-action danger" onclick="deleteQuizItem('${item.id}')">Excluir</button>
-                <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" onclick="toggleStarQuizItem('${item.id}')">${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}</button>
-              </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--neon);">
+              ${(item.disease || item.subject).toUpperCase()} • QUESTÃO #${qIdx + 1}
             </div>
-          ` : ''}
-          <div style="font-size: 11px; font-weight: 700; color: var(--neon);">
-            ${(item.disease || item.subject).toUpperCase()} • QUESTÃO #${qIdx + 1}
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleStarQuizItem('${item.id}')">
+                ${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}
+              </button>
+              <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')">
+                🗑️
+              </button>
+            </div>
           </div>
           <div style="font-size: 15px; font-weight: 600; line-height: 1.5;">${item.question}</div>
           <div class="quiz-options-list">
@@ -2920,6 +3129,268 @@
         showToast(item.isStarred ? '⭐ Quiz favoritado!' : 'Quiz desfavoritado.');
       }
     }
+
+    // GERAÇÃO SOB DEMANDA, AUDITORIA DE REDUNDÂNCIA POR MATÉRIA & EXCLUSÃO
+    function generateQuestionsForSubject(subjectName) {
+      const targetSubject = subjectName || currentStudySubject;
+      if (!targetSubject) return;
+
+      let materials = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === targetSubject) : []);
+      if (materials.length === 0) {
+        materials = [{ name: `${targetSubject} - Conteúdo Curricular`, disease: targetSubject, subject: targetSubject }];
+      }
+
+      // Remove questões prévias dessa matéria para evitar repetições
+      sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== targetSubject);
+
+      let generatedCount = 0;
+      materials.forEach((file, idx) => {
+        const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
+        const qText = `Semiologia & Conduta Clínica: Quais os critérios diagnósticos e abordagem de primeira linha em ${diseaseName}?`;
+        const red = evaluateRedundancy(qText);
+
+        sharedQuestionsBank.unshift({
+          id: `gen-${Date.now()}-${idx}`,
+          subject: targetSubject,
+          disease: diseaseName,
+          question: qText,
+          answer: `Em ${diseaseName}, a identificação semiológica precoce aliada à correlação anatomoclínica orienta o estadiamento e a terapêutica de precisão conforme as diretrizes médicas atualizadas.`,
+          quizOptions: [
+            `Iniciar antibioticoterapia empírica ampla e suspender acompanhamento em ${diseaseName}.`,
+            `Estratificar gravidade semiológica segundo critérios validados e instituir protocolo direcionado para ${diseaseName}.`,
+            `Aguardar evolução espontânea sem monitorização clínica nem suporte.`,
+            `Encaminhar para cirurgia de urgência de rotina sem propedêutica armada em ${diseaseName}.`
+          ],
+          correctIndex: 1,
+          isRedundant: red.isRedundant,
+          redundancyScore: red.percentage,
+          matchedText: red.matchedText,
+          isStarred: false
+        });
+        generatedCount++;
+      });
+
+      subjectGenerationStatus[targetSubject] = {
+        status: 'ready',
+        materialsCount: materials.length,
+        questionsCount: generatedCount
+      };
+
+      currentStudySubject = targetSubject;
+      currentCardIndex = 0;
+      currentDiseaseFilter = 'all';
+
+      renderSharedStudyItems();
+      renderCurriculumGrid();
+      renderSceBars();
+      updateSubjectFilterMenus();
+
+      showToast(`⚡ ${generatedCount} Flashcards e Quizzes gerados com IA para "${targetSubject}"!`);
+    }
+
+    function generateQuestionsForCurrentSubject() {
+      generateQuestionsForSubject(currentStudySubject);
+    }
+
+    function auditSubjectRedundancy(subjectName) {
+      const targetSubject = subjectName || currentStudySubject;
+      const questions = sharedQuestionsBank.filter(q => q.subject === targetSubject);
+      const container = document.getElementById('subjectRedundancyContent');
+      if (!container) return;
+
+      if (questions.length < 2) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 24px;">
+            <div style="font-size: 36px; margin-bottom: 8px;">🛡️</div>
+            <h3 style="font-size: 16px; margin-bottom: 6px;">${targetSubject}</h3>
+            <p style="color: var(--text-secondary); font-size: 13px;">
+              Esta matéria possui apenas ${questions.length} questão cadastrada. São necessárias pelo menos 2 questões para calcular correlação e redundância de conteúdo.
+            </p>
+          </div>
+        `;
+        document.getElementById('subjectRedundancyModal').classList.add('active');
+        return;
+      }
+
+      const pairs = [];
+      const redundantIds = new Set();
+
+      for (let i = 0; i < questions.length; i++) {
+        for (let j = i + 1; j < questions.length; j++) {
+          const qA = questions[i];
+          const qB = questions[j];
+          const sim = calculateLocalSimilarity(qA.question, qB.question);
+          if (sim >= 0.40) {
+            pairs.push({ qA, qB, score: Math.round(sim * 100) });
+            redundantIds.add(qB.id);
+          }
+        }
+      }
+
+      pairs.sort((a, b) => b.score - a.score);
+      const redundancyRate = Math.round((redundantIds.size / questions.length) * 100);
+
+      let html = `
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-size: 10px; font-weight: 700; color: var(--neon); background: rgba(0, 229, 255, 0.12); padding: 2px 6px; border-radius: 4px;">MATÉRIA AUDITADA</span>
+              <h3 style="font-size: 16px; margin: 4px 0 0 0;">${targetSubject}</h3>
+            </div>
+            ${pairs.length > 0 ? `
+              <button class="btn-outline-action danger" onclick="autoPruneSubjectRedundancies('${targetSubject.replace(/'/g, "\\'")}')" style="font-size: 12px; padding: 6px 12px;">
+                ⚡ Otimizar Matéria (Eliminar ${redundantIds.size} Redundantes)
+              </button>
+            ` : ''}
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px;">
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 11px; color: var(--text-secondary);">Total Questões</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${questions.length}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 11px; color: var(--text-secondary);">Duplicadas</div>
+              <div style="font-size: 18px; font-weight: 700; color: ${redundantIds.size > 0 ? 'var(--danger)' : '#00ff66'};">${redundantIds.size}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 11px; color: var(--text-secondary);">Taxa de Redundância</div>
+              <div style="font-size: 18px; font-weight: 700; color: ${redundancyRate > 25 ? 'var(--danger)' : (redundancyRate > 0 ? 'var(--warning)' : '#00ff66')};">${redundancyRate}%</div>
+            </div>
+          </div>
+      `;
+
+      if (pairs.length === 0) {
+        html += `
+          <div style="background: rgba(0, 255, 102, 0.08); border: 1px solid rgba(0, 255, 102, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 26px; margin-bottom: 4px;">✅</div>
+            <strong style="color: #00ff66; font-size: 14px;">Matéria 100% Otimizada!</strong>
+            <p style="color: var(--text-secondary); font-size: 12px; margin: 4px 0 0 0;">
+              Nenhum conteúdo redundante ou questão duplicada identificada entre as ${questions.length} questões desta disciplina.
+            </p>
+          </div>
+        `;
+      } else {
+        html += `
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">
+            Pares com Sobreposição Detectada:
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+            ${pairs.map((p, idx) => `
+              <div style="background: var(--bg-surface); border: 1px solid rgba(255, 68, 68, 0.3); border-radius: 10px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-size: 11px; font-weight: 700; color: var(--danger);">Par #${idx + 1} • ${p.score}% de Sobreposição</span>
+                  <button class="btn-outline-action danger" style="padding: 3px 8px; font-size: 11px;" onclick="deleteDuplicateQuestion('${p.qB.id}', '${targetSubject.replace(/'/g, "\\'")}')">
+                    🗑️ Excluir Cópia
+                  </button>
+                </div>
+                <div style="font-size: 12px; margin-bottom: 6px; color: var(--text-primary);">
+                  <span style="color: var(--neon); font-weight: 700;">Questão A:</span> ${p.qA.question}
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                  <span style="color: var(--warning); font-weight: 700;">Questão B (Sobreposta):</span> ${p.qB.question}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+      container.innerHTML = html;
+      document.getElementById('subjectRedundancyModal').classList.add('active');
+    }
+
+    function auditCurrentSubjectRedundancy() {
+      ensureCurrentSubjectValid();
+      auditSubjectRedundancy(currentStudySubject);
+    }
+
+    function deleteDuplicateQuestion(qId, subjectName) {
+      const idx = sharedQuestionsBank.findIndex(q => q.id === qId);
+      if (idx !== -1) {
+        sharedQuestionsBank.splice(idx, 1);
+      }
+      showToast('🗑️ Questão redundante excluída.');
+      auditSubjectRedundancy(subjectName);
+      renderSharedStudyItems();
+      renderSceBars();
+      updateSubjectFilterMenus();
+    }
+
+    function autoPruneSubjectRedundancies(subjectName) {
+      const targetSubject = subjectName || currentStudySubject;
+      const questions = sharedQuestionsBank.filter(q => q.subject === targetSubject);
+      const toRemove = new Set();
+
+      for (let i = 0; i < questions.length; i++) {
+        if (toRemove.has(questions[i].id)) continue;
+        for (let j = i + 1; j < questions.length; j++) {
+          if (toRemove.has(questions[j].id)) continue;
+          const sim = calculateLocalSimilarity(questions[i].question, questions[j].question);
+          if (sim >= 0.40) {
+            toRemove.add(questions[j].id);
+          }
+        }
+      }
+
+      sharedQuestionsBank = sharedQuestionsBank.filter(q => !toRemove.has(q.id));
+      showToast(`⚡ ${toRemove.size} questões redundantes removidas de "${targetSubject}"!`);
+      auditSubjectRedundancy(targetSubject);
+      renderSharedStudyItems();
+      renderSceBars();
+      updateSubjectFilterMenus();
+    }
+
+    function deleteSubjectData(subjectName) {
+      const target = subjectName || currentStudySubject;
+      if (!target) return;
+
+      const confirmed = confirm(`Deseja realmente excluir todos os materiais, flashcards e quizzes da matéria "${target}"?\n\nEsta ação liberará o cache e memória da sessão.`);
+      if (!confirmed) return;
+
+      if (typeof chatDriveMaterials !== 'undefined') {
+        chatDriveMaterials = chatDriveMaterials.filter(m => m.subject !== target);
+      }
+      sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== target);
+      delete subjectGenerationStatus[target];
+
+      const available = getAvailableStudySubjects();
+      if (currentStudySubject === target) {
+        currentStudySubject = available[0] || '';
+      }
+
+      renderChatDriveVerticalList();
+      updateChatAttachedBar();
+      renderSharedStudyItems();
+      renderCurriculumGrid();
+      renderSceBars();
+      updateSubjectFilterMenus();
+
+      showToast(`🗑️ Matéria "${target}" excluída e cache liberado.`);
+    }
+
+    function deleteCurrentSubjectData() {
+      deleteSubjectData(currentStudySubject);
+    }
+
+    // ELIMINAÇÃO DE CACHE DE MATÉRIAS SEM UPLOAD AO FECHAR OU ATUALIZAR
+    function pruneUnuploadedSubjectsCache() {
+      if (typeof chatDriveMaterials === 'undefined') return;
+      const uploadedSubjects = new Set(chatDriveMaterials.map(m => m.subject).filter(Boolean));
+      Object.keys(subjectGenerationStatus).forEach(s => {
+        if (!uploadedSubjects.has(s)) {
+          delete subjectGenerationStatus[s];
+        }
+      });
+      sharedQuestionsBank = sharedQuestionsBank.filter(q => uploadedSubjects.has(q.subject));
+    }
+
+    window.addEventListener('beforeunload', () => {
+      try {
+        pruneUnuploadedSubjectsCache();
+      } catch (e) {}
+    });
 
     // 6. PROCESSAMENTO DE UPLOAD COM DIRECIONAMENTO E TESTE DE REDUNDÂNCIA
     let pendingUploadMaterial = null;
@@ -4111,8 +4582,8 @@
 
         const discipline = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
 
-        // 1. SINCRONIZAR ARQUIVOS COM O CHAT E DROPDOWN VERTICAL
-        chatDriveMaterials = selectedFiles.map(f => ({
+        // 1. SINCRONIZAR ARQUIVOS COM O CHAT E LISTAS DE MATERIAIS
+        const newMaterials = selectedFiles.map(f => ({
           id: f.id,
           name: f.name,
           sizeStr: f.sizeStr,
@@ -4124,6 +4595,18 @@
           folderPath: f.folderPath || '',
           subject: discipline
         }));
+
+        // Mantém materiais de outras disciplinas e atualiza os desta disciplina
+        chatDriveMaterials = chatDriveMaterials.filter(m => m.subject !== discipline).concat(newMaterials);
+
+        // Define a disciplina ativa e sinaliza PENDÊNCIA DE GERAÇÃO (sem gerar tudo de uma vez)
+        currentStudySubject = discipline;
+        subjectGenerationStatus[discipline] = {
+          status: 'pending',
+          materialsCount: selectedFiles.length,
+          questionsCount: 0
+        };
+
         renderChatDriveVerticalList();
         updateChatAttachedBar();
 
@@ -4134,33 +4617,7 @@
         const readerModalSub = document.getElementById('readerModalSubtitle');
         if (readerModalSub) readerModalSub.textContent = currentScannedFolder ? currentScannedFolder.sub : `Disciplina: ${discipline}`;
 
-        // 2. GERAR PERGUNTAS E FLASHCARDS PERSONALIZADOS PARA CADA DOENÇA/AULA
-        selectedFiles.forEach((file, idx) => {
-          const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
-          const qText = `Semiologia & Conduta Clínica: Quais os critérios diagnósticos e abordagem de primeira linha em ${diseaseName}?`;
-          const red = evaluateRedundancy(qText);
-
-          sharedQuestionsBank.unshift({
-            id: `drive-sync-${Date.now()}-${idx}`,
-            subject: discipline,
-            disease: diseaseName,
-            question: qText,
-            answer: `Em ${diseaseName}, a identificação semiológica precoce aliada à correlação anatomoclínica orienta o estadiamento e a terapêutica de precisão conforme as diretrizes médicas atualizadas.`,
-            quizOptions: [
-              `Iniciar antibioticoterapia empírica ampla e suspender acompanhamento em ${diseaseName}.`,
-              `Estratificar gravidade semiológica segundo critérios validados e instituir protocolo direcionado para ${diseaseName}.`,
-              `Aguardar evolução espontânea sem monitorização clínica nem suporte.`,
-              `Encaminhar para cirurgia de urgência de rotina sem propedêutica armada em ${diseaseName}.`
-            ],
-            correctIndex: 1,
-            isRedundant: red.isRedundant,
-            redundancyScore: red.percentage,
-            matchedText: red.matchedText,
-            isStarred: false
-          });
-        });
-
-        // 3. ATUALIZAR O ROTEIRO ADAPTATIVO (WAZE DA MEDICINA)
+        // 2. ATUALIZAR O ROTEIRO ADAPTATIVO (WAZE DA MEDICINA)
         selectedFiles.slice(0, 3).forEach((file, idx) => {
           const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
           studyRouteSchedule.unshift({
@@ -4173,13 +4630,14 @@
           });
         });
 
-        // 4. ATUALIZAR MENUS E GRÁFICOS
+        // 3. ATUALIZAR MENUS, ABAS E GRÁFICOS
         renderSceBars();
         renderSceTimeline();
         renderSharedStudyItems();
         updateSubjectFilterMenus();
+        renderCurriculumGrid();
 
-        showToast(`☁️ Drive sincronizado! ${selectedFiles.length} aulas de "${discipline}" importadas para o Chat, Flashcards e SCE.`);
+        showToast(`☁️ Drive sincronizado! ${selectedFiles.length} aulas de "${discipline}" prontas. Geração de Flashcards & Quizzes sob demanda.`);
       }, needsCompression ? 750 : 300);
     }
 
@@ -4568,10 +5026,46 @@
                 const isUser = typeof s === 'object' && s.isUser;
                 const matCount = getDisciplineMaterialsCount(sName);
                 const hasMaterials = matCount > 0;
+                
+                // Busca status da matéria
+                let matchedSubjectKey = sName;
+                if (subjectGenerationStatus[sName]) {
+                  matchedSubjectKey = sName;
+                } else {
+                  const sLower = sName.toLowerCase();
+                  for (const k of Object.keys(subjectGenerationStatus)) {
+                    const kLower = k.toLowerCase();
+                    if (sLower.includes(kLower) || kLower.includes(sLower) || (sLower.includes('dermatolog') && kLower.includes('sistemas 2'))) {
+                      matchedSubjectKey = k;
+                      break;
+                    }
+                  }
+                }
+                const statusObj = subjectGenerationStatus[matchedSubjectKey];
+                const isPending = hasMaterials && (!statusObj || statusObj.status === 'pending');
 
                 let rightTag = '';
                 if (hasMaterials) {
-                  rightTag = `<span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">📁 ${matCount} ${matCount === 1 ? 'aula ativa' : 'aulas ativas'}</span>`;
+                  if (isPending) {
+                    rightTag = `
+                      <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                        <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
+                        <button class="btn-outline-action primary" style="padding: 2px 7px; font-size: 10px; font-weight: 700;" onclick="generateQuestionsForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Flashcards e Quizzes sob demanda com IA">⚡ Gerar IA</button>
+                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
+                        <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
+                      </div>
+                    `;
+                  } else {
+                    rightTag = `
+                      <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                        <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
+                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'flashcards')" title="Estudar Flashcards desta matéria">🗂️ Flashcards</button>
+                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Estudar Quizzes desta matéria">📝 Quizzes</button>
+                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
+                        <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
+                      </div>
+                    `;
+                  }
                 } else if (isUser) {
                   rightTag = `<span style="background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">🎯 Ementa do Aluno</span>`;
                 } else {
@@ -4579,8 +5073,8 @@
                 }
 
                 return `
-                  <div class="subject-row" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.07); border-radius: 8px; padding: 6px 8px; border: 1px solid rgba(0, 255, 102, 0.25);' : (isUser ? 'background: rgba(0, 229, 255, 0.05); border-radius: 8px; padding: 6px 8px; border: 1px solid rgba(0, 229, 255, 0.2);' : '')}">
-                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1;">
+                  <div class="subject-row" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 7px 10px; border: 1px solid rgba(0, 255, 102, 0.2);' : (isUser ? 'background: rgba(0, 229, 255, 0.05); border-radius: 8px; padding: 6px 8px; border: 1px solid rgba(0, 229, 255, 0.2);' : '')}">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1; min-width: 130px;">
                       <span style="font-size: 12px; color: ${hasMaterials ? '#00ff66' : (isUser ? 'var(--neon)' : 'var(--text-primary)')}; font-weight: ${hasMaterials || isUser ? '700' : '500'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${sName}">
                         ${hasMaterials ? '🟢 ' : (isUser ? '⭐ ' : '• ')}${sName}
                       </span>
@@ -4861,7 +5355,8 @@
         selected: true,
         tag: 'Slide Aula',
         disease: 'Histologia da Barreira Epidérmica',
-        topic: 'Sistema Tegumentar, Epiderme e Derme'
+        topic: 'Sistema Tegumentar, Epiderme e Derme',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1x88R5i6B3qFmZp6fU4cZ8W4K1L2M3N4',
@@ -4871,7 +5366,8 @@
         selected: true,
         tag: 'Slide Aula',
         disease: 'Semiologia das Lesões Elementares Cutâneas',
-        topic: 'Mácula, Pápula, Placa, Nódulo e Vesículas'
+        topic: 'Mácula, Pápula, Placa, Nódulo e Vesículas',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1a5Z5l9B9C8X7W6V5U4T3S2R1Q0P9O8N',
@@ -4881,7 +5377,8 @@
         selected: true,
         tag: 'Slide Aula',
         disease: 'Psoríase Vulgar & Líquen Plano',
-        topic: 'Koebner, Auspitz e Estrias de Wickham'
+        topic: 'Koebner, Auspitz e Estrias de Wickham',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1L9mK8j7H6g5F4d3S2a1Z0X9C8V7B6N5',
@@ -4891,7 +5388,8 @@
         selected: true,
         tag: 'Slide Aula',
         disease: 'Dermatite Atópica & Eczemas',
-        topic: 'Eczemas e Diagnóstico Diferencial'
+        topic: 'Eczemas e Diagnóstico Diferencial',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1yZ4m6K2L9x1W8v7U3t5S4r3Q2p1O0n9',
@@ -4901,7 +5399,8 @@
         selected: false,
         tag: 'Cronograma',
         disease: 'Cronograma e Plano de Aulas',
-        topic: 'Plano Pedagógico Semestral'
+        topic: 'Plano Pedagógico Semestral',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1J0N9m7K4v3W2x1L8u6T5s4R3q2P1o0N',
@@ -4911,7 +5410,8 @@
         selected: false,
         tag: 'Casos Clínicos',
         disease: 'Casos Clínicos Ambulatoriais',
-        topic: 'Roteiro de Casos Práticos'
+        topic: 'Roteiro de Casos Práticos',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1YxMHcUSCNYyW_8t6WOw9Bv8JvYKVIBOF',
@@ -4921,7 +5421,8 @@
         selected: false,
         tag: 'Resumo Ambulatório',
         disease: 'Esquemas Diagnósticos Práticos',
-        topic: 'Esquemas Diagnósticos e Conduta'
+        topic: 'Esquemas Diagnósticos e Conduta',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       },
       {
         id: '1XCjuoqYcWCCb_wNiQVA31x9RNnL27Kr9',
@@ -4932,7 +5433,8 @@
         isBook: true,
         tag: 'Tratado / Livro',
         disease: 'Tratado de Referência (Azulay)',
-        topic: 'Tratado Omitido por Padrão (> 50 MB)'
+        topic: 'Tratado Omitido por Padrão (> 50 MB)',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)'
       }
     ];
 
@@ -5213,10 +5715,14 @@
     function getAvailableDiseases() {
       const diseases = new Set();
       sharedQuestionsBank.forEach(q => {
-        if (q.disease) diseases.add(q.disease);
+        if ((!currentStudySubject || q.subject === currentStudySubject) && q.disease) {
+          diseases.add(q.disease);
+        }
       });
       chatDriveMaterials.forEach(m => {
-        if (m.disease) diseases.add(m.disease);
+        if ((!currentStudySubject || m.subject === currentStudySubject) && m.disease) {
+          diseases.add(m.disease);
+        }
       });
       return Array.from(diseases);
     }
@@ -5720,6 +6226,8 @@
 
       // 2. Limpar questões e flashcards
       sharedQuestionsBank = [];
+      subjectGenerationStatus = {};
+      currentStudySubject = '';
       currentCardIndex = 0;
       currentDiseaseFilter = 'all';
 
@@ -5830,6 +6338,14 @@
         { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed' }
       ];
       universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
+      currentStudySubject = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+      subjectGenerationStatus = {
+        'Integração de Sistemas Humanos 2 (Dermatologia)': {
+          status: 'ready',
+          materialsCount: 8,
+          questionsCount: 5
+        }
+      };
       currentCardIndex = 0;
       currentDiseaseFilter = 'all';
 
@@ -5855,6 +6371,8 @@
       chatDriveMaterials = [];
       sharedQuestionsBank = [];
       studyRouteSchedule = [];
+      subjectGenerationStatus = {};
+      currentStudySubject = '';
       universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
       currentScannedFolder = null;
       const subLabel = document.getElementById('chatSubjectCurrentName');
