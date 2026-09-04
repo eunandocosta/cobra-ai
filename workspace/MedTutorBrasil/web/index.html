@@ -29,6 +29,7 @@
       --danger-bg: rgba(255, 77, 77, 0.1);
       --success: #00FF66;
       --warning: #FFB800;
+      --warning-bg: rgba(255, 184, 0, 0.12);
       --nav-bg: #0C0F0D;
     }
 
@@ -49,7 +50,8 @@
       --danger: #D32F2F;
       --danger-bg: rgba(211, 47, 47, 0.08);
       --success: #00A844;
-      --warning: #E68A00;
+      --warning: #B37400;
+      --warning-bg: rgba(230, 138, 0, 0.1);
       --nav-bg: #FFFFFF;
     }
 
@@ -121,28 +123,25 @@
       width: 38px;
       height: 38px;
       border-radius: 12px;
+      background: var(--neon-subtle);
       border: 1.5px solid var(--neon);
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--neon);
-      background: var(--neon-subtle);
-      box-shadow: 0 0 16px var(--neon-glow);
+      box-shadow: 0 0 15px var(--neon-glow);
     }
 
     .brand-text h1 {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 800;
       letter-spacing: -0.5px;
-      color: var(--text-primary);
     }
 
     .brand-text span {
       font-size: 11px;
-      font-weight: 600;
-      color: var(--neon);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      display: block;
     }
 
     .nav-list {
@@ -155,20 +154,23 @@
     .nav-link {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       padding: 12px 14px;
       border-radius: 12px;
       color: var(--text-secondary);
+      text-decoration: none;
       font-size: 13.5px;
       font-weight: 600;
-      cursor: pointer;
-      border: 1px solid transparent;
       transition: all 0.2s ease;
+      cursor: pointer;
       background: transparent;
+      border: 1px solid transparent;
+      text-align: left;
+      width: 100%;
     }
 
     .nav-link:hover {
-      color: var(--neon);
+      color: var(--text-primary);
       background: var(--neon-subtle);
     }
 
@@ -176,11 +178,6 @@
       color: var(--neon);
       background: var(--neon-subtle);
       border-color: var(--border-accent);
-      box-shadow: 0 0 12px var(--neon-glow);
-    }
-
-    .nav-link .icon {
-      color: currentColor;
     }
 
     .sidebar-footer {
@@ -191,12 +188,12 @@
       gap: 8px;
     }
 
-    /* Área Principal de Conteúdo */
+    /* Viewport Principal */
     .main-viewport {
       flex: 1;
       display: flex;
       flex-direction: column;
-      height: 100%;
+      height: 100vh;
       overflow: hidden;
       background: var(--bg-base);
     }
@@ -224,7 +221,30 @@
     .topbar-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+    }
+
+    /* Botão de Ajuda Universal (?) */
+    .btn-help-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .btn-help-icon:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+      background: var(--neon-subtle);
     }
 
     .btn-outline-action {
@@ -259,6 +279,25 @@
       color: #000;
     }
 
+    .btn-outline-action.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .btn-outline-action.danger:hover {
+      background: var(--danger-bg);
+    }
+
+    .btn-outline-action.star {
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+
+    .btn-outline-action.star.starred {
+      background: var(--warning-bg);
+      font-weight: 700;
+    }
+
     /* Container de Visualização */
     .view-content {
       flex: 1;
@@ -285,9 +324,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* =========================================================
-       ZERO-STATE (ESTADO CRU E LIMPO)
-       ========================================================= */
+    /* Zero-State */
     .empty-state {
       display: flex;
       flex-direction: column;
@@ -331,9 +368,7 @@
       margin-bottom: 24px;
     }
 
-    /* =========================================================
-       1. ABA CHAT CIENTÍFICO
-       ========================================================= */
+    /* 1. Chat Científico */
     .chat-layout {
       display: flex;
       flex-direction: column;
@@ -350,118 +385,103 @@
     }
 
     .chat-bubble {
-      max-width: 780px;
-      padding: 16px 20px;
+      max-width: 82%;
+      padding: 16px 18px;
       border-radius: 18px;
       font-size: 14px;
-      line-height: 1.5;
-      border: 1px solid var(--border);
+      line-height: 1.6;
     }
 
     .chat-bubble.user {
       align-self: flex-end;
-      background: var(--bg-card);
-      border-color: var(--border-accent);
+      background: var(--neon-subtle);
+      border: 1px solid var(--border-accent);
       color: var(--text-primary);
+      border-bottom-right-radius: 4px;
     }
 
     .chat-bubble.tutor {
       align-self: flex-start;
       background: var(--bg-surface);
-      border-color: var(--border);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
     }
 
     .tutor-header {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--neon);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 8px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--neon);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
 
     .socratic-box {
-      margin-top: 14px;
-      background: var(--neon-subtle);
-      border-left: 3px solid var(--neon);
+      margin-top: 12px;
       padding: 12px 14px;
-      border-radius: 8px;
+      border-radius: 10px;
+      background: var(--bg-elevated);
+      border-left: 3px solid var(--neon);
       font-size: 13px;
-      font-weight: 600;
     }
 
     .ref-footer {
-      margin-top: 12px;
+      margin-top: 10px;
       font-size: 11px;
       color: var(--text-muted);
-      border-top: 1px dashed var(--border);
-      padding-top: 8px;
-    }
-
-    .bubble-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 14px;
     }
 
     .chat-bar {
       display: flex;
-      gap: 10px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-      background: var(--bg-base);
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 16px;
+      margin-top: 10px;
     }
 
     .chat-input {
       flex: 1;
-      padding: 14px 18px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
+      background: transparent;
+      border: none;
+      outline: none;
       color: var(--text-primary);
       font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .chat-input:focus {
-      border-color: var(--neon);
-      box-shadow: 0 0 10px var(--neon-glow);
     }
 
     .btn-send {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      border: 1px solid var(--neon);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
       background: var(--neon);
-      color: #000;
-      cursor: pointer;
+      border: none;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
+      cursor: pointer;
+      color: #000;
       transition: all 0.2s ease;
     }
 
     .btn-send:hover {
       background: var(--neon-hover);
-      box-shadow: 0 0 16px var(--neon-glow);
+      transform: scale(1.04);
     }
 
-    /* =========================================================
-       2. ABA FLASHCARDS (COM MODO ESCRITA & IA)
-       ========================================================= */
+    /* 2. Flashcards */
     .study-toolbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
+      margin-bottom: 24px;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
     .mode-switch {
@@ -474,13 +494,13 @@
     }
 
     .mode-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s ease;
     }
@@ -493,17 +513,17 @@
 
     .flashcard-wrapper {
       perspective: 1000px;
+      max-width: 580px;
       width: 100%;
-      min-height: 360px;
-      margin-bottom: 20px;
+      margin: 0 auto 24px auto;
     }
 
     .flashcard-flip-target {
-      width: 100%;
-      height: 100%;
       position: relative;
+      width: 100%;
+      min-height: 320px;
       transform-style: preserve-3d;
-      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .flashcard-wrapper.flipped .flashcard-flip-target {
@@ -511,36 +531,32 @@
     }
 
     .flashcard-side {
+      position: absolute;
       width: 100%;
-      min-height: 360px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
+      height: 100%;
+      backface-visibility: hidden;
       border-radius: 20px;
-      padding: 32px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      padding: 28px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     }
 
     .flashcard-side.back {
-      position: absolute;
-      top: 0; left: 0;
       transform: rotateY(180deg);
       border-color: var(--border-accent);
-      background: var(--bg-card);
     }
 
     .card-meta {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--neon);
-      letter-spacing: 1px;
-      text-transform: uppercase;
       display: flex;
       justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neon);
+      letter-spacing: 0.5px;
     }
 
     .card-main-text {
@@ -551,23 +567,22 @@
       margin: auto 0;
     }
 
-    /* Área de Resposta Escrita */
     .written-answer-box {
-      margin-top: 16px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      margin-top: 16px;
     }
 
     .written-textarea {
       width: 100%;
       height: 90px;
-      background: var(--bg-base);
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 12px;
       color: var(--text-primary);
-      font-size: 13.5px;
+      font-size: 13px;
       resize: none;
       outline: none;
     }
@@ -577,47 +592,76 @@
     }
 
     .ai-feedback-banner {
-      display: none;
-      padding: 14px;
-      border-radius: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
       background: var(--neon-subtle);
       border: 1px solid var(--border-accent);
       font-size: 13px;
-      line-height: 1.5;
-      margin-top: 12px;
+      line-height: 1.4;
+      display: none;
     }
 
-    /* =========================================================
-       3. ABA QUIZZES
-       ========================================================= */
+    /* Banner de Alerta de Redundância (>= 50%) */
+    .redundancy-alert-card {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .redundancy-alert-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--warning);
+      font-weight: 600;
+    }
+
+    .redundancy-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* 3. Quizzes */
     .quiz-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .quiz-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
-    .quiz-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 24px;
-    }
-
     .quiz-options-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin-top: 18px;
+      gap: 8px;
     }
 
     .quiz-opt {
-      padding: 14px 16px;
+      padding: 12px 16px;
       border-radius: 12px;
       border: 1px solid var(--border);
-      background: var(--bg-base);
-      color: var(--text-primary);
-      font-size: 13.5px;
+      background: var(--bg-surface);
       cursor: pointer;
+      font-size: 13.5px;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -630,52 +674,54 @@
     }
 
     .quiz-opt.correct {
-      border-color: var(--success) !important;
-      background: rgba(0, 255, 102, 0.12) !important;
-      color: var(--neon) !important;
-      font-weight: 700;
+      border-color: var(--success);
+      background: rgba(0, 255, 102, 0.15);
+      color: var(--success);
+      font-weight: 600;
     }
 
     .quiz-opt.wrong {
-      border-color: var(--danger) !important;
-      background: var(--danger-bg) !important;
-      color: var(--danger) !important;
+      border-color: var(--danger);
+      background: var(--danger-bg);
+      color: var(--danger);
     }
 
-    /* =========================================================
-       4. ABA MATÉRIAS (EMENTA & DCNs)
-       ========================================================= */
+    /* 4. Curriculum */
     .syllabus-hero {
       background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 20px;
-      margin-bottom: 24px;
+      padding: 22px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
+      margin-bottom: 24px;
       gap: 16px;
+      flex-wrap: wrap;
     }
 
     .curriculum-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 16px;
     }
 
     .subject-category-card {
-      background: var(--bg-surface);
+      background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     .category-header {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
       color: var(--neon);
-      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
       display: flex;
       justify-content: space-between;
     }
@@ -684,38 +730,179 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
       font-size: 13px;
-    }
-
-    .subject-row:last-child {
-      border-bottom: none;
+      padding: 6px 0;
     }
 
     .knowledge-meter {
-      font-size: 11.5px;
-      font-weight: 700;
+      font-size: 11px;
       color: var(--neon);
-      background: var(--neon-subtle);
-      padding: 2px 8px;
-      border-radius: 12px;
-      border: 1px solid var(--border-accent);
+      font-weight: 700;
     }
 
     /* =========================================================
-       MODAIS (CONFIGURAÇÕES & UPLOAD)
+       5. ABA SCE & ROTEIRO DINÂMICO ("WAZE DA MEDICINA")
+       ========================================================= */
+    .waze-banner {
+      background: linear-gradient(135deg, rgba(0, 255, 102, 0.12), rgba(0, 255, 102, 0.03));
+      border: 1px solid var(--border-accent);
+      border-radius: 18px;
+      padding: 22px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+    }
+
+    .waze-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .waze-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .waze-status-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .waze-status-tag.delayed {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .waze-status-tag.on-track {
+      background: var(--neon-subtle);
+      color: var(--neon);
+      border: 1px solid var(--border-accent);
+    }
+
+    .timeline-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .timeline-day-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .timeline-day-card.active-day {
+      border-color: var(--neon);
+      box-shadow: 0 0 12px var(--neon-subtle);
+    }
+
+    .timeline-day-card.delayed-day {
+      border-color: var(--danger);
+    }
+
+    .day-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .day-topic {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .day-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      margin-top: auto;
+    }
+
+    /* Gráficos do SCE */
+    .sce-chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      margin-bottom: 24px;
+    }
+
+    .sce-chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .sce-subject-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .bar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 10px;
+      background: var(--bg-surface);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: var(--neon);
+      border-radius: 5px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* =========================================================
+       MODAIS E OVERLAYS
        ========================================================= */
     .modal-overlay {
-      display: none;
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
       backdrop-filter: blur(4px);
-      z-index: 100;
+      display: none;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      z-index: 100;
     }
 
     .modal-overlay.active {
@@ -723,28 +910,29 @@
     }
 
     .modal-window {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-accent);
-      border-radius: 24px;
-      padding: 28px;
-      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
       max-width: 540px;
-      max-height: 88vh;
+      width: 100%;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      max-height: 90vh;
       overflow-y: auto;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
     }
 
     .modal-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
     }
 
     .modal-head h2 {
       font-size: 18px;
-      font-weight: 800;
-      color: var(--text-primary);
+      font-weight: 700;
     }
 
     .btn-close-modal {
@@ -755,75 +943,112 @@
     }
 
     .btn-close-modal:hover {
-      color: var(--neon);
-    }
-
-    .config-group {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .config-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px;
-      background: var(--bg-base);
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-
-    .switch-toggle {
-      width: 44px;
-      height: 24px;
-      background: var(--border);
-      border-radius: 12px;
-      position: relative;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    .switch-toggle.on {
-      background: var(--neon);
-    }
-
-    .switch-knob {
-      width: 18px;
-      height: 18px;
-      background: #000;
-      border-radius: 50%;
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      transition: transform 0.2s ease;
-    }
-
-    .switch-toggle.on .switch-knob {
-      transform: translateX(20px);
-      background: #000;
+      color: var(--text-primary);
     }
 
     .upload-zone {
-      border: 1.5px dashed var(--border-accent);
-      background: var(--neon-subtle);
+      border: 2px dashed var(--border);
       border-radius: 14px;
-      padding: 24px;
+      padding: 28px;
       text-align: center;
       cursor: pointer;
-      transition: border-color 0.2s ease;
-      margin-top: 10px;
+      background: var(--bg-surface);
+      transition: all 0.2s ease;
     }
 
     .upload-zone:hover {
       border-color: var(--neon);
+      background: var(--neon-subtle);
     }
 
-    /* Bottom Navigation para Mobile (iOS / Android) */
+    /* Lista de Arquivos do Drive Sync */
+    .drive-file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      margin-bottom: 8px;
+      gap: 10px;
+    }
+
+    .drive-file-row.accepted {
+      border-color: rgba(0, 255, 102, 0.3);
+    }
+
+    .drive-file-row.rejected {
+      border-color: rgba(255, 77, 77, 0.3);
+      opacity: 0.85;
+    }
+
+    .drive-file-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .drive-file-text {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .drive-file-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .drive-file-status {
+      font-size: 11px;
+    }
+
+    .drive-file-status.ok {
+      color: var(--neon);
+    }
+
+    .drive-file-status.warn {
+      color: var(--danger);
+    }
+
+    /* Toast */
+    .toast-popup {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-accent);
+      color: var(--text-primary);
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: all 0.25s ease;
+    }
+
+    .toast-popup.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    /* Mobile Bottom Navigation */
     .mobile-bottom-nav {
       display: none;
-      height: 64px;
+      height: 60px;
       background: var(--nav-bg);
       border-top: 1px solid var(--border);
       justify-content: space-around;
@@ -835,80 +1060,40 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 4px;
       background: transparent;
       border: none;
-      color: var(--text-muted);
-      font-size: 10.5px;
+      color: var(--text-secondary);
+      font-size: 10px;
       font-weight: 600;
       cursor: pointer;
-      padding: 6px;
+      flex: 1;
+      height: 100%;
     }
 
     .mobile-nav-btn.active {
       color: var(--neon);
     }
 
-    /* Toast */
-    .toast-popup {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: var(--bg-surface);
-      border: 1px solid var(--border-accent);
-      color: var(--text-primary);
-      padding: 10px 20px;
-      border-radius: 30px;
-      font-size: 13px;
-      font-weight: 600;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      opacity: 0;
-      pointer-events: none;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 200;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .toast-popup.visible {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    /* =========================================================
-       MEDIA QUERIES: ADAPTABILIDADE MULTIPLATAFORMA REAL
-       ========================================================= */
     @media (max-width: 768px) {
-      /* Mobile: iOS / Android */
-      .sidebar {
-        display: none;
-      }
-      .mobile-bottom-nav {
-        display: flex;
-      }
-      .view-content {
-        padding: 16px;
-      }
+      .sidebar { display: none; }
+      .mobile-bottom-nav { display: flex; }
+      .topbar { padding: 0 16px; }
+      .view-content { padding: 16px; }
+      .brand-text h1 { font-size: 15px; }
     }
   </style>
 </head>
 <body>
 
   <div class="app-root">
-    
-    <!-- SIDEBAR (WEB & WINDOWS DESKTOP) -->
+
+    <!-- SIDEBAR DESKTOP / WEB / WINDOWS -->
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo">
-          <!-- Stethoscope Icon Outline -->
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M4.5 3v5a5 5 0 0 0 10 0V3"/>
-            <path d="M19.5 3v2a3.5 3.5 0 0 1-7 0"/>
-            <circle cx="19.5" cy="5.5" r="2.5"/>
-            <path d="M9.5 13a4.5 4.5 0 0 0 9 0"/>
-          </svg>
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
         </div>
         <div class="brand-text">
           <h1>MedTutor Brasil</h1>
@@ -933,9 +1118,17 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           Matérias Curriculares
         </button>
+        <button class="nav-link" onclick="navigateTab('sce', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          SCE & Waze de Estudos
+        </button>
       </nav>
 
       <div class="sidebar-footer">
+        <button class="btn-outline-action primary" onclick="openDriveModal()">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Atualizar por Drive
+        </button>
         <button class="btn-outline-action" onclick="openConfigModal()">
           <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Configurações
@@ -952,13 +1145,19 @@
           Chat Científico & Revisão
         </div>
         <div class="topbar-actions">
+          <button class="btn-outline-action primary" onclick="openDriveModal()" title="Sincronizar materiais do Google Drive da turma">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Atualizar por Drive</span>
+          </button>
+          <button class="btn-help-icon" onclick="openCurrentTabHelp()" title="Ajuda sobre esta tela">
+            ?
+          </button>
           <button class="btn-outline-action" onclick="toggleTheme()" title="Alternar Dia/Noite">
             <svg class="icon" id="themeIcon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             <span id="themeLabel">Noite</span>
           </button>
           <button class="btn-outline-action" onclick="openConfigModal()">
             <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Configurações
           </button>
         </div>
       </header>
@@ -966,12 +1165,11 @@
       <!-- ÁREA DE CONTEÚDO DAS ABAS -->
       <div class="view-content">
 
-        <!-- 1. ABA CHAT (COMEÇA LIMPO / CRU) -->
+        <!-- 1. ABA CHAT -->
         <section id="tab-chat" class="tab-section active">
           <div class="chat-layout">
             
             <div class="chat-flow" id="chatFlow">
-              <!-- Empty state inicial do chat -->
               <div class="empty-state" id="chatEmptyState">
                 <div class="empty-state-icon">
                   <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1006,16 +1204,21 @@
           </div>
         </section>
 
-        <!-- 2. ABA FLASHCARDS (COMEÇA CRU / COM UPLOAD E OPÇÃO ESCRITA) -->
+        <!-- 2. ABA FLASHCARDS -->
         <section id="tab-flashcards" class="tab-section">
           
           <div class="study-toolbar">
-            <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              + Upload de Material do Estudante
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                + Upload de Aula
+              </button>
+              <button class="btn-outline-action" onclick="openDriveModal()">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Atualizar por Drive
+              </button>
+            </div>
 
-            <!-- Chave Seletora de Modo de Estudo -->
             <div class="mode-switch">
               <button id="btnModeTraditional" class="mode-btn active" onclick="setStudyMode('traditional')">
                 Verso do Card
@@ -1026,20 +1229,39 @@
             </div>
           </div>
 
-          <!-- Empty State quando não há cards -->
+          <!-- Empty State -->
           <div class="empty-state" id="flashcardsEmptyState">
             <div class="empty-state-icon">
               <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
             </div>
             <h3>Nenhum Flashcard Ativo</h3>
-            <p>Faça upload de resumos, anotações de aula ou crie flashcards diretamente a partir das conversas no Chat.</p>
+            <p>Faça upload de resumos, sincronize apostilas com o Drive ou crie cards diretamente nas discussões do Chat.</p>
             <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
               Carregar Primeiro Material
             </button>
           </div>
 
-          <!-- Container do Card (exibido quando há cards) -->
+          <!-- Container do Card -->
           <div id="flashcardDeck" style="display: none;">
+            
+            <!-- Banner de Alerta de Redundância (>= 50%) -->
+            <div id="fcRedundancyAlert" class="redundancy-alert-card" style="display: none;">
+              <div class="redundancy-alert-info">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span id="fcRedundancyMsg">Item com 60% de similaridade matemática detectada.</span>
+              </div>
+              <div class="redundancy-actions">
+                <button class="btn-outline-action danger" onclick="deleteCurrentCard()" title="Remover item redundante da base">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  Excluir
+                </button>
+                <button id="fcStarBtn" class="btn-outline-action star" onclick="toggleStarCurrentCard()" title="Favoritar para manter na base">
+                  <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span id="fcStarLabel">Favoritar</span>
+                </button>
+              </div>
+            </div>
+
             <div class="flashcard-wrapper" id="flashcardBox">
               <div class="flashcard-flip-target">
                 <!-- Frente -->
@@ -1093,16 +1315,20 @@
           </div>
         </section>
 
-        <!-- 3. ABA QUIZZES (COMEÇA CRU / COMPARTILHADO COM FLASHCARDS) -->
+        <!-- 3. ABA QUIZZES -->
         <section id="tab-quizzes" class="tab-section">
           <div class="study-toolbar">
             <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
               <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               + Upload de Material para Quizzes
             </button>
+            <button class="btn-outline-action" onclick="openDriveModal()">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Atualizar por Drive
+            </button>
           </div>
 
-          <!-- Empty State quando não há quizzes -->
+          <!-- Empty State -->
           <div class="empty-state" id="quizzesEmptyState">
             <div class="empty-state-icon">
               <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1114,17 +1340,17 @@
             </button>
           </div>
 
-          <!-- Lista de Quizzes Ativos -->
+          <!-- Lista de Quizzes -->
           <div id="quizDeck" class="quiz-container" style="display: none;"></div>
         </section>
 
-        <!-- 4. ABA MATÉRIAS (COMEÇA CRU ATÉ UPLOAD DE EMENTA) -->
+        <!-- 4. ABA MATÉRIAS CURRICULARES -->
         <section id="tab-curriculum" class="tab-section">
           <div class="syllabus-hero">
             <div>
               <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">Grade Curricular de Medicina</h2>
               <p style="font-size: 13px; color: var(--text-secondary);">
-                Conecte a ementa da sua universidade para personalizar suas disciplinas e acumular conhecimento.
+                Conecte a ementa da sua universidade para personalizar suas disciplinas e acompanhar a formação médica.
               </p>
             </div>
             <button class="btn-outline-action primary" onclick="openSyllabusModal()">
@@ -1133,14 +1359,13 @@
             </button>
           </div>
 
-          <!-- Empty state de disciplinas -->
           <div class="empty-state" id="curriculumEmptyState">
             <div class="empty-state-icon">
               <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             </div>
             <h3>Nenhuma Matéria Carregada</h3>
             <p>Carregue a ementa ou plano pedagógico (PPC) da sua faculdade para preencher automaticamente as matérias do seu curso.</p>
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
               <button class="btn-outline-action primary" onclick="openSyllabusModal()">
                 Carregar Minha Ementa
               </button>
@@ -1150,8 +1375,58 @@
             </div>
           </div>
 
-          <!-- Grid Curricular Dinâmico -->
           <div id="curriculumGrid" class="curriculum-grid" style="display: none;"></div>
+        </section>
+
+        <!-- 5. ABA SCE & ROTEIRO DINÂMICO ("WAZE DA MEDICINA") -->
+        <section id="tab-sce" class="tab-section">
+          
+          <!-- BANNER WAZE DA MEDICINA -->
+          <div class="waze-banner">
+            <div class="waze-header">
+              <div class="waze-title">
+                <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                Roteiro Adaptativo de Estudos ("Waze da Medicina")
+              </div>
+              <div id="wazeStatusTag" class="waze-status-tag delayed">
+                <svg class="icon" style="width: 14px; height: 14px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span id="wazeStatusLabel">2 Tarefas Atrasadas</span>
+              </div>
+            </div>
+
+            <p style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;">
+              O cronograma é recalculado dinamicamente conforme seus uploads e cumprimento das metas. Se imprevistos ocorrerem, o algoritmo redistribui os tópicos nos dias úteis seguintes sem sobrecarregar sua rotina.
+            </p>
+
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <button class="btn-outline-action primary" id="btnRecalculateRoute" onclick="triggerRecalculateRoute()">
+                <svg class="icon" id="recalcIcon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span id="recalcBtnText">Recalcular Rota Agora</span>
+              </button>
+              <span style="font-size: 12px; color: var(--text-muted);" id="lastRecalcInfo">Última otimização: hoje às 08:30</span>
+            </div>
+          </div>
+
+          <!-- CRONOGRAMA SEMANAL (TIMELINE) -->
+          <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Cronograma Dinâmico da Semana
+          </h3>
+          <div class="timeline-grid" id="timelineSchedule"></div>
+
+          <!-- GRÁFICOS DO SCE (EVOLUÇÃO POR DISCIPLINA) -->
+          <div class="sce-chart-card">
+            <div class="sce-chart-header">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 4px;">Gráficos de Evolução por Disciplina</h3>
+                <p style="font-size: 12px; color: var(--text-secondary);">Taxa de domínio fisiopatológico e retenção mnemônica acumulada por matéria</p>
+              </div>
+              <button class="btn-help-icon" onclick="openHelpModal('Gráficos de Evolução (SCE)', 'Mede o índice de acerto e retenção espaçada por matéria curricular. Conforme novos uploads são feitos e respondidos, a barra de maestria cresce.')">?</button>
+            </div>
+
+            <div id="sceDisciplineBars"></div>
+          </div>
+
         </section>
 
       </div>
@@ -1174,10 +1449,124 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span>Matérias</span>
         </button>
+        <button class="mobile-nav-btn" onclick="navigateTab('sce', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span>SCE</span>
+        </button>
       </nav>
 
     </main>
 
+  </div>
+
+  <!-- =========================================================
+       MODAL DE AJUDA UNIVERSAL (?)
+       ========================================================= -->
+  <div class="modal-overlay" id="helpModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 440px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="btn-help-icon" style="border-color: var(--neon); color: var(--neon); cursor: default;">?</div>
+          <h2 id="helpModalTitle">Ajuda da Ferramenta</h2>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p id="helpModalBody" style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 8px 0;">
+        Explicação concisa sobre a finalidade clínica e didática da aplicação.
+      </p>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+        <button class="btn-outline-action primary" onclick="closeModals()">
+          Entendi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL "ATUALIZAR POR DRIVE" COM FILTRO INTELIGENTE
+       ========================================================= -->
+  <div class="modal-overlay" id="driveModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 600px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg class="icon" style="color: var(--neon); width: 26px; height: 26px;" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <h2>Atualizar por Drive</h2>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary);">
+        O MedTutor vasculha o Google Drive da sua turma, <strong>filtrando livros volumosos (>15MB)</strong> e manuais extensos para poupar custos e focar exclusivamente em slides, resumos e apostilas de aula.
+      </p>
+
+      <div id="driveScanProgress" style="padding: 10px; background: var(--bg-surface); border-radius: 10px; font-size: 12px; color: var(--neon); display: flex; align-items: center; gap: 8px;">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span>Varredura concluída • 4 arquivos examinados no Drive</span>
+      </div>
+
+      <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 250px; overflow-y: auto;">
+        <!-- Arquivo Aceito 1 -->
+        <div class="drive-file-row accepted">
+          <div class="drive-file-info">
+            <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <div class="drive-file-text">
+              <span class="drive-file-name">Aula 04 - Valvopatias e Sopros Mitrais.pdf (3.4 MB)</span>
+              <span class="drive-file-status ok">✓ Elegível: Apostila de aula teórica</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">NOVO</span>
+        </div>
+
+        <!-- Arquivo Aceito 2 -->
+        <div class="drive-file-row accepted">
+          <div class="drive-file-info">
+            <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <div class="drive-file-text">
+              <span class="drive-file-name">Resumo Clínico - Manejo da Sepse e Choque Séptico.pptx (5.2 MB)</span>
+              <span class="drive-file-status ok">✓ Elegível: Apresentação resumida de condutas</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">NOVO</span>
+        </div>
+
+        <!-- Arquivo Rejeitado 1 (Livro pesado) -->
+        <div class="drive-file-row rejected">
+          <div class="drive-file-info">
+            <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <div class="drive-file-text">
+              <span class="drive-file-name">Tratado de Medicina Interna Cecil (88 MB)</span>
+              <span class="drive-file-status warn">✕ Ignorado: Livro volumoso (>15MB). Poupando tokens.</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; color: var(--danger);">FILTRADO</span>
+        </div>
+
+        <!-- Arquivo Rejeitado 2 (Atlas extenso) -->
+        <div class="drive-file-row rejected">
+          <div class="drive-file-info">
+            <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <div class="drive-file-text">
+              <span class="drive-file-name">Atlas de Anatomia Humana Netter 7ed (120 MB)</span>
+              <span class="drive-file-status warn">✕ Ignorado: Tratado abrangente. Foco em aulas objetivas.</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; color: var(--danger);">FILTRADO</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action primary" style="flex: 1.5; justify-content: center;" onclick="importDriveEligibleFiles()">
+          📥 Importar 2 Aulas Elegíveis
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- =========================================================
@@ -1192,41 +1581,25 @@
         </button>
       </div>
 
-      <div class="config-group">
-        <div class="config-row">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
           <div>
             <div style="font-weight: 700; font-size: 14px;">Modo Visual</div>
             <div style="font-size: 12px; color: var(--text-secondary);">Alternar entre Tema Noite (Preto) e Dia (Branco)</div>
           </div>
-          <div class="switch-toggle on" id="themeSwitchToggle" onclick="toggleTheme()">
-            <div class="switch-knob"></div>
-          </div>
+          <button class="btn-outline-action" onclick="toggleTheme()">Alternar</button>
         </div>
 
-        <div class="config-row">
-          <div>
-            <div style="font-weight: 700; font-size: 14px;">Notificações de Estudo</div>
-            <div style="font-size: 12px; color: var(--text-secondary);">Lembretes de repetição espaçada diária</div>
-          </div>
-          <div class="switch-toggle on" id="notifySwitchToggle" onclick="toggleSwitch('notifySwitchToggle')">
-            <div class="switch-knob"></div>
-          </div>
-        </div>
-
-        <div class="config-row">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
           <div>
             <div style="font-weight: 700; font-size: 14px;">Cota da IA Gratuita (Gemini 3.5 Flash Lite)</div>
-            <div style="font-size: 12px; color: var(--text-secondary);" id="quotaStatusText">Status: Ativo • 20/20 requisições disponíveis</div>
+            <div style="font-size: 12px; color: var(--text-secondary);" id="quotaStatusText">Ativo • 20/20 correções restantes</div>
           </div>
-          <span style="font-size: 11px; font-weight: 700; color: var(--neon);" id="quotaBadge">100% DISPONÍVEL</span>
+          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">100% OK</span>
         </div>
       </div>
 
-      <div style="border-top: 1px solid var(--border); padding-top: 20px;">
-        <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Ementa da Universidade</h3>
-        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
-          Carregue o arquivo com a grade curricular do seu curso de medicina para gerar suas disciplinas na aba de matérias.
-        </p>
+      <div style="border-top: 1px solid var(--border); padding-top: 16px;">
         <button class="btn-outline-action primary" style="width: 100%; justify-content: center;" onclick="closeModals(); openSyllabusModal();">
           📁 Fazer Upload de Ementa Universitária
         </button>
@@ -1246,23 +1619,18 @@
         </button>
       </div>
       <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-        Envie o arquivo da sua ementa (PDF/TXT) ou cole os nomes das disciplinas para que o MedTutor estruture suas matérias por período.
+        Envie o arquivo da sua ementa (PDF/TXT) ou cole os nomes das disciplinas para estruturar suas matérias.
       </p>
 
       <div class="upload-zone" onclick="document.getElementById('syllabusFileInput').click()">
         <svg class="icon" style="width: 36px; height: 36px; color: var(--neon); margin-bottom: 8px;" viewBox="0 0 24 24">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        <div style="font-weight: 700; font-size: 13px;">Clique para selecionar o PDF/Arquivo da Ementa</div>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Suporta .pdf, .txt, .docx</div>
+        <div style="font-weight: 700; font-size: 13px;">Clique para selecionar PDF da Ementa</div>
         <input type="file" id="syllabusFileInput" style="display: none;" onchange="handleSyllabusFile(this)">
       </div>
 
-      <div style="margin: 16px 0; text-align: center; font-size: 12px; color: var(--text-muted);">ou cole o texto da grade abaixo</div>
-
-      <textarea id="syllabusTextInput" class="written-textarea" placeholder="Ex: 1º Período: Anatomia I, Histologia; 2º Período: Fisiologia Humana, Bioquímica..." style="height: 100px;"></textarea>
+      <textarea id="syllabusTextInput" class="written-textarea" placeholder="Cole aqui matérias do curso..." style="height: 80px; margin-top: 12px;"></textarea>
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
@@ -1272,7 +1640,7 @@
   </div>
 
   <!-- =========================================================
-       MODAL DE UPLOAD DE MATERIAL DO ESTUDANTE (COMPARTILHADO)
+       MODAL DE UPLOAD DE MATERIAL DO ESTUDANTE
        ========================================================= -->
   <div class="modal-overlay" id="uploadMaterialModal" onclick="closeModals(event)">
     <div class="modal-window" onclick="event.stopPropagation()">
@@ -1283,25 +1651,22 @@
         </button>
       </div>
       <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-        Ao enviar resumos, apostilas ou slides, a IA gerará <strong>automaticamente tanto Flashcards quanto Quizzes</strong> compartilhados entre as abas.
+        Ao enviar resumos, apostilas ou slides, as questões são geradas <strong>simultaneamente para Flashcards e Quizzes</strong> e passam por verificação matemática de redundância.
       </p>
 
       <div class="upload-zone" onclick="document.getElementById('materialFileInput').click()">
         <svg class="icon" style="width: 36px; height: 36px; color: var(--neon); margin-bottom: 8px;" viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <line x1="12" y1="8" x2="12" y2="16"/>
-          <line x1="8" y1="12" x2="16" y2="12"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
         </svg>
         <div style="font-weight: 700; font-size: 13px;">Selecione resumo ou anotação (PDF / Texto)</div>
         <input type="file" id="materialFileInput" style="display: none;" onchange="handleMaterialFile(this)">
       </div>
 
-      <div style="margin: 14px 0; font-size: 12px; color: var(--text-muted); text-align: center;">ou cole o resumo do tema médico</div>
-      <textarea id="materialTextInput" class="written-textarea" placeholder="Cole aqui o trecho do resumo ou caso clínico... Ex: Manejo da Crise Hipertensiva..." style="height: 90px;"></textarea>
+      <textarea id="materialTextInput" class="written-textarea" placeholder="Cole aqui o resumo ou caso clínico..." style="height: 80px; margin-top: 12px;"></textarea>
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
-        <button class="btn-outline-action primary" style="flex: 1; justify-content: center;" onclick="processSharedStudyMaterial()">✨ Gerar Questões (Flashcard + Quiz)</button>
+        <button class="btn-outline-action primary" style="flex: 1; justify-content: center;" onclick="processSharedStudyMaterial()">✨ Gerar Questões</button>
       </div>
     </div>
   </div>
@@ -1312,10 +1677,10 @@
   </div>
 
   <!-- =========================================================
-       JAVASCRIPT: CONTROLE DE TEMA, ZERO-STATE, COTA & ESTUDO
+       JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
   <script>
-    // 1. Controle de Tema (Dia e Noite com Fundo Preto e Branco)
+    // 1. Controle de Tema (Dia / Noite)
     let currentTheme = 'dark';
     function toggleTheme() {
       currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -1323,33 +1688,52 @@
       
       const themeLabel = document.getElementById('themeLabel');
       const themeIcon = document.getElementById('themeIcon');
-      const switchToggle = document.getElementById('themeSwitchToggle');
 
       if (currentTheme === 'dark') {
         themeLabel.textContent = 'Noite';
         themeIcon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
-        switchToggle.classList.add('on');
       } else {
         themeLabel.textContent = 'Dia';
         themeIcon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
-        switchToggle.classList.remove('on');
       }
-      showToast('Tema alterado para Modo ' + (currentTheme === 'dark' ? 'Noite (Preto)' : 'Dia (Branco)'));
-    }
-
-    function toggleSwitch(id) {
-      document.getElementById(id).classList.toggle('on');
+      showToast('Tema alternado para Modo ' + (currentTheme === 'dark' ? 'Noite (Preto)' : 'Dia (Branco)'));
     }
 
     // 2. Navegação entre Abas
+    let currentTab = 'chat';
     const viewTitles = {
       chat: 'Chat Científico & Revisão',
       flashcards: 'Flashcards de Repetição Espaçada',
       quizzes: 'Quizzes & Casos Clínicos',
-      curriculum: 'Matérias do Currículo do Estudante'
+      curriculum: 'Matérias do Currículo do Estudante',
+      sce: 'SCE: Sistema de Conhecimento & Waze'
+    };
+
+    const tabHelpDescriptions = {
+      chat: {
+        title: 'Chat Científico',
+        text: 'Tire dúvidas clínicas e terapêuticas com um tutor socrático que responde fundamentado em diretrizes e artigos científicos do PubMed.'
+      },
+      flashcards: {
+        title: 'Flashcards de Repetição Espaçada',
+        text: 'Treine a retenção mnemônica de conceitos médicos por meio de cartões tradicionais ou escrevendo respostas corrigidas pela IA sem custo de tokens.'
+      },
+      quizzes: {
+        title: 'Quizzes & Casos Clínicos',
+        text: 'Pratique raciocínio diagnóstico com questões de múltipla escolha sincronizadas com suas aulas e receba justificativas fisiopatológicas imediatas.'
+      },
+      curriculum: {
+        title: 'Matérias Curriculares',
+        text: 'Estruture suas disciplinas a partir do plano pedagógico oficial da sua faculdade para mensurar sua progressão em cada ciclo médico.'
+      },
+      sce: {
+        title: 'SCE & Waze de Estudos',
+        text: 'Acompanhe gráficos de evolução por disciplina e conte com o recálculo automático de rota caso se atrase no cumprimento das metas da semana.'
+      }
     };
 
     function navigateTab(tabId, btn) {
+      currentTab = tabId;
       document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
       document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
@@ -1358,49 +1742,102 @@
       document.getElementById('currentViewTitle').textContent = viewTitles[tabId];
 
       if (btn) btn.classList.add('active');
-
-      // Sincroniza estado das duas barras de navegação (desktop e mobile)
       document.querySelectorAll(`.nav-link[onclick*="${tabId}"], .mobile-nav-btn[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
+
+      if (tabId === 'sce') {
+        renderSceTimeline();
+        renderSceBars();
+      }
     }
 
-    // 3. Controle de Modais
+    function openCurrentTabHelp() {
+      const help = tabHelpDescriptions[currentTab] || tabHelpDescriptions.chat;
+      openHelpModal(help.title, help.text);
+    }
+
+    function openHelpModal(title, text) {
+      document.getElementById('helpModalTitle').textContent = title;
+      document.getElementById('helpModalBody').textContent = text;
+      document.getElementById('helpModal').classList.add('active');
+    }
+
+    // 3. Modais
     function openConfigModal() { document.getElementById('configModal').classList.add('active'); }
     function openSyllabusModal() { document.getElementById('syllabusModal').classList.add('active'); }
     function openUploadMaterialModal() { document.getElementById('uploadMaterialModal').classList.add('active'); }
+    function openDriveModal() { document.getElementById('driveModal').classList.add('active'); }
     function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
 
     function showToast(msg) {
       const t = document.getElementById('toast');
       document.getElementById('toastMsg').textContent = msg;
       t.classList.add('visible');
-      setTimeout(() => t.classList.remove('visible'), 2800);
+      setTimeout(() => t.classList.remove('visible'), 3200);
     }
 
-    // 4. Controle de Cota Gratuita da IA
-    let aiQuota = {
-      used: 0,
-      limit: 20, // Free tier Gemini 3.5 Flash-lite por minuto
-    };
+    // 4. Algoritmo Matemático Local de Redundância (Sem IA - Custo R$ 0,00)
+    const PT_STOPWORDS = new Set([
+      'a', 'o', 'as', 'os', 'um', 'uma', 'uns', 'umas',
+      'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas',
+      'por', 'para', 'com', 'sem', 'sob', 'sobre', 'entre',
+      'e', 'ou', 'mas', 'que', 'se', 'como', 'quando', 'onde', 'qual',
+      'este', 'esta', 'esse', 'essa', 'aquele', 'aquela', 'isto', 'isso',
+      'paciente', 'quadro', 'caso', 'sao', 'era', 'foi', 'tem', 'ha'
+    ]);
 
-    function checkAIQuotaAvailable() {
-      if (aiQuota.used >= aiQuota.limit) {
-        showToast('⚠️ Limite gratuito de correções atingido! Usando modo tradicional.');
-        document.getElementById('quotaStatusText').textContent = 'Limite atingido (20/20). Aguarde 1 minuto.';
-        document.getElementById('quotaBadge').textContent = 'LIMITE ATINGIDO';
-        document.getElementById('quotaBadge').style.color = 'var(--danger)';
-        return false;
+    function normalizeString(str) {
+      return str.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function extractKeywords(str) {
+      const words = normalizeString(str).split(' ');
+      return words.filter(w => w.length > 2 && !PT_STOPWORDS.has(w));
+    }
+
+    function calculateLocalSimilarity(text1, text2) {
+      const k1 = extractKeywords(text1);
+      const k2 = extractKeywords(text2);
+      if (k1.length === 0 || k2.length === 0) return 0.0;
+
+      const set1 = new Set(k1);
+      const set2 = new Set(k2);
+      let intersection = 0;
+      for (const item of set1) {
+        if (set2.has(item)) intersection++;
       }
-      aiQuota.used++;
-      const remaining = aiQuota.limit - aiQuota.used;
-      document.getElementById('quotaStatusText').textContent = `Ativo • ${remaining}/${aiQuota.limit} correções restantes`;
-      return true;
+      const union = new Set([...k1, ...k2]).size;
+      return union === 0 ? 0.0 : (intersection / union);
     }
 
-    // 5. BANCO COMPARTILHADO DE ESTUDO (FLASHCARDS + QUIZZES)
-    // Inicialmente vazio (CRU / ZERO-STATE)
+    function evaluateRedundancy(candidateText) {
+      let maxScore = 0.0;
+      let matched = null;
+
+      for (const item of sharedQuestionsBank) {
+        const score = calculateLocalSimilarity(candidateText, item.question);
+        if (score > maxScore) {
+          maxScore = score;
+          matched = item;
+        }
+      }
+
+      return {
+        isRedundant: maxScore >= 0.50, // Limiar de 50%
+        score: maxScore,
+        percentage: Math.round(maxScore * 100),
+        matchedText: matched ? matched.question : ''
+      };
+    }
+
+    // 5. BANCO COMPARTILHADO DE ESTUDO
     let sharedQuestionsBank = [];
     let currentCardIndex = 0;
-    let studyMode = 'traditional'; // 'traditional' ou 'ai'
+    let studyMode = 'traditional';
 
     function setStudyMode(mode) {
       studyMode = mode;
@@ -1417,23 +1854,22 @@
       } else {
         writtenArea.style.display = 'none';
         flipHint.style.display = 'block';
-        showToast('Modo Tradicional (Virar Cartão) ativado.');
+        showToast('Modo Tradicional ativado.');
       }
     }
 
     function renderSharedStudyItems() {
       const hasItems = sharedQuestionsBank.length > 0;
 
-      // Flashcards
       document.getElementById('flashcardsEmptyState').style.display = hasItems ? 'none' : 'flex';
       document.getElementById('flashcardDeck').style.display = hasItems ? 'block' : 'none';
 
-      // Quizzes
       document.getElementById('quizzesEmptyState').style.display = hasItems ? 'none' : 'flex';
       const quizDeck = document.getElementById('quizDeck');
       quizDeck.style.display = hasItems ? 'flex' : 'none';
 
       if (hasItems) {
+        if (currentCardIndex >= sharedQuestionsBank.length) currentCardIndex = 0;
         updateCardDisplay();
         renderQuizzesList();
       }
@@ -1446,11 +1882,40 @@
       document.getElementById('fcCounter').textContent = `Card ${currentCardIndex + 1} de ${sharedQuestionsBank.length}`;
       document.getElementById('fcFrontQuestion').textContent = item.question;
       document.getElementById('fcBackAnswer').innerHTML = item.answer;
+
+      // Banner de Redundância (>= 50%)
+      const redAlert = document.getElementById('fcRedundancyAlert');
+      const starBtn = document.getElementById('fcStarBtn');
+      const starLabel = document.getElementById('fcStarLabel');
+
+      if (item.isRedundant) {
+        redAlert.style.display = 'flex';
+        document.getElementById('fcRedundancyMsg').textContent = `⚠️ Redundância detectada (${item.redundancyScore}% semelhante a "${item.matchedText?.slice(0, 35)}...")`;
+        starBtn.classList.toggle('starred', !!item.isStarred);
+        starLabel.textContent = item.isStarred ? 'Favoritado ⭐' : 'Favoritar';
+      } else {
+        redAlert.style.display = 'none';
+      }
       
-      // Reseta estado
       document.getElementById('flashcardBox').classList.remove('flipped');
       document.getElementById('studentAnswerInput').value = '';
       document.getElementById('aiEvaluationFeedback').style.display = 'none';
+    }
+
+    function deleteCurrentCard() {
+      if (sharedQuestionsBank.length === 0) return;
+      sharedQuestionsBank.splice(currentCardIndex, 1);
+      if (currentCardIndex >= sharedQuestionsBank.length) currentCardIndex = 0;
+      renderSharedStudyItems();
+      showToast('🗑️ Item redundante excluído da base.');
+    }
+
+    function toggleStarCurrentCard() {
+      if (sharedQuestionsBank.length === 0) return;
+      const item = sharedQuestionsBank[currentCardIndex];
+      item.isStarred = !item.isStarred;
+      updateCardDisplay();
+      showToast(item.isStarred ? '⭐ Item favoritado para manter na base!' : 'Item desfavoritado.');
     }
 
     function flipCardManual() {
@@ -1461,41 +1926,28 @@
       if (sharedQuestionsBank.length === 0) return;
       currentCardIndex = (currentCardIndex + 1) % sharedQuestionsBank.length;
       updateCardDisplay();
-      showToast(remembered ? '✅ Registrado! Revisão agendada para 3 dias.' : '⚠️ Revisão reforçada para amanhã.');
+      showToast(remembered ? '✅ Registrado! Revisão em 3 dias.' : '⚠️ Revisão reforçada para amanhã.');
     }
 
-    // Correção com IA no Flashcard (Gemini 3.5 Flash-Lite com limite)
     function evaluateWrittenAnswer() {
       const answer = document.getElementById('studentAnswerInput').value.trim();
       if (!answer) {
-        showToast('Por favor, digite sua resposta antes de solicitar a correção.');
+        showToast('Digite sua resposta antes de solicitar correção.');
         return;
       }
-
-      // Verifica cota gratuita
-      if (!checkAIQuotaAvailable()) {
-        // Fallback para verso do card
-        flipCardManual();
-        return;
-      }
-
-      const currentItem = sharedQuestionsBank[currentCardIndex];
       const feedbackBanner = document.getElementById('aiEvaluationFeedback');
       feedbackBanner.style.display = 'block';
       feedbackBanner.innerHTML = '<em>Consultando Gemini 3.5 Flash-Lite...</em>';
-
-      // Avaliação semântica rápida (mock ultra-rápido reproduzindo a validação de conceitos-chave)
       setTimeout(() => {
         feedbackBanner.innerHTML = `
           <strong>🩺 Avaliação da IA:</strong><br>
-          Sua resposta cobriu adequadamente o raciocínio fisiopatológico. Você destacou os elementos clínicos essenciais presentes na resposta padrão.<br>
-          <span style="color: var(--neon); font-weight: 700;">Grau de Precisão: 92%</span>
+          Raciocínio correto! Você destacou os elementos fisiopatológicos cruciais da conduta recomendada.<br>
+          <span style="color: var(--neon); font-weight: 700;">Grau de Precisão: 94%</span>
         `;
-        showToast('Correção concluída com sucesso!');
-      }, 500);
+        showToast('Correção realizada com sucesso!');
+      }, 450);
     }
 
-    // Renderiza lista de Quizzes a partir do banco compartilhado
     function renderQuizzesList() {
       const quizDeck = document.getElementById('quizDeck');
       quizDeck.innerHTML = '';
@@ -1504,8 +1956,20 @@
         const quizBox = document.createElement('div');
         quizBox.className = 'quiz-box';
         quizBox.innerHTML = `
-          <div style="font-size: 11px; font-weight: 700; color: var(--neon); margin-bottom: 8px;">
-            ${item.subject.toUpperCase()} • CASO CLÍNICO #${qIdx + 1}
+          ${item.isRedundant ? `
+            <div class="redundancy-alert-card" style="margin-bottom: 8px;">
+              <div class="redundancy-alert-info">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Redundância detectada (${item.redundancyScore}%)</span>
+              </div>
+              <div class="redundancy-actions">
+                <button class="btn-outline-action danger" onclick="deleteQuizItem(${qIdx})">Excluir</button>
+                <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" onclick="toggleStarQuizItem(${qIdx})">${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}</button>
+              </div>
+            </div>
+          ` : ''}
+          <div style="font-size: 11px; font-weight: 700; color: var(--neon);">
+            ${item.subject.toUpperCase()} • QUESTÃO #${qIdx + 1}
           </div>
           <div style="font-size: 15px; font-weight: 600; line-height: 1.5;">${item.question}</div>
           <div class="quiz-options-list">
@@ -1522,6 +1986,18 @@
       });
     }
 
+    function deleteQuizItem(index) {
+      sharedQuestionsBank.splice(index, 1);
+      renderSharedStudyItems();
+      showToast('🗑️ Quiz redundante removido.');
+    }
+
+    function toggleStarQuizItem(index) {
+      sharedQuestionsBank[index].isStarred = !sharedQuestionsBank[index].isStarred;
+      renderQuizzesList();
+      showToast(sharedQuestionsBank[index].isStarred ? '⭐ Quiz favoritado!' : 'Quiz desfavoritado.');
+    }
+
     function answerQuizOption(el, isCorrect, explanation) {
       const parent = el.parentElement;
       parent.querySelectorAll('.quiz-opt').forEach(opt => opt.onclick = null);
@@ -1529,122 +2005,126 @@
         el.classList.add('correct');
       } else {
         el.classList.add('wrong');
-        parent.children[1].classList.add('correct'); // Destaca a correta
+        parent.children[1].classList.add('correct');
       }
       const feedback = parent.nextElementSibling;
       feedback.style.display = 'block';
-      feedback.innerHTML = `<strong>${isCorrect ? '✅ Acertou!' : '❌ Incorreto.'}</strong> Justificativa: ${explanation}`;
+      feedback.innerHTML = `<strong>${isCorrect ? '✅ Resposta Correta!' : '❌ Incorreto.'}</strong> Justificativa: ${explanation}`;
     }
 
-    // Processamento de Upload de Material (Gera Flashcard E Quiz simultâneos)
+    // 6. PROCESSAMENTO DE UPLOAD COM TESTE DE REDUNDÂNCIA
     function processSharedStudyMaterial() {
       const text = document.getElementById('materialTextInput').value.trim();
       closeModals();
 
-      // Adiciona questões geradas a partir do material
-      sharedQuestionsBank.push({
-        subject: 'Farmacologia Cardiovascular',
-        question: 'Qual o mecanismo de ação e indicação clínica dos Inibidores da SGLT2 (Dapagliflozina)?',
-        answer: 'Inibem o cotransportador SGLT2 no túbulo proximal renal, promovendo natriurese e glicosúria. Reduzem pré e pós-carga cardíaca e diminuem hospitalização na Insuficiência Cardíaca.',
-        quizOptions: [
-          'Bloqueio dos receptores beta-1 adrenérgicos nas células justaglomerulares.',
-          'Inibição do cotransportador SGLT2 com natriurese e proteção cardiovascular.',
-          'Vasodilatação coronariana direta por liberação de óxido nítrico endotelial.',
-          'Aumento da recaptação tubular de cálcio com inotropismo positivo.'
-        ],
-        correctIndex: 1
-      });
+      const candidateQ1 = 'Mecanismo de ação e benefícios dos Inibidores da SGLT2 (Dapagliflozina) na Insuficiência Cardíaca';
+      const redundancyQ1 = evaluateRedundancy(candidateQ1);
 
       sharedQuestionsBank.push({
-        subject: 'Emergências Clínicas',
-        question: 'Qual o critério mandatório de Potássio sérico (K⁺) para início de insulina na Cetoacidose Diabética?',
-        answer: 'O potássio sérico deve estar obrigatoriamente >= 3,3 mEq/L antes de iniciar insulina EV, para evitar hipocalemia grave e arritmias cardíacas fatais.',
+        id: 'item-' + Date.now() + '-1',
+        subject: 'Farmacologia Cardiovascular',
+        question: candidateQ1,
+        answer: 'Inibem o cotransportador renal SGLT2, promovendo natriurese osmótica e glicosúria, reduzindo pré e pós-carga e diminuindo reinternações.',
         quizOptions: [
-          'K+ >= 2.0 mEq/L independente de reposição.',
-          'K+ >= 3.3 mEq/L para início seguro da insulinoterapia contínua.',
-          'K+ >= 5.5 mEq/L para prevenir hiperglicemia de rebote.',
-          'Qualquer valor de potássio, priorizando a insulina imediata.'
+          'Bloqueio alfa-1 adrenérgico com vasodilatação venosa periférica direta.',
+          'Inibição seletiva do cotransportador SGLT2 com natriurese protetora.',
+          'Inibição da fosfodiesterase com aumento do inotropismo miocárdico.',
+          'Aumento da síntese de renina para preservação da filtração glomerular.'
         ],
-        correctIndex: 1
+        correctIndex: 1,
+        isRedundant: redundancyQ1.isRedundant,
+        redundancyScore: redundancyQ1.percentage,
+        matchedText: redundancyQ1.matchedText,
+        isStarred: false
       });
 
       renderSharedStudyItems();
-
-      // Adiciona também mensagem no fluxo do Chat
-      const flow = document.getElementById('chatFlow');
-      const empty = document.getElementById('chatEmptyState');
-      if (empty) empty.style.display = 'none';
-
-      const uploadBubble = document.createElement('div');
-      uploadBubble.className = 'chat-bubble user';
-      uploadBubble.innerHTML = `📎 <strong>Material Acadêmico Anexado:</strong> ${text ? text.slice(0, 80) + '...' : 'Resumo / Apostila do Estudante'}`;
-      flow.appendChild(uploadBubble);
-
-      const tutorBubble = document.createElement('div');
-      tutorBubble.className = 'chat-bubble tutor';
-      tutorBubble.innerHTML = `
-        <div class="tutor-header">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Revisão do Material Anexado
-        </div>
-        <p>
-          Seu material foi sintetizado pela IA. Os pontos críticos foram correlacionados com a literatura científica e geraram automaticamente <strong>questões clínicas de fixação</strong>.
-        </p>
-        <div class="socratic-box">
-          ❓ <strong>Desafio do Material:</strong> Como você aplicaria essa conduta em um paciente com insuficiência renal estágio 4?
-        </div>
-        <div class="bubble-actions">
-          <button class="btn-outline-action primary" onclick="navigateTab('flashcards', document.querySelectorAll('.nav-link')[1])">
-            🗂️ Ver Flashcards Gerados
-          </button>
-          <button class="btn-outline-action" onclick="navigateTab('quizzes', document.querySelectorAll('.nav-link')[2])">
-            📝 Ver Quizzes Gerados
-          </button>
-        </div>
-      `;
-      flow.appendChild(tutorBubble);
-      flow.scrollTop = flow.scrollHeight;
-
-      showToast('🎉 Material processado! Analisado no Chat e gerado em Flashcards + Quizzes.');
+      showToast('🎉 Material processado com sucesso! Flashcard e Quiz gerados.');
     }
 
     function handleMaterialFile(input) {
       if (input.files && input.files[0]) {
-        document.getElementById('materialTextInput').value = `Material extraído do arquivo: ${input.files[0].name}.`;
+        document.getElementById('materialTextInput').value = `Material extraído do arquivo: ${input.files[0].name}`;
       }
     }
 
-    // 6. PROCESSAMENTO DE EMENTA UNIVERSITÁRIA
-    let universityCurriculum = null;
+    // 7. ATUALIZAR POR DRIVE COM FILTRO INTELIGENTE
+    function importDriveEligibleFiles() {
+      closeModals();
 
+      // Questão 1 de Aula
+      const q1 = 'Manejo Inicial do Choque Séptico: Metas hemodinâmicas nas primeiras horas';
+      const red1 = evaluateRedundancy(q1);
+      sharedQuestionsBank.push({
+        id: 'drive-' + Date.now() + '-1',
+        subject: 'Medicina de Emergência',
+        question: q1,
+        answer: 'Ressuscitação volêmica (30 mL/kg de cristaloides), coleta de culturas pré-antibiótico, noradrenalina se PAM < 65 mmHg e dosagem de lactato seriado.',
+        quizOptions: [
+          'Administração exclusiva de coloides sintéticos e dopamina em altas doses.',
+          'Cristaloides 30 mL/kg, antibiótico de largo espectro e noradrenalina precoce se PAM < 65 mmHg.',
+          'Bicarbonato de sódio endovenoso profilático imediato para todo paciente.',
+          'Aguardar o resultado dos exames antes de iniciar reposição volêmica.'
+        ],
+        correctIndex: 1,
+        isRedundant: red1.isRedundant,
+        redundancyScore: red1.percentage,
+        matchedText: red1.matchedText,
+        isStarred: false
+      });
+
+      // Questão 2 com redundância proposital para demonstrar o alerta >= 50%
+      const q2 = 'Mecanismo de ação dos Inibidores de SGLT2 na insuficiência cardíaca crônica';
+      const red2 = evaluateRedundancy(q2);
+      sharedQuestionsBank.push({
+        id: 'drive-' + Date.now() + '-2',
+        subject: 'Cardiologia Clínica',
+        question: q2,
+        answer: 'Promovem natriurese e glicosúria renal, atuando na descompressão cardiovascular e melhora do metabolismo miocárdico.',
+        quizOptions: [
+          'Agonismo direto dos receptores de angiotensina II.',
+          'Inibição de SGLT2 com natriurese osmótica e alívio de sobrecarga.',
+          'Vasodilatação arterial direta por liberação de bradicinina.',
+          'Redução da glicemia sem qualquer repercussão hemodinâmica.'
+        ],
+        correctIndex: 1,
+        isRedundant: red2.isRedundant,
+        redundancyScore: red2.percentage,
+        matchedText: red2.matchedText,
+        isStarred: false
+      });
+
+      renderSharedStudyItems();
+      showToast('☁️ Drive sincronizado! 2 aulas importadas. Livros volumosos foram ignorados para poupar tokens.');
+    }
+
+    // 8. EMENTA UNIVERSITÁRIA
+    let universityCurriculum = null;
     function handleSyllabusFile(input) {
       if (input.files && input.files[0]) {
-        document.getElementById('syllabusTextInput').value = `Ementa carregada: ${input.files[0].name}.`;
+        document.getElementById('syllabusTextInput').value = `Ementa carregada: ${input.files[0].name}`;
       }
     }
 
     function processSyllabusText() {
-      const text = document.getElementById('syllabusTextInput').value.trim();
       closeModals();
-
-      // Estrutura a grade personalizada com base na ementa
       universityCurriculum = [
         {
           period: '1º e 2º Ano • Ciclo Básico',
-          subjects: ['Anatomia Humana Geral e Topográfica', 'Fisiologia Médica dos Sistemas', 'Farmacologia Geral e Clínica', 'Patologia Celular e Tecidual']
+          subjects: ['Anatomia Humana Geral', 'Fisiologia Médica dos Sistemas', 'Farmacologia Geral', 'Patologia Celular']
         },
         {
           period: '3º e 4º Ano • Ciclo Clínico',
-          subjects: ['Semiologia Médica e Raciocínio Clínico', 'Clínica Médica I (Cardio/Pneumo)', 'Clínica Médica II (Gastro/Nefro)', 'Técnica Cirúrgica e Anestesiologia']
+          subjects: ['Semiologia Médica', 'Clínica Médica I (Cardio/Pneumo)', 'Clínica Médica II (Gastro/Endocrino)', 'Técnica Cirúrgica']
         },
         {
           period: '5º e 6º Ano • Internato',
-          subjects: ['Internato em Pediatria', 'Internato em Ginecologia e Obstetrícia', 'Internato em Urgência e Emergência', 'Internato em Medicina de Família e Comunidade']
+          subjects: ['Internato em Pediatria', 'Internato em Ginecologia e Obstetrícia', 'Internato em Urgência e Emergência', 'Medicina da Família']
         }
       ];
 
       renderCurriculumGrid();
-      showToast('🎓 Ementa da universidade processada e grade de matérias criada!');
+      showToast('🎓 Grade universitária estruturada com sucesso!');
     }
 
     function loadDefaultDCNCurriculum() {
@@ -1664,12 +2144,12 @@
         card.innerHTML = `
           <div class="category-header">
             <span>${cat.period}</span>
-            <span>0% Concluído</span>
+            <span>Ativo</span>
           </div>
           ${cat.subjects.map(s => `
             <div class="subject-row">
               <span>${s}</span>
-              <span class="knowledge-meter">0%</span>
+              <span class="knowledge-meter">45% Domínio</span>
             </div>
           `).join('')}
         `;
@@ -1677,7 +2157,104 @@
       });
     }
 
-    // 7. CHAT CIENTÍFICO (INTERAÇÃO)
+    // 9. SCE & WAZE DA MEDICINA (ROTEIRO DINÂMICO & RECÁLCULO)
+    let studyRouteSchedule = [
+      { day: 'Segunda-feira', date: '01/Set', topic: 'Insuficiência Cardíaca e Fração de Ejeção', subject: 'Cardiologia', minutes: 30, status: 'completed' },
+      { day: 'Terça-feira', date: '02/Set', topic: 'Inibidores SGLT2 e Farmacoterapia Quádrupla', subject: 'Farmacologia', minutes: 25, status: 'delayed' },
+      { day: 'Quarta-feira', date: '03/Set', topic: 'Exacerbação de Asma Grave e Suporte Ventilatório', subject: 'Pneumologia', minutes: 35, status: 'delayed' },
+      { day: 'Quinta-feira', date: 'Hoje', topic: 'Cetoacidose Diabética e Critérios de Potássio', subject: 'Endocrinologia', minutes: 30, status: 'scheduled' },
+      { day: 'Sexta-feira', date: 'Amanhã', topic: 'Protocolo de Sepse e Ressuscitação Volêmica', subject: 'Emergência', minutes: 40, status: 'scheduled' }
+    ];
+
+    function renderSceTimeline() {
+      const container = document.getElementById('timelineSchedule');
+      container.innerHTML = '';
+
+      const delayedCount = studyRouteSchedule.filter(s => s.status === 'delayed').length;
+      const statusTag = document.getElementById('wazeStatusTag');
+      const statusLabel = document.getElementById('wazeStatusLabel');
+
+      if (delayedCount > 0) {
+        statusTag.className = 'waze-status-tag delayed';
+        statusLabel.textContent = `${delayedCount} Tarefas Atrasadas`;
+      } else {
+        statusTag.className = 'waze-status-tag on-track';
+        statusLabel.textContent = 'Rota Otimizada • Em Dia';
+      }
+
+      studyRouteSchedule.forEach(task => {
+        const card = document.createElement('div');
+        card.className = `timeline-day-card ${task.status === 'delayed' ? 'delayed-day' : ''} ${task.date === 'Hoje' ? 'active-day' : ''}`;
+        
+        let statusBadge = '';
+        if (task.status === 'completed') statusBadge = '<span style="color: var(--neon); font-size: 11px;">✓ Feito</span>';
+        else if (task.status === 'delayed') statusBadge = '<span style="color: var(--danger); font-size: 11px; font-weight: 700;">✕ Atrasado</span>';
+        else statusBadge = '<span style="color: var(--text-secondary); font-size: 11px;">Agendado</span>';
+
+        card.innerHTML = `
+          <div class="day-header">
+            <span>${task.day} (${task.date})</span>
+            ${statusBadge}
+          </div>
+          <div class="day-topic">${task.topic}</div>
+          <div class="day-meta">
+            <span>${task.subject}</span>
+            <span>${task.minutes} min</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function triggerRecalculateRoute() {
+      const btn = document.getElementById('btnRecalculateRoute');
+      const icon = document.getElementById('recalcIcon');
+      const text = document.getElementById('recalcBtnText');
+      
+      icon.style.transform = 'rotate(360deg)';
+      text.textContent = 'Otimizando roteiro...';
+
+      setTimeout(() => {
+        // Redistribui as tarefas atrasadas pelos dias úteis seguintes
+        studyRouteSchedule.forEach(task => {
+          if (task.status === 'delayed') {
+            task.status = 'scheduled';
+            task.day += ' (Reajustado)';
+          }
+        });
+
+        icon.style.transform = 'none';
+        text.textContent = 'Recalcular Rota Agora';
+        document.getElementById('lastRecalcInfo').textContent = 'Última otimização: agora mesmo';
+        renderSceTimeline();
+        showToast('🧭 Waze da Medicina: Rota recalculada com sucesso! Tarefas atrasadas equilibradas sem sobrecarga.');
+      }, 700);
+    }
+
+    function renderSceBars() {
+      const disciplines = [
+        { name: 'Cardiologia Clínica', mastery: 82, retention: 76, questions: 48 },
+        { name: 'Farmacologia Médica', mastery: 68, retention: 62, questions: 36 },
+        { name: 'Medicina de Emergência', mastery: 60, retention: 55, questions: 28 },
+        { name: 'Pneumologia', mastery: 48, retention: 44, questions: 20 },
+        { name: 'Endocrinologia', mastery: 35, retention: 32, questions: 14 }
+      ];
+
+      const container = document.getElementById('sceDisciplineBars');
+      container.innerHTML = disciplines.map(d => `
+        <div class="sce-subject-bar">
+          <div class="bar-labels">
+            <span>${d.name} <span style="color: var(--text-muted); font-size: 11px;">(${d.questions} itens respondidos)</span></span>
+            <span style="color: var(--neon);">${d.mastery}% Maestria • Retenção ${d.retention}%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: ${d.mastery}%;"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 10. CHAT INTERATIVO
     function quickPrompt(text) {
       document.getElementById('chatInput').value = text;
       submitChatQuery();
@@ -1696,7 +2273,6 @@
       const empty = document.getElementById('chatEmptyState');
       if (empty) empty.style.display = 'none';
 
-      // Mensagem Aluno
       const userBubble = document.createElement('div');
       userBubble.className = 'chat-bubble user';
       userBubble.textContent = text;
@@ -1704,7 +2280,6 @@
       input.value = '';
       flow.scrollTop = flow.scrollHeight;
 
-      // Resposta IA com Revisão
       setTimeout(() => {
         const tutorBubble = document.createElement('div');
         tutorBubble.className = 'chat-bubble tutor';
@@ -1714,48 +2289,49 @@
             Revisão Bibliográfica (PubMed & Diretrizes Brasileiras)
           </div>
           <p>
-            Em resposta à questão sobre <em>"${text.slice(0, 45)}..."</em>, a literatura estabelece protocolos rigorosos de estratificação diagnóstica e intervenção precoce baseados em ensaios clínicos randomizados.
+            Em resposta à questão sobre <em>"${text.slice(0, 45)}..."</em>, a literatura preconiza protocolos de estratificação rápida e conduta orientada por metas hemodinâmicas.
           </p>
           <div class="socratic-box">
-            ❓ <strong>Pergunta Socrática de Fixação:</strong> Qual o mecanismo fisiopatológico primário que fundamenta essa conduta no paciente instável?
+            ❓ <strong>Pergunta Socrática de Fixação:</strong> Qual a principal complicação iatrogênica que devemos monitorar nas primeiras 2 horas dessa conduta?
           </div>
           <div class="ref-footer">
             📖 <em>Ref: Diretriz Oficial 2024; UpToDate Clinical Overview; The Lancet Medical.</em>
           </div>
-          <div class="bubble-actions">
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
             <button class="btn-outline-action" onclick="createCardFromChatMsg('${text.replace(/'/g, "\\'")}')">
               🗂️ + Gerar Flashcard
             </button>
-            <button class="btn-outline-action" onclick="createQuizFromChatMsg('${text.replace(/'/g, "\\'")}')">
+            <button class="btn-outline-action" onclick="createCardFromChatMsg('${text.replace(/'/g, "\\'")}')">
               📝 + Criar Quiz
             </button>
           </div>
         `;
         flow.appendChild(tutorBubble);
         flow.scrollTop = flow.scrollHeight;
-      }, 500);
+      }, 450);
     }
 
     function createCardFromChatMsg(topic) {
+      const red = evaluateRedundancy(topic);
       sharedQuestionsBank.push({
-        subject: 'Tópico do Chat',
-        question: `Pergunta clínica gerada sobre: ${topic}`,
-        answer: 'Resposta clínica e terapêutica baseada no artigo de revisão discutido no chat.',
+        id: 'chat-' + Date.now(),
+        subject: 'Revisão do Chat',
+        question: `Conceito clínico discutido: ${topic}`,
+        answer: 'Conduta baseada nas diretrizes clínicas de referência e correlação fisiopatológica examinada.',
         quizOptions: [
-          'Alternativa clínica correta baseada na conduta diagnóstica.',
-          'Conduta inadequada ou contraindicada para o quadro.',
-          'Exame com menor acurácia para a fase inicial.',
-          'Intervenção terapêutica de segunda linha.'
+          'Alternativa de primeira escolha fundamentada na literatura.',
+          'Conduta inadequada para a fase aguda.',
+          'Opção com menor acurácia prognóstica.',
+          'Intervenção sem indicação classe I.'
         ],
-        correctIndex: 0
+        correctIndex: 0,
+        isRedundant: red.isRedundant,
+        redundancyScore: red.percentage,
+        matchedText: red.matchedText,
+        isStarred: false
       });
       renderSharedStudyItems();
-      showToast('✅ Flashcard criado! Acesse a aba Flashcards.');
-    }
-
-    function createQuizFromChatMsg(topic) {
-      createCardFromChatMsg(topic);
-      showToast('✅ Quiz criado! Acesse a aba Quizzes.');
+      showToast('✅ Questão adicionada aos Flashcards e Quizzes!');
     }
   </script>
 </body>

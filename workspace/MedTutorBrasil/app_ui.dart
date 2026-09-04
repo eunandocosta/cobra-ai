@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services.dart';
 
 void main() {
   runApp(const MedTutorBrasilApp());
@@ -80,26 +81,106 @@ class MainAdaptiveScaffold extends StatefulWidget {
 class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
   int _selectedIndex = 0;
 
-  // Banco Unificado de Estudo (Começa vazio / Zero-State)
-  final List<Map<String, dynamic>> _sharedItems = [];
+  // Banco Unificado de Estudo com suporte a detecção de redundância e estrelas
+  final List<SharedStudyItem> _sharedItems = [];
 
   // Grade Curricular (Começa vazia até upload da ementa)
-  final List<Map<String, dynamic>> _curriculumSubjects = [];
+  final List<UniversitySubject> _curriculumSubjects = [];
+
+  // Roteiro Adaptativo de Estudos ("Waze da Medicina")
+  late AdaptiveStudyRoute _adaptiveRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSampleRoute();
+  }
+
+  void _initSampleRoute() {
+    final now = DateTime.now();
+    _adaptiveRoute = AdaptiveStudyRoute(tasks: [
+      AdaptiveStudyTask(
+        id: 't-1',
+        subjectName: 'Cardiologia',
+        topic: 'Insuficiência Cardíaca com Fração de Ejeção Reduzida',
+        targetMinutes: 30,
+        scheduledDate: now.subtract(const Duration(days: 1)),
+        isDelayed: true,
+      ),
+      AdaptiveStudyTask(
+        id: 't-2',
+        subjectName: 'Farmacologia',
+        topic: 'Inibidores de SGLT2 e Antagonistas dos Receptores de Mineralocorticoides',
+        targetMinutes: 25,
+        scheduledDate: now,
+      ),
+      AdaptiveStudyTask(
+        id: 't-3',
+        subjectName: 'Pneumologia',
+        topic: 'Exacerbação da Asma Grave e Manejo na Emergência',
+        targetMinutes: 35,
+        scheduledDate: now.add(const Duration(days: 1)),
+      ),
+    ]);
+  }
 
   void _addMaterialItem(String question, String answer, String subject) {
+    // Detecção Matemática de Redundância sem IA (Custo R$ 0,00)
+    final redundancyCheck = TextSimilarityEngine.checkRedundancy(question, _sharedItems);
+    final isRedundant = redundancyCheck['isRedundant'] as bool;
+    final score = redundancyCheck['score'] as double;
+    final matched = redundancyCheck['matchedItem'] as SharedStudyItem?;
+
     setState(() {
-      _sharedItems.add({
-        'subject': subject,
-        'question': question,
-        'answer': answer,
-        'quizOptions': [
-          'Alternativa de conduta inicial correta',
-          'Intervenção tardia ou inadequada',
-          'Contraindicação absoluta',
-          'Diagnóstico diferencial improvável'
-        ],
-        'correctIndex': 0,
-      });
+      _sharedItems.add(
+        SharedStudyItem(
+          id: 'item-${DateTime.now().millisecondsSinceEpoch}-${_sharedItems.length}',
+          subject: subject,
+          question: question,
+          referenceAnswer: answer,
+          quizOptions: [
+            'Opção A: Conduta de primeira escolha fundamentada',
+            'Opção B: Conduta diagnóstica secundária',
+            'Opção C: Conduta contraindicada neste estágio',
+            'Opção D: Exame complementar com baixa acurácia'
+          ],
+          correctOptionIndex: 0,
+          isRedundant: isRedundant,
+          redundancyScore: score,
+          similarToId: matched?.id,
+          isStarred: false,
+        ),
+      );
+    });
+
+    if (isRedundant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.amber[900],
+          content: Text(
+            'Aviso: ${redundancyCheck['percentage']}% de similaridade com item existente! Marque com Estrela ou Exclua para evitar repetição.',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _deleteItem(String id) {
+    setState(() {
+      _sharedItems.removeWhere((item) => item.id == id);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Item redundante excluído da base com sucesso.')),
+    );
+  }
+
+  void _toggleStarItem(String id) {
+    setState(() {
+      final index = _sharedItems.indexWhere((item) => item.id == id);
+      if (index != -1) {
+        final current = _sharedItems[index];
+        _sharedItems[index] = current.copyWith(isStarred: !current.isStarred);
+      }
     });
   }
 
@@ -107,9 +188,145 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
     setState(() {
       _curriculumSubjects.clear();
       for (var s in subjects) {
-        _curriculumSubjects.add({'name': s, 'mastery': 0.0});
+        _curriculumSubjects.add(UniversitySubject(
+          id: 'subj-${DateTime.now().millisecondsSinceEpoch}-${_curriculumSubjects.length}',
+          name: s,
+          period: 'Ciclo Clínico',
+          masteryPercentage: 45.0,
+          studiedItemsCount: 12,
+        ));
       }
     });
+  }
+
+  void _showHelp(BuildContext context, String title, String explanation) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.help_outline, color: Color(0xFF00FF66)),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          explanation,
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendi', style: TextStyle(color: Color(0xFF00FF66))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openDriveSyncModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        final simulatedFiles = [
+          {'name': 'Aula 04 - Valvopatias e Sopros Mitrais.pdf', 'size': 3.4, 'eligible': true, 'reason': 'Aceito: Apostila de aula objetiva'},
+          {'name': 'Resumo Clínico - Conduta em Sepse.pptx', 'size': 5.2, 'eligible': true, 'reason': 'Aceito: Resumo em slides de aula'},
+          {'name': 'Tratado Completo de Cardiologia Braunwald (12ª Ed).pdf', 'size': 85.0, 'eligible': false, 'reason': 'Ignorado: Livro volumoso (>15MB). Poupando tokens e dados.'},
+          {'name': 'Atlas de Anatomia Humana Netter 7ed.pdf', 'size': 120.0, 'eligible': false, 'reason': 'Ignorado: Atlas/Tratado extenso. Foco em materiais de aula objetivos.'},
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.cloud_sync_outlined, color: Color(0xFF00FF66), size: 28),
+                      SizedBox(width: 10),
+                      Text('Atualizar por Drive', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.help_outline, size: 20),
+                    onPressed: () => _showHelp(
+                      context,
+                      'Atualizar por Drive',
+                      'Vasculha o Google Drive da sua turma, filtrando livros volumosos (>15MB) para poupar custos e importando apenas apostilas e slides de aula.',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Filtro Inteligente Anti-Desperdício ativo: Livros extensos e manuais volumosos são ignorados para manter o estudo 100% focado e econômico.',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              ...simulatedFiles.map((file) {
+                final isEligible = file['eligible'] as bool;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isEligible ? const Color(0xFF00FF66).withOpacity(0.3) : Colors.red.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isEligible ? Icons.check_circle_outline : Icons.block_outlined,
+                        color: isEligible ? const Color(0xFF00FF66) : Colors.red,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(file['name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text(file['reason'] as String, style: TextStyle(fontSize: 11, color: isEligible ? Colors.green[400] : Colors.red[300])),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF66),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(Icons.sync_outlined),
+                  label: const Text('Sincronizar 2 Aulas Identificadas', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _addMaterialItem('Mecanismos de Sopro na Insuficiência Mitral Aguda vs Crônica', 'Na fase crônica ocorre dilatação atrial progressiva mantendo pressões relativamente toleráveis; na aguda há congestão súbita.', 'Cardiologia');
+                    _addMaterialItem('Fórmulas e Metas no Manejo de Choque Séptico (Protocolo Sepse)', 'Ressuscitação volêmica guiada por lactato, PAM >= 65 mmHg e antibioticoterapia na primeira hora.', 'Emergência');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Drive sincronizado: 2 apostilas convertidas em cards/quizzes! Livros pesados ignorados.')),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -119,24 +336,96 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
     final screens = [
       ChatScreen(
         onGenerateItem: _addMaterialItem,
+        onShowHelp: () => _showHelp(
+          context,
+          'Chat Científico',
+          'Tire dúvidas clínicas e de farmacologia com fundamentação socrática em artigos médicos de alto impacto.',
+        ),
       ),
       FlashcardsScreen(
         items: _sharedItems,
         onAddMaterial: _addMaterialItem,
+        onDeleteItem: _deleteItem,
+        onToggleStar: _toggleStarItem,
+        onShowHelp: () => _showHelp(
+          context,
+          'Flashcards com Resposta Escrita',
+          'Treine raciocínio clínico escrevendo respostas completas corrigidas por IA sem custo, ou use repetição espaçada tradicional.',
+        ),
       ),
       QuizzesScreen(
         items: _sharedItems,
         onAddMaterial: _addMaterialItem,
+        onDeleteItem: _deleteItem,
+        onToggleStar: _toggleStarItem,
+        onShowHelp: () => _showHelp(
+          context,
+          'Quizzes & Casos Clínicos',
+          'Responda desafios de múltipla escolha sincronizados com seu material e receba justificativas imediatas.',
+        ),
       ),
       CurriculumScreen(
         subjects: _curriculumSubjects,
         onLoadSyllabus: _loadSyllabus,
+        onShowHelp: () => _showHelp(
+          context,
+          'Matérias Curriculares',
+          'Organize suas disciplinas a partir do upload da ementa oficial da faculdade de medicina.',
+        ),
+      ),
+      SceEvolutionScreen(
+        subjects: _curriculumSubjects,
+        route: _adaptiveRoute,
+        onRecalculateRoute: () {
+          setState(() {
+            _adaptiveRoute.recalculateRoute();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Waze da Medicina: Rota recalculada! Tarefas redistribuídas nos próximos dias com sucesso.'),
+            ),
+          );
+        },
+        onShowHelp: () => _showHelp(
+          context,
+          'SCE & Waze de Estudos',
+          'Acompanhe gráficos de evolução de aprendizado por disciplina e use o recálculo automático de rota caso se atrase.',
+        ),
       ),
     ];
 
     if (isDesktop) {
-      // Layout Desktop: Web e Windows com NavigationRail
+      // Layout Desktop: Web e Windows com NavigationRail lateral
       return Scaffold(
+        appBar: AppBar(
+          title: const Text('MedTutor Brasil', style: TextStyle(fontWeight: FontWeight.bold)),
+          actions: [
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF00FF66),
+                side: const BorderSide(color: Color(0xFF00FF66)),
+              ),
+              icon: const Icon(Icons.cloud_sync_outlined, size: 18),
+              label: const Text('Atualizar por Drive'),
+              onPressed: () => _openDriveSyncModal(context),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.help_outline),
+              tooltip: 'Ajuda desta tela',
+              onPressed: () => _showHelp(
+                context,
+                'MedTutor Brasil - Plataforma Integrada',
+                'Ambiente unificado de medicina com Chat Clínico, Flashcards, Quizzes, Ementa Universitária e SCE Adaptativo.',
+              ),
+            ),
+            IconButton(
+              icon: Icon(widget.themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+              onPressed: widget.onToggleTheme,
+            ),
+            const SizedBox(width: 16),
+          ],
+        ),
         body: Row(
           children: [
             NavigationRail(
@@ -147,22 +436,12 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                 padding: EdgeInsets.symmetric(vertical: 16),
                 child: Icon(Icons.local_hospital_outlined, size: 32, color: Color(0xFF00FF66)),
               ),
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: IconButton(
-                    icon: Icon(
-                      widget.themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                    ),
-                    onPressed: widget.onToggleTheme,
-                  ),
-                ),
-              ),
               destinations: const [
                 NavigationRailDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: Text('Chat')),
                 NavigationRailDestination(icon: Icon(Icons.style_outlined), selectedIcon: Icon(Icons.style), label: Text('Cards')),
                 NavigationRailDestination(icon: Icon(Icons.quiz_outlined), selectedIcon: Icon(Icons.quiz), label: Text('Quizzes')),
                 NavigationRailDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: Text('Matérias')),
+                NavigationRailDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: Text('SCE Roteiro')),
               ],
             ),
             const VerticalDivider(width: 1),
@@ -172,18 +451,28 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
       );
     }
 
-    // Layout Mobile: iOS e Android com NavigationBar inferior
+    // Layout Mobile: iOS e Android com NavigationBar inferior e Topbar
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MedTutor Brasil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('MedTutor Brasil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.cloud_sync_outlined, color: Color(0xFF00FF66)),
+            tooltip: 'Atualizar por Drive',
+            onPressed: () => _openDriveSyncModal(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Ajuda',
+            onPressed: () => _showHelp(
+              context,
+              'MedTutor Brasil',
+              'Toque no ícone de interrogação em qualquer seção para entender sua utilidade e metodologia médica.',
+            ),
+          ),
           IconButton(
             icon: Icon(widget.themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
             onPressed: widget.onToggleTheme,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => _openSettingsModal(context),
           ),
         ],
       ),
@@ -196,56 +485,18 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
           NavigationDestination(icon: Icon(Icons.style_outlined), selectedIcon: Icon(Icons.style), label: 'Cards'),
           NavigationDestination(icon: Icon(Icons.quiz_outlined), selectedIcon: Icon(Icons.quiz), label: 'Quizzes'),
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Matérias'),
+          NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'SCE'),
         ],
       ),
     );
   }
-
-  void _openSettingsModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Configurações Básicas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.brightness_6_outlined),
-                title: const Text('Modo Visual (Dia/Noite)'),
-                trailing: Switch(
-                  value: widget.themeMode == ThemeMode.dark,
-                  onChanged: (_) => widget.onToggleTheme(),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.upload_file_outlined),
-                title: const Text('Upload de Ementa Universitária'),
-                subtitle: const Text('Gere sua grade de matérias a partir da faculdade'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _loadSyllabus(['Anatomia Humana', 'Fisiologia Médica', 'Semiologia', 'Farmacologia']);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ementa carregada! Matérias criadas.')),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }
 
-// 1. ABA CHAT (COM UPLOAD DE MATERIAL DO ESTUDANTE)
+// 1. TELA DE CHAT CIENTÍFICO
 class ChatScreen extends StatefulWidget {
   final Function(String, String, String) onGenerateItem;
-  const ChatScreen({super.key, required this.onGenerateItem});
+  final VoidCallback onShowHelp;
+  const ChatScreen({super.key, required this.onGenerateItem, required this.onShowHelp});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -257,91 +508,85 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _handleUploadMaterial() {
     widget.onGenerateItem(
-      'Mecanismo de ação dos Inibidores da SGLT2',
-      'Inibição de SGLT2 promovendo glicosúria, natriurese e proteção cardiovascular.',
+      'Mecanismo de ação dos Inibidores da SGLT2 na IC',
+      'Promovem glicosúria e natriurese, reduzindo pré e pós-carga e atuando na proteção cardiovascular e renal.',
       'Farmacologia',
     );
-    setState(() {
-      _messages.add({
-        'isUser': true,
-        'text': '📎 Material do Estudante Anexado: Resumo de Farmacologia Clínica',
-      });
-      _messages.add({
-        'isUser': false,
-        'text': '📚 Revisão do Material: Identifiquei os conceitos centrais. Foram gerados automaticamente novos Flashcards e Quizzes sincronizados nas respectivas abas!',
-      });
-    });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Material processado! Flashcards e Quizzes gerados.')),
+      const SnackBar(content: Text('Material convertido em Flashcards e Quizzes!')),
     );
   }
 
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
     setState(() {
-      _messages.add({'isUser': true, 'text': text});
+      _messages.add({'role': 'user', 'text': text});
       _messages.add({
-        'isUser': false,
-        'text': 'Revisão Sistemática: A literatura recente recomenda condutas baseadas em ensaios randomizados para "\$text".\\n\\n❓ Desafio Socrático: Qual o biomarcador inicial você avaliaria?',
+        'role': 'assistant',
+        'text': 'Baseado nas diretrizes clínicas vigentes: A conduta fundamenta-se na otimização hemodinâmica e farmacoterapia quadrupla. Gostaria de criar um card de revisão para este conceito?'
       });
+      _controller.clear();
     });
-    _controller.clear();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_messages.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.chat_bubble_outline, size: 64, color: Color(0xFF00FF66)),
-            const SizedBox(height: 16),
-            const Text('Tutor Médico em Espera', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                'Faça perguntas clínicas ou envie seus resumos de aula para gerar artigos e questões.',
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.attach_file_outlined),
-              label: const Text('Upload de Material do Estudante'),
-              onPressed: _handleUploadMaterial,
-            ),
-          ],
-        ),
-      );
-    }
-
     return Column(
       children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _messages.length,
-            itemBuilder: (ctx, i) {
-              final msg = _messages[i];
-              final isUser = msg['isUser'] as bool;
-              return Align(
-                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isUser ? const Color(0xFF151B18) : Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isUser ? const Color(0xFF00FF66).withOpacity(0.3) : Theme.of(context).colorScheme.outline),
-                  ),
-                  child: Text(msg['text']),
-                ),
-              );
-            },
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Tutor Clínico Socrático', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              IconButton(icon: const Icon(Icons.help_outline, size: 18), onPressed: widget.onShowHelp),
+            ],
           ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: _messages.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.chat_bubble_outline, size: 48, color: Color(0xFF00FF66)),
+                      const SizedBox(height: 16),
+                      const Text('Tutor Clínico Pronto', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      const Text('Envie dúvidas de casos ou anexe materiais de aula.', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('+ Upload de Material de Aula'),
+                        onPressed: _handleUploadMaterial,
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _messages.length,
+                  itemBuilder: (ctx, i) {
+                    final isUser = _messages[i]['role'] == 'user';
+                    return Align(
+                      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isUser ? const Color(0xFF00FF66).withOpacity(0.15) : Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Theme.of(context).colorScheme.outline),
+                        ),
+                        child: Text(_messages[i]['text'] as String),
+                      ),
+                    );
+                  },
+                ),
         ),
         Container(
           padding: const EdgeInsets.all(12),
@@ -353,21 +598,21 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.attach_file_outlined),
-                tooltip: 'Upload de Material do Estudante',
+                tooltip: 'Anexar material de estudo',
                 onPressed: _handleUploadMaterial,
               ),
               Expanded(
                 child: TextField(
                   controller: _controller,
                   decoration: const InputDecoration(
-                    hintText: 'Digite uma dúvida ou caso clínico...',
+                    hintText: 'Pergunte sobre condutas, diagnósticos ou fármacos...',
                     border: InputBorder.none,
                   ),
                   onSubmitted: (_) => _sendMessage(),
                 ),
               ),
-              IconButton.filled(
-                icon: const Icon(Icons.send_outlined),
+              IconButton(
+                icon: const Icon(Icons.send_outlined, color: Color(0xFF00FF66)),
                 onPressed: _sendMessage,
               ),
             ],
@@ -378,151 +623,549 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// 2. ABA FLASHCARDS (MODO ESCRITA COM IA & TRADICIONAL)
-class FlashcardsScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
+// 2. TELA DE FLASHCARDS COM REDUNDÂNCIA, EXCLUIR E ESTRELA
+class FlashcardsScreen extends StatefulWidget {
+  final List<SharedStudyItem> items;
   final Function(String, String, String) onAddMaterial;
+  final Function(String) onDeleteItem;
+  final Function(String) onToggleStar;
+  final VoidCallback onShowHelp;
 
-  const FlashcardsScreen({super.key, required this.items, required this.onAddMaterial});
+  const FlashcardsScreen({
+    super.key,
+    required this.items,
+    required this.onAddMaterial,
+    required this.onDeleteItem,
+    required this.onToggleStar,
+    required this.onShowHelp,
+  });
+
+  @override
+  State<FlashcardsScreen> createState() => _FlashcardsScreenState();
+}
+
+class _FlashcardsScreenState extends State<FlashcardsScreen> {
+  int _currentIndex = 0;
+  bool _isFlipped = false;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.style_outlined, size: 64, color: Color(0xFF00FF66)),
-            const SizedBox(height: 16),
-            const Text('Nenhum Flashcard Criado', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('Faça upload de materiais de aula para gerar perguntas.'),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Upload de Resumo/Material'),
-              onPressed: () {
-                onAddMaterial(
-                  'Qual a meta de redução horária da glicemia na CAD?',
-                  '50 a 70 mg/dL por hora para prevenir edema cerebral.',
-                  'Emergências',
-                );
-              },
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) {
-        final item = items[i];
-        return Card(
-          child: ListTile(
-            title: Text(item['question']),
-            subtitle: Text('Disciplina: \${item['subject']}'),
-            trailing: const Icon(Icons.chevron_right_outlined),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Repetição Espaçada Ativa', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              IconButton(icon: const Icon(Icons.help_outline, size: 18), onPressed: widget.onShowHelp),
+            ],
           ),
-        );
-      },
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: widget.items.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.style_outlined, size: 48, color: Color(0xFF00FF66)),
+                      const SizedBox(height: 16),
+                      const Text('Nenhum Flashcard Ativo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      const Text('Envie apostilas ou crie cards a partir de aulas.', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Carregar Primeiro Conteúdo'),
+                        onPressed: () => widget.onAddMaterial(
+                          'Classificação de NYHA para Insuficiência Cardíaca',
+                          'Classe I (sem sintomas), Classe II (leves a esforços habituais), Classe III (limitação aos mínimos esforços), Classe IV (em repouso).',
+                          'Cardiologia',
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 500),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_currentIndex < widget.items.length) ...[
+                          // Card de Alerta de Redundância (>= 50%)
+                          if (widget.items[_currentIndex].isRedundant)
+                            Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.amber),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.warning_amber_outlined, color: Colors.amber, size: 24),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Similaridade de ${(widget.items[_currentIndex].redundancyScore * 100).round()}% detectada com outro item da base!',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.amber),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    tooltip: 'Excluir redundância',
+                                    onPressed: () => widget.onDeleteItem(widget.items[_currentIndex].id),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      widget.items[_currentIndex].isStarred ? Icons.star : Icons.star_border_outlined,
+                                      color: const Color(0xFF00FF66),
+                                    ),
+                                    tooltip: 'Favoritar para manter',
+                                    onPressed: () => widget.onToggleStar(widget.items[_currentIndex].id),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: Theme.of(context).colorScheme.outline),
+                            ),
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            child: InkWell(
+                              onTap: () => setState(() => _isFlipped = !_isFlipped),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                height: 260,
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          widget.items[_currentIndex].subject.toUpperCase(),
+                                          style: const TextStyle(color: Color(0xFF00FF66), fontWeight: FontWeight.bold, fontSize: 12),
+                                        ),
+                                        Text('Card ${_currentIndex + 1} de ${widget.items.length}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                      ],
+                                    ),
+                                    Text(
+                                      _isFlipped
+                                          ? widget.items[_currentIndex].referenceAnswer
+                                          : widget.items[_currentIndex].question,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: _isFlipped ? 15 : 18,
+                                        fontWeight: _isFlipped ? FontWeight.normal : FontWeight.bold,
+                                      ),
+                                    ),
+                                    const Text('Toque para virar o card', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _currentIndex = (_currentIndex + 1) % widget.items.length;
+                                    _isFlipped = false;
+                                  });
+                                },
+                                child: const Text('Próximo Card'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }
 
-// 3. ABA QUIZZES
+// 3. TELA DE QUIZZES & CASOS
 class QuizzesScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
+  final List<SharedStudyItem> items;
   final Function(String, String, String) onAddMaterial;
+  final Function(String) onDeleteItem;
+  final Function(String) onToggleStar;
+  final VoidCallback onShowHelp;
 
-  const QuizzesScreen({super.key, required this.items, required this.onAddMaterial});
+  const QuizzesScreen({
+    super.key,
+    required this.items,
+    required this.onAddMaterial,
+    required this.onDeleteItem,
+    required this.onToggleStar,
+    required this.onShowHelp,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.quiz_outlined, size: 64, color: Color(0xFF00FF66)),
-            SizedBox(height: 16),
-            Text('Nenhum Quiz Disponível', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('O upload de material em Flashcards também alimenta os Quizzes.'),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) {
-        final item = items[i];
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item['subject'], style: const TextStyle(color: Color(0xFF00FF66), fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(item['question'], style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            ),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Banco de Casos e Questões', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              IconButton(icon: const Icon(Icons.help_outline, size: 18), onPressed: onShowHelp),
+            ],
           ),
-        );
-      },
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: items.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.quiz_outlined, size: 48, color: Color(0xFF00FF66)),
+                      const SizedBox(height: 16),
+                      const Text('Nenhum Quiz Disponível', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      const Text('Os quizzes compartilham a mesma base dos flashcards.', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Carregar Questões'),
+                        onPressed: () => onAddMaterial(
+                          'Diagnóstico diferencial entre Cetoacidose e EHH',
+                          'Cetoacidose apresenta acidose metabólica com gap aumentado e cetonemia positiva; EHH apresenta osmolaridade >320 mOsm/kg e glicemia severa.',
+                          'Endocrinologia',
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: items.length,
+                  itemBuilder: (ctx, i) {
+                    final q = items[i];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Theme.of(context).colorScheme.outline),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (q.isRedundant)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.amber),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber_outlined, color: Colors.amber, size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Item redundante (${(q.redundancyScore * 100).round()}% de similaridade)',
+                                        style: const TextStyle(fontSize: 11, color: Colors.amber, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                      onPressed: () => onDeleteItem(q.id),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(q.isStarred ? Icons.star : Icons.star_border_outlined, size: 18, color: const Color(0xFF00FF66)),
+                                      onPressed: () => onToggleStar(q.id),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            Text(q.subject.toUpperCase(), style: const TextStyle(color: Color(0xFF00FF66), fontSize: 11, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 6),
+                            Text(q.question, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                            const SizedBox(height: 12),
+                            ...q.quizOptions.map((opt) => Container(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Theme.of(context).colorScheme.outline),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.radio_button_unchecked, size: 16),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(opt, style: const TextStyle(fontSize: 13))),
+                                    ],
+                                  ),
+                                )),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
 
-// 4. ABA MATÉRIAS
+// 4. TELA DE MATÉRIAS CURRICULARES
 class CurriculumScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> subjects;
+  final List<UniversitySubject> subjects;
   final Function(List<String>) onLoadSyllabus;
+  final VoidCallback onShowHelp;
 
-  const CurriculumScreen({super.key, required this.subjects, required this.onLoadSyllabus});
+  const CurriculumScreen({
+    super.key,
+    required this.subjects,
+    required this.onLoadSyllabus,
+    required this.onShowHelp,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (subjects.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.menu_book_outlined, size: 64, color: Color(0xFF00FF66)),
-            const SizedBox(height: 16),
-            const Text('Nenhuma Disciplina Carregada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('Carregue a ementa da sua faculdade nas configurações para começar.'),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Carregar Ementa Universitária'),
-              onPressed: () {
-                onLoadSyllabus(['Anatomia Humana', 'Fisiologia Médica', 'Semiologia', 'Farmacologia']);
-              },
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: subjects.length,
-      itemBuilder: (ctx, i) {
-        final s = subjects[i];
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.circle_outlined, color: Color(0xFF00FF66)),
-            title: Text(s['name']),
-            trailing: Text('\${(s['mastery'] * 100).toInt()}%'),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Grade Oficial Universitária', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              IconButton(icon: const Icon(Icons.help_outline, size: 18), onPressed: onShowHelp),
+            ],
           ),
-        );
-      },
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: subjects.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.menu_book_outlined, size: 48, color: Color(0xFF00FF66)),
+                      const SizedBox(height: 16),
+                      const Text('Nenhuma Matéria Carregada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      const Text('Carregue sua ementa da faculdade para personalizar o currículo.', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF66), foregroundColor: Colors.black),
+                        icon: const Icon(Icons.upload_file),
+                        label: const Text('Carregar Ementa da Faculdade'),
+                        onPressed: () => onLoadSyllabus(['Cardiologia Clínica', 'Pneumologia', 'Gastroenterologia', 'Farmacologia Médica']),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: subjects.length,
+                  itemBuilder: (ctx, i) {
+                    final s = subjects[i];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Theme.of(context).colorScheme.outline)),
+                      child: ListTile(
+                        leading: const Icon(Icons.bookmark_outline, color: Color(0xFF00FF66)),
+                        title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('${s.period} • ${s.studiedItemsCount} itens dominados'),
+                        trailing: Text('${s.masteryPercentage.toStringAsFixed(0)}% Maestria', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00FF66))),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// 5. TELA DO SCE (SISTEMA DE CONHECIMENTO E EVOLUÇÃO) & ROTEIRO ADAPTATIVO
+class SceEvolutionScreen extends StatelessWidget {
+  final List<UniversitySubject> subjects;
+  final AdaptiveStudyRoute route;
+  final VoidCallback onRecalculateRoute;
+  final VoidCallback onShowHelp;
+
+  const SceEvolutionScreen({
+    super.key,
+    required this.subjects,
+    required this.route,
+    required this.onRecalculateRoute,
+    required this.onShowHelp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('SCE: Sistema de Conhecimento e Evolução', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              IconButton(icon: const Icon(Icons.help_outline, size: 18), onPressed: onShowHelp),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // BANNER "WAZE DA MEDICINA" COM RECÁLCULO DE ROTA
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF00FF66).withOpacity(0.15),
+                      const Color(0xFF00FF66).withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF00FF66).withOpacity(0.4)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.alt_route_outlined, color: Color(0xFF00FF66)),
+                            SizedBox(width: 8),
+                            Text('Roteiro Adaptativo de Estudos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ],
+                        ),
+                        if (route.hasDelayedTasks)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red),
+                            ),
+                            child: Text(
+                              '${route.delayedTasksCount} tarefa(s) atrasada(s)',
+                              style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Seu plano de estudos adapta-se dinamicamente ao seu ritmo. Se você atrasar conteúdos, recalcule a rota para equilibrar a semana sem sobrecarga.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00FF66),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      icon: const Icon(Icons.sync_alt_outlined),
+                      label: const Text('Recalcular Rota Agora', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: onRecalculateRoute,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // LISTA DE TAREFAS DO ROTEIRO
+              const Text('Cronograma Otimizado da Semana', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              ...route.tasks.map((task) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Theme.of(context).colorScheme.outline)),
+                  child: ListTile(
+                    leading: Icon(
+                      task.isDelayed ? Icons.schedule_outlined : Icons.calendar_today_outlined,
+                      color: task.isDelayed ? Colors.red : const Color(0xFF00FF66),
+                    ),
+                    title: Text(task.topic, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: Text('${task.subjectName} • ${task.targetMinutes} min de revisão'),
+                    trailing: task.isDelayed
+                        ? const Text('Atrasado', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 11))
+                        : const Text('Em dia', style: TextStyle(color: Color(0xFF00FF66), fontSize: 11)),
+                  ),
+                );
+              }),
+              const SizedBox(height: 24),
+
+              // GRÁFICO DE EVOLUÇÃO POR DISCIPLINA
+              const Text('Gráficos de Maestria e Retenção por Disciplina', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ...['Cardiologia', 'Farmacologia', 'Pneumologia', 'Emergências Clínicas'].map((subj) {
+                final mastery = subj == 'Cardiologia' ? 78 : (subj == 'Farmacologia' ? 62 : 45);
+                final retention = (mastery * 0.9).round();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(subj, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('$mastery% Dominado (Retenção: $retention%)', style: const TextStyle(color: Color(0xFF00FF66), fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: mastery / 100.0,
+                          minHeight: 8,
+                          backgroundColor: Colors.grey.withOpacity(0.2),
+                          color: const Color(0xFF00FF66),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
