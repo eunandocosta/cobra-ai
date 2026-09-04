@@ -8,6 +8,7 @@
 class SharedStudyItem {
   final String id;
   final String subject;
+  final String? disease;
   final String question;
   final String referenceAnswer;
   final List<String> quizOptions;
@@ -22,6 +23,7 @@ class SharedStudyItem {
   SharedStudyItem({
     required this.id,
     required this.subject,
+    this.disease,
     required this.question,
     required this.referenceAnswer,
     required this.quizOptions,
@@ -35,6 +37,7 @@ class SharedStudyItem {
   }) : lastReviewed = lastReviewed ?? DateTime.now();
 
   SharedStudyItem copyWith({
+    String? disease,
     int? intervalDays,
     DateTime? lastReviewed,
     bool? isRedundant,
@@ -45,6 +48,7 @@ class SharedStudyItem {
     return SharedStudyItem(
       id: id,
       subject: subject,
+      disease: disease ?? this.disease,
       question: question,
       referenceAnswer: referenceAnswer,
       quizOptions: quizOptions,

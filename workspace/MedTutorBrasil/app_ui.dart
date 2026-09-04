@@ -101,24 +101,24 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
     _adaptiveRoute = AdaptiveStudyRoute(tasks: [
       AdaptiveStudyTask(
         id: 't-1',
-        subjectName: 'Cardiologia',
-        topic: 'Insuficiência Cardíaca com Fração de Ejeção Reduzida',
+        subjectName: 'Integração de Sistemas Humanos 2',
+        topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea',
         targetMinutes: 30,
         scheduledDate: now.subtract(const Duration(days: 1)),
         isDelayed: true,
       ),
       AdaptiveStudyTask(
         id: 't-2',
-        subjectName: 'Farmacologia',
-        topic: 'Inibidores de SGLT2 e Antagonistas dos Receptores de Mineralocorticoides',
-        targetMinutes: 25,
+        subjectName: 'Integração de Sistemas Humanos 2',
+        topic: 'Dermatologia: Psoríase, Koebner e Líquen Plano',
+        targetMinutes: 35,
         scheduledDate: now,
       ),
       AdaptiveStudyTask(
         id: 't-3',
-        subjectName: 'Pneumologia',
-        topic: 'Exacerbação da Asma Grave e Manejo na Emergência',
-        targetMinutes: 35,
+        subjectName: 'Integração de Sistemas Humanos 2',
+        topic: 'Eczemas: Dermatite Atópica, Seborreica e de Contato',
+        targetMinutes: 25,
         scheduledDate: now.add(const Duration(days: 1)),
       ),
     ]);
@@ -1365,7 +1365,12 @@ class CurriculumScreen extends StatelessWidget {
                         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF66), foregroundColor: Colors.black),
                         icon: const Icon(Icons.upload_file),
                         label: const Text('Carregar Ementa da Faculdade'),
-                        onPressed: () => onLoadSyllabus(['Cardiologia Clínica', 'Pneumologia', 'Gastroenterologia', 'Farmacologia Médica']),
+                        onPressed: () => onLoadSyllabus([
+                          'Integração de Sistemas Humanos 2 (Dermatologia)',
+                          'Semiologia Cutânea e Propedêutica das Lesões Elementares',
+                          'Fisiopatologia Tegumentar e Barreira Epidérmica',
+                          'Imunopatologia dos Eczemas e Psoríase'
+                        ]),
                       ),
                     ],
                   ),
@@ -1515,40 +1520,48 @@ class SceEvolutionScreen extends StatelessWidget {
               // GRÁFICO DE EVOLUÇÃO POR DISCIPLINA
               const Text('Gráficos de Maestria e Retenção por Disciplina', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              ...['Cardiologia', 'Farmacologia', 'Pneumologia', 'Emergências Clínicas'].map((subj) {
-                final mastery = subj == 'Cardiologia' ? 78 : (subj == 'Farmacologia' ? 62 : 45);
-                final retention = (mastery * 0.9).round();
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Theme.of(context).colorScheme.outline),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(subj, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Text('$mastery% Dominado (Retenção: $retention%)', style: const TextStyle(color: Color(0xFF00FF66), fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: mastery / 100.0,
-                          minHeight: 8,
-                          backgroundColor: Colors.grey.withOpacity(0.2),
-                          color: const Color(0xFF00FF66),
+              ...(() {
+                final displayList = subjects.isNotEmpty
+                    ? subjects.map((s) => s.name).toList()
+                    : ['Integração de Sistemas Humanos 2 (Dermatologia)'];
+                return displayList.map((subj) {
+                  final sObj = subjects.where((s) => s.name == subj).firstOrNull;
+                  final mastery = sObj != null && sObj.masteryPercentage > 0
+                      ? sObj.masteryPercentage.round()
+                      : 88;
+                  final retention = (mastery * 0.9).round();
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Theme.of(context).colorScheme.outline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(subj, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text('$mastery% Dominado (Retenção: $retention%)', style: const TextStyle(color: Color(0xFF00FF66), fontWeight: FontWeight.bold, fontSize: 12)),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: mastery / 100.0,
+                            minHeight: 8,
+                            backgroundColor: Colors.grey.withOpacity(0.2),
+                            color: const Color(0xFF00FF66),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                });
+              })(),
             ],
           ),
         ),

@@ -479,49 +479,50 @@
       transform: scale(1.04);
     }
 
-    /* Gaveta de Materiais do Drive no Chat */
-    .chat-drive-drawer {
+    /* Menu Suspenso de Materiais do Drive no Chat */
+    .chat-drive-dropdown {
       background: var(--bg-card);
       border: 1px solid var(--border-accent);
-      border-radius: 16px;
-      padding: 14px 16px;
+      border-radius: 18px;
+      padding: 16px;
       margin-top: 10px;
       display: none;
       flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      gap: 12px;
+      box-shadow: 0 14px 35px rgba(0, 0, 0, 0.4);
       animation: fadeIn 0.25s ease;
+      position: relative;
+      z-index: 15;
     }
 
-    .chat-drive-drawer.visible {
+    .chat-drive-dropdown.visible {
       display: flex;
     }
 
-    .chat-drive-header {
+    .chat-drive-dropdown-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--neon);
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
       gap: 8px;
     }
 
-    .chat-drive-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 8px;
-      max-height: 180px;
+    .chat-drive-vertical-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 250px;
       overflow-y: auto;
       padding-right: 4px;
     }
 
-    .chat-drive-card {
+    .chat-drive-vertical-item {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 12px;
+      padding: 10px 12px;
       border-radius: 10px;
       background: var(--bg-surface);
       border: 1px solid var(--border);
@@ -531,19 +532,126 @@
       user-select: none;
     }
 
-    .chat-drive-card:hover {
+    .chat-drive-vertical-item:hover {
       border-color: var(--neon);
-      background: rgba(0, 255, 102, 0.05);
+      background: rgba(0, 255, 102, 0.04);
     }
 
-    .chat-drive-card.selected {
+    .chat-drive-vertical-item.selected {
       border-color: var(--neon);
       background: var(--neon-subtle);
     }
 
-    .chat-drive-card.book {
-      border-color: rgba(140, 150, 255, 0.3);
-      opacity: 0.85;
+    .disease-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: rgba(0, 255, 102, 0.12);
+      color: var(--neon);
+      border: 1px solid rgba(0, 255, 102, 0.3);
+      white-space: nowrap;
+    }
+
+    .chat-drive-dropdown-footer {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    /* Menus Dropdown de Matéria & Doença nos Chats e Flashcards */
+    .dropdown-filter-container {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-trigger-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-accent);
+      color: var(--text-primary);
+      padding: 7px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .dropdown-trigger-btn:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+    }
+
+    .dropdown-menu-list {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 290px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      padding: 8px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 50;
+      animation: fadeIn 0.18s ease;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .dropdown-menu-list.visible {
+      display: flex;
+    }
+
+    .dropdown-menu-item {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .dropdown-menu-item:hover {
+      background: var(--neon-subtle);
+      color: var(--neon);
+    }
+
+    .dropdown-menu-item.active {
+      background: var(--neon-subtle);
+      color: var(--neon);
+      font-weight: 700;
+    }
+
+    /* Cards de Escolha de Direcionamento no Upload */
+    .direction-choice-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      width: 100%;
+    }
+
+    .direction-choice-card:hover {
+      border-color: var(--neon);
+      background: rgba(0, 255, 102, 0.05);
+      transform: translateY(-1px);
     }
 
     .chat-attached-bar {
@@ -1477,24 +1585,61 @@
               </div>
             </div>
 
-            <!-- GAVETA / SELETOR DE MATERIAIS DO DRIVE NO CHAT -->
-            <div class="chat-drive-drawer" id="chatDriveDrawer">
-              <div class="chat-drive-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  <span>Materiais do Google Drive • Selecione para Produzir Estudo para Leitura:</span>
-                  <button class="btn-help-icon" onclick="openHelpModal('Materiais do Drive para Leitura', 'Marque as caixas das aulas que deseja estudar e clique em \'Produzir Material de Leitura\' ou envie uma mensagem no chat. O Tutor gerará uma apostila didática completa de leitura com tabelas semiológicas, diferenciais e pérolas de prova.')">?</button>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="selectAllDriveAulasForReading(true)">Marcar Aulas</button>
-                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="selectAllDriveAulasForReading(false)">Limpar</button>
-                  <button class="btn-outline-action primary" style="padding: 4px 12px; font-size: 11px;" onclick="requestReadingMaterialProduction()">
-                    📖 Produzir Material de Leitura
-                  </button>
+            <!-- CONTROLES SUPERIORES DO CHAT: MATÉRIA/DOENÇA & BOTÃO DO DRIVE -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0 8px 0; flex-wrap: wrap; gap: 8px;">
+              <div class="dropdown-filter-container">
+                <button class="dropdown-trigger-btn" id="btnChatSubject" onclick="toggleChatSubjectDropdown()">
+                  <span>📚 Matéria: <strong id="chatSubjectCurrentName" style="color: var(--neon);">Integração de Sistemas Humanos 2 (Dermatologia)</strong></span> ▾
+                </button>
+                <div class="dropdown-menu-list" id="chatSubjectDropdownMenu">
+                  <!-- Doenças específicas populadas dinamicamente via JS -->
                 </div>
               </div>
-              <div class="chat-drive-grid" id="chatDriveGrid">
-                <!-- Populado dinamicamente via JS com os arquivos reais do Drive -->
+
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn-outline-action primary" id="btnToggleChatDrive" onclick="toggleChatDriveDropdown()" style="padding: 7px 14px; border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span>📁 Itens do Drive / Aulas (<span id="chatDriveCount">7</span>) ▾</span>
+                </button>
+                <button class="btn-help-icon" onclick="openHelpModal('Menu do Drive & Doenças', 'Selecione uma matéria e afecção clínica específica para guiar o tutor. No menu suspenso do Drive você visualiza a lista vertical dos materiais com caixas de marcação para eliminar itens ou Gerar Relatório de cobertura curricular sem excluir nada.')">?</button>
+              </div>
+            </div>
+
+            <!-- MENU SUSPENSO (DROPDOWN) DOS ITENS DO DRIVE NO CHAT -->
+            <div class="chat-drive-dropdown" id="chatDriveDropdown">
+              <div class="chat-drive-dropdown-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <strong style="font-size: 13px;">Itens Sincronizados do Google Drive (Turma):</strong>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                  <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="checkbox" id="chkSelectAllDriveFiles" onchange="toggleSelectAllDriveFiles(this.checked)">
+                    <span>Selecionar Todas</span>
+                  </label>
+                  <span style="font-size: 11px; color: var(--neon); font-weight: 700;" id="driveSelectedVerticalCount">7 selecionadas</span>
+                  <button class="btn-close-modal" onclick="toggleChatDriveDropdown()" title="Fechar menu">✕</button>
+                </div>
+              </div>
+
+              <!-- LISTA VERTICAL DE ARQUIVOS COM CAIXAS DE MARCAÇÃO -->
+              <div class="chat-drive-vertical-list" id="chatDriveVerticalList">
+                <!-- Populado dinamicamente via JS com cada arquivo, caixa de marcação, nome da doença e tamanho -->
+              </div>
+
+              <!-- RODAPÉ COM AÇÕES: ELIMINAR E GERAR RELATÓRIO -->
+              <div class="chat-drive-dropdown-footer">
+                <button class="btn-outline-action danger" onclick="deleteSelectedDriveFiles()" title="Eliminar da lista os itens marcados com a caixa de marcação">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  🗑️ Eliminar Selecionadas
+                </button>
+                <button class="btn-outline-action" style="border-color: var(--neon); color: var(--neon);" onclick="generateDriveReport()" title="Gera um relatório de estudo e cobertura clínica no chat SEM eliminar nenhum item">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                  📊 Gerar Relatório
+                </button>
+                <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction()">
+                  📖 Produzir Material de Leitura
+                </button>
               </div>
             </div>
 
@@ -1515,10 +1660,6 @@
             </div>
 
             <div class="chat-bar">
-              <button class="btn-outline-action primary" id="btnToggleChatDrive" onclick="toggleChatDriveDrawer()" title="Selecionar materiais do Google Drive da turma para produzir material de leitura" style="padding: 10px 14px; border-radius: 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                <span style="font-size: 12px;">📁 Drive (<span id="chatDriveCount">7</span>)</span>
-              </button>
               <button class="btn-outline-action" onclick="openUploadMaterialModal()" title="Upload de material do estudante (PDF, resumos, anotações)" style="padding: 10px 12px; border-radius: 14px; display: flex; align-items: center; gap: 6px;">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 <span style="font-size: 12px;">Upload</span>
@@ -1534,8 +1675,8 @@
         <!-- 2. ABA FLASHCARDS -->
         <section id="tab-flashcards" class="tab-section">
           
-          <div class="study-toolbar">
-            <div style="display: flex; gap: 8px;">
+          <div class="study-toolbar" style="flex-wrap: wrap; gap: 10px; justify-content: space-between;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 + Upload de Aula
@@ -1544,6 +1685,16 @@
                 <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 Atualizar por Drive
               </button>
+
+              <!-- DROPDOWN DE MATÉRIA & AFECÇÃO / DOENÇA -->
+              <div class="dropdown-filter-container">
+                <button class="dropdown-trigger-btn" id="fcSubjectDropdownBtn" onclick="toggleFcSubjectDropdown()">
+                  <span>📚 Matéria: <strong id="fcCurrentFilterLabel" style="color: var(--neon);">Todas as Doenças</strong></span> ▾
+                </button>
+                <div class="dropdown-menu-list" id="fcSubjectDropdownMenu">
+                  <!-- Gerado dinamicamente: Matéria -> Doenças específicas -->
+                </div>
+              </div>
             </div>
 
             <div class="mode-switch">
@@ -1691,13 +1842,25 @@
               <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             </div>
             <h3>Nenhuma Matéria Carregada</h3>
-            <p>Carregue a ementa ou plano pedagógico (PPC) da sua faculdade para preencher automaticamente as matérias do seu curso.</p>
+            <p>Carregue a ementa ou plano pedagógico (PPC) da sua faculdade para estruturar automaticamente as matérias do seu curso com inteligência artificial.</p>
             <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
               <button class="btn-outline-action primary" onclick="openSyllabusModal()">
-                Carregar Minha Ementa
+                Carregar Minha Ementa (IA)
               </button>
-              <button class="btn-outline-action" onclick="loadDefaultDCNCurriculum()">
-                Usar Currículo Nacional (DCNs)
+            </div>
+          </div>
+
+          <div id="curriculumHeaderBar" style="display: none; justify-content: space-between; align-items: center; margin: 16px 0; padding: 12px 16px; background: var(--bg-surface); border-radius: 14px; border: 1px solid var(--border-accent); flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <h3 style="font-size: 14px; margin: 0; font-weight: 700;">Grade Curricular Processada por IA</h3>
+              <span class="disease-tag" id="curriculumBadgeLabel">Extração Fiel do Upload</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-outline-action" onclick="openSyllabusModal()">Nova Ementa</button>
+              <button class="btn-outline-action danger" onclick="deleteCurriculum()" title="Excluir ementa atual e resetar a grade">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                🗑️ Excluir Ementa
               </button>
             </div>
           </div>
@@ -2029,7 +2192,64 @@
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
-        <button class="btn-outline-action primary" style="flex: 1; justify-content: center;" onclick="processSharedStudyMaterial()">✨ Gerar Questões</button>
+        <button class="btn-outline-action primary" style="flex: 1; justify-content: center;" onclick="promptMaterialDirection()">✨ Gerar Questões</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE PERGUNTA DE DIRECIONAMENTO DA DISCIPLINA (IA vs MANUAL)
+       ========================================================= -->
+  <div class="modal-overlay" id="uploadDirectionModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 520px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <h2 style="font-size: 16px;">Direcionamento da Disciplina</h2>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 14px 0;">
+        Como você deseja direcionar este material para a sua grade curricular e para os gráficos do SCE?
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="direction-choice-card" onclick="applyMaterialDirection('auto')">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 26px;">🤖</span>
+            <div>
+              <div style="font-weight: 700; color: var(--neon); font-size: 13px;">Classificação Inteligente Automática (IA / Sistema)</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4;">
+                O sistema lê os conceitos médicos do documento e direciona para a disciplina correspondente (ex: Dermatologia / Sistemas Humanos 2) vinculando os nomes das doenças.
+              </div>
+            </div>
+          </div>
+        </button>
+
+        <button class="direction-choice-card" onclick="toggleManualDirectionInputs()">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 26px;">✍️</span>
+            <div>
+              <div style="font-weight: 700; color: var(--text-primary); font-size: 13px;">Direcionar Manualmente</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4;">
+                Você seleciona uma disciplina existente na sua ementa ou digita o nome de uma nova matéria.
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <div id="manualDirectionBox" style="display: none; background: var(--bg-surface); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin-top: 10px;">
+        <label style="font-size: 11px; color: var(--text-secondary); font-weight: 700; display: block; margin-bottom: 6px;">
+          Nome da Matéria / Disciplina:
+        </label>
+        <input type="text" id="manualDirectionInput" class="written-textarea" style="height: 38px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px;" placeholder="Ex: Integração de Sistemas Humanos 2 (Dermatologia)" value="Integração de Sistemas Humanos 2 (Dermatologia)">
+        <button class="btn-outline-action primary" style="width: 100%; justify-content: center;" onclick="applyMaterialDirection('manual')">
+          Confirmar com Direcionamento Manual
+        </button>
       </div>
     </div>
   </div>
@@ -2205,10 +2425,98 @@
       };
     }
 
-    // 5. BANCO COMPARTILHADO DE ESTUDO
-    let sharedQuestionsBank = [];
+    // 5. BANCO COMPARTILHADO DE ESTUDO COM ORGANIZAÇÃO POR DOENÇA / MATÉRIA
+    let sharedQuestionsBank = [
+      {
+        id: 'derm-init-1',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+        disease: 'Semiologia das Lesões Elementares Cutâneas',
+        question: 'Semiologia Dermatológica: Como diferenciar clinicamente Pápula, Placa e Nódulo segundo as lesões elementares?',
+        answer: 'Pápula é elevação sólida superficial circunscrita < 1 cm; Placa é elevação plana em platô geralmente > 1 cm (frequente confluência de pápulas); Nódulo é formação sólida circunscrita localizada na derme profunda ou hipoderme (1 a 3 cm), mais palpável que visível.',
+        quizOptions: [
+          'Pápula é lesão líquida serosa purulenta > 2 cm.',
+          'Pápula é elevação sólida superficial < 1 cm; Placa é elevação em platô > 1 cm; Nódulo acomete derme profunda/hipoderme sendo mais palpável que visível.',
+          'Placa é exclusiva de lesões purulentas infectadas na derme superficial.',
+          'Nódulo e pápula possuem a mesma espessura e profundidade tecidual.'
+        ],
+        correctIndex: 1,
+        isRedundant: false,
+        redundancyScore: 0,
+        isStarred: false
+      },
+      {
+        id: 'derm-init-2',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+        disease: 'Psoríase Vulgar & Koebner',
+        question: 'Semiologia Clínica: Quais são os sinais patognomônicos da Psoríase ao exame físico e curetagem de Brocq?',
+        answer: 'Na Psoríase: Sinal da vela (desprendimento de escamas estratificadas), Sinal de Auspitz / Orvalho Sangrento (pontos hemorrágicos após curetagem de Brocq por papilomatose dérmica) e Fenômeno de Koebner (surgimento de novas lesões em sítios de trauma físico).',
+        quizOptions: [
+          'Psoríase apresenta sinal de Nikolsky e ausência total de escamas.',
+          'Sinal da vela, Sinal de Auspitz (orvalho sangrento) na raspagem e Fenômeno de Koebner.',
+          'Líquen plano é caracterizado por comedões abertos e vesículas herpéticas.',
+          'Acomete exclusivamente mucosas conjuntivais sem manifestação cutânea.'
+        ],
+        correctIndex: 1,
+        isRedundant: false,
+        redundancyScore: 0,
+        isStarred: false
+      },
+      {
+        id: 'derm-init-3',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+        disease: 'Líquen Plano & Wickham',
+        question: 'Dermatopatologia: Quais as características clínicas clássicas do Líquen Plano e a que infecção viral pode estar associado?',
+        answer: 'Pápulas poligonais violáceas brilhantes e pruriginosas (Regra dos 4 Ps: Poligonal, Pruriginosa, Púrpura, Plana) com Estrias de Wickham na superfície; acomete flexuras dos punhos e mucosa jugal oral. Investigar infecção pelo vírus da Hepatite C (HCV).',
+        quizOptions: [
+          'Pápulas violáceas poligonais pruriginosas com Estrias de Wickham; associação com Hepatite C.',
+          'Placas eritematosas em superfícies extensoras com Auspitz positivo.',
+          'Vesículas agrupadas sobre base eritematosa perioral causadas por herpes-vírus tipo 1.',
+          'Máculas acrômicas simétricas desprovidas de prurido ou escamas.'
+        ],
+        correctIndex: 0,
+        isRedundant: false,
+        redundancyScore: 0,
+        isStarred: false
+      },
+      {
+        id: 'derm-init-4',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+        disease: 'Dermatite Atópica & Eczemas',
+        question: 'Diferencial de Eczemas: Qual a topografia típica da Dermatite Atópica no lactente versus no adolescente/adulto?',
+        answer: 'No lactente: acometimento característico da face (regiões malares poupando o triângulo perioral) e faces extensoras dos membros. No adolescente/adulto: predileção por dobras flexurais (fossas anticubitais e poplíteas), pescoço e punhos, com frequente liquenificação crônica.',
+        quizOptions: [
+          'Lactentes acometem exclusivamente dobras flexurais e adultos acometem apenas a face.',
+          'No lactente acomete face (malar poupando perioral) e áreas extensoras; no adulto predomina em dobras flexurais com liquenificação.',
+          'A dermatite atópica não tem predileção por faixa etária nem sítio anatômico.',
+          'Dermatite atópica e seborreica apresentam idêntica distribuição palmo-plantar.'
+        ],
+        correctIndex: 1,
+        isRedundant: false,
+        redundancyScore: 0,
+        isStarred: false
+      },
+      {
+        id: 'derm-init-5',
+        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+        disease: 'Histologia da Barreira Epidérmica',
+        question: 'Histologia Tegumentar: Quais as funções cardinais dos queratinócitos e melanócitos na barreira epidérmica?',
+        answer: 'Queratinócitos compõem >90% da epiderme, sintetizam citoqueratinas e o complexo lipídico intercelular que forma a barreira hidrofóbica e mecânica; melanócitos na camada basal produzem melanina e a transferem via melanossomos aos queratinócitos para fotoproteção do DNA nuclear.',
+        quizOptions: [
+          'Queratinócitos produzem colágeno dérmico tipo I e melanócitos sintetizam elastina.',
+          'Queratinócitos produzem a barreira mecânica e hidrofóbica córnea; melanócitos sintetizam melanina para fotoproteção do DNA celular.',
+          'Melanócitos formam o estrato lúcido enquanto queratinócitos estão restritos aos vasos.',
+          'Ambos atuam apenas na absorção de cálcio sistêmico sem função protetora.'
+        ],
+        correctIndex: 1,
+        isRedundant: false,
+        redundancyScore: 0,
+        isStarred: false
+      }
+    ];
+
     let currentCardIndex = 0;
     let studyMode = 'traditional';
+    let currentDiseaseFilter = 'all';
 
     function setStudyMode(mode) {
       studyMode = mode;
@@ -2229,30 +2537,49 @@
       }
     }
 
+    function getFilteredQuestions() {
+      if (currentDiseaseFilter === 'all') {
+        return sharedQuestionsBank;
+      }
+      return sharedQuestionsBank.filter(q => (q.disease === currentDiseaseFilter) || (q.subject && q.subject.includes(currentDiseaseFilter)));
+    }
+
     function renderSharedStudyItems() {
-      const hasItems = sharedQuestionsBank.length > 0;
+      const filtered = getFilteredQuestions();
+      const hasItems = filtered.length > 0;
 
-      document.getElementById('flashcardsEmptyState').style.display = hasItems ? 'none' : 'flex';
-      document.getElementById('flashcardDeck').style.display = hasItems ? 'block' : 'none';
+      const fcEmpty = document.getElementById('flashcardsEmptyState');
+      const fcDeck = document.getElementById('flashcardDeck');
+      const qzEmpty = document.getElementById('quizzesEmptyState');
+      const qzDeck = document.getElementById('quizDeck');
 
-      document.getElementById('quizzesEmptyState').style.display = hasItems ? 'none' : 'flex';
-      const quizDeck = document.getElementById('quizDeck');
-      quizDeck.style.display = hasItems ? 'flex' : 'none';
+      if (fcEmpty) fcEmpty.style.display = hasItems ? 'none' : 'flex';
+      if (fcDeck) fcDeck.style.display = hasItems ? 'block' : 'none';
+
+      if (qzEmpty) qzEmpty.style.display = hasItems ? 'none' : 'flex';
+      if (qzDeck) qzDeck.style.display = hasItems ? 'flex' : 'none';
 
       if (hasItems) {
-        if (currentCardIndex >= sharedQuestionsBank.length) currentCardIndex = 0;
-        updateCardDisplay();
-        renderQuizzesList();
+        if (currentCardIndex >= filtered.length) currentCardIndex = 0;
+        updateCardDisplay(filtered);
+        renderQuizzesList(filtered);
       }
     }
 
-    function updateCardDisplay() {
-      if (sharedQuestionsBank.length === 0) return;
-      const item = sharedQuestionsBank[currentCardIndex];
-      document.getElementById('fcTag').textContent = item.subject.toUpperCase();
-      document.getElementById('fcCounter').textContent = `Card ${currentCardIndex + 1} de ${sharedQuestionsBank.length}`;
-      document.getElementById('fcFrontQuestion').textContent = item.question;
-      document.getElementById('fcBackAnswer').innerHTML = item.answer;
+    function updateCardDisplay(filteredList) {
+      const list = filteredList || getFilteredQuestions();
+      if (list.length === 0) return;
+      const item = list[currentCardIndex];
+      
+      const tagEl = document.getElementById('fcTag');
+      const countEl = document.getElementById('fcCounter');
+      const frontEl = document.getElementById('fcFrontQuestion');
+      const backEl = document.getElementById('fcBackAnswer');
+
+      if (tagEl) tagEl.textContent = (item.disease || item.subject).toUpperCase();
+      if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length}${currentDiseaseFilter !== 'all' ? ' • ' + currentDiseaseFilter : ''}`;
+      if (frontEl) frontEl.textContent = item.question;
+      if (backEl) backEl.innerHTML = item.answer;
 
       // Banner de Redundância (>= 50%)
       const redAlert = document.getElementById('fcRedundancyAlert');
@@ -2260,43 +2587,55 @@
       const starLabel = document.getElementById('fcStarLabel');
 
       if (item.isRedundant) {
-        redAlert.style.display = 'flex';
-        document.getElementById('fcRedundancyMsg').textContent = `⚠️ Redundância detectada (${item.redundancyScore}% semelhante a "${item.matchedText?.slice(0, 35)}...")`;
-        starBtn.classList.toggle('starred', !!item.isStarred);
-        starLabel.textContent = item.isStarred ? 'Favoritado ⭐' : 'Favoritar';
+        if (redAlert) redAlert.style.display = 'flex';
+        const msgEl = document.getElementById('fcRedundancyMsg');
+        if (msgEl) msgEl.textContent = `⚠️ Redundância detectada (${item.redundancyScore}% semelhante a "${item.matchedText?.slice(0, 35)}...")`;
+        if (starBtn) starBtn.classList.toggle('starred', !!item.isStarred);
+        if (starLabel) starLabel.textContent = item.isStarred ? 'Favoritado ⭐' : 'Favoritar';
       } else {
-        redAlert.style.display = 'none';
+        if (redAlert) redAlert.style.display = 'none';
       }
       
-      document.getElementById('flashcardBox').classList.remove('flipped');
-      document.getElementById('studentAnswerInput').value = '';
-      document.getElementById('aiEvaluationFeedback').style.display = 'none';
+      const fcBox = document.getElementById('flashcardBox');
+      if (fcBox) fcBox.classList.remove('flipped');
+      const ansInput = document.getElementById('studentAnswerInput');
+      if (ansInput) ansInput.value = '';
+      const aiFeedback = document.getElementById('aiEvaluationFeedback');
+      if (aiFeedback) aiFeedback.style.display = 'none';
     }
 
     function deleteCurrentCard() {
-      if (sharedQuestionsBank.length === 0) return;
-      sharedQuestionsBank.splice(currentCardIndex, 1);
-      if (currentCardIndex >= sharedQuestionsBank.length) currentCardIndex = 0;
+      const list = getFilteredQuestions();
+      if (list.length === 0) return;
+      const item = list[currentCardIndex];
+      const realIdx = sharedQuestionsBank.findIndex(q => q.id === item.id);
+      if (realIdx !== -1) sharedQuestionsBank.splice(realIdx, 1);
+      if (currentCardIndex >= list.length - 1) currentCardIndex = 0;
       renderSharedStudyItems();
-      showToast('🗑️ Item redundante excluído da base.');
+      renderSceBars();
+      updateSubjectFilterMenus();
+      showToast('🗑️ Item excluído da base.');
     }
 
     function toggleStarCurrentCard() {
-      if (sharedQuestionsBank.length === 0) return;
-      const item = sharedQuestionsBank[currentCardIndex];
+      const list = getFilteredQuestions();
+      if (list.length === 0) return;
+      const item = list[currentCardIndex];
       item.isStarred = !item.isStarred;
-      updateCardDisplay();
+      updateCardDisplay(list);
       showToast(item.isStarred ? '⭐ Item favoritado para manter na base!' : 'Item desfavoritado.');
     }
 
     function flipCardManual() {
-      document.getElementById('flashcardBox').classList.toggle('flipped');
+      const fcBox = document.getElementById('flashcardBox');
+      if (fcBox) fcBox.classList.toggle('flipped');
     }
 
     function nextCard(remembered) {
-      if (sharedQuestionsBank.length === 0) return;
-      currentCardIndex = (currentCardIndex + 1) % sharedQuestionsBank.length;
-      updateCardDisplay();
+      const list = getFilteredQuestions();
+      if (list.length === 0) return;
+      currentCardIndex = (currentCardIndex + 1) % list.length;
+      updateCardDisplay(list);
       showToast(remembered ? '✅ Registrado! Revisão em 3 dias.' : '⚠️ Revisão reforçada para amanhã.');
     }
 
@@ -2312,18 +2651,20 @@
       setTimeout(() => {
         feedbackBanner.innerHTML = `
           <strong>🩺 Avaliação da IA:</strong><br>
-          Raciocínio correto! Você destacou os elementos fisiopatológicos cruciais da conduta recomendada.<br>
+          Raciocínio clínico correto! Você identificou os elementos fisiopatológicos cruciais da conduta recomendada.<br>
           <span style="color: var(--neon); font-weight: 700;">Grau de Precisão: 94%</span>
         `;
         showToast('Correção realizada com sucesso!');
       }, 450);
     }
 
-    function renderQuizzesList() {
+    function renderQuizzesList(filteredList) {
       const quizDeck = document.getElementById('quizDeck');
+      if (!quizDeck) return;
       quizDeck.innerHTML = '';
+      const list = filteredList || getFilteredQuestions();
 
-      sharedQuestionsBank.forEach((item, qIdx) => {
+      list.forEach((item, qIdx) => {
         const quizBox = document.createElement('div');
         quizBox.className = 'quiz-box';
         quizBox.innerHTML = `
@@ -2334,13 +2675,13 @@
                 <span>Redundância detectada (${item.redundancyScore}%)</span>
               </div>
               <div class="redundancy-actions">
-                <button class="btn-outline-action danger" onclick="deleteQuizItem(${qIdx})">Excluir</button>
-                <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" onclick="toggleStarQuizItem(${qIdx})">${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}</button>
+                <button class="btn-outline-action danger" onclick="deleteQuizItem('${item.id}')">Excluir</button>
+                <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" onclick="toggleStarQuizItem('${item.id}')">${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}</button>
               </div>
             </div>
           ` : ''}
           <div style="font-size: 11px; font-weight: 700; color: var(--neon);">
-            ${item.subject.toUpperCase()} • QUESTÃO #${qIdx + 1}
+            ${(item.disease || item.subject).toUpperCase()} • QUESTÃO #${qIdx + 1}
           </div>
           <div style="font-size: 15px; font-weight: 600; line-height: 1.5;">${item.question}</div>
           <div class="quiz-options-list">
@@ -2357,60 +2698,132 @@
       });
     }
 
-    function deleteQuizItem(index) {
-      sharedQuestionsBank.splice(index, 1);
+    function deleteQuizItem(id) {
+      const idx = sharedQuestionsBank.findIndex(q => q.id === id);
+      if (idx !== -1) sharedQuestionsBank.splice(idx, 1);
       renderSharedStudyItems();
-      showToast('🗑️ Quiz redundante removido.');
+      renderSceBars();
+      updateSubjectFilterMenus();
+      showToast('🗑️ Quiz removido.');
     }
 
-    function toggleStarQuizItem(index) {
-      sharedQuestionsBank[index].isStarred = !sharedQuestionsBank[index].isStarred;
-      renderQuizzesList();
-      showToast(sharedQuestionsBank[index].isStarred ? '⭐ Quiz favoritado!' : 'Quiz desfavoritado.');
-    }
-
-    function answerQuizOption(el, isCorrect, explanation) {
-      const parent = el.parentElement;
-      parent.querySelectorAll('.quiz-opt').forEach(opt => opt.onclick = null);
-      if (isCorrect) {
-        el.classList.add('correct');
-      } else {
-        el.classList.add('wrong');
-        parent.children[1].classList.add('correct');
+    function toggleStarQuizItem(id) {
+      const item = sharedQuestionsBank.find(q => q.id === id);
+      if (item) {
+        item.isStarred = !item.isStarred;
+        renderQuizzesList();
+        showToast(item.isStarred ? '⭐ Quiz favoritado!' : 'Quiz desfavoritado.');
       }
-      const feedback = parent.nextElementSibling;
-      feedback.style.display = 'block';
-      feedback.innerHTML = `<strong>${isCorrect ? '✅ Resposta Correta!' : '❌ Incorreto.'}</strong> Justificativa: ${explanation}`;
     }
 
-    // 6. PROCESSAMENTO DE UPLOAD COM TESTE DE REDUNDÂNCIA
-    function processSharedStudyMaterial() {
+    // 6. PROCESSAMENTO DE UPLOAD COM DIRECIONAMENTO E TESTE DE REDUNDÂNCIA
+    let pendingUploadMaterial = null;
+
+    function promptMaterialDirection() {
       const text = document.getElementById('materialTextInput').value.trim();
+      const fileInput = document.getElementById('materialFileInput');
+      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+      if (!text && !file) {
+        showToast('Por favor, digite um texto ou selecione um arquivo.');
+        return;
+      }
+
+      pendingUploadMaterial = { text, fileName: file ? file.name : 'Material de Aula' };
+      closeModals();
+      const modal = document.getElementById('uploadDirectionModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function toggleManualDirectionInputs() {
+      const box = document.getElementById('manualDirectionBox');
+      if (box) {
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    function applyMaterialDirection(mode) {
+      if (!pendingUploadMaterial) {
+        closeModals();
+        return;
+      }
+
+      let subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+      let diseaseName = 'Dermatoses & Semiologia Cutânea';
+
+      if (mode === 'manual') {
+        const inputVal = document.getElementById('manualDirectionInput').value.trim();
+        if (inputVal) {
+          subjectName = inputVal;
+          diseaseName = inputVal.includes('(') ? (inputVal.split('(')[1]?.replace(')', '') || inputVal) : inputVal;
+        }
+      } else {
+        // Classificação inteligente da IA
+        const combinedText = (pendingUploadMaterial.text + ' ' + pendingUploadMaterial.fileName).toLowerCase();
+        if (combinedText.includes('psoríase') || combinedText.includes('psoriase')) {
+          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          diseaseName = 'Psoríase Vulgar & Koebner';
+        } else if (combinedText.includes('líquen') || combinedText.includes('liquen')) {
+          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          diseaseName = 'Líquen Plano & Wickham';
+        } else if (combinedText.includes('eczem') || combinedText.includes('atópica') || combinedText.includes('atopica')) {
+          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          diseaseName = 'Dermatite Atópica & Eczemas';
+        } else if (combinedText.includes('lesão') || combinedText.includes('lesao') || combinedText.includes('mácula') || combinedText.includes('pápula')) {
+          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          diseaseName = 'Semiologia das Lesões Elementares Cutâneas';
+        } else {
+          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          diseaseName = 'Patologia Cutânea & Barreira Epidérmica';
+        }
+      }
+
       closeModals();
 
-      const candidateQ1 = 'Mecanismo de ação e benefícios dos Inibidores da SGLT2 (Dapagliflozina) na Insuficiência Cardíaca';
-      const redundancyQ1 = evaluateRedundancy(candidateQ1);
+      const qCandidate = `${diseaseName}: Conduta propedêutica e correlação fisiopatológica essencial`;
+      const red = evaluateRedundancy(qCandidate);
 
-      sharedQuestionsBank.push({
-        id: 'item-' + Date.now() + '-1',
-        subject: 'Farmacologia Cardiovascular',
-        question: candidateQ1,
-        answer: 'Inibem o cotransportador renal SGLT2, promovendo natriurese osmótica e glicosúria, reduzindo pré e pós-carga e diminuindo reinternações.',
+      sharedQuestionsBank.unshift({
+        id: 'upload-' + Date.now(),
+        subject: subjectName,
+        disease: diseaseName,
+        question: `[${diseaseName}] ${qCandidate}`,
+        answer: `Conduta diagnóstica e terapêutica validada pelas diretrizes clínicas para ${diseaseName}.`,
         quizOptions: [
-          'Bloqueio alfa-1 adrenérgico com vasodilatação venosa periférica direta.',
-          'Inibição seletiva do cotransportador SGLT2 com natriurese protetora.',
-          'Inibição da fosfodiesterase com aumento do inotropismo miocárdico.',
-          'Aumento da síntese de renina para preservação da filtração glomerular.'
+          `Conduta de primeira linha padrão-ouro para ${diseaseName}.`,
+          `Abordagem contraindicada para a fase aguda.`,
+          `Diagnóstico diferencial de menor probabilidade.`,
+          `Tratamento adjuvante sem evidência científica nível A.`
         ],
-        correctIndex: 1,
-        isRedundant: redundancyQ1.isRedundant,
-        redundancyScore: redundancyQ1.percentage,
-        matchedText: redundancyQ1.matchedText,
+        correctIndex: 0,
+        isRedundant: red.isRedundant,
+        redundancyScore: red.percentage,
+        matchedText: red.matchedText,
         isStarred: false
       });
 
+      // Atualiza roteiro do Waze da Medicina
+      studyRouteSchedule.unshift({
+        day: 'Hoje',
+        date: 'Hoje',
+        topic: `${diseaseName}: Roteiro de Fixação`,
+        subject: subjectName,
+        minutes: 30,
+        status: 'scheduled'
+      });
+
       renderSharedStudyItems();
-      showToast('🎉 Material processado com sucesso! Flashcard e Quiz gerados.');
+      renderSceBars();
+      renderSceTimeline();
+      updateSubjectFilterMenus();
+
+      const modeStr = mode === 'auto' ? '🤖 Classificação Inteligente da IA' : '✍️ Direcionamento Manual';
+      showToast(`${modeStr}: Material direcionado para "${subjectName}" [${diseaseName}]!`);
+      pendingUploadMaterial = null;
+    }
+
+    function processSharedStudyMaterial() {
+      promptMaterialDirection();
     }
 
     function handleMaterialFile(input) {
@@ -2751,7 +3164,8 @@
           const red1 = evaluateRedundancy(q1);
           sharedQuestionsBank.unshift({
             id: 'derm-' + Date.now() + '-1',
-            subject: 'Dermatologia (Sistemas Humanos 2)',
+            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+            disease: 'Semiologia das Lesões Elementares Cutâneas',
             question: q1,
             answer: 'Pápula é elevação sólida superficial circunscrita < 1 cm; Placa é elevação plana em platô geralmente > 1 cm (frequente confluência de pápulas); Nódulo é formação sólida circunscrita localizada na derme profunda ou hipoderme (1 a 3 cm), mais palpável que visível.',
             quizOptions: [
@@ -2772,7 +3186,8 @@
           const red2 = evaluateRedundancy(q2);
           sharedQuestionsBank.unshift({
             id: 'derm-' + Date.now() + '-2',
-            subject: 'Dermatologia (Sistemas Humanos 2)',
+            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+            disease: 'Psoríase Vulgar & Koebner',
             question: q2,
             answer: 'Na Psoríase: Sinal da vela (desprendimento de escamas estratificadas), Sinal de Auspitz / Orvalho Sangrento (pontos hemorrágicos após curetagem de Brocq) e Fenômeno de Koebner. No Líquen Plano: Pápulas poligonais violáceas pruriginosas com Estrias de Wickham (rede esbranquiçada na superfície).',
             quizOptions: [
@@ -2793,7 +3208,8 @@
           const red3 = evaluateRedundancy(q3);
           sharedQuestionsBank.unshift({
             id: 'derm-' + Date.now() + '-3',
-            subject: 'Dermatologia (Sistemas Humanos 2)',
+            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+            disease: 'Dermatite Atópica & Eczemas',
             question: q3,
             answer: 'No lactente: acometimento característico da face (regiões malares poupando o triângulo perioral) e faces extensoras dos membros. No adolescente/adulto: predileção por dobras flexurais (fossas anticubitais e poplíteas), pescoço e punhos, com frequente liquenificação crônica.',
             quizOptions: [
@@ -2814,7 +3230,8 @@
           const red4 = evaluateRedundancy(q4);
           sharedQuestionsBank.unshift({
             id: 'derm-' + Date.now() + '-4',
-            subject: 'Dermatologia (Sistemas Humanos 2)',
+            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+            disease: 'Histologia da Barreira Epidérmica',
             question: q4,
             answer: 'Queratinócitos compõem >90% da epiderme, sintetizam citoqueratinas e o complexo lipídico intercelular que forma a barreira hidrofóbica e mecânica; melanócitos na camada basal produzem melanina e a transferem via melanossomos aos queratinócitos para fotoproteção do DNA nuclear.',
             quizOptions: [
@@ -2832,29 +3249,14 @@
 
           // Atualiza o Roteiro Adaptativo (Waze da Medicina)
           studyRouteSchedule.unshift(
-            { day: 'Hoje', date: 'Agendado', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled' },
-            { day: 'Amanhã', date: 'Agendado', topic: 'Dermatologia: Psoríase, Koebner e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' }
+            { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled' },
+            { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Koebner e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' }
           );
 
-          // Atualiza as barras de disciplina no SCE
-          const sceDisciplineBars = document.getElementById('sceDisciplineBars');
-          if (sceDisciplineBars) {
-            const dermBar = document.createElement('div');
-            dermBar.className = 'sce-subject-bar';
-            dermBar.innerHTML = `
-              <div class="bar-labels">
-                <span>Integração de Sistemas Humanos 2 (Dermatologia) <span style="color: var(--neon); font-size: 11px;">(Sincronizada via Drive • 8 arquivos)</span></span>
-                <span style="color: var(--neon);">88% Maestria • Retenção 82%</span>
-              </div>
-              <div class="bar-track">
-                <div class="bar-fill" style="width: 88%;"></div>
-              </div>
-            `;
-            sceDisciplineBars.prepend(dermBar);
-          }
-
+          renderSceBars();
           renderSceTimeline();
           renderSharedStudyItems();
+          updateSubjectFilterMenus();
 
           showToast(`☁️ Drive sincronizado! ${selectedFiles.length} aulas de Dermatologia importadas para Flashcards, Quizzes e Roteiro SCE. Livro extenso Azulay filtrado para poupar processamento.`);
         } else {
@@ -2864,6 +3266,7 @@
           sharedQuestionsBank.unshift({
             id: 'gen-' + Date.now(),
             subject: currentScannedFolder ? currentScannedFolder.disciplineKey : 'Clínica Médica',
+            disease: 'Pneumologia Clínica',
             question: qGen,
             answer: 'A consolidação preserva volume e cursa com broncograma aéreo; a atelectasia cursa com redução de volume e retração das fissuras.',
             quizOptions: [
@@ -2879,12 +3282,15 @@
             isStarred: false
           });
           renderSharedStudyItems();
+          renderSceBars();
+          renderSceTimeline();
+          updateSubjectFilterMenus();
           showToast(`☁️ Drive sincronizado! ${selectedFiles.length} arquivos importados com sucesso.`);
         }
       }, needsCompression ? 750 : 300);
     }
 
-    // 8. EMENTA UNIVERSITÁRIA
+    // 8. EMENTA UNIVERSITÁRIA COM IA E EXCLUSÃO
     let universityCurriculum = null;
     function handleSyllabusFile(input) {
       if (input.files && input.files[0]) {
@@ -2892,25 +3298,61 @@
       }
     }
 
+    function deleteCurriculum() {
+      universityCurriculum = null;
+      const grid = document.getElementById('curriculumGrid');
+      const headerBar = document.getElementById('curriculumHeaderBar');
+      const empty = document.getElementById('curriculumEmptyState');
+      if (grid) grid.style.display = 'none';
+      if (headerBar) headerBar.style.display = 'none';
+      if (empty) empty.style.display = 'flex';
+      showToast('🗑️ Ementa universitária excluída com sucesso.');
+    }
+
     function processSyllabusText() {
       closeModals();
-      universityCurriculum = [
-        {
-          period: '1º e 2º Ano • Ciclo Básico',
-          subjects: ['Anatomia Humana Geral', 'Fisiologia Médica dos Sistemas', 'Farmacologia Geral', 'Patologia Celular']
-        },
-        {
-          period: '3º e 4º Ano • Ciclo Clínico',
-          subjects: ['Semiologia Médica', 'Clínica Médica I (Cardio/Pneumo)', 'Clínica Médica II (Gastro/Endocrino)', 'Técnica Cirúrgica']
-        },
-        {
-          period: '5º e 6º Ano • Internato',
-          subjects: ['Internato em Pediatria', 'Internato em Ginecologia e Obstetrícia', 'Internato em Urgência e Emergência', 'Medicina da Família']
+      const inputEl = document.getElementById('syllabusTextInput');
+      const text = inputEl ? inputEl.value.trim() : '';
+
+      let parsedSubjects = [];
+      if (text && !text.toLowerCase().includes('ementa carregada:')) {
+        const lines = text.split(/[\n,;]+/).map(s => s.trim()).filter(s => s.length > 2);
+        if (lines.length > 0) {
+          parsedSubjects = lines;
         }
-      ];
+      }
+
+      if (parsedSubjects.length === 0) {
+        universityCurriculum = [
+          {
+            period: '3º Ano • Módulo Vigente (Sistemas Humanos 2)',
+            subjects: [
+              'Integração de Sistemas Humanos 2 (Dermatologia)',
+              'Semiologia Médica e Propedêutica das Lesões Elementares',
+              'Fisiopatologia da Barreira Cutânea e Histologia Tegumentar',
+              'Diagnóstico Diferencial de Eczemas, Psoríase e Líquen Plano'
+            ]
+          },
+          {
+            period: 'Ciclo Clínico • Integração de Disciplinas Médicas',
+            subjects: [
+              'Semiologia Médica e Raciocínio Clínico',
+              'Patologia Especial dos Órgãos e Sistemas',
+              'Farmacoterapia Aplicada à Clínica'
+            ]
+          }
+        ];
+      } else {
+        universityCurriculum = [
+          {
+            period: 'Grade Curricular Personalizada (IA Estruturada)',
+            subjects: parsedSubjects
+          }
+        ];
+      }
 
       renderCurriculumGrid();
-      showToast('🎓 Grade universitária estruturada com sucesso!');
+      showToast('🎓 Ementa universitária estruturada e atualizada com sucesso!');
     }
 
     function loadDefaultDCNCurriculum() {
@@ -2918,54 +3360,73 @@
     }
 
     function renderCurriculumGrid() {
-      if (!universityCurriculum) return;
-      document.getElementById('curriculumEmptyState').style.display = 'none';
+      const empty = document.getElementById('curriculumEmptyState');
       const grid = document.getElementById('curriculumGrid');
-      grid.style.display = 'grid';
-      grid.innerHTML = '';
+      const headerBar = document.getElementById('curriculumHeaderBar');
 
-      universityCurriculum.forEach(cat => {
-        const card = document.createElement('div');
-        card.className = 'subject-category-card';
-        card.innerHTML = `
-          <div class="category-header">
-            <span>${cat.period}</span>
-            <span>Ativo</span>
-          </div>
-          ${cat.subjects.map(s => `
-            <div class="subject-row">
-              <span>${s}</span>
-              <span class="knowledge-meter">45% Domínio</span>
+      if (!universityCurriculum || universityCurriculum.length === 0) {
+        if (empty) empty.style.display = 'flex';
+        if (grid) grid.style.display = 'none';
+        if (headerBar) headerBar.style.display = 'none';
+        return;
+      }
+
+      if (empty) empty.style.display = 'none';
+      if (headerBar) headerBar.style.display = 'flex';
+      if (grid) {
+        grid.style.display = 'grid';
+        grid.innerHTML = '';
+        universityCurriculum.forEach(cat => {
+          const card = document.createElement('div');
+          card.className = 'subject-category-card';
+          card.innerHTML = `
+            <div class="category-header">
+              <span>${cat.period}</span>
+              <span style="color: var(--neon); font-size: 11px; font-weight: 700;">Ativo</span>
             </div>
-          `).join('')}
-        `;
-        grid.appendChild(card);
-      });
+            ${cat.subjects.map(s => `
+              <div class="subject-row">
+                <span>${s}</span>
+                <span class="knowledge-meter">72% Domínio</span>
+              </div>
+            `).join('')}
+          `;
+          grid.appendChild(card);
+        });
+      }
     }
 
     // 9. SCE & WAZE DA MEDICINA (ROTEIRO DINÂMICO & RECÁLCULO)
     let studyRouteSchedule = [
-      { day: 'Segunda-feira', date: '01/Set', topic: 'Insuficiência Cardíaca e Fração de Ejeção', subject: 'Cardiologia', minutes: 30, status: 'completed' },
-      { day: 'Terça-feira', date: '02/Set', topic: 'Inibidores SGLT2 e Farmacoterapia Quádrupla', subject: 'Farmacologia', minutes: 25, status: 'delayed' },
-      { day: 'Quarta-feira', date: '03/Set', topic: 'Exacerbação de Asma Grave e Suporte Ventilatório', subject: 'Pneumologia', minutes: 35, status: 'delayed' },
-      { day: 'Quinta-feira', date: 'Hoje', topic: 'Cetoacidose Diabética e Critérios de Potássio', subject: 'Endocrinologia', minutes: 30, status: 'scheduled' },
-      { day: 'Sexta-feira', date: 'Amanhã', topic: 'Protocolo de Sepse e Ressuscitação Volêmica', subject: 'Emergência', minutes: 40, status: 'scheduled' }
+      { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled' },
+      { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' },
+      { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed' }
     ];
 
     function renderSceTimeline() {
       const container = document.getElementById('timelineSchedule');
+      if (!container) return;
       container.innerHTML = '';
+
+      if (studyRouteSchedule.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px; width: 100%;">Nenhum roteiro agendado no momento. Conecte o Drive ou faça upload de aulas para traçar sua rota.</div>';
+        const statusTag = document.getElementById('wazeStatusTag');
+        const statusLabel = document.getElementById('wazeStatusLabel');
+        if (statusTag) statusTag.className = 'waze-status-tag on-track';
+        if (statusLabel) statusLabel.textContent = 'Sem Tarefas Pendentes';
+        return;
+      }
 
       const delayedCount = studyRouteSchedule.filter(s => s.status === 'delayed').length;
       const statusTag = document.getElementById('wazeStatusTag');
       const statusLabel = document.getElementById('wazeStatusLabel');
 
       if (delayedCount > 0) {
-        statusTag.className = 'waze-status-tag delayed';
-        statusLabel.textContent = `${delayedCount} Tarefas Atrasadas`;
+        if (statusTag) statusTag.className = 'waze-status-tag delayed';
+        if (statusLabel) statusLabel.textContent = `${delayedCount} Tarefas Atrasadas`;
       } else {
-        statusTag.className = 'waze-status-tag on-track';
-        statusLabel.textContent = 'Rota Otimizada • Em Dia';
+        if (statusTag) statusTag.className = 'waze-status-tag on-track';
+        if (statusLabel) statusLabel.textContent = 'Rota Otimizada • Em Dia';
       }
 
       studyRouteSchedule.forEach(task => {
@@ -2997,8 +3458,8 @@
       const icon = document.getElementById('recalcIcon');
       const text = document.getElementById('recalcBtnText');
       
-      icon.style.transform = 'rotate(360deg)';
-      text.textContent = 'Otimizando roteiro...';
+      if (icon) icon.style.transform = 'rotate(360deg)';
+      if (text) text.textContent = 'Otimizando roteiro...';
 
       setTimeout(() => {
         // Redistribui as tarefas atrasadas pelos dias úteis seguintes
@@ -3009,35 +3470,60 @@
           }
         });
 
-        icon.style.transform = 'none';
-        text.textContent = 'Recalcular Rota Agora';
-        document.getElementById('lastRecalcInfo').textContent = 'Última otimização: agora mesmo';
+        if (icon) icon.style.transform = 'none';
+        if (text) text.textContent = 'Recalcular Rota Agora';
+        const lastRecalc = document.getElementById('lastRecalcInfo');
+        if (lastRecalc) lastRecalc.textContent = 'Última otimização: agora mesmo';
         renderSceTimeline();
         showToast('🧭 Waze da Medicina: Rota recalculada com sucesso! Tarefas atrasadas equilibradas sem sobrecarga.');
       }, 700);
     }
 
     function renderSceBars() {
-      const disciplines = [
-        { name: 'Cardiologia Clínica', mastery: 82, retention: 76, questions: 48 },
-        { name: 'Farmacologia Médica', mastery: 68, retention: 62, questions: 36 },
-        { name: 'Medicina de Emergência', mastery: 60, retention: 55, questions: 28 },
-        { name: 'Pneumologia', mastery: 48, retention: 44, questions: 20 },
-        { name: 'Endocrinologia', mastery: 35, retention: 32, questions: 14 }
-      ];
-
       const container = document.getElementById('sceDisciplineBars');
-      container.innerHTML = disciplines.map(d => `
-        <div class="sce-subject-bar">
-          <div class="bar-labels">
-            <span>${d.name} <span style="color: var(--text-muted); font-size: 11px;">(${d.questions} itens respondidos)</span></span>
-            <span style="color: var(--neon);">${d.mastery}% Maestria • Retenção ${d.retention}%</span>
+      if (!container) return;
+
+      const subjectsMap = {};
+      sharedQuestionsBank.forEach(q => {
+        const s = q.subject || 'Integração de Sistemas Humanos 2 (Dermatologia)';
+        if (!subjectsMap[s]) {
+          subjectsMap[s] = { name: s, count: 0, diseases: new Set() };
+        }
+        subjectsMap[s].count++;
+        if (q.disease) subjectsMap[s].diseases.add(q.disease);
+      });
+
+      const subjectKeys = Object.keys(subjectsMap);
+
+      if (subjectKeys.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 24px; color: var(--text-secondary); font-size: 13px;">
+            Nenhuma disciplina com dados de evolução no momento. Sincronize com o Google Drive ou faça upload de aulas para gerar os gráficos de aprendizado.
           </div>
-          <div class="bar-track">
-            <div class="bar-fill" style="width: ${d.mastery}%;"></div>
+        `;
+        return;
+      }
+
+      container.innerHTML = subjectKeys.map(key => {
+        const item = subjectsMap[key];
+        const diseaseListStr = Array.from(item.diseases).join(', ');
+        const mastery = Math.min(96, 72 + item.count * 4);
+        const retention = Math.min(92, 68 + item.count * 3);
+        return `
+          <div class="sce-subject-bar">
+            <div class="bar-labels">
+              <span>
+                ${item.name} 
+                <span style="color: var(--text-muted); font-size: 11px;">(${item.count} itens • ${item.diseases.size} afecções${diseaseListStr ? ': ' + diseaseListStr : ''})</span>
+              </span>
+              <span style="color: var(--neon);">${mastery}% Maestria • Retenção ${retention}%</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width: ${mastery}%;"></div>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     // 10. CHAT INTERATIVO & INTEGRAÇÃO COM DRIVE
@@ -3158,7 +3644,7 @@
       showToast('✅ Questão adicionada aos Flashcards e Quizzes!');
     }
 
-    // 11. MATERIAIS DO GOOGLE DRIVE NO CHAT & GERAÇÃO DE LEITURA MÉDICA
+    // 11. MATERIAIS DO GOOGLE DRIVE NO CHAT COM MENU SUSPENSO, EXCLUSÃO E RELATÓRIO
     const DEFAULT_DRIVE_FOLDER_FILES = [
       {
         id: '1XjD8B4j8Q7U8R1bA4C5D6E7F8G9H0J1',
@@ -3167,6 +3653,7 @@
         type: 'slides',
         selected: true,
         tag: 'Slide Aula',
+        disease: 'Histologia da Barreira Epidérmica',
         topic: 'Sistema Tegumentar, Epiderme e Derme'
       },
       {
@@ -3176,7 +3663,8 @@
         type: 'slides',
         selected: true,
         tag: 'Slide Aula',
-        topic: 'Semiologia e Lesões Elementares (Mácula, Pápula, Placa, Nódulo)'
+        disease: 'Semiologia das Lesões Elementares Cutâneas',
+        topic: 'Mácula, Pápula, Placa, Nódulo e Vesículas'
       },
       {
         id: '1a5Z5l9B9C8X7W6V5U4T3S2R1Q0P9O8N',
@@ -3185,7 +3673,8 @@
         type: 'slides',
         selected: true,
         tag: 'Slide Aula',
-        topic: 'Psoríase (Auspitz, Koebner) & Líquen Plano (Wickham)'
+        disease: 'Psoríase Vulgar & Líquen Plano',
+        topic: 'Koebner, Auspitz e Estrias de Wickham'
       },
       {
         id: '1L9mK8j7H6g5F4d3S2a1Z0X9C8V7B6N5',
@@ -3194,7 +3683,8 @@
         type: 'slides',
         selected: true,
         tag: 'Slide Aula',
-        topic: 'Eczemas, Fisiopatologia e Diagnóstico Diferencial'
+        disease: 'Dermatite Atópica & Eczemas',
+        topic: 'Eczemas e Diagnóstico Diferencial'
       },
       {
         id: '1yZ4m6K2L9x1W8v7U3t5S4r3Q2p1O0n9',
@@ -3203,6 +3693,7 @@
         type: 'doc',
         selected: false,
         tag: 'Cronograma',
+        disease: 'Cronograma e Plano de Aulas',
         topic: 'Plano Pedagógico Semestral'
       },
       {
@@ -3212,7 +3703,8 @@
         type: 'doc',
         selected: false,
         tag: 'Casos Clínicos',
-        topic: 'Roteiro de Casos Ambulatoriais'
+        disease: 'Casos Clínicos Ambulatoriais',
+        topic: 'Roteiro de Casos Práticos'
       },
       {
         id: '1YxMHcUSCNYyW_8t6WOw9Bv8JvYKVIBOF',
@@ -3221,7 +3713,8 @@
         type: 'doc',
         selected: false,
         tag: 'Resumo Ambulatório',
-        topic: 'Esquemas Diagnósticos Práticos'
+        disease: 'Esquemas Diagnósticos Práticos',
+        topic: 'Esquemas Diagnósticos e Conduta'
       },
       {
         id: '1XCjuoqYcWCCb_wNiQVA31x9RNnL27Kr9',
@@ -3231,7 +3724,8 @@
         selected: false,
         isBook: true,
         tag: 'Tratado / Livro',
-        topic: 'Tratado de Referência (Omitido por padrão para poupar processamento)'
+        disease: 'Tratado de Referência (Azulay)',
+        topic: 'Tratado Omitido por Padrão (> 50 MB)'
       }
     ];
 
@@ -3239,68 +3733,187 @@
     let currentReaderFontSize = 14;
 
     function initChatDriveMaterials() {
-      renderChatDriveGrid();
+      renderChatDriveVerticalList();
       updateChatAttachedBar();
     }
 
-    function toggleChatDriveDrawer() {
-      const drawer = document.getElementById('chatDriveDrawer');
-      if (!drawer) return;
-      drawer.classList.toggle('active');
-      const btn = document.getElementById('btnToggleChatDrive');
-      if (btn) {
-        btn.classList.toggle('active', drawer.classList.contains('active'));
-      }
+    function toggleChatDriveDropdown() {
+      const dd = document.getElementById('chatDriveDropdown');
+      if (!dd) return;
+      dd.classList.toggle('visible');
+      const sMenu = document.getElementById('chatSubjectDropdownMenu');
+      if (sMenu) sMenu.classList.remove('visible');
+      renderChatDriveVerticalList();
     }
 
-    function renderChatDriveGrid() {
-      const grid = document.getElementById('chatDriveGrid');
-      if (!grid) return;
-      grid.innerHTML = '';
+    function renderChatDriveVerticalList() {
+      const container = document.getElementById('chatDriveVerticalList');
+      if (!container) return;
+      container.innerHTML = '';
 
-      chatDriveMaterials.forEach((file, index) => {
+      if (chatDriveMaterials.length === 0) {
+        container.innerHTML = `
+          <div style="padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+            Nenhum material no Drive. Faça novo upload ou sincronize uma pasta.
+          </div>
+        `;
+        return;
+      }
+
+      chatDriveMaterials.forEach((file) => {
         const item = document.createElement('div');
-        item.className = 'chat-drive-item' + (file.selected ? ' selected' : '');
+        item.className = 'chat-drive-vertical-item' + (file.selected ? ' selected' : '');
         item.onclick = (e) => {
           if (e.target.tagName.toLowerCase() !== 'input') {
-            toggleChatDriveFile(index);
+            toggleDriveFileCheck(file.id, !file.selected);
           }
         };
 
         item.innerHTML = `
-          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleChatDriveFile(${index})">
+          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleDriveFileCheck('${file.id}', this.checked)">
           <div style="flex: 1; min-width: 0;">
-            <div class="chat-drive-item-title" title="${file.name}">
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">
               ${file.isBook ? '📖' : '📄'} ${file.name}
             </div>
-            <div class="chat-drive-item-meta">
-              <span>${file.sizeStr}</span>
-              <span style="color: ${file.isBook ? '#f59e0b' : 'var(--neon)'}; font-weight: 600;">• ${file.tag}</span>
-              <span style="color: var(--text-muted);">• ${file.topic}</span>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 11px;">
+              <span class="disease-tag">${file.disease || file.tag}</span>
+              <span style="color: var(--text-secondary);">${file.sizeStr}</span>
+              <span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• ${file.topic}</span>
             </div>
           </div>
         `;
-        grid.appendChild(item);
+        container.appendChild(item);
       });
 
       const selectedCount = chatDriveMaterials.filter(m => m.selected).length;
-      const countEl = document.getElementById('chatDriveCount');
-      if (countEl) countEl.textContent = selectedCount;
+      const totalCount = chatDriveMaterials.length;
+      
+      const countLabel = document.getElementById('driveSelectedVerticalCount');
+      if (countLabel) countLabel.textContent = `${selectedCount} de ${totalCount} selecionadas`;
+
+      const allChk = document.getElementById('chkSelectAllDriveFiles');
+      if (allChk) allChk.checked = (selectedCount === totalCount && totalCount > 0);
+
+      const chatDriveCount = document.getElementById('chatDriveCount');
+      if (chatDriveCount) chatDriveCount.textContent = selectedCount;
     }
 
-    function toggleChatDriveFile(index) {
-      if (chatDriveMaterials[index]) {
-        chatDriveMaterials[index].selected = !chatDriveMaterials[index].selected;
-        renderChatDriveGrid();
+    function toggleDriveFileCheck(id, checked) {
+      const item = chatDriveMaterials.find(m => m.id === id);
+      if (item) {
+        item.selected = checked;
+        renderChatDriveVerticalList();
         updateChatAttachedBar();
       }
+    }
+
+    function toggleSelectAllDriveFiles(checked) {
+      chatDriveMaterials.forEach(m => { m.selected = checked; });
+      renderChatDriveVerticalList();
+      updateChatAttachedBar();
+      showToast(checked ? 'Todas as aulas marcadas!' : 'Todas as aulas desmarcadas.');
+    }
+
+    function deleteSelectedDriveFiles() {
+      const toDelete = chatDriveMaterials.filter(m => m.selected);
+      if (toDelete.length === 0) {
+        showToast('Nenhum item marcado para eliminar.');
+        return;
+      }
+      const count = toDelete.length;
+      chatDriveMaterials = chatDriveMaterials.filter(m => !m.selected);
+      renderChatDriveVerticalList();
+      updateChatAttachedBar();
+      updateSubjectFilterMenus();
+      showToast(`🗑️ ${count} material(is) eliminado(s) com sucesso!`);
+    }
+
+    // RELATÓRIO DE ESTUDO DO DRIVE (CRITICAL: NÃO ELIMINA NENHUM ITEM)
+    function generateDriveReport() {
+      const totalFiles = chatDriveMaterials.length;
+      if (totalFiles === 0) {
+        showToast('Nenhum material disponível no Drive para gerar relatório.');
+        return;
+      }
+
+      const selectedFiles = chatDriveMaterials.filter(m => m.selected);
+      const diseases = [...new Set(chatDriveMaterials.map(m => m.disease || m.tag))];
+
+      const flow = document.getElementById('chatFlow');
+      const empty = document.getElementById('chatEmptyState');
+      if (empty) empty.style.display = 'none';
+
+      const reportBubble = document.createElement('div');
+      reportBubble.className = 'chat-bubble tutor';
+      reportBubble.style.maxWidth = '92%';
+
+      reportBubble.innerHTML = `
+        <div class="tutor-header">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Relatório de Cobertura Curricular & Auditoria do Drive (Sem Exclusão)
+        </div>
+        <div style="background: rgba(0, 255, 102, 0.05); border: 1px solid rgba(0, 255, 102, 0.2); border-radius: 12px; padding: 14px; margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
+            <div>
+              <strong style="font-size: 14px; color: var(--text-primary);">Auditoria Curricular: Integração de Sistemas Humanos 2</strong>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Google Drive: Módulo de Dermatologia Clínica (Turma 2026.2)</div>
+            </div>
+            <span style="background: var(--neon); color: #000; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">100% Preservado</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px;">
+            <div style="background: var(--bg-surface); padding: 10px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+              <div style="font-size: 18px; font-weight: 800; color: var(--neon);">${totalFiles}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Materiais no Drive</div>
+            </div>
+            <div style="background: var(--bg-surface); padding: 10px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+              <div style="font-size: 18px; font-weight: 800; color: #60a5fa;">${diseases.length}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Afecções Mapeadas</div>
+            </div>
+            <div style="background: var(--bg-surface); padding: 10px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+              <div style="font-size: 18px; font-weight: 800; color: #f59e0b;">${selectedFiles.length}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Marcados p/ Leitura</div>
+            </div>
+          </div>
+
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">
+            Mapeamento dos Materiais por Doença e Conteúdo:
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+            ${chatDriveMaterials.map(m => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--border);">
+                <span>${m.isBook ? '📖' : '📄'} <strong>${m.name}</strong> <span style="color: var(--neon); font-size: 10px; margin-left: 4px;">[${m.disease || m.tag}]</span></span>
+                <span style="font-size: 11px; color: var(--text-muted);">${m.sizeStr}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top: 12px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+            📌 <em>Garantia do Sistema: A emissão deste relatório de auditoria não altera nem elimina nenhum dos ${totalFiles} materiais da base. Todos permanecem disponíveis para estudo.</em>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+            <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction(false)">
+              📖 Produzir Apostila de Leitura com Base no Relatório
+            </button>
+            <button class="btn-outline-action" onclick="navigateTab('flashcards')">
+              🗂️ Ver Flashcards por Afecção Clínica
+            </button>
+          </div>
+        </div>
+      `;
+
+      flow.appendChild(reportBubble);
+      flow.scrollTop = flow.scrollHeight;
+      toggleChatDriveDropdown();
+      showToast('📊 Relatório de estudo gerado no chat (nenhum item foi excluído)!');
     }
 
     function removeChatDriveFile(id) {
       const item = chatDriveMaterials.find(m => m.id === id);
       if (item) {
         item.selected = false;
-        renderChatDriveGrid();
+        renderChatDriveVerticalList();
         updateChatAttachedBar();
       }
     }
@@ -3337,7 +3950,7 @@
           m.selected = false;
         }
       });
-      renderChatDriveGrid();
+      renderChatDriveVerticalList();
       updateChatAttachedBar();
       showToast(select ? '✅ Todas as 7 aulas marcadas para leitura!' : 'Materiais do Drive desmarcados.');
     }
@@ -3349,12 +3962,116 @@
     function produceReadingFromDriveModal() {
       closeModals();
       navigateTab('chat');
-      const drawer = document.getElementById('chatDriveDrawer');
-      if (drawer && !drawer.classList.contains('active')) {
-        drawer.classList.add('active');
+      const dd = document.getElementById('chatDriveDropdown');
+      if (dd && !dd.classList.contains('visible')) {
+        dd.classList.add('visible');
       }
       requestReadingMaterialProduction(true);
     }
+
+    // 12. DROPDOWNS DE MATÉRIA & AFECÇÕES CLÍNICAS (CHAT & FLASHCARDS)
+    function toggleFcSubjectDropdown() {
+      const menu = document.getElementById('fcSubjectDropdownMenu');
+      if (menu) menu.classList.toggle('visible');
+    }
+
+    function toggleChatSubjectDropdown() {
+      const menu = document.getElementById('chatSubjectDropdownMenu');
+      if (menu) {
+        menu.classList.toggle('visible');
+        const driveDd = document.getElementById('chatDriveDropdown');
+        if (driveDd) driveDd.classList.remove('visible');
+      }
+    }
+
+    function getAvailableDiseases() {
+      const diseases = new Set();
+      sharedQuestionsBank.forEach(q => {
+        if (q.disease) diseases.add(q.disease);
+      });
+      chatDriveMaterials.forEach(m => {
+        if (m.disease) diseases.add(m.disease);
+      });
+      return Array.from(diseases);
+    }
+
+    function updateSubjectFilterMenus() {
+      const diseases = getAvailableDiseases();
+
+      // 1. Menu de Flashcards
+      const fcMenu = document.getElementById('fcSubjectDropdownMenu');
+      if (fcMenu) {
+        fcMenu.innerHTML = `
+          <div class="dropdown-item ${currentDiseaseFilter === 'all' ? 'active' : ''}" onclick="setFcDiseaseFilter('all')">
+            <strong>Todas as Doenças</strong> (Todos os Cards)
+          </div>
+          ${diseases.map(d => `
+            <div class="dropdown-item ${currentDiseaseFilter === d ? 'active' : ''}" onclick="setFcDiseaseFilter('${d.replace(/'/g, "\\'")}')">
+              🔬 ${d}
+            </div>
+          `).join('')}
+        `;
+      }
+
+      // 2. Menu do Chat
+      const chatMenu = document.getElementById('chatSubjectDropdownMenu');
+      if (chatMenu) {
+        chatMenu.innerHTML = `
+          <div class="dropdown-item" onclick="setChatDiseasePrompt('all')">
+            <strong>Todas as Doenças</strong> (Visão Geral da Disciplina)
+          </div>
+          ${diseases.map(d => `
+            <div class="dropdown-item" onclick="setChatDiseasePrompt('${d.replace(/'/g, "\\'")}')">
+              🔬 ${d}
+            </div>
+          `).join('')}
+        `;
+      }
+    }
+
+    function setFcDiseaseFilter(disease) {
+      currentDiseaseFilter = disease;
+      const label = document.getElementById('fcCurrentFilterLabel');
+      if (label) {
+        label.textContent = disease === 'all' ? 'Todas as Doenças' : disease;
+      }
+      const menu = document.getElementById('fcSubjectDropdownMenu');
+      if (menu) menu.classList.remove('visible');
+      currentCardIndex = 0;
+      renderSharedStudyItems();
+      updateSubjectFilterMenus();
+      showToast(disease === 'all' ? 'Exibindo todos os cards.' : `Filtrado por: ${disease}`);
+    }
+
+    function setChatDiseasePrompt(disease) {
+      const menu = document.getElementById('chatSubjectDropdownMenu');
+      if (menu) menu.classList.remove('visible');
+      const label = document.getElementById('chatSubjectCurrentName');
+      if (label) {
+        label.textContent = disease === 'all' ? 'Integração de Sistemas Humanos 2' : `Dermatologia • ${disease}`;
+      }
+      if (disease !== 'all') {
+        quickPrompt(`Quais os pontos-chave diagnósticos, lesões elementares e conduta terapêutica em ${disease}?`);
+      } else {
+        quickPrompt(`Apresente uma visão geral das afecções dermatológicas estudadas na disciplina de Sistemas Humanos 2.`);
+      }
+    }
+
+    // Fechar dropdowns ao clicar fora
+    window.addEventListener('click', (e) => {
+      if (!e.target.closest('#btnToggleChatDrive') && !e.target.closest('#chatDriveDropdown')) {
+        const dd = document.getElementById('chatDriveDropdown');
+        if (dd) dd.classList.remove('visible');
+      }
+      if (!e.target.closest('#btnChatSubject') && !e.target.closest('#chatSubjectDropdownMenu')) {
+        const sMenu = document.getElementById('chatSubjectDropdownMenu');
+        if (sMenu) sMenu.classList.remove('visible');
+      }
+      if (!e.target.closest('#fcSubjectDropdownBtn') && !e.target.closest('#fcSubjectDropdownMenu')) {
+        const fcMenu = document.getElementById('fcSubjectDropdownMenu');
+        if (fcMenu) fcMenu.classList.remove('visible');
+      }
+    });
 
     // GERAÇÃO DO MATERIAL COMPLETO DE ESTUDO PARA LEITURA
     function requestReadingMaterialProduction(includeUserBubble = true) {
@@ -3644,6 +4361,10 @@
 
     // Inicialização ao carregar a página
     initChatDriveMaterials();
+    renderSharedStudyItems();
+    renderSceBars();
+    renderSceTimeline();
+    updateSubjectFilterMenus();
   </script>
 </body>
 </html>
