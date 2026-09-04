@@ -1523,10 +1523,6 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           Atualizar por Drive
         </button>
-        <button class="btn-outline-action danger" onclick="confirmResetAllUploadedData()" style="border-color: rgba(255, 68, 68, 0.4); color: #ff5555; justify-content: center; font-size: 11px;" title="Zerar todos os uploads para novos testes">
-          <svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-          Zerar Uploads (Hot Reload)
-        </button>
         <button class="btn-outline-action" onclick="openConfigModal()">
           <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Configurações
@@ -1543,10 +1539,6 @@
           Chat Científico & Revisão
         </div>
         <div class="topbar-actions">
-          <button class="btn-outline-action danger" onclick="confirmResetAllUploadedData()" title="Zerar todos os uploads, materiais e histórico para novos testes (Hot Reload)" style="border-color: rgba(255, 68, 68, 0.4); color: #ff5555; display: flex; align-items: center; gap: 6px;">
-            <svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-            <span>Zerar Uploads (Hot Reload)</span>
-          </button>
           <button class="btn-outline-action primary" onclick="openDriveModal()" title="Sincronizar materiais do Google Drive da turma">
             <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <span>Atualizar por Drive</span>
@@ -1597,7 +1589,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0 8px 0; flex-wrap: wrap; gap: 8px;">
               <div class="dropdown-filter-container">
                 <button class="dropdown-trigger-btn" id="btnChatSubject" onclick="toggleChatSubjectDropdown()">
-                  <span>📚 Matéria: <strong id="chatSubjectCurrentName" style="color: var(--neon);">Integração de Sistemas Humanos 2 (Dermatologia)</strong></span> ▾
+                  <span>📚 Matéria: <strong id="chatSubjectCurrentName" style="color: var(--neon);">Geral (Aguardando Upload)</strong></span> ▾
                 </button>
                 <div class="dropdown-menu-list" id="chatSubjectDropdownMenu">
                   <!-- Doenças específicas populadas dinamicamente via JS -->
@@ -2129,11 +2121,11 @@
         <div style="background: rgba(0, 255, 102, 0.05); border: 1px solid rgba(0, 255, 102, 0.2); padding: 10px 14px; border-radius: 10px;">
           <div style="font-size: 13px; font-weight: 700; color: var(--neon); display: flex; align-items: center; gap: 8px;">
             <svg class="icon" style="width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span id="driveFolderTitleDisplay">DISCIPLINA: Integração de sistemas humanos 2</span>
+            <span id="driveFolderTitleDisplay">DISCIPLINA: Nenhuma Pasta Conectada</span>
           </div>
           <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between;">
-            <span id="driveFilesCountInfo">8 arquivos encontrados no Drive • Módulo Dermatologia</span>
-            <span style="color: var(--neon); font-weight: 600;" id="driveSelectedCountBadge">7 aulas selecionadas</span>
+            <span id="driveFilesCountInfo">Aguardando busca de arquivos no Google Drive</span>
+            <span style="color: var(--neon); font-weight: 600;" id="driveSelectedCountBadge">0 selecionados</span>
           </div>
         </div>
 
@@ -2188,7 +2180,7 @@
           <span style="font-size: 22px;">📖</span>
           <div>
             <h2 id="readerModalTitle" style="font-size: 16px; margin: 0;">Material de Estudo para Leitura Médica</h2>
-            <span id="readerModalSubtitle" style="font-size: 11px; color: var(--text-secondary);">Integração de Sistemas Humanos 2 • Módulo Dermatologia</span>
+            <span id="readerModalSubtitle" style="font-size: 11px; color: var(--text-secondary);">Material de Leitura Médica</span>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -2279,12 +2271,17 @@
           <span style="font-size: 11px; font-weight: 700; color: var(--neon);">100% OK</span>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 68, 68, 0.05); border-radius: 12px; border: 1px solid rgba(255, 68, 68, 0.25);">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px; background: rgba(255, 68, 68, 0.06); border-radius: 12px; border: 1px solid rgba(255, 68, 68, 0.3);">
           <div>
-            <div style="font-weight: 700; font-size: 14px; color: var(--danger);">Ambiente de Testes / Reset de Uploads</div>
-            <div style="font-size: 12px; color: var(--text-secondary);">Zera todos os uploads, materiais e histórico para testar novos arquivos</div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--danger); display: flex; align-items: center; gap: 6px;">
+              <svg class="icon" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+              Zerar Uploads (Hot Reload)
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Limpa todos os arquivos do Drive/Uploads, materiais de leitura, histórico do Chat, Flashcards e Ementa para novos testes</div>
           </div>
-          <button class="btn-outline-action danger" onclick="closeModals(); confirmResetAllUploadedData();">Zerar Tudo</button>
+          <button class="btn-outline-action danger" onclick="closeModals(); confirmResetAllUploadedData();" style="white-space: nowrap; font-weight: 700;">
+            Zerar Uploads (Hot Reload)
+          </button>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
@@ -2417,7 +2414,7 @@
         <label style="font-size: 11px; color: var(--text-secondary); font-weight: 700; display: block; margin-bottom: 6px;">
           Nome da Matéria / Disciplina:
         </label>
-        <input type="text" id="manualDirectionInput" class="written-textarea" style="height: 38px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px;" placeholder="Ex: Integração de Sistemas Humanos 2 (Dermatologia)" value="Integração de Sistemas Humanos 2 (Dermatologia)">
+        <input type="text" id="manualDirectionInput" class="written-textarea" style="height: 38px; padding: 8px 12px; font-size: 12px; margin-bottom: 8px;" placeholder="Ex: Semiologia Médica, Cardiologia, Cirurgia..." value="">
         <button class="btn-outline-action primary" style="width: 100%; justify-content: center;" onclick="applyMaterialDirection('manual')">
           Confirmar com Direcionamento Manual
         </button>
@@ -2920,8 +2917,9 @@
         return;
       }
 
-      let subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
-      let diseaseName = 'Dermatoses & Semiologia Cutânea';
+      let defaultSubject = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+      let subjectName = defaultSubject;
+      let diseaseName = 'Semiologia e Propedêutica Geral';
 
       if (mode === 'manual') {
         const inputVal = document.getElementById('manualDirectionInput').value.trim();
@@ -2933,24 +2931,48 @@
         // Classificação inteligente da IA
         const combinedText = (pendingUploadMaterial.text + ' ' + pendingUploadMaterial.fileName).toLowerCase();
         if (combinedText.includes('psoríase') || combinedText.includes('psoriase')) {
-          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          subjectName = 'Dermatologia Clínica';
           diseaseName = 'Psoríase Vulgar & Koebner';
         } else if (combinedText.includes('líquen') || combinedText.includes('liquen')) {
-          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          subjectName = 'Dermatologia Clínica';
           diseaseName = 'Líquen Plano & Wickham';
         } else if (combinedText.includes('eczem') || combinedText.includes('atópica') || combinedText.includes('atopica')) {
-          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          subjectName = 'Dermatologia Clínica';
           diseaseName = 'Dermatite Atópica & Eczemas';
+        } else if (combinedText.includes('cardio') || combinedText.includes('eletrocardio') || combinedText.includes('infarto')) {
+          subjectName = 'Cardiologia Clínica';
+          diseaseName = 'Eletrocardiograma & Isquemia Miocárdica';
+        } else if (combinedText.includes('pneumo') || combinedText.includes('asma') || combinedText.includes('dpoc')) {
+          subjectName = 'Pneumologia Clínica';
+          diseaseName = 'Asma, DPOC & Espirometria';
+        } else if (combinedText.includes('pediat') || combinedText.includes('lactente') || combinedText.includes('puericultura')) {
+          subjectName = 'Pediatria & Puericultura';
+          diseaseName = 'Crescimento e Desenvolvimento Infantil';
         } else if (combinedText.includes('lesão') || combinedText.includes('lesao') || combinedText.includes('mácula') || combinedText.includes('pápula')) {
-          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+          subjectName = 'Dermatologia Clínica';
           diseaseName = 'Semiologia das Lesões Elementares Cutâneas';
         } else {
-          subjectName = 'Integração de Sistemas Humanos 2 (Dermatologia)';
-          diseaseName = 'Patologia Cutânea & Barreira Epidérmica';
+          subjectName = defaultSubject;
+          diseaseName = extractDiseaseFromFilename(pendingUploadMaterial.fileName);
         }
       }
 
       closeModals();
+
+      // Adiciona o material enviado ao menu suspenso do Chat
+      chatDriveMaterials.unshift({
+        id: 'upload-mat-' + Date.now(),
+        name: pendingUploadMaterial.fileName,
+        sizeStr: `${(pendingUploadMaterial.text.length / 1024).toFixed(1)} KB`,
+        type: 'doc',
+        selected: true,
+        tag: 'Upload Estudante',
+        disease: diseaseName,
+        topic: diseaseName,
+        subject: subjectName
+      });
+      renderChatDriveVerticalList();
+      updateChatAttachedBar();
 
       const qCandidate = `${diseaseName}: Conduta propedêutica e correlação fisiopatológica essencial`;
       const red = evaluateRedundancy(qCandidate);
@@ -4025,6 +4047,8 @@
         compressBox.style.display = 'none';
         btn.disabled = false;
 
+        const discipline = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+
         // 1. SINCRONIZAR ARQUIVOS COM O CHAT E DROPDOWN VERTICAL
         chatDriveMaterials = selectedFiles.map(f => ({
           id: f.id,
@@ -4034,12 +4058,18 @@
           selected: true,
           tag: f.type === 'slide' ? 'Slide Aula' : (f.type === 'book' ? 'Tratado / Livro' : 'Material Didático'),
           disease: f.disease || extractDiseaseFromFilename(f.name),
-          topic: f.disease || f.name.replace(/\.[^/.]+$/, '')
+          topic: f.disease || f.name.replace(/\.[^/.]+$/, ''),
+          subject: discipline
         }));
         renderChatDriveVerticalList();
         updateChatAttachedBar();
 
-        const discipline = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+        const chatSubjectLabel = document.getElementById('chatSubjectCurrentName');
+        if (chatSubjectLabel) chatSubjectLabel.textContent = discipline;
+        const driveFolderTitle = document.getElementById('driveFolderTitleDisplay');
+        if (driveFolderTitle) driveFolderTitle.textContent = currentScannedFolder ? currentScannedFolder.title : `DISCIPLINA: ${discipline}`;
+        const readerModalSub = document.getElementById('readerModalSubtitle');
+        if (readerModalSub) readerModalSub.textContent = currentScannedFolder ? currentScannedFolder.sub : `Disciplina: ${discipline}`;
 
         // 2. GERAR PERGUNTAS E FLASHCARDS PERSONALIZADOS PARA CADA DOENÇA/AULA
         selectedFiles.forEach((file, idx) => {
@@ -4125,20 +4155,20 @@
       if (parsedSubjects.length === 0) {
         universityCurriculum = [
           {
-            period: '3º Ano • Módulo Vigente (Sistemas Humanos 2)',
+            period: 'Ciclo Clínico • Grade Curricular Integrada',
             subjects: [
-              'Integração de Sistemas Humanos 2 (Dermatologia)',
-              'Semiologia Médica e Propedêutica das Lesões Elementares',
-              'Fisiopatologia da Barreira Cutânea e Histologia Tegumentar',
-              'Diagnóstico Diferencial de Eczemas, Psoríase e Líquen Plano'
+              'Semiologia Médica e Propedêutica Clínica',
+              'Clínica Médica e Diagnóstico Diferencial',
+              'Farmacoterapia Aplicada à Clínica',
+              'Condutas em Emergências e Urgências Médicas'
             ]
           },
           {
-            period: 'Ciclo Clínico • Integração de Disciplinas Médicas',
+            period: 'Internato e Prática Médica Avançada',
             subjects: [
-              'Semiologia Médica e Raciocínio Clínico',
-              'Patologia Especial dos Órgãos e Sistemas',
-              'Farmacoterapia Aplicada à Clínica'
+              'Raciocínio Clínico e Tomada de Decisão',
+              'Abordagem Multidisciplinar de Casos Complexos',
+              'Medicina Baseada em Evidências e Diretrizes'
             ]
           }
         ];
@@ -4285,7 +4315,7 @@
 
       const subjectsMap = {};
       sharedQuestionsBank.forEach(q => {
-        const s = q.subject || 'Integração de Sistemas Humanos 2 (Dermatologia)';
+        const s = q.subject || 'Geral';
         if (!subjectsMap[s]) {
           subjectsMap[s] = { name: s, count: 0, diseases: new Set() };
         }
@@ -4386,6 +4416,11 @@
              </div>` 
           : '';
 
+        const activeDiscipline = (currentScannedFolder && currentScannedFolder.disciplineKey) ||
+          (chatDriveMaterials.length > 0 && chatDriveMaterials[0].subject ? chatDriveMaterials[0].subject : null) ||
+          (sharedQuestionsBank.length > 0 && sharedQuestionsBank[0].subject ? sharedQuestionsBank[0].subject : null) ||
+          'Medicina e Raciocínio Clínico';
+
         tutorBubble.innerHTML = `
           <div class="tutor-header">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -4393,16 +4428,16 @@
           </div>
           ${attachedCitations}
           <p>
-            Analisando sua questão sobre <em>"${text.slice(0, 50)}..."</em> em consonância com as diretrizes e materiais de aula da disciplina de <strong>Integração de Sistemas Humanos 2</strong>:
+            Analisando sua questão sobre <em>"${text.slice(0, 50)}..."</em> em consonância com as diretrizes e materiais de aula da disciplina de <strong>${activeDiscipline}</strong>:
           </p>
           <p style="color: var(--text-secondary); line-height: 1.6;">
-            A identificação semiológica correta da lesão elementar (ex: mácula plana vs placa infiltrada) é o primeiro passo diagnóstico mandatório, orientando se a biópsia deve ser incisional, excisional ou se a conduta inicial pode ser eminentemente tópica.
+            A identificação semiológica correta da hipótese diagnóstica e manifestações cardinais é o primeiro passo diagnóstico mandatório, orientando os exames de estratificação e se a conduta inicial deve ser conservadora, farmacológica ou de urgência.
           </p>
           <div class="socratic-box">
-            ❓ <strong>Desafio Socrático do Tutor:</strong> Na vigência de lesões eritemato-descamativas pruriginosas no couro cabeludo e cotovelos, que sinal clínico você pesquisaria na curetagem de Brocq para fechar o diagnóstico?
+            ❓ <strong>Desafio Socrático do Tutor:</strong> Diante deste quadro clínico, quais critérios de gravidade imediata e exames complementares de primeira linha você solicitaria antes de definir a conduta?
           </div>
           <div class="ref-footer">
-            📖 <em>Ref: Slides da Turma (Dermatologia 2026.2); Diretrizes Brasileiras de Dermatologia; PubMed.</em>
+            📖 <em>Ref: Materiais da Disciplina (${activeDiscipline}); Diretrizes Clínicas Especializadas; PubMed.</em>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
             <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction(false)">
@@ -4647,6 +4682,9 @@
       reportBubble.className = 'chat-bubble tutor';
       reportBubble.style.maxWidth = '92%';
 
+      const discTitle = currentScannedFolder ? (currentScannedFolder.disciplineKey || currentScannedFolder.title || 'Materiais Curriculares') : (chatDriveMaterials[0]?.subject || 'Materiais Curriculares');
+      const discSub = currentScannedFolder?.sub || 'Sincronização & Análise Curricular';
+
       reportBubble.innerHTML = `
         <div class="tutor-header">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -4655,8 +4693,8 @@
         <div style="background: rgba(0, 255, 102, 0.05); border: 1px solid rgba(0, 255, 102, 0.2); border-radius: 12px; padding: 14px; margin-top: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
             <div>
-              <strong style="font-size: 14px; color: var(--text-primary);">Auditoria Curricular: Integração de Sistemas Humanos 2</strong>
-              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Google Drive: Módulo de Dermatologia Clínica (Turma 2026.2)</div>
+              <strong style="font-size: 14px; color: var(--text-primary);">Auditoria Curricular: ${discTitle}</strong>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Google Drive: ${discSub}</div>
             </div>
             <span style="background: var(--neon); color: #000; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">100% Preservado</span>
           </div>
@@ -4812,35 +4850,64 @@
 
     function updateSubjectFilterMenus() {
       const diseases = getAvailableDiseases();
+      const currentDiscipline = (currentScannedFolder && currentScannedFolder.disciplineKey) ||
+        (chatDriveMaterials.length > 0 && chatDriveMaterials[0].subject ? chatDriveMaterials[0].subject : null) ||
+        (sharedQuestionsBank.length > 0 && sharedQuestionsBank[0].subject ? sharedQuestionsBank[0].subject : null);
+
+      // Atualiza o indicador de matéria no Chat
+      const chatLabel = document.getElementById('chatSubjectCurrentName');
+      if (chatLabel) {
+        if (!currentDiscipline && diseases.length === 0) {
+          chatLabel.textContent = 'Geral (Aguardando Upload)';
+        } else if (chatLabel.textContent === 'Geral (Aguardando Upload)' || chatLabel.textContent.includes('Integração de Sistemas')) {
+          chatLabel.textContent = currentDiscipline || 'Geral (Aguardando Upload)';
+        }
+      }
 
       // 1. Menu de Flashcards
       const fcMenu = document.getElementById('fcSubjectDropdownMenu');
       if (fcMenu) {
-        fcMenu.innerHTML = `
-          <div class="dropdown-item ${currentDiseaseFilter === 'all' ? 'active' : ''}" onclick="setFcDiseaseFilter('all')">
-            <strong>Todas as Doenças</strong> (Todos os Cards)
-          </div>
-          ${diseases.map(d => `
-            <div class="dropdown-item ${currentDiseaseFilter === d ? 'active' : ''}" onclick="setFcDiseaseFilter('${d.replace(/'/g, "\\'")}')">
-              🔬 ${d}
+        if (diseases.length === 0) {
+          fcMenu.innerHTML = `
+            <div class="dropdown-item active" onclick="setFcDiseaseFilter('all')">
+              <strong>Todas as Doenças</strong> (Aguardando uploads)
             </div>
-          `).join('')}
-        `;
+          `;
+        } else {
+          fcMenu.innerHTML = `
+            <div class="dropdown-item ${currentDiseaseFilter === 'all' ? 'active' : ''}" onclick="setFcDiseaseFilter('all')">
+              <strong>Todas as Doenças</strong> (Todos os Cards)
+            </div>
+            ${diseases.map(d => `
+              <div class="dropdown-item ${currentDiseaseFilter === d ? 'active' : ''}" onclick="setFcDiseaseFilter('${d.replace(/'/g, "\\'")}')">
+                🔬 ${d}
+              </div>
+            `).join('')}
+          `;
+        }
       }
 
       // 2. Menu do Chat
       const chatMenu = document.getElementById('chatSubjectDropdownMenu');
       if (chatMenu) {
-        chatMenu.innerHTML = `
-          <div class="dropdown-item" onclick="setChatDiseasePrompt('all')">
-            <strong>Todas as Doenças</strong> (Visão Geral da Disciplina)
-          </div>
-          ${diseases.map(d => `
-            <div class="dropdown-item" onclick="setChatDiseasePrompt('${d.replace(/'/g, "\\'")}')">
-              🔬 ${d}
+        if (diseases.length === 0) {
+          chatMenu.innerHTML = `
+            <div class="dropdown-item active" onclick="setChatDiseasePrompt('all')">
+              <strong>Geral</strong> (Aguardando upload de materiais)
             </div>
-          `).join('')}
-        `;
+          `;
+        } else {
+          chatMenu.innerHTML = `
+            <div class="dropdown-item" onclick="setChatDiseasePrompt('all')">
+              <strong>Todas as Doenças</strong> (${currentDiscipline || 'Visão Geral da Disciplina'})
+            </div>
+            ${diseases.map(d => `
+              <div class="dropdown-item" onclick="setChatDiseasePrompt('${d.replace(/'/g, "\\'")}')">
+                🔬 ${d}
+              </div>
+            `).join('')}
+          `;
+        }
       }
     }
 
@@ -4862,13 +4929,25 @@
       const menu = document.getElementById('chatSubjectDropdownMenu');
       if (menu) menu.classList.remove('visible');
       const label = document.getElementById('chatSubjectCurrentName');
+      const currentDiscipline = (currentScannedFolder && currentScannedFolder.disciplineKey) ||
+        (chatDriveMaterials.length > 0 && chatDriveMaterials[0].subject ? chatDriveMaterials[0].subject : null) ||
+        (sharedQuestionsBank.length > 0 && sharedQuestionsBank[0].subject ? sharedQuestionsBank[0].subject : null);
+
       if (label) {
-        label.textContent = disease === 'all' ? 'Integração de Sistemas Humanos 2' : `Dermatologia • ${disease}`;
+        if (disease === 'all') {
+          label.textContent = currentDiscipline || 'Geral (Aguardando Upload)';
+        } else {
+          label.textContent = currentDiscipline ? `${currentDiscipline.split('(')[0].trim()} • ${disease}` : `Disciplina • ${disease}`;
+        }
       }
       if (disease !== 'all') {
         quickPrompt(`Quais os pontos-chave diagnósticos, lesões elementares e conduta terapêutica em ${disease}?`);
       } else {
-        quickPrompt(`Apresente uma visão geral das afecções dermatológicas estudadas na disciplina de Sistemas Humanos 2.`);
+        if (!currentDiscipline) {
+          quickPrompt(`Como o tutor inteligente organiza o aprendizado e correlaciona as diretrizes clínicas a partir dos materiais enviados?`);
+        } else {
+          quickPrompt(`Apresente uma visão geral dos principais tópicos clínicos e diretrizes da disciplina ${currentDiscipline}.`);
+        }
       }
     }
 
@@ -5332,7 +5411,21 @@
         `;
       }
 
-      // 8. Atualizar todas as telas e componentes visuais
+      // 8. Limpar rótulos fixos e títulos para estado limpo
+      const subLabel = document.getElementById('chatSubjectCurrentName');
+      if (subLabel) subLabel.textContent = 'Geral (Aguardando Upload)';
+      const fcLabel = document.getElementById('fcCurrentFilterLabel');
+      if (fcLabel) fcLabel.textContent = 'Todas as Doenças';
+      const folderTitle = document.getElementById('driveFolderTitleDisplay');
+      if (folderTitle) folderTitle.textContent = 'DISCIPLINA: Nenhuma Pasta Conectada';
+      const readerSub = document.getElementById('readerModalSubtitle');
+      if (readerSub) readerSub.textContent = 'Material de Leitura Médica';
+      const countEl = document.getElementById('chatDriveCount');
+      if (countEl) countEl.textContent = '0';
+      const manualInput = document.getElementById('manualDirectionInput');
+      if (manualInput) manualInput.value = '';
+
+      // 9. Atualizar todas as telas e componentes visuais
       renderChatDriveVerticalList();
       updateChatAttachedBar();
       updateSubjectFilterMenus();
@@ -5367,6 +5460,13 @@
       currentCardIndex = 0;
       currentDiseaseFilter = 'all';
 
+      const subLabel = document.getElementById('chatSubjectCurrentName');
+      if (subLabel) subLabel.textContent = 'Integração de Sistemas Humanos 2 (Dermatologia)';
+      const folderTitle = document.getElementById('driveFolderTitleDisplay');
+      if (folderTitle) folderTitle.textContent = 'DISCIPLINA: Integração de sistemas humanos 2';
+      const readerSub = document.getElementById('readerModalSubtitle');
+      if (readerSub) readerSub.textContent = 'Integração de Sistemas Humanos 2 • Módulo Dermatologia';
+
       initChatDriveMaterials();
       renderSharedStudyItems();
       renderSceBars();
@@ -5382,6 +5482,15 @@
       sharedQuestionsBank = [];
       studyRouteSchedule = [];
       universityCurriculum = null;
+      currentScannedFolder = null;
+      const subLabel = document.getElementById('chatSubjectCurrentName');
+      if (subLabel) subLabel.textContent = 'Geral (Aguardando Upload)';
+      const folderTitle = document.getElementById('driveFolderTitleDisplay');
+      if (folderTitle) folderTitle.textContent = 'DISCIPLINA: Nenhuma Pasta Conectada';
+      const readerSub = document.getElementById('readerModalSubtitle');
+      if (readerSub) readerSub.textContent = 'Material de Leitura Médica';
+      const countEl = document.getElementById('chatDriveCount');
+      if (countEl) countEl.textContent = '0';
     }
     initChatDriveMaterials();
     renderSharedStudyItems();
