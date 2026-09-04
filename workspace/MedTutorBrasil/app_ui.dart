@@ -264,10 +264,51 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Compactador Local Ativo: Arquivos de 100MB a 300MB são reduzidos no próprio aparelho (downsampling de imagens a 150 DPI) sem gastar tokens. Limite máximo: 300 MB.',
+                'Insira o link da pasta compartilhada do Google Drive da sua turma ou faculdade para vasculhar os materiais:',
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Theme.of(context).colorScheme.outline),
+                      ),
+                      child: const TextField(
+                        decoration: InputDecoration(
+                          hintText: 'https://drive.google.com/drive/folders/1abc...',
+                          hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                          border: InputBorder.none,
+                          icon: Icon(Icons.link, size: 18),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00FF66),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Drive conectado com sucesso! 3 materiais examinados.')),
+                      );
+                    },
+                    child: const Text('Vasculhar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Materiais identificados nesta pasta (Compactador local de 100MB a 300MB ativo):',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
               ...simulatedFiles.map((file) {
                 final isEligible = file['eligible'] as bool;
                 final needsComp = file['needsComp'] as bool;

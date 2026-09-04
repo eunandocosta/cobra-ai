@@ -247,6 +247,12 @@ class LocalDeviceCompressor {
 class DriveSyncService {
   static const double maxAllowedSizeBytes = 300.0; // 300 MB máximo
   static const double minForCompressionBytes = 100.0; // 100 MB ativa compactador
+  static String? connectedFolderUrl;
+
+  static bool validateDriveUrl(String url) {
+    final clean = url.trim().toLowerCase();
+    return clean.contains('drive.google.com') || clean.contains('/folders/');
+  }
 
   static DriveFileItem evaluateFile(String id, String name, double sizeMB, String mimeType) {
     final lowerName = name.toLowerCase();

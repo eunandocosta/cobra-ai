@@ -324,6 +324,11 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
     /* Zero-State */
     .empty-state {
       display: flex;
@@ -1487,84 +1492,116 @@
   </div>
 
   <!-- =========================================================
-       MODAL "ATUALIZAR POR DRIVE" COM FILTRO INTELIGENTE
+       MODAL "ATUALIZAR POR DRIVE" COM LINK E FILTRO INTELIGENTE
        ========================================================= -->
   <div class="modal-overlay" id="driveModal" onclick="closeModals(event)">
-    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 600px;">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 620px;">
       <div class="modal-head">
         <div style="display: flex; align-items: center; gap: 10px;">
           <svg class="icon" style="color: var(--neon); width: 26px; height: 26px;" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          <h2>Atualizar por Drive</h2>
+          <h2>Atualizar por Google Drive</h2>
         </div>
         <button class="btn-close-modal" onclick="closeModals()">
           <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
-      <p style="font-size: 13px; color: var(--text-secondary);">
-        O MedTutor vasculha o Google Drive da sua turma com <strong>Compactador Local no Dispositivo (sem IA)</strong>:
-        Arquivos de até 100 MB entram direto; arquivos de <strong>100 MB a 300 MB</strong> são compactados no próprio aparelho (-70% de peso). Arquivos acima de 300 MB são avisados como excessivamente grandes.
+      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+        Conecte a pasta compartilhada da sua faculdade ou turma. O app vasculha os arquivos, <strong>compacta materiais pesados (100MB a 300MB) no seu próprio aparelho sem usar IA</strong>, e descarta arquivos gigantes (&gt; 300MB).
       </p>
 
-      <div id="driveScanProgress" style="padding: 10px; background: var(--bg-surface); border-radius: 10px; font-size: 12px; color: var(--neon); display: flex; align-items: center; gap: 8px;">
-        <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        <span>Varredura do Drive • 3 arquivos encontrados</span>
-      </div>
-
-      <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 270px; overflow-y: auto;">
-        <!-- Arquivo 1: <= 100 MB (Aceito direto) -->
-        <div class="drive-file-row accepted">
-          <div class="drive-file-info">
-            <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <div class="drive-file-text">
-              <span class="drive-file-name">Aula 04 - Valvopatias e Sopros Mitrais.pdf (24.5 MB)</span>
-              <span class="drive-file-status ok">✓ Elegível direto (&lt;= 100 MB): Apostila de aula teórica</span>
-            </div>
-          </div>
-          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">DIRETO</span>
+      <!-- CAMPO DE ENTRADA DO LINK DO DRIVE -->
+      <div style="background: var(--bg-surface); padding: 14px; border-radius: 14px; border: 1px solid var(--border);">
+        <label for="driveUrlInput" style="display: block; font-size: 12px; font-weight: 700; color: var(--neon); margin-bottom: 6px;">
+          🔗 Link da Pasta do Google Drive (Turma / Disciplina):
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input 
+            type="url" 
+            id="driveUrlInput" 
+            class="written-textarea" 
+            style="height: 42px; padding: 10px 14px; font-size: 13px; margin: 0; flex: 1;" 
+            placeholder="https://drive.google.com/drive/folders/1abcDEfgHIjk..." 
+            value="https://drive.google.com/drive/folders/1MedTurma2026_ClinicaMedica"
+          >
+          <button class="btn-outline-action primary" id="btnScanDrive" onclick="scanDriveFolder()" style="height: 42px; white-space: nowrap;">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Vasculhar Drive
+          </button>
         </div>
-
-        <!-- Arquivo 2: 100 MB a 300 MB (Compactador no dispositivo) -->
-        <div class="drive-file-row" style="border-color: rgba(255, 184, 0, 0.4);">
-          <div class="drive-file-info">
-            <svg class="icon" style="color: var(--warning);" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            <div class="drive-file-text">
-              <span class="drive-file-name">Apresentação com Lâminas e Casos de Radiologia.pptx (185 MB)</span>
-              <span class="drive-file-status" style="color: var(--warning);">⚡ Compactador Local Ativado: reduzirá no aparelho de 185 MB para ~52 MB</span>
-            </div>
-          </div>
-          <span style="font-size: 11px; font-weight: 700; color: var(--warning);">COMPACTAR</span>
-        </div>
-
-        <!-- Arquivo 3: > 300 MB (Excessivamente grande) -->
-        <div class="drive-file-row rejected">
-          <div class="drive-file-info">
-            <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-            <div class="drive-file-text">
-              <span class="drive-file-name">Tratado Enciclopédico de Medicina e Cirurgia (420 MB)</span>
-              <span class="drive-file-status warn">✕ Arquivo excessivamente grande (&gt; 300 MB). Divida por capítulos de aula.</span>
-            </div>
-          </div>
-          <span style="font-size: 11px; color: var(--danger);">BLOQUEADO</span>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+          Cole o link de compartilhamento da pasta onde seus professores ou colegas colocam os slides e PDFs.
         </div>
       </div>
 
-      <!-- Barra de compressão no dispositivo -->
-      <div id="deviceCompressingBox" style="display: none; padding: 12px; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 12px; font-size: 12px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-          <span style="color: var(--neon); font-weight: 700;">⚙️ Processando no dispositivo (sem IA):</span>
-          <span id="compressProgressLabel">185 MB ➔ 52 MB (-72%)</span>
-        </div>
-        <div style="width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
-          <div id="compressProgressBar" style="width: 20%; height: 100%; background: var(--neon); transition: width 0.4s ease;"></div>
-        </div>
+      <!-- STATUS DE VARREDURA -->
+      <div id="driveScanProgress" style="display: none; padding: 10px 14px; background: var(--bg-surface); border-radius: 10px; font-size: 12px; color: var(--neon); align-items: center; gap: 8px;">
+        <svg class="icon" style="animation: spin 1.5s linear infinite;" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span id="driveScanLabel">Conectando ao Google Drive e vasculhando pastas...</span>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
-        <button id="btnImportDriveFiles" class="btn-outline-action primary" style="flex: 1.6; justify-content: center;" onclick="importDriveEligibleFiles()">
-          📥 Importar Aulas (1 Direta + 1 Compactada)
-        </button>
+      <!-- CONTAINER DOS RESULTADOS DA VARREDURA -->
+      <div id="driveResultsContainer" style="display: none; flex-direction: column; gap: 10px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: flex; justify-content: space-between;">
+          <span>Materiais Encontrados nesta Pasta</span>
+          <span style="color: var(--neon);">3 arquivos avaliados</span>
+        </div>
+
+        <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 240px; overflow-y: auto;">
+          <!-- Arquivo 1: <= 100 MB (Aceito direto) -->
+          <div class="drive-file-row accepted">
+            <div class="drive-file-info">
+              <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <div class="drive-file-text">
+                <span class="drive-file-name">Aula 04 - Valvopatias e Sopros Mitrais.pdf (24.5 MB)</span>
+                <span class="drive-file-status ok">✓ Elegível direto (&lt;= 100 MB): Apostila de aula teórica</span>
+              </div>
+            </div>
+            <span style="font-size: 11px; font-weight: 700; color: var(--neon);">DIRETO</span>
+          </div>
+
+          <!-- Arquivo 2: 100 MB a 300 MB (Compactador no dispositivo) -->
+          <div class="drive-file-row" style="border-color: rgba(255, 184, 0, 0.4);">
+            <div class="drive-file-info">
+              <svg class="icon" style="color: var(--warning);" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <div class="drive-file-text">
+                <span class="drive-file-name">Apresentação com Lâminas e Casos de Radiologia.pptx (185 MB)</span>
+                <span class="drive-file-status" style="color: var(--warning);">⚡ Compactador Local Ativado: reduzirá no aparelho de 185 MB para ~52 MB</span>
+              </div>
+            </div>
+            <span style="font-size: 11px; font-weight: 700; color: var(--warning);">COMPACTAR</span>
+          </div>
+
+          <!-- Arquivo 3: > 300 MB (Excessivamente grande) -->
+          <div class="drive-file-row rejected">
+            <div class="drive-file-info">
+              <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <div class="drive-file-text">
+                <span class="drive-file-name">Tratado Enciclopédico de Medicina e Cirurgia (420 MB)</span>
+                <span class="drive-file-status warn">✕ Arquivo excessivamente grande (&gt; 300 MB). Divida por capítulos de aula.</span>
+              </div>
+            </div>
+            <span style="font-size: 11px; color: var(--danger);">BLOQUEADO</span>
+          </div>
+        </div>
+
+        <!-- Barra de compressão no dispositivo -->
+        <div id="deviceCompressingBox" style="display: none; padding: 12px; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 12px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--neon); font-weight: 700;">⚙️ Processando no dispositivo (sem IA):</span>
+            <span id="compressProgressLabel">185 MB ➔ 52 MB (-72%)</span>
+          </div>
+          <div style="width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+            <div id="compressProgressBar" style="width: 20%; height: 100%; background: var(--neon); transition: width 0.4s ease;"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 4px;">
+          <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
+          <button id="btnImportDriveFiles" class="btn-outline-action primary" style="flex: 1.6; justify-content: center;" onclick="importDriveEligibleFiles()">
+            📥 Importar Aulas (1 Direta + 1 Compactada)
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1765,8 +1802,16 @@
     function openConfigModal() { document.getElementById('configModal').classList.add('active'); }
     function openSyllabusModal() { document.getElementById('syllabusModal').classList.add('active'); }
     function openUploadMaterialModal() { document.getElementById('uploadMaterialModal').classList.add('active'); }
-    function openDriveModal() { document.getElementById('driveModal').classList.add('active'); }
     function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+    function openDriveModal() { 
+      document.getElementById('driveModal').classList.add('active'); 
+      try {
+        const savedUrl = localStorage.getItem('medtutor_saved_drive_url');
+        if (savedUrl) {
+          document.getElementById('driveUrlInput').value = savedUrl;
+        }
+      } catch (e) {}
+    }
 
     function showToast(msg) {
       const t = document.getElementById('toast');
@@ -2063,7 +2108,39 @@
       }
     }
 
-    // 7. ATUALIZAR POR DRIVE COM COMPACTADOR LOCAL (100MB A 300MB)
+    // 7. ATUALIZAR POR DRIVE COM LINK E COMPACTADOR LOCAL (100MB A 300MB)
+    function scanDriveFolder() {
+      const input = document.getElementById('driveUrlInput');
+      const url = input.value.trim();
+
+      if (!url || (!url.includes('drive.google.com') && !url.includes('/folders/'))) {
+        showToast('⚠️ Por favor, insira um link válido do Google Drive (ex: https://drive.google.com/drive/folders/...)');
+        input.focus();
+        return;
+      }
+
+      try {
+        localStorage.setItem('medtutor_saved_drive_url', url);
+      } catch (e) {}
+
+      const progress = document.getElementById('driveScanProgress');
+      const results = document.getElementById('driveResultsContainer');
+      const btn = document.getElementById('btnScanDrive');
+      const label = document.getElementById('driveScanLabel');
+
+      progress.style.display = 'flex';
+      results.style.display = 'none';
+      btn.disabled = true;
+      label.textContent = `Conectando a pasta informada (${url.slice(0, 32)}...) e vasculhando por PDFs e Slides...`;
+
+      setTimeout(() => {
+        progress.style.display = 'none';
+        results.style.display = 'flex';
+        btn.disabled = false;
+        showToast('✅ Drive conectado com sucesso! 3 materiais avaliados na pasta informada.');
+      }, 700);
+    }
+
     function importDriveEligibleFiles() {
       const compressBox = document.getElementById('deviceCompressingBox');
       const progressBar = document.getElementById('compressProgressBar');
