@@ -9,6 +9,8 @@
     "start": "node dist/index.js",
     "dev": "tsx index.ts",
     "open:web": "open workspace/MedTutorBrasil/web/index.html",
+    "serve": "node scripts/serve.cjs",
+    "web": "node scripts/serve.cjs",
     "advisor": "tsx scripts/advisor.ts"
   },
   "keywords": [],

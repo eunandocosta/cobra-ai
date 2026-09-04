@@ -2070,6 +2070,52 @@
         <span id="driveScanLabel">Conectando ao Google Drive e vasculhando pastas...</span>
       </div>
 
+      <!-- FALLBACK COM VISUALIZADOR OFICIAL EMBUTIDO DO DRIVE (SE A PASTA REQUERER LOGIN OU FOR RESTRITA) -->
+      <div id="driveAuthFallbackContainer" style="display: none; flex-direction: column; gap: 10px; background: var(--bg-surface); padding: 14px; border-radius: 14px; border: 1px solid var(--border);">
+        <div style="background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.25); padding: 10px 14px; border-radius: 10px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+            <svg class="icon" style="width: 16px; height: 16px;" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Pasta Institucional / Protegida (<span id="driveFallbackFolderId">Google Drive</span>)</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
+            Esta pasta exige permissão da sua conta Google ou domínio universitário. Veja os arquivos reais no painel oficial do Drive abaixo. Cole seus nomes ou selecione arquivos do computador para catalogar com as regras de estudo (<100MB direto, 100-300MB compressor no aparelho, >300MB bloqueado).
+          </div>
+        </div>
+
+        <div style="border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: #ffffff;">
+          <iframe 
+            id="driveEmbeddedIframe" 
+            src="about:blank" 
+            style="width: 100%; height: 260px; border: none; display: block;" 
+            loading="lazy"
+            title="Visualizador Oficial do Google Drive"
+          ></iframe>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="inlineDrivePasteInput" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">
+            📋 Copie os nomes dos arquivos visíveis acima e cole aqui (um por linha):
+          </label>
+          <textarea 
+            id="inlineDrivePasteInput" 
+            class="written-textarea" 
+            style="height: 70px; padding: 8px 12px; font-size: 11px; margin: 0; width: 100%; resize: vertical;" 
+            placeholder="Exemplo:&#10;Aula 1 - Semiologia e Anamnese.pdf (5.2 MB)&#10;Aula 2 - Diagnóstico Diferencial.pptx (120 MB)&#10;Tratado de Medicina Interna.pdf (450 MB)"
+          ></textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div>
+              <input type="file" id="inlineDriveFileInput" multiple onchange="handleDriveLocalFilesSelect(this.files)" style="display: none;">
+              <button class="btn-outline-action" type="button" onclick="document.getElementById('inlineDriveFileInput').click()" style="height: 34px; font-size: 11px;">
+                📁 Ou selecione arquivos do computador
+              </button>
+            </div>
+            <button class="btn-outline-action primary" type="button" onclick="processInlinePastedDriveFiles()" style="height: 34px; font-size: 11px;">
+              ⚡ Analisar e Catalogar Aulas
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- CONTAINER DOS RESULTADOS DA VARREDURA -->
       <div id="driveResultsContainer" style="display: none; flex-direction: column; gap: 10px;">
         <div style="background: rgba(0, 255, 102, 0.05); border: 1px solid rgba(0, 255, 102, 0.2); padding: 10px 14px; border-radius: 10px;">
@@ -3305,48 +3351,136 @@
       };
     }
 
-    // Tenta ler o HTML real do Drive público usando proxies CORS
-    async function fetchDriveFolderHtml(folderId, fullUrl) {
-      const targetUrl = (fullUrl && fullUrl.startsWith('http')) ? fullUrl : `https://drive.google.com/drive/folders/${folderId}`;
-      const proxies = [
-        `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+    // 1. Tenta obter arquivos reais via proxy local MedTutor (Node.js serve.cjs)
+    async function fetchDriveViaLocalProxy(folderId) {
+      if (!folderId) return null;
+      const endpoints = [
+        `/api/drive?id=${encodeURIComponent(folderId)}`,
+        `http://localhost:3000/api/drive?id=${encodeURIComponent(folderId)}`,
+        `http://127.0.0.1:3000/api/drive?id=${encodeURIComponent(folderId)}`
       ];
 
-      for (const proxyUrl of proxies) {
+      for (const ep of endpoints) {
         try {
           const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 3500);
-          const res = await fetch(proxyUrl, { signal: ctrl.signal });
+          const timer = setTimeout(() => ctrl.abort(), 7000);
+          const res = await fetch(ep, { signal: ctrl.signal });
           clearTimeout(timer);
           if (res.ok) {
-            const text = await res.text();
-            if (text && (text.includes('.pdf') || text.includes('.ppt') || text.includes('_DRIVE_') || text.includes('initData'))) {
-              return text;
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.files) && data.files.length > 0) {
+              const filesMapped = data.files.map((f, idx) => {
+                let sizeMB = f.sizeMB || 4.5;
+                if (!f.sizeMB) {
+                  const low = f.name.toLowerCase();
+                  if (low.includes('tratado') || low.includes('azulay') || low.includes('harrison') || low.includes('braunwald') || low.includes('cecil')) {
+                    sizeMB = 450.0;
+                  } else if (low.includes('atlas')) {
+                    sizeMB = 140.0;
+                  }
+                }
+                const rules = evaluateFileRules(f.name, sizeMB);
+                return {
+                  id: f.id || `proxy-file-${idx + 1}`,
+                  name: f.name,
+                  sizeStr: f.sizeStr || (sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${Math.round(sizeMB * 1024)} KB`),
+                  sizeMB: sizeMB,
+                  date: f.date || 'Recente',
+                  type: f.name.includes('.ppt') ? 'slide' : (f.name.includes('.doc') ? 'doc' : 'slide'),
+                  selected: rules.selected,
+                  status: rules.status,
+                  disease: extractDiseaseFromFilename(f.name),
+                  desc: rules.desc
+                };
+              });
+
+              return {
+                title: data.title ? `DISCIPLINA: ${data.title}` : `Pasta Drive: ${folderId.slice(0, 16)}...`,
+                sub: `${filesMapped.length} arquivos reais extraídos do Google Drive`,
+                disciplineKey: data.title || 'Clínica Médica',
+                files: filesMapped
+              };
             }
           }
         } catch (e) {
-          // Continua para o próximo proxy
+          // tentar próximo endpoint
+        }
+      }
+      return null;
+    }
+
+    // 2. Tenta ler o HTML real do Drive usando proxies CORS públicos
+    async function fetchDriveFolderHtml(folderId, fullUrl) {
+      const embeddedUrl = `https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(folderId)}#list`;
+      const standardUrl = (fullUrl && fullUrl.startsWith('http')) ? fullUrl : `https://drive.google.com/drive/folders/${folderId}`;
+
+      const targets = [embeddedUrl, standardUrl];
+      const proxyMakers = [
+        u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+        u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+        u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+      ];
+
+      for (const target of targets) {
+        for (const makeProxy of proxyMakers) {
+          try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 4000);
+            const res = await fetch(makeProxy(target), { signal: ctrl.signal });
+            clearTimeout(timer);
+            if (res.ok) {
+              const text = await res.text();
+              if (text && (text.includes('flip-entry') || text.includes('.pdf') || text.includes('.ppt') || text.includes('_DRIVE_') || text.includes('initData'))) {
+                return text;
+              }
+            }
+          } catch (e) {
+            // tentar próximo proxy
+          }
         }
       }
       return null;
     }
 
     function parseDriveFolderHtml(html, folderId) {
-      // 1. Extrair título da pasta
       let folderTitle = `Pasta Drive: ${folderId.slice(0, 16)}...`;
       const titleMatch = html.match(/<title>(.*?)(?: - Google Drive)?<\/title>/i);
       if (titleMatch && titleMatch[1] && !titleMatch[1].includes('Google Drive') && titleMatch[1].trim().length > 2) {
         folderTitle = `DISCIPLINA: ${titleMatch[1].trim()}`;
       }
 
-      // 2. Extrair arquivos
-      const unescaped = html.replace(/\\x22/g, '"').replace(/\\x5b/g, '[').replace(/\\x5d/g, ']');
       const filesFound = [];
       const seenNames = new Set();
 
-      // Padrão estruturado do Google Drive interno
+      // Extração 1: flip-entry do embeddedfolderview oficial
+      const flipRegex = /<div class="flip-entry" id="entry-([a-zA-Z0-9_-]+)"[\s\S]*?<div class="flip-entry-title">([^<]+)<\/div>[\s\S]*?<div class="flip-entry-last-modified"><div>([^<]+)<\/div>/g;
+      let flm;
+      while ((flm = flipRegex.exec(html)) !== null) {
+        const id = flm[1];
+        const name = flm[2].trim();
+        const date = flm[3].trim();
+        if (!seenNames.has(name)) {
+          seenNames.add(name);
+          const low = name.toLowerCase();
+          const approxMB = (low.includes('tratado') || low.includes('azulay') || low.includes('harrison')) ? 450.0 : (low.includes('atlas') ? 140.0 : 4.5);
+          const rules = evaluateFileRules(name, approxMB);
+          filesFound.push({
+            id: id,
+            name: name,
+            sizeStr: approxMB >= 1 ? `${approxMB.toFixed(1)} MB` : '850 KB',
+            sizeMB: approxMB,
+            date: date,
+            type: name.includes('.ppt') ? 'slide' : (name.includes('.doc') ? 'doc' : 'slide'),
+            selected: rules.selected,
+            status: rules.status,
+            disease: extractDiseaseFromFilename(name),
+            desc: rules.desc
+          });
+        }
+      }
+
+      // Extração 2: Padrão estruturado do Google Drive interno
+      const unescaped = html.replace(/\\x22/g, '"').replace(/\\x5b/g, '[').replace(/\\x5d/g, ']');
       const driveItemRegex = /\["([a-zA-Z0-9_-]{20,})",\["[a-zA-Z0-9_-]+"\],"([^"]+\.[a-zA-Z0-9]{2,5})","([^"]+)",\d+,[^,]+,\d+,\d+,\d+,\d+,\d+,[^,]+,[^,]+,(\d+)/g;
       let m;
       while ((m = driveItemRegex.exec(unescaped)) !== null) {
@@ -3372,16 +3506,17 @@
         }
       }
 
-      // Fallback regex se não achou via payload estruturado
+      // Extração 3: Fallback regex por extensão de arquivos médicos
       if (filesFound.length === 0) {
         const fileRegex = /"([^"\\]+?\.(?:pdf|pptx?|docx?|xlsx?|mp4|txt))"/gi;
         let fm;
         let counter = 1;
         while ((fm = fileRegex.exec(unescaped)) !== null) {
-          const name = fm[1];
-          if (!seenNames.has(name) && !name.startsWith('http') && name.length > 4) {
+          const name = fm[1].trim();
+          if (!seenNames.has(name) && !name.startsWith('http') && name.length > 4 && !name.includes('/')) {
             seenNames.add(name);
-            const approxMB = name.toLowerCase().includes('tratado') ? 420.0 : (name.toLowerCase().includes('atlas') ? 140.0 : 4.5);
+            const low = name.toLowerCase();
+            const approxMB = (low.includes('tratado') || low.includes('azulay') || low.includes('harrison')) ? 450.0 : (low.includes('atlas') ? 140.0 : 4.5);
             const rules = evaluateFileRules(name, approxMB);
             filesFound.push({
               id: `parsed-${counter++}`,
@@ -3410,111 +3545,97 @@
       return null;
     }
 
-    function generateDynamicFolderFiles(url, folderId) {
-      const lower = (url + ' ' + (folderId || '')).toLowerCase();
-      if (lower.includes('cardio') || lower.includes('cora')) {
-        return KNOWN_DRIVE_FOLDERS['cardio'];
-      }
-      if (lower.includes('pneumo') || lower.includes('pulm') || lower.includes('respira')) {
-        return KNOWN_DRIVE_FOLDERS['pneumo'];
-      }
-      if (lower.includes('pediat') || lower.includes('crianc') || lower.includes('infant')) {
-        return KNOWN_DRIVE_FOLDERS['pediatria'];
-      }
-      if (lower.includes('dermato') || lower.includes('pele') || lower.includes('tegument')) {
-        return KNOWN_DRIVE_FOLDERS['1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ'];
-      }
+    // Exibe o visualizador embutido oficial do Google Drive quando o acesso automático for bloqueado por login/CORS
+    function showDriveEmbeddedFolderHelper(folderId, url) {
+      const progress = document.getElementById('driveScanProgress');
+      const results = document.getElementById('driveResultsContainer');
+      const btn = document.getElementById('btnScanDrive');
+      const fallbackBox = document.getElementById('driveAuthFallbackContainer');
 
-      // Pasta com arquivos de Clínica Geral baseados no link ou ID informado
-      const cleanId = folderId ? (folderId.length > 18 ? folderId.slice(0, 18) + '...' : folderId) : 'Geral';
-      return {
-        title: `DISCIPLINA: Clínica Médica (${cleanId})`,
-        sub: 'Varredura didática com detecção de aulas, afecções e compactador no aparelho',
-        disciplineKey: 'Clínica Médica',
-        files: [
-          {
-            id: `scan-${Date.now()}-1`,
-            name: 'Aula Teórica 1 - Propedêutica Médica e Raciocínio Clínico.pdf',
-            sizeStr: '6.4 MB',
-            sizeMB: 6.4,
-            date: 'Recente',
-            type: 'slide',
-            selected: true,
-            status: 'direct',
-            disease: 'Propedêutica e Raciocínio Clínico',
-            desc: '✓ Elegível direto (< 100 MB): Anamnese guiada por hipóteses diagnósticas'
-          },
-          {
-            id: `scan-${Date.now()}-2`,
-            name: 'Aula Teórica 2 - Diagnóstico Diferencial em Afecções Sistêmicas.pdf',
-            sizeStr: '14.8 MB',
-            sizeMB: 14.8,
-            date: 'Recente',
-            type: 'slide',
-            selected: true,
-            status: 'direct',
-            disease: 'Diagnóstico Diferencial e Conduta',
-            desc: '✓ Elegível direto (< 100 MB): Exames complementares e critérios de estratificação'
-          },
-          {
-            id: `scan-${Date.now()}-3`,
-            name: 'Casos Clínicos de Alta Resolução e Discussão Multidisciplinar.pptx',
-            sizeStr: '145 MB',
-            sizeMB: 145.0,
-            date: 'Recente',
-            type: 'slide',
-            selected: true,
-            status: 'compress',
-            disease: 'Casos Clínicos Complexos',
-            desc: '⚡ Compactador Local Ativado: reduzirá no aparelho de 145 MB para ~44 MB (sem IA)'
-          },
-          {
-            id: `scan-${Date.now()}-4`,
-            name: 'Roteiro Ambulatorial de Condutas e Protocolos de Prescrição.pdf',
-            sizeStr: '2.1 MB',
-            sizeMB: 2.1,
-            date: 'Recente',
-            type: 'doc',
-            selected: true,
-            status: 'direct',
-            disease: 'Protocolos de Prescrição Ambulatorial',
-            desc: '✓ Elegível direto (< 100 MB): Posologias e acompanhamento terapêutico'
-          },
-          {
-            id: `scan-${Date.now()}-5`,
-            name: 'Tratado Enciclopédico de Medicina Interna e Especialidades.pdf',
-            sizeStr: '495 MB',
-            sizeMB: 495.0,
-            date: 'Anual',
-            type: 'book',
-            selected: false,
-            status: 'blocked',
-            disease: 'Tratado de Medicina Interna',
-            desc: '✕ Arquivo excessivamente grande (> 300 MB). Divida por capítulos de aula.'
-          }
-        ]
-      };
+      if (progress) progress.style.display = 'none';
+      if (btn) btn.disabled = false;
+      if (results) results.style.display = 'none';
+
+      if (fallbackBox) {
+        fallbackBox.style.display = 'flex';
+        const iframe = document.getElementById('driveEmbeddedIframe');
+        if (iframe) {
+          iframe.src = `https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(folderId)}#list`;
+        }
+        const titleSpan = document.getElementById('driveFallbackFolderId');
+        if (titleSpan) {
+          titleSpan.textContent = folderId.length > 20 ? folderId.slice(0, 20) + '...' : folderId;
+        }
+        showToast('ℹ️ Pasta protegida por login Google. Visualize os arquivos abaixo e cole seus nomes para catalogar.');
+      }
     }
 
-    function processPastedDriveFiles() {
-      const textarea = document.getElementById('drivePastedFilesInput');
+    // Processa os arquivos colados na caixa inline do visualizador oficial
+    function processInlinePastedDriveFiles() {
+      const textarea = document.getElementById('inlineDrivePasteInput');
       const text = textarea ? textarea.value.trim() : '';
       if (!text) {
-        showToast('⚠️ Por favor, cole os nomes dos arquivos ou aulas no campo.');
+        showToast('⚠️ Por favor, cole os nomes dos arquivos que aparecem no Drive acima.');
         if (textarea) textarea.focus();
         return;
       }
+      importPastedTextAsFiles(text, 'Arquivos do Google Drive');
+    }
 
+    // Processa arquivos selecionados diretamente do computador
+    function handleDriveLocalFilesSelect(fileList) {
+      if (!fileList || fileList.length === 0) return;
+      const parsedFiles = [];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        const sizeMB = file.size / (1024 * 1024);
+        const rules = evaluateFileRules(file.name, sizeMB);
+        parsedFiles.push({
+          id: `local-upload-${Date.now()}-${i}`,
+          name: file.name,
+          sizeStr: sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${Math.round(sizeMB * 1024)} KB`,
+          sizeMB: sizeMB,
+          date: 'Arquivo Local',
+          type: file.name.includes('.ppt') ? 'slide' : 'doc',
+          selected: rules.selected,
+          status: rules.status,
+          disease: extractDiseaseFromFilename(file.name),
+          desc: rules.desc
+        });
+      }
+
+      const fallbackBox = document.getElementById('driveAuthFallbackContainer');
+      if (fallbackBox) fallbackBox.style.display = 'none';
+
+      currentScannedFolder = {
+        title: 'DISCIPLINA: Arquivos Selecionados do Aparelho',
+        sub: `${parsedFiles.length} materiais analisados com regras locais de estudo`,
+        disciplineKey: parsedFiles[0] ? parsedFiles[0].disease : 'Clínica Médica'
+      };
+      scannedDriveFiles = parsedFiles;
+
+      document.getElementById('driveFolderTitleDisplay').textContent = currentScannedFolder.title;
+      document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos locais analisados`;
+      document.getElementById('driveResultsContainer').style.display = 'flex';
+
+      const searchInput = document.getElementById('driveSearchFilter');
+      if (searchInput) searchInput.value = '';
+      driveSearchQuery = '';
+      renderDriveScannedFiles();
+
+      showToast(`✅ ${parsedFiles.length} arquivos locais analisados com sucesso!`);
+    }
+
+    function importPastedTextAsFiles(text, originLabel) {
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
       if (lines.length === 0) {
-        showToast('Nenhum arquivo válido identificado no texto colado.');
+        showToast('Nenhum arquivo válido identificado no texto informado.');
         return;
       }
 
       const parsedFiles = [];
       lines.forEach((line, idx) => {
-        // Tentar extrair tamanho se presente, ex: (140 MB), [15mb], 2.4 MB
-        let sizeMB = 5.0; // Padrão de aula
+        let sizeMB = 5.0;
         const sizeMatch = line.match(/(\d+[\.,]?\d*)\s*(MB|GB|KB)/i);
         if (sizeMatch) {
           const val = parseFloat(sizeMatch[1].replace(',', '.'));
@@ -3526,7 +3647,6 @@
           sizeMB = 450.0;
         }
 
-        // Limpar o nome
         let cleanName = line.replace(/\s*[\(\[]?\d+[\.,]?\d*\s*(?:MB|GB|KB)[\)\]]?/i, '').trim();
         if (!cleanName.includes('.')) cleanName += '.pdf';
 
@@ -3538,7 +3658,7 @@
           name: cleanName,
           sizeStr: sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${(sizeMB * 1024).toFixed(0)} KB`,
           sizeMB: sizeMB,
-          date: 'Colado',
+          date: 'Lista Real',
           type: cleanName.includes('.ppt') ? 'slide' : 'doc',
           selected: rules.selected,
           status: rules.status,
@@ -3547,23 +3667,37 @@
         });
       });
 
+      const fallbackBox = document.getElementById('driveAuthFallbackContainer');
+      if (fallbackBox) fallbackBox.style.display = 'none';
+
       currentScannedFolder = {
-        title: 'DISCIPLINA: Arquivos Colados do Google Drive',
+        title: `DISCIPLINA: ${originLabel || 'Google Drive'}`,
         sub: `${parsedFiles.length} materiais analisados com regras locais de estudo`,
         disciplineKey: parsedFiles[0] ? parsedFiles[0].disease : 'Clínica Médica'
       };
       scannedDriveFiles = parsedFiles;
 
       document.getElementById('driveFolderTitleDisplay').textContent = currentScannedFolder.title;
-      document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos avaliados na lista colada`;
+      document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos analisados com sucesso`;
       document.getElementById('driveResultsContainer').style.display = 'flex';
-      
+
       const searchInput = document.getElementById('driveSearchFilter');
       if (searchInput) searchInput.value = '';
       driveSearchQuery = '';
       renderDriveScannedFiles();
 
-      showToast(`✅ ${parsedFiles.length} arquivos colados processados com sucesso!`);
+      showToast(`✅ ${parsedFiles.length} arquivos catalogados com sucesso!`);
+    }
+
+    function processPastedDriveFiles() {
+      const textarea = document.getElementById('drivePastedFilesInput');
+      const text = textarea ? textarea.value.trim() : '';
+      if (!text) {
+        showToast('⚠️ Por favor, cole os nomes dos arquivos ou aulas no campo.');
+        if (textarea) textarea.focus();
+        return;
+      }
+      importPastedTextAsFiles(text, 'Arquivos Colados do Google Drive');
     }
 
     function filterDriveScannedFiles(term) {
@@ -3711,6 +3845,9 @@
       const folderId = extractDriveFolderId(url) || url;
       label.textContent = `Conectando ao Google Drive e vasculhando pasta (${folderId.slice(0, 16)}...)...`;
 
+      const fallbackBox = document.getElementById('driveAuthFallbackContainer');
+      if (fallbackBox) fallbackBox.style.display = 'none';
+
       // 1. Verificar se é uma pasta pré-catalogada (ex: pasta de dermatologia real ou presets)
       if (folderId && KNOWN_DRIVE_FOLDERS[folderId]) {
         setTimeout(() => {
@@ -3723,17 +3860,43 @@
           scannedDriveFiles = JSON.parse(JSON.stringify(folderData.files));
           
           document.getElementById('driveFolderTitleDisplay').textContent = folderData.title;
-          document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos encontrados no Drive • ${folderData.sub}`;
+          document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos reais encontrados no Drive • ${folderData.sub}`;
           const searchInput = document.getElementById('driveSearchFilter');
           if (searchInput) searchInput.value = '';
           driveSearchQuery = '';
           renderDriveScannedFiles();
           showToast(`✅ Pasta "${folderData.title}" conectada! ${scannedDriveFiles.length} arquivos identificados.`);
-        }, 500);
+        }, 300);
         return;
       }
 
-      // 2. Tentar varredura ao vivo usando proxies CORS
+      // 2. Tentar varredura via servidor local / proxy MedTutor (sem restrições de CORS)
+      label.textContent = `Consultando servidor local e Google Drive (${folderId.slice(0, 16)}...)...`;
+      try {
+        const proxyData = await fetchDriveViaLocalProxy(folderId);
+        if (proxyData && proxyData.files && proxyData.files.length > 0) {
+          progress.style.display = 'none';
+          results.style.display = 'flex';
+          btn.disabled = false;
+
+          currentScannedFolder = proxyData;
+          scannedDriveFiles = proxyData.files;
+
+          document.getElementById('driveFolderTitleDisplay').textContent = proxyData.title;
+          document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos reais extraídos diretamente do Google Drive`;
+          const searchInput = document.getElementById('driveSearchFilter');
+          if (searchInput) searchInput.value = '';
+          driveSearchQuery = '';
+          renderDriveScannedFiles();
+          showToast(`✅ Drive conectado! ${scannedDriveFiles.length} arquivos reais encontrados na sua pasta.`);
+          return;
+        }
+      } catch (proxyErr) {
+        console.warn('Erro ao consultar proxy local:', proxyErr);
+      }
+
+      // 3. Tentar varredura ao vivo usando proxies CORS públicos
+      label.textContent = `Tentando extração web direta (${folderId.slice(0, 16)}...)...`;
       try {
         const liveHtml = await fetchDriveFolderHtml(folderId, url);
         if (liveHtml) {
@@ -3760,24 +3923,11 @@
         console.warn('Erro ao tentar varredura online do Drive:', err);
       }
 
-      // 3. Fallback inteligente: pasta institucional ou protegida por login universitário
-      setTimeout(() => {
-        progress.style.display = 'none';
-        results.style.display = 'flex';
-        btn.disabled = false;
-
-        const dynamicData = generateDynamicFolderFiles(url, folderId);
-        currentScannedFolder = dynamicData;
-        scannedDriveFiles = JSON.parse(JSON.stringify(dynamicData.files));
-
-        document.getElementById('driveFolderTitleDisplay').textContent = currentScannedFolder.title;
-        document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos avaliados para estudo • ${currentScannedFolder.sub}`;
-        const searchInput = document.getElementById('driveSearchFilter');
-        if (searchInput) searchInput.value = '';
-        driveSearchQuery = '';
-        renderDriveScannedFiles();
-        showToast(`✅ Pasta do Drive conectada! ${scannedDriveFiles.length} materiais analisados com regras didáticas.`);
-      }, 650);
+      // 4. Se a pasta for protegida por autenticação institucional ou domínio restrito:
+      // Exibir o visualizador oficial embutido do Google Drive e área para colar/selecionar arquivos reais (NUNCA gerar dados falsos!)
+      progress.style.display = 'none';
+      btn.disabled = false;
+      showDriveEmbeddedFolderHelper(folderId, url);
     }
 
     function importDriveEligibleFiles() {
