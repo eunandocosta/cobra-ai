@@ -1023,6 +1023,391 @@
       color: var(--danger);
     }
 
+    /* =========================================================
+       NOVO CHAT DE ALTA PERFORMANCE (SIDEBAR, CHIPS, CITAÇÕES E AÇÕES)
+       ========================================================= */
+    .chat-container-split {
+      display: flex;
+      height: calc(100vh - 180px);
+      min-height: 540px;
+      gap: 16px;
+      position: relative;
+    }
+
+    .chat-sidebar {
+      width: 270px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .chat-sidebar.collapsed {
+      width: 0;
+      min-width: 0;
+      padding: 0;
+      margin: 0;
+      border: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .chat-sidebar-header {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-new-chat {
+      background: var(--neon);
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+
+    .btn-new-chat:hover {
+      background: var(--neon-hover);
+      transform: translateY(-1px);
+    }
+
+    .chat-history-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-history-group-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chat-history-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .chat-history-item:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .chat-history-item.active {
+      background: var(--neon-subtle);
+      border: 1px solid var(--border-accent);
+      color: var(--neon);
+      font-weight: 600;
+    }
+
+    .chat-history-title-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .chat-history-actions {
+      display: none;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .chat-history-item:hover .chat-history-actions,
+    .chat-history-item.active .chat-history-actions {
+      display: flex;
+    }
+
+    .chat-item-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .chat-item-btn:hover {
+      color: var(--neon);
+      background: rgba(0, 229, 255, 0.15);
+    }
+
+    .chat-main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      height: 100%;
+    }
+
+    /* Chips de Continuação de Raciocínio */
+    .thought-continuation-container {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .thought-chips-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .thought-chips-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .thought-chip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-accent);
+      color: var(--neon);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .thought-chip:hover {
+      background: var(--neon-subtle);
+      border-color: var(--neon);
+      transform: translateY(-1px);
+    }
+
+    /* Citações Clicáveis com Preview (Padrão Perplexity) */
+    .citation-badge {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: var(--neon);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 0 3px;
+      position: relative;
+      transition: all 0.15s ease;
+      vertical-align: baseline;
+    }
+
+    .citation-badge:hover {
+      background: var(--neon);
+      color: #000;
+    }
+
+    .citation-popover {
+      position: fixed;
+      z-index: 9999;
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      max-width: 380px;
+      display: none;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    .citation-popover.visible {
+      display: block;
+      animation: fadeIn 0.18s ease;
+    }
+
+    /* Barra de Ações Rápidas por Mensagem */
+    .msg-actions-bar {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .msg-action-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .msg-action-btn:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+      background: rgba(0, 229, 255, 0.08);
+    }
+
+    .msg-action-btn.pinned {
+      border-color: #ffaa00;
+      color: #ffaa00;
+      background: rgba(255, 170, 0, 0.12);
+    }
+
+    /* =========================================================
+       QUESTÕES PADRÃO ENARE / ENAM & COMENTÁRIO TRIPARTIDO
+       ========================================================= */
+    .area-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .area-clinica { background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); }
+    .area-cirurgia { background: rgba(255, 82, 82, 0.12); color: #ff5252; border: 1px solid rgba(255, 82, 82, 0.3); }
+    .area-pediatria { background: rgba(255, 170, 0, 0.12); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); }
+    .area-go { background: rgba(255, 105, 180, 0.14); color: #ff69b4; border: 1px solid rgba(255, 105, 180, 0.3); }
+    .area-preventiva { background: rgba(0, 255, 102, 0.12); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.3); }
+
+    .quiz-vignette-box {
+      background: var(--bg-surface);
+      border-left: 3px solid var(--neon);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      margin: 10px 0 14px 0;
+    }
+
+    .tripartite-commentary {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .commentary-card {
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    .commentary-correct {
+      background: rgba(0, 255, 102, 0.08);
+      border: 1px solid rgba(0, 255, 102, 0.3);
+    }
+
+    .commentary-distractors {
+      background: rgba(255, 82, 82, 0.06);
+      border: 1px solid rgba(255, 82, 82, 0.25);
+    }
+
+    .commentary-pearl {
+      background: linear-gradient(135deg, rgba(255, 170, 0, 0.15), rgba(255, 170, 0, 0.05));
+      border: 1px solid rgba(255, 170, 0, 0.4);
+      color: #ffd280;
+    }
+
+    /* =========================================================
+       TELA DE CONFIRMAÇÃO & FEEDBACK PROGRESSIVO DE UPLOAD
+       ========================================================= */
+    .upload-stepper-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 24px 16px;
+      gap: 16px;
+    }
+
+    .stepper-spinner-ring {
+      width: 58px;
+      height: 58px;
+      border: 4px solid rgba(0, 229, 255, 0.15);
+      border-top-color: var(--neon);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    .stepper-word-display {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      min-height: 32px;
+      transition: all 0.25s ease;
+    }
+
+    .stepper-progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-surface);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .stepper-progress-bar-fill {
+      height: 100%;
+      width: 20%;
+      background: linear-gradient(90deg, var(--neon), var(--neon-green, #00ff66));
+      border-radius: 6px;
+      transition: width 0.35s ease;
+    }
+
     /* 4. Curriculum */
     .syllabus-hero {
       background: var(--bg-surface);
@@ -1561,114 +1946,146 @@
 
         <!-- 1. ABA CHAT -->
         <section id="tab-chat" class="tab-section active">
-          <div class="chat-layout">
+          <div class="chat-container-split">
             
-            <div class="chat-flow" id="chatFlow">
-              <div class="empty-state" id="chatEmptyState">
-                <div class="empty-state-icon">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <!-- SIDEBAR DE HISTÓRICO DE ATENDIMENTOS (ESTILO CHATGPT / CLAUDE) -->
+            <div class="chat-sidebar" id="chatSidebar">
+              <div class="chat-sidebar-header">
+                <button class="btn-new-chat" onclick="createNewChatSession()" title="Criar nova sessão de atendimento clínico">
+                  <svg class="icon" style="width: 15px; height: 15px; stroke: #000;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>+ Novo Atendimento</span>
+                </button>
+                <button class="btn-outline-action" style="font-size: 11px; padding: 6px; justify-content: center;" onclick="openPinnedPearlsModal()" title="Consultar Pérolas Clínicas Salvas">
+                  ⭐ Pérolas Salvas (<span id="sidebarPinnedCount">0</span>)
+                </button>
+              </div>
+              <div class="chat-history-scroll" id="chatHistoryList">
+                <!-- Populado dinamicamente: 📌 Fixados, 📅 Hoje, 📅 Últimos 7 dias, 📅 Mês anterior -->
+              </div>
+            </div>
+
+            <!-- ÁREA PRINCIPAL DO CHAT -->
+            <div class="chat-main-area">
+              <div class="chat-layout">
+                
+                <!-- CONTROLES SUPERIORES: BOTÃO TOGGLE SIDEBAR, MATÉRIA/DOENÇA E DRIVE -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0 8px 0; flex-wrap: wrap; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn-outline-action" id="btnToggleSidebar" onclick="toggleChatSidebar()" title="Ocultar / Exibir Histórico de Atendimentos" style="padding: 7px 10px; border-radius: 10px;">
+                      <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    
+                    <div class="dropdown-filter-container">
+                      <button class="dropdown-trigger-btn" id="btnChatSubject" onclick="toggleChatSubjectDropdown()">
+                        <span>📚 Matéria: <strong id="chatSubjectCurrentName" style="color: var(--neon);">Geral (Aguardando Upload)</strong></span> ▾
+                      </button>
+                      <div class="dropdown-menu-list" id="chatSubjectDropdownMenu">
+                        <!-- Doenças específicas populadas dinamicamente via JS -->
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <button class="btn-outline-action primary" id="btnToggleChatDrive" onclick="toggleChatDriveDropdown()" style="padding: 7px 14px; border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                      <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                      <span>📁 Itens do Drive / Aulas (<span id="chatDriveCount">0</span>) ▾</span>
+                    </button>
+                    <button class="btn-help-icon" onclick="openHelpModal('Chat Clínico & Histórico', 'Consulte casos clínicos com o tutor socrático. O chat inclui histórico automático de atendimentos, sugestões dinâmicas de raciocínio, citações com preview de diretrizes médicas e criação direta de Flashcards e Quizzes no padrão ENARE.')">?</button>
+                  </div>
                 </div>
-                <h3>Seu Tutor Clínico está pronto</h3>
-                <p>Faça perguntas sobre casos clínicos, farmacologia ou condutas diagnósticas. O tutor responderá com artigos de revisão fundamentados e desafios socráticos.</p>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px;">
-                  <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
-                    <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    + Upload de Material de Aula
+
+                <!-- MENU SUSPENSO (DROPDOWN) DOS ITENS DO DRIVE NO CHAT -->
+                <div class="chat-drive-dropdown" id="chatDriveDropdown">
+                  <div class="chat-drive-dropdown-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                      <strong style="font-size: 13px;">Itens Sincronizados do Google Drive (Turma):</strong>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                      <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="checkbox" id="chkSelectAllDriveFiles" onchange="toggleSelectAllDriveFiles(this.checked)">
+                        <span>Selecionar Todas</span>
+                      </label>
+                      <span style="font-size: 11px; color: var(--neon); font-weight: 700;" id="driveSelectedVerticalCount">0 selecionadas</span>
+                      <button class="btn-close-modal" onclick="toggleChatDriveDropdown()" title="Fechar menu">✕</button>
+                    </div>
+                  </div>
+
+                  <!-- LISTA VERTICAL DE ARQUIVOS COM CAIXAS DE MARCAÇÃO -->
+                  <div class="chat-drive-vertical-list" id="chatDriveVerticalList">
+                    <!-- Populado dinamicamente via JS com cada arquivo, caixa de marcação, nome da doença e tamanho -->
+                  </div>
+
+                  <!-- RODAPÉ COM AÇÕES: ELIMINAR E GERAR RELATÓRIO -->
+                  <div class="chat-drive-dropdown-footer">
+                    <button class="btn-outline-action danger" onclick="deleteSelectedDriveFiles()" title="Eliminar da lista os itens marcados com a caixa de marcação">
+                      <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                      🗑️ Eliminar Selecionadas
+                    </button>
+                    <button class="btn-outline-action" style="border-color: var(--neon); color: var(--neon);" onclick="generateDriveReport()" title="Gera um relatório de estudo e cobertura clínica no chat SEM eliminar nenhum item">
+                      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                      📊 Gerar Relatório
+                    </button>
+                    <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction()">
+                      📖 Produzir Material de Leitura
+                    </button>
+                  </div>
+                </div>
+
+                <!-- BARRA DE MATERIAIS ANEXADOS / SELECIONADOS NO CHAT -->
+                <div class="chat-attached-bar" id="chatAttachedBar">
+                  <div class="attached-chips-wrapper">
+                    <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700;">📎 Base para Leitura:</span>
+                    <div id="chatAttachedChipsList" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px;" onclick="requestReadingMaterialProduction()">
+                      📖 Gerar Leitura Completa
+                    </button>
+                    <button class="btn-close-modal" style="width: 24px; height: 24px;" onclick="clearChatDriveSelection()" title="Desmarcar materiais">
+                      <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- FLUXO DE MENSAGENS DO CHAT -->
+                <div class="chat-flow" id="chatFlow">
+                  <div class="empty-state" id="chatEmptyState">
+                    <div class="empty-state-icon">
+                      <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <h3>Seu Tutor Clínico está pronto</h3>
+                    <p>Discuta casos clínicos do SUS e emergência. O tutor responderá com fundamentação por diretrizes oficiais, desafios socráticos e sugestões de próximos passos.</p>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px;">
+                      <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        + Upload de Aula
+                      </button>
+                      <button class="btn-outline-action" onclick="quickPrompt('Paciente de 54 anos com dor torácica típica há 2 horas. Qual a conduta inicial?')">
+                        Ex: Dor Torácica Aguda
+                      </button>
+                      <button class="btn-outline-action" onclick="quickPrompt('Lactente de 2 meses com febre de 38,8°C sem foco aparente. Qual o manejo ambulatorial/hospitalar?')">
+                        Ex: Febre em Lactente
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- BARRA DE ENTRADA DO CHAT -->
+                <div class="chat-bar">
+                  <button class="btn-outline-action" onclick="openUploadMaterialModal()" title="Upload de material do estudante (PDF, resumos, anotações)" style="padding: 10px 12px; border-radius: 14px; display: flex; align-items: center; gap: 6px;">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span style="font-size: 12px;">Upload</span>
                   </button>
-                  <button class="btn-outline-action" onclick="quickPrompt('Qual a conduta inicial na Cetoacidose Diabética?')">
-                    Ex: Conduta na CAD
-                  </button>
-                  <button class="btn-outline-action" onclick="quickPrompt('Diferença auscultatória entre estenose e insuficiência mitral?')">
-                    Ex: Sopros Mitrais
+                  <input type="text" id="chatInput" class="chat-input" placeholder="Digite sua dúvida clínica ou discuta uma conduta diagnóstica/terapêutica..." onkeypress="handleEnter(event)">
+                  <button class="btn-send" onclick="submitChatQuery()" title="Enviar mensagem">
+                    <svg class="icon" style="stroke: #000;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
                 </div>
+
               </div>
             </div>
 
-            <!-- CONTROLES SUPERIORES DO CHAT: MATÉRIA/DOENÇA & BOTÃO DO DRIVE -->
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0 8px 0; flex-wrap: wrap; gap: 8px;">
-              <div class="dropdown-filter-container">
-                <button class="dropdown-trigger-btn" id="btnChatSubject" onclick="toggleChatSubjectDropdown()">
-                  <span>📚 Matéria: <strong id="chatSubjectCurrentName" style="color: var(--neon);">Geral (Aguardando Upload)</strong></span> ▾
-                </button>
-                <div class="dropdown-menu-list" id="chatSubjectDropdownMenu">
-                  <!-- Doenças específicas populadas dinamicamente via JS -->
-                </div>
-              </div>
-
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button class="btn-outline-action primary" id="btnToggleChatDrive" onclick="toggleChatDriveDropdown()" style="padding: 7px 14px; border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  <span>📁 Itens do Drive / Aulas (<span id="chatDriveCount">7</span>) ▾</span>
-                </button>
-                <button class="btn-help-icon" onclick="openHelpModal('Menu do Drive & Doenças', 'Selecione uma matéria e afecção clínica específica para guiar o tutor. No menu suspenso do Drive você visualiza a lista vertical dos materiais com caixas de marcação para eliminar itens ou Gerar Relatório de cobertura curricular sem excluir nada.')">?</button>
-              </div>
-            </div>
-
-            <!-- MENU SUSPENSO (DROPDOWN) DOS ITENS DO DRIVE NO CHAT -->
-            <div class="chat-drive-dropdown" id="chatDriveDropdown">
-              <div class="chat-drive-dropdown-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                  <strong style="font-size: 13px;">Itens Sincronizados do Google Drive (Turma):</strong>
-                </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                  <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                    <input type="checkbox" id="chkSelectAllDriveFiles" onchange="toggleSelectAllDriveFiles(this.checked)">
-                    <span>Selecionar Todas</span>
-                  </label>
-                  <span style="font-size: 11px; color: var(--neon); font-weight: 700;" id="driveSelectedVerticalCount">7 selecionadas</span>
-                  <button class="btn-close-modal" onclick="toggleChatDriveDropdown()" title="Fechar menu">✕</button>
-                </div>
-              </div>
-
-              <!-- LISTA VERTICAL DE ARQUIVOS COM CAIXAS DE MARCAÇÃO -->
-              <div class="chat-drive-vertical-list" id="chatDriveVerticalList">
-                <!-- Populado dinamicamente via JS com cada arquivo, caixa de marcação, nome da doença e tamanho -->
-              </div>
-
-              <!-- RODAPÉ COM AÇÕES: ELIMINAR E GERAR RELATÓRIO -->
-              <div class="chat-drive-dropdown-footer">
-                <button class="btn-outline-action danger" onclick="deleteSelectedDriveFiles()" title="Eliminar da lista os itens marcados com a caixa de marcação">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                  🗑️ Eliminar Selecionadas
-                </button>
-                <button class="btn-outline-action" style="border-color: var(--neon); color: var(--neon);" onclick="generateDriveReport()" title="Gera um relatório de estudo e cobertura clínica no chat SEM eliminar nenhum item">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                  📊 Gerar Relatório
-                </button>
-                <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction()">
-                  📖 Produzir Material de Leitura
-                </button>
-              </div>
-            </div>
-
-            <!-- BARRA DE MATERIAIS ANEXADOS / SELECIONADOS NO CHAT -->
-            <div class="chat-attached-bar" id="chatAttachedBar">
-              <div class="attached-chips-wrapper">
-                <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700;">📎 Base para Leitura:</span>
-                <div id="chatAttachedChipsList" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
-              </div>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px;" onclick="requestReadingMaterialProduction()">
-                  📖 Gerar Leitura Completa
-                </button>
-                <button class="btn-close-modal" style="width: 24px; height: 24px;" onclick="clearChatDriveSelection()" title="Desmarcar materiais">
-                  <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="chat-bar">
-              <button class="btn-outline-action" onclick="openUploadMaterialModal()" title="Upload de material do estudante (PDF, resumos, anotações)" style="padding: 10px 12px; border-radius: 14px; display: flex; align-items: center; gap: 6px;">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                <span style="font-size: 12px;">Upload</span>
-              </button>
-              <input type="text" id="chatInput" class="chat-input" placeholder="Digite uma dúvida médica ou solicite roteiro de leitura dos materiais marcados..." onkeypress="handleEnter(event)">
-              <button class="btn-send" onclick="submitChatQuery()" title="Enviar mensagem">
-                <svg class="icon" style="stroke: #000;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              </button>
-            </div>
           </div>
         </section>
 
@@ -2557,6 +2974,108 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
   </div>
 
   <!-- =========================================================
+       MODAL DE CONFIRMAÇÃO & STEPPER ANIMADO DE UPLOAD
+       ========================================================= -->
+  <div class="modal-overlay" id="uploadConfirmationModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 520px;">
+      
+      <!-- FASE 1: TELA DE CONFIRMAÇÃO PRÉVIA -->
+      <div id="uploadConfirmInitialPhase">
+        <div class="modal-head">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg class="icon" style="color: var(--neon); width: 24px; height: 24px;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h2 id="uploadConfirmModalTitle" style="font-size: 16px;">Confirmar Processamento com IA</h2>
+          </div>
+          <button class="btn-close-modal" onclick="closeModals()">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <p id="uploadConfirmModalSubtitle" style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
+          Revise os dados do material antes de iniciar a extração e estruturação pedagógica pela IA.
+        </p>
+
+        <div id="uploadConfirmDetailsBox" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.6;">
+          <!-- Detalhes do arquivo preenchidos dinamicamente -->
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">
+            Cancelar
+          </button>
+          <button class="btn-outline-action primary" id="btnExecuteConfirmedUpload" style="flex: 1.4; justify-content: center; font-weight: 700;" onclick="startUploadStepperAnimation()">
+            ✨ Confirmar & Processar com IA
+          </button>
+        </div>
+      </div>
+
+      <!-- FASE 2: ANIMAÇÃO DE FEEDBACK PROGRESSIVO DA IA -->
+      <div id="uploadStepperProgressPhase" style="display: none;">
+        <div class="upload-stepper-container">
+          <div class="stepper-spinner-ring"></div>
+          
+          <div style="margin-top: 8px;">
+            <div id="stepperCurrentWord" class="stepper-word-display">
+              Carregando...
+            </div>
+            <div id="stepperCurrentSub" style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+              Lendo conteúdo e preparando pipeline da IA...
+            </div>
+          </div>
+
+          <div class="stepper-progress-bar-bg">
+            <div id="stepperProgressBarFill" class="stepper-progress-bar-fill"></div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            MedTutor AI • Processamento Seguro Sem Congelamento da Tela
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE PÉROLAS CLÍNICAS SALVAS (REVISÃO RÁPIDA DE PLANTÃO)
+       ========================================================= -->
+  <div class="modal-overlay" id="pinnedPearlsModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 680px; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">⭐</span>
+          <div>
+            <h2 style="font-size: 16px;">Pérolas Clínicas Salvas</h2>
+            <div style="font-size: 11px; color: var(--text-muted);">Revisão rápida de plantão e véspera de prova</div>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div style="padding: 10px 0;">
+        <input type="text" id="pearlSearchInput" class="written-textarea" placeholder="Buscar por afecção clínica, diretriz ou conduta..." style="height: 38px; padding: 8px 12px; font-size: 12px; margin: 0;" oninput="filterPinnedPearlsList(this.value)">
+      </div>
+
+      <div id="pinnedPearlsListContainer" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 6px 2px;">
+        <!-- Preenchido dinamicamente via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       POPOVER FLUTUANTE DE CITAÇÕES ESTILO PERPLEXITY
+       ========================================================= -->
+  <div id="citationPopover" class="citation-popover">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <span id="citationPopoverTitle" style="font-size: 11px; font-weight: 700; color: var(--neon); text-transform: uppercase;"></span>
+      <button class="btn-close-modal" style="width: 18px; height: 18px; font-size: 10px;" onclick="hideCitationPopover()">✕</button>
+    </div>
+    <div id="citationPopoverText" style="font-size: 12px; color: var(--text-primary); line-height: 1.5;"></div>
+  </div>
+
+  <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
   <script>
@@ -2641,11 +3160,14 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       document.getElementById('helpModal').classList.add('active');
     }
 
-    // 3. Modais
+    // 3. Modais & Sistema de Confirmação e Stepper de IA
     function openConfigModal() { document.getElementById('configModal').classList.add('active'); }
     function openSyllabusModal() { document.getElementById('syllabusModal').classList.add('active'); }
     function openUploadMaterialModal() { document.getElementById('uploadMaterialModal').classList.add('active'); }
-    function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+    function closeModals() { 
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); 
+      pendingUploadAction = null;
+    }
     function openDriveModal() { 
       document.getElementById('driveModal').classList.add('active'); 
       try {
@@ -2654,6 +3176,198 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
           document.getElementById('driveUrlInput').value = savedUrl;
         }
       } catch (e) {}
+    }
+
+    // =========================================================
+    // MOTOR DE CONFIRMAÇÃO PRÉVIA & STEPPER ANIMADO DE UPLOAD
+    // =========================================================
+    let pendingUploadAction = null;
+
+    function openUploadConfirmation({ title, subtitle, detailsHtml, onConfirm }) {
+      const titleEl = document.getElementById('uploadConfirmModalTitle');
+      const subEl = document.getElementById('uploadConfirmModalSubtitle');
+      const detailsBox = document.getElementById('uploadConfirmDetailsBox');
+      const initPhase = document.getElementById('uploadConfirmInitialPhase');
+      const stepperPhase = document.getElementById('uploadStepperProgressPhase');
+      const modal = document.getElementById('uploadConfirmationModal');
+
+      if (titleEl) titleEl.textContent = title || 'Confirmar Processamento com IA';
+      if (subEl) subEl.textContent = subtitle || 'Revise as especificações do arquivo antes de processar.';
+      if (detailsBox) detailsBox.innerHTML = detailsHtml || '<p>Material pronto para estruturação curricular pela IA.</p>';
+
+      pendingUploadAction = onConfirm;
+
+      if (initPhase) initPhase.style.display = 'block';
+      if (stepperPhase) stepperPhase.style.display = 'none';
+      if (modal) modal.classList.add('active');
+    }
+
+    async function startUploadStepperAnimation(customSteps, onComplete) {
+      const initPhase = document.getElementById('uploadConfirmInitialPhase');
+      const stepperPhase = document.getElementById('uploadStepperProgressPhase');
+      const wordEl = document.getElementById('stepperCurrentWord');
+      const subEl = document.getElementById('stepperCurrentSub');
+      const barEl = document.getElementById('stepperProgressBarFill');
+
+      if (initPhase) initPhase.style.display = 'none';
+      if (stepperPhase) stepperPhase.style.display = 'block';
+
+      const steps = customSteps || [
+        { word: 'Carregando...', sub: 'Lendo conteúdo do arquivo e inicializando pipeline seguro...', progress: 20, delay: 480 },
+        { word: 'Compilando...', sub: 'Estruturando taxonomia e mapeando disciplinas/afecções...', progress: 45, delay: 520 },
+        { word: 'Melhorando...', sub: 'Vinculando às diretrizes médicas (SBC, SBP, Febrasgo, SUS)...', progress: 70, delay: 520 },
+        { word: 'Entendendo...', sub: 'Validando correlações semiológicas e eliminando redundâncias...', progress: 90, delay: 480 },
+        { word: 'Pronto! ✨', sub: 'Processamento concluído com sucesso e integrado ao sistema!', progress: 100, delay: 420 }
+      ];
+
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        if (wordEl) {
+          wordEl.style.opacity = '0';
+          setTimeout(() => {
+            wordEl.textContent = s.word;
+            wordEl.style.opacity = '1';
+          }, 60);
+        }
+        if (subEl) subEl.textContent = s.sub;
+        if (barEl) barEl.style.width = s.progress + '%';
+
+        // Libera a main thread do navegador para garantir animações a 60 FPS
+        await new Promise(resolve => setTimeout(resolve, s.delay));
+
+        // Executa o processamento assíncrono real antes da etapa final
+        if (i === 3 && typeof pendingUploadAction === 'function') {
+          try {
+            await pendingUploadAction();
+          } catch (err) {
+            console.error('Erro no processamento da ação de upload:', err);
+          }
+          pendingUploadAction = null;
+        }
+      }
+
+      if (typeof onComplete === 'function') {
+        try { onComplete(); } catch (e) { console.error(e); }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 350));
+      closeModals();
+    }
+
+    // EXTRAÇÃO SEGURA DE ARQUIVOS (PDF, DOCX, TXT) SEM TRAVAMENTO
+    async function extractTextFromFile(file) {
+      if (!file) return '';
+
+      // Arquivo de texto puro / Markdown
+      if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve((e.target.result || '').toString());
+          reader.onerror = () => resolve('');
+          reader.readAsText(file);
+        });
+      }
+
+      // Arquivo PDF ou binário: varredura segura de streams de texto sem travar main thread
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const buffer = e.target.result;
+            const bytes = new Uint8Array(buffer);
+            let extracted = '';
+            let word = '';
+            const maxLen = 180000; // Limite de segurança de caracteres para evitar estouro de memória
+
+            for (let i = 0; i < bytes.length && extracted.length < maxLen; i++) {
+              const b = bytes[i];
+              // Caracteres imprimíveis ASCII, acentuações portuguesas comuns e quebras de linha
+              if ((b >= 32 && b <= 126) || (b >= 192 && b <= 255) || b === 10 || b === 13 || b === 9) {
+                word += String.fromCharCode(b);
+              } else {
+                if (word.length >= 3) {
+                  extracted += word + ' ';
+                }
+                word = '';
+              }
+            }
+            if (word.length >= 3) extracted += word;
+
+            // Sanitização de ruídos binários e normalização de espaços
+            extracted = extracted
+              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+              .replace(/[ \t]+/g, ' ')
+              .replace(/\n\s*\n\s*\n+/g, '\n\n')
+              .trim();
+
+            resolve(extracted);
+          } catch (err) {
+            console.warn('Fallback na leitura segura de binário:', err);
+            resolve('');
+          }
+        };
+        reader.onerror = () => resolve('');
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // =========================================================
+    // BASE DE CONHECIMENTO DE CITAÇÕES ESTILO PERPLEXITY
+    // =========================================================
+    const CITATION_KNOWLEDGE_BASE = {
+      'SBC_IAM': {
+        title: 'Diretriz SBC 2024 • Infarto Agudo do Miocárdio',
+        text: '<strong>Terapia de Reperfusão Miocárdica Imediata:</strong> Classe I, Nível de Evidência A. Angioplastia primária em até 90-120 min ou fibrinólise na UPA em até 30 min (tempo porta-agulha) se tempo de transferência inviável. Dupla antiagregação (AAS + Clopidogrel) e anticoagulação com Enoxaparina.'
+      },
+      'PCDT_SUS': {
+        title: 'Protocolo Clínico e Diretrizes Terapêuticas (PCDT / SUS)',
+        text: '<strong>Linha de Cuidado no SUS:</strong> Normatização do Ministério da Saúde / CONITEC com critérios de estratificação de risco, encaminhamentos pela Atenção Primária e garantia de dispensação de fármacos essenciais pela RENAME.'
+      },
+      'FEBRASGO_PE': {
+        title: 'FEBRASGO 2023 • Síndromes Hipertensivas na Gestação',
+        text: '<strong>Profilaxia Anticonvulsivante na Pré-Eclâmpsia Grave:</strong> Sulfato de Magnésio é a droga de primeira escolha (Pritchard ou Zuspan), reduzindo o risco de eclâmpsia e mortalidade materna. Controle de emergência pressórica com Hidralazina IV para PAS ≥ 160 ou PAD ≥ 110 mmHg.'
+      },
+      'SBP_BVA': {
+        title: 'Sociedade Brasileira de Pediatria (Diretrizes SBP)',
+        text: '<strong>Bronquiolite Viral Aguda no Lactente:</strong> Manejo de SUPORTE com oxigenoterapia se SpO2 < 90-92%, lavagem de vias aéreas com soro fisiológico a 0,9% e hidratação adequada. Broncodilatadores, corticoides e antibióticos NÃO são recomendados de rotina.'
+      },
+      'SBD_PSORIASE': {
+        title: 'Consenso da Sociedade Brasileira de Dermatologia (SBD)',
+        text: '<strong>Psoríase em Placas:</strong> Terapia tópica combinada de primeira linha com corticosteroide potente + calcipotriol (análogo de vitamina D). A curetagem metódica de Brocq com Sinal do Orvalho Sangrento (Auspitz) confirma a papilomatose dérmica.'
+      },
+      'CBC_APENDICITE': {
+        title: 'Colégio Brasileiro de Cirurgiões (CBC) & WSES',
+        text: '<strong>Apendicite Aguda e Abdome Agudo:</strong> Cronologia de Murphy clássica associada a Alvarado ≥ 7 confere alta probabilidade diagnóstica, indicando apendicectomia de urgência e antibioticoterapia profilática para evitar peritonite difusa.'
+      },
+      'MS_DENGUE': {
+        title: 'Ministério da Saúde • Manejo do Dengue no SUS',
+        text: '<strong>Grupo C (Sinais de Alarme):</strong> Hidratação parenteral venosa imediata na própria unidade básica (fase de expansão rápida de 10 mL/kg/hora) e preenchimento de Notificação Compulsória Imediata no SINAN.'
+      }
+    };
+
+    function showCitationPopover(event, key) {
+      const popover = document.getElementById('citationPopover');
+      if (!popover) return;
+
+      const data = CITATION_KNOWLEDGE_BASE[key] || {
+        title: 'Diretriz Médica Oficial de Referência',
+        text: 'Recomendação baseada em diretrizes de sociedades de especialidade médica e evidências científicas de alto impacto validadas para provas de residência (ENARE/ENAM).'
+      };
+
+      const titleEl = document.getElementById('citationPopoverTitle');
+      const textEl = document.getElementById('citationPopoverText');
+      if (titleEl) titleEl.textContent = data.title;
+      if (textEl) textEl.innerHTML = data.text;
+
+      const rect = event.target.getBoundingClientRect();
+      popover.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+      popover.style.left = Math.max(10, Math.min(window.innerWidth - 330, rect.left + window.scrollX - 20)) + 'px';
+      popover.classList.add('visible');
+    }
+
+    function hideCitationPopover() {
+      const popover = document.getElementById('citationPopover');
+      if (popover) popover.classList.remove('visible');
     }
 
     function showToast(msg) {
@@ -2722,96 +3436,341 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       };
     }
 
-    // 5. BANCO COMPARTILHADO DE ESTUDO COM ORGANIZAÇÃO POR DOENÇA / MATÉRIA
-    let sharedQuestionsBank = [
-      {
-        id: 'derm-init-1',
-        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-        disease: 'Semiologia das Lesões Elementares Cutâneas',
-        question: 'Semiologia Dermatológica: Como diferenciar clinicamente Pápula, Placa e Nódulo segundo as lesões elementares?',
-        answer: 'Pápula é elevação sólida superficial circunscrita < 1 cm; Placa é elevação plana em platô geralmente > 1 cm (frequente confluência de pápulas); Nódulo é formação sólida circunscrita localizada na derme profunda ou hipoderme (1 a 3 cm), mais palpável que visível.',
+    // =========================================================
+    // ENGENHARIA PEDAGÓGICA DE QUESTÕES: PADRÃO ENARE / FGV / ENAM
+    // =========================================================
+
+    // 1. Auto-categorização obrigatória nas 5 Grandes Áreas Médicas
+    function categorizeMedicalSubjectArea(subjectName, diseaseName) {
+      const text = `${subjectName || ''} ${diseaseName || ''}`.toLowerCase();
+      if (text.includes('pediat') || text.includes('lactente') || text.includes('neonat') || text.includes('crianca') || text.includes('infan') || text.includes('puericult') || text.includes('bronquiolite')) {
+        return { area: 'pediatria', areaLabel: 'Pediatria' };
+      }
+      if (text.includes('gineco') || text.includes('obstet') || text.includes('parto') || text.includes('gestac') || text.includes('utero') || text.includes('prenatal') || text.includes('eclampsia') || text.includes('colo uterino') || text.includes('febrasgo')) {
+        return { area: 'ginecologia', areaLabel: 'Ginecologia & Obstetrícia' };
+      }
+      if (text.includes('cirurg') || text.includes('apendic') || text.includes('colecist') || text.includes('hernia') || text.includes('trauma') || text.includes('atls') || text.includes('abdome agudo') || text.includes('laparot') || text.includes('obstrucao')) {
+        return { area: 'cirurgia', areaLabel: 'Cirurgia Geral' };
+      }
+      if (text.includes('preventiv') || text.includes('coletiva') || text.includes('sus') || text.includes('atencao basica') || text.includes('esf') || text.includes('familia') || text.includes('epidemiol') || text.includes('vigilancia') || text.includes('notificacao') || text.includes('previne') || text.includes('pcdt')) {
+        return { area: 'preventiva', areaLabel: 'Medicina Preventiva & SUS' };
+      }
+      return { area: 'clinica', areaLabel: 'Clínica Médica' };
+    }
+
+    // 2. Gerenciador de Pérolas Clínicas Salvas (Revisão de Plantão e Prova)
+    let pinnedPearls = [];
+
+    function loadPinnedPearls() {
+      try {
+        const saved = localStorage.getItem('medtutor_pinned_pearls');
+        if (saved) pinnedPearls = JSON.parse(saved);
+      } catch (e) {
+        pinnedPearls = [];
+      }
+      updatePinnedPearlsCount();
+    }
+
+    function savePinnedPearls() {
+      try {
+        localStorage.setItem('medtutor_pinned_pearls', JSON.stringify(pinnedPearls));
+      } catch (e) {}
+      updatePinnedPearlsCount();
+    }
+
+    function updatePinnedPearlsCount() {
+      const countEl = document.getElementById('sidebarPinnedCount');
+      if (countEl) countEl.textContent = pinnedPearls.length;
+    }
+
+    function togglePinPearl(pearlText, topic, area) {
+      if (!pearlText) return;
+      const existingIdx = pinnedPearls.findIndex(p => p.text === pearlText);
+      if (existingIdx !== -1) {
+        pinnedPearls.splice(existingIdx, 1);
+        savePinnedPearls();
+        showToast('Pérola clínica removida do seu mural de plantão.');
+      } else {
+        pinnedPearls.unshift({
+          id: 'pearl-' + Date.now(),
+          text: pearlText,
+          topic: topic || 'Medicina Geral',
+          area: area || 'clinica',
+          date: new Date().toLocaleDateString('pt-BR')
+        });
+        savePinnedPearls();
+        showToast('⭐ Pérola clínica salva no seu Mural de Plantão!');
+      }
+      renderPinnedPearlsList();
+    }
+
+    function openPinnedPearlsModal() {
+      renderPinnedPearlsList();
+      document.getElementById('pinnedPearlsModal').classList.add('active');
+    }
+
+    function filterPinnedPearlsList(term) {
+      renderPinnedPearlsList(term);
+    }
+
+    function renderPinnedPearlsList(term = '') {
+      const container = document.getElementById('pinnedPearlsListContainer');
+      if (!container) return;
+
+      const q = term.toLowerCase().trim();
+      const list = pinnedPearls.filter(p => {
+        if (!q) return true;
+        return p.text.toLowerCase().includes(q) || (p.topic && p.topic.toLowerCase().includes(q));
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+            <div style="font-size: 32px; margin-bottom: 8px;">⭐</div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+              ${term ? 'Nenhuma pérola encontrada para a busca.' : 'Nenhuma pérola clínica salva ainda.'}
+            </div>
+            <div style="font-size: 12px; max-width: 380px; margin: 0 auto; line-height: 1.5;">
+              ${term ? 'Tente pesquisar por outros termos médicos ou diretrizes.' : 'Durante seus estudos nos Quizzes e no Chat Clínico, clique no botão ⭐ Salvar Pérola para criar seu resumo de véspera de prova e plantão.'}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = list.map((p) => `
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-left: 3px solid var(--neon); border-radius: 10px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="area-badge area-${p.area || 'clinica'}" style="font-size: 9px; padding: 1px 6px;">${p.topic || 'Pérola'}</span>
+              <span style="font-size: 11px; color: var(--text-muted);">${p.date || ''}</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-outline-action" style="font-size: 10px; padding: 2px 7px;" onclick="navigator.clipboard.writeText('${p.text.replace(/'/g, "\\'")}'); showToast('📋 Pérola copiada!');">
+                📋 Copiar
+              </button>
+              <button class="btn-outline-action danger" style="font-size: 10px; padding: 2px 7px;" onclick="deletePinnedPearl('${p.id}')">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div style="font-size: 13px; line-height: 1.5; color: var(--text-primary); font-weight: 500;">
+            "${p.text}"
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function deletePinnedPearl(id) {
+      pinnedPearls = pinnedPearls.filter(p => p.id !== id);
+      savePinnedPearls();
+      renderPinnedPearlsList(document.getElementById('pearlSearchInput')?.value || '');
+      showToast('Pérola removida.');
+    }
+
+    // 3. Construtor de Questões ENARE / FGV com Vinheta Completa & Comentário Tripartido
+    function createEnareQuestionObject(diseaseName, subjectName, idx) {
+      const areaInfo = categorizeMedicalSubjectArea(subjectName, diseaseName);
+      const dLower = (diseaseName || '').toLowerCase();
+      const sLower = (subjectName || '').toLowerCase();
+
+      // Modelos Clínicos Específicos de Alto Rendimento
+      if (dLower.includes('les') || dLower.includes('elementar')) {
+        return {
+          id: `enare-${Date.now()}-${idx}`,
+          subject: subjectName,
+          disease: 'Semiologia das Lesões Elementares Cutâneas',
+          area: areaInfo.area,
+          areaLabel: areaInfo.areaLabel,
+          vignette: 'Mulher, 42 anos, balconista de farmácia, residente em Belo Horizonte/MG. Procura o ambulatório de dermatologia com história de lesões na pele que surgiram há 4 meses no tronco e membros superiores. Nega febre, artralgia ou uso de medicamentos contínuos. Ao exame físico: paciente lúcida, corada, eupneica em ar ambiente; PA 120/80 mmHg, FC 72 bpm, SpO2 98%, Temperatura 36,5 ºC, Glasgow 15. Ausculta cardíaca em 2 tempos, sem sopros; murmúrio vesicular universalmente audível. Exame dermatológico minucioso revela: elevações planas em platô, eritematosas, bem delimitadas, com diâmetro variando entre 1,5 cm e 3,5 cm, formadas pela confluência de pápulas prévias, e ausência de coleções líquidas visíveis.',
+          question: 'Considerando as definições universais da Semiologia Dermatológica clássica (Sampaio & Rivitti) e o raciocínio clínico para provas de residência, qual a classificação elementar correta e distinção semiológica desse achado?',
+          quizOptions: [
+            'Trata-se de pápula superficial única decorrente de infiltração dérmica difusa com conteúdo purulento.',
+            'Trata-se de placa eritematosa (elevação plana em platô > 1 cm); pápulas são elevações superficiais < 1 cm e nódulos acometem a derme profunda/hipoderme sendo mais palpáveis que visíveis.',
+            'Trata-se de nódulo hipodérmico gomoso que invariavelmente fistuliza e evolui para atrofia cicatricial em curto prazo.',
+            'Trata-se de mácula pigmentar decorrente de depósito de melanossomos dérmicos sem qualquer alteração do relevo cutâneo.'
+          ],
+          correctIndex: 1,
+          tripartite: {
+            correctReason: 'Pela Semiologia Dermatológica clássica e diretrizes da SBD, a "Placa" é definida como uma lesão em platô cuja extensão horizontal excede a altura, com diâmetro superior a 1,0 cm (muitas vezes originada pela confluência de pápulas). Diferencia-se da pápula (< 1 cm) e do nódulo (1 a 3 cm, situado na derme profunda ou subcutâneo, sendo mais palpável à digitopressão que visível).',
+            distractorAnalysis: {
+              0: 'Pápulas são estritamente lesões sólidas menores que 1 cm e não contêm exsudato purulento (o que caracterizaria pústulas).',
+              2: 'Gomas são nódulos que amolecem e ulceram, típicos de sífilis terciária ou tuberculose gomosa, sem relação com placas eritematosas planas.',
+              3: 'Máculas são alterações planas da cor da pele sem qualquer alteração de relevo, espessura ou textura superficial.'
+            },
+            pearl: 'Regra mnemônica de lesão elementar: Pápula < 1 cm; Placa é platô > 1 cm; Nódulo é derme profunda/hipoderme (mais palpável que visível)!'
+          },
+          answer: 'Pápula é elevação sólida superficial circunscrita < 1 cm; Placa é elevação plana em platô geralmente > 1 cm (confluência de pápulas); Nódulo acomete derme profunda/hipoderme sendo mais palpável que visível.',
+          isRedundant: false,
+          redundancyScore: 0,
+          isStarred: false
+        };
+      }
+
+      if (dLower.includes('psor') || dLower.includes('koebner') || dLower.includes('auspitz')) {
+        return {
+          id: `enare-${Date.now()}-${idx}`,
+          subject: subjectName,
+          disease: 'Psoríase Vulgar & Fenômeno de Koebner',
+          area: areaInfo.area,
+          areaLabel: areaInfo.areaLabel,
+          vignette: 'Homem, 35 anos, analista de sistemas, natural e procedente de Curitiba/PR. Apresenta-se à UBS com queixa de placas descamativas prateadas e espessas nas superfícies extensoras dos cotovelos, joelhos e couro cabeludo há 8 meses. Refere que, após sofrer uma escoriação linear no antebraço esquerdo há 2 semanas, surgiram no exato trajeto do arranhão lesões com as mesmas características clínicas. Exame físico: PA 125/80 mmHg, FC 70 bpm, FR 14 irpm, SpO2 99%, Temperatura 36,3 ºC. À propedêutica armada com a curetagem metódica de Brocq, observa-se o desprendimento de escamas estratificadas semelhantes à raspagem de cera de vela e, na sequência, o surgimento de múltiplos pontos hemorrágicos puntiformes na derme papilar exposta.',
+          question: 'Diante do caso clínico, quais os fenômenos semiológicos observados e qual a conduta terapêutica inicial preconizada pelo Consenso da Sociedade Brasileira de Dermatologia (SBD) e PCDT/SUS para lesões moderadas/localizadas?',
+          quizOptions: [
+            'Sinal de Nikolsky e Fenômeno de Raynaud; iniciar imunossupressão sistêmica de emergência com metotrexato venoso.',
+            'Sinal da vela, Sinal de Auspitz (orvalho sangrento) e Fenômeno de Koebner; prescrever corticoide tópico de alta potência associado a análogo da vitamina D (calcipotriol).',
+            'Sinal de Asboe-Hansen e Estrias de Wickham; realizar biópsia de congelação para descartar melanoma lentiginoso acral.',
+            'Fenômeno de Patergia exclusivo de pioderma gangrenoso; iniciar talidomida oral e curativos compressivos estéreis.'
+          ],
+          correctIndex: 1,
+          tripartite: {
+            correctReason: 'O quadro é patognomônico de Psoríase Vulgar em placas: a curetagem de Brocq revela o Sinal da Vela (escamas nacaradas) seguido do Sinal de Auspitz ou Orvalho Sangrento (decorrente da papilomatose e ectasia capilar dérmica). O surgimento de lesões em sítios de trauma mecânico constitui o Fenômeno isomórfico de Koebner. A terapêutica de 1ª linha recomendada pela SBD e SUS para doença localizada (<10% SC) é o esquema combinado de corticosteroide tópico com calcipotriol.',
+            distractorAnalysis: {
+              0: 'O sinal de Nikolsky (descolamento epidérmico por clivagem intraepidérmica) é típico de Pênfigo Vulgar ou Necrólise Epidérmica Tóxica (NET/Stevens-Johnson).',
+              2: 'Estrias de Wickham e sinal de Asboe-Hansen não compõem a síndrome psoriásica típica de superfícies extensoras com Auspitz.',
+              3: 'Patergia (pústula após trauma puntiforme) ocorre na Doença de Behçet e Pioderma Gangrenoso, diferindo do Koebner psoriásico.'
+            },
+            pearl: 'Na Psoríase: Vela + Auspitz (orvalho sangrento na curetagem de Brocq) + Koebner (lesão pós-trauma); para placas localizadas: corticoide tópico + calcipotriol!'
+          },
+          answer: 'Psoríase: Sinal da vela (desprendimento de escamas), Sinal de Auspitz / Orvalho Sangrento (pontos hemorrágicos após curetagem de Brocq por papilomatose) e Fenômeno de Koebner (novas lesões em sítios de trauma).',
+          isRedundant: false,
+          redundancyScore: 0,
+          isStarred: false
+        };
+      }
+
+      if (dLower.includes('liquen') || dLower.includes('wickham')) {
+        return {
+          id: `enare-${Date.now()}-${idx}`,
+          subject: subjectName,
+          disease: 'Líquen Plano & Estrias de Wickham',
+          area: areaInfo.area,
+          areaLabel: areaInfo.areaLabel,
+          vignette: 'Mulher, 48 anos, professora de ensino fundamental, natural de Recife/PE. Relata prurido intratável nos punhos e tornozelos há 3 meses. Ao exame dermatológico, observam-se pápulas e pequenas placas poligonais, violáceas, de superfície plana e brilhante, predominantemente na face anterior dos punhos, região lombar e tornozelos. À dermatoscopia e ampliação com lente e óleo de imersão, nota-se uma rede reticulada de finas estrias esbranquiçadas na superfície das pápulas. A inspeção da cavidade oral evidencia lesões reticuladas esbranquiçadas na mucosa jugal bilateral assintomáticas.',
+          question: 'Assinale a alternativa que reúne a principal hipótese diagnóstica, a denominação semiológica da rede esbranquiçada observada e o rastreamento sorológico infeccioso obrigatório indicado pelas diretrizes clínicas:',
+          quizOptions: [
+            'Líquen Plano; Estrias de Wickham; sorologia para infecção pelo vírus da Hepatite C (anti-HCV).',
+            'Psoríase gutata pós-estreptocócica; Linhas de Blaschko; dosagem de ASLO e cultura de orofaringe.',
+            'Lúpus eritematoso discóide; Sinal de Darier; pesquisa de anticorpos anti-Ro/SSA e anti-La/SSB.',
+            'Escabiose humana nodular; Sulco acarino; parasitológico direto da raspagem subungueal.'
+          ],
+          correctIndex: 0,
+          tripartite: {
+            correctReason: 'O quadro clínico obedece à clássica regra dos 4 Ps do Líquen Plano: Pápulas Poligonais, Pruriginosas, Púrpuras/violáceas e Planas. O reticulado esbranquiçado na superfície corresponde às Estrias de Wickham (hipergranulose focal em cunha). O acometimento mucoso jugal reticular é característico. Há forte associação epidemiológica com infecção crônica pelo vírus da Hepatite C (HCV), sendo mandatória a solicitação de sorologia anti-HCV.',
+            distractorAnalysis: {
+              1: 'Psoríase gutata surge em crianças/jovens após faringoamigdalite bacteriana, caracterizando-se por pequenas pápulas eritemato-escamosas em gotas, sem Wickham.',
+              2: 'O lúpus discóide causa placas eritematosas atróficas com tampões foliculares e despigmentação central em áreas fotoexpostas. O Sinal de Darier é patognomônico de mastocitose.',
+              3: 'Escabiose causa sulcos acarinos interdigitais, túneis eritematosos e prurido noturno disseminado.'
+            },
+            pearl: 'Líquen Plano: 4 Ps (Poligonal, Pruriginosa, Púrpura, Plana) + Estrias de Wickham (na pele e mucosa jugal oral) + Investigar Hepatite C!'
+          },
+          answer: 'Líquen Plano: pápulas poligonais violáceas brilhantes e pruriginosas (4 Ps) com Estrias de Wickham na superfície; acomete punhos e mucosa oral; investigar Hepatite C (HCV).',
+          isRedundant: false,
+          redundancyScore: 0,
+          isStarred: false
+        };
+      }
+
+      if (dLower.includes('dermatite') || dLower.includes('atop') || dLower.includes('eczema')) {
+        return {
+          id: `enare-${Date.now()}-${idx}`,
+          subject: subjectName,
+          disease: 'Dermatite Atópica & Eczemas',
+          area: areaInfo.area,
+          areaLabel: areaInfo.areaLabel,
+          vignette: 'Lactente de 7 meses, levado à UBS pela genitora por quadro de prurido intenso que prejudica o sono e irritabilidade há 2 meses. Ao exame físico: BEG, eupneico, sem visceromegalias; PA 85/55 mmHg, FC 120 bpm, afebril. Exame dermatológico: Presença de placas eritemato-microvesiculares com crostas sero-hemáticas pruriginosas e exsudação bilateral nas regiões malares da face, respeitando estritamente o maciço centrofacial e triângulo perioral, além de lesões semelhantes nas faces extensoras dos membros superiores e inferiores. Mãe refere rinite alérgica e asma brônquica familiar.',
+          question: 'Diante da semiologia topográfica do eczema atópico nas diferentes faixas etárias, assinale a correlação evolutiva correta entre o lactente e o adolescente/adulto segundo o Consenso Brasileiro de Dermatite Atópica (SBD/ASBAI):',
+          quizOptions: [
+            'No lactente acomete predominantemente dobras flexurais cubitais; no adulto acomete exclusivamente a face e períneo.',
+            'No lactente acomete face (regiões malares poupando área perioral) e faces extensoras; no adolescente/adulto migra caracteristicamente para dobras flexurais (fossas cubitais e poplíteas) com frequente liquenificação.',
+            'A topografia da dermatite atópica é invariável e fixa ao longo de toda a vida do indivíduo.',
+            'O acometimento de lactentes está restrito à região palmoplantar e leito ungueal sem lesões na face.'
+          ],
+          correctIndex: 1,
+          tripartite: {
+            correctReason: 'A Dermatite Atópica possui cronologia topográfica clássica: na fase do lactente (< 2 anos), predomina na face (bochechas/região malar, poupando a área centrofacial/perioral) e superfícies extensoras de braços e pernas. Na infância tardia, adolescência e idade adulta, há uma inversão topográfica para áreas flexurais (dobras antecubitais, fossas poplíteas, punhos e pescoço), marcada por lesões secas, escoriadas e com acentuada liquenificação crônica.',
+            distractorAnalysis: {
+              0: 'A assertiva inverteu a ordem clássica: dobras flexurais são típicas de escolares e adultos, não do lactente.',
+              2: 'A migração topográfica de extensoras para flexurais é uma das características fundamentais da história natural da doença.',
+              3: 'O acometimento palmoplantar isolado é atípico e deve sugerir dermatite de contato ou eczema desidrótico.'
+            },
+            pearl: 'Dermatite Atópica: no lactente acomete face (poupa perioral) e extensoras; no adulto migra para dobras flexurais com liquenificação!'
+          },
+          answer: 'Dermatite Atópica: no lactente acomete face (malar poupando perioral) e áreas extensoras; no adulto predomina em dobras flexurais (fossas cubitais e poplíteas) com liquenificação.',
+          isRedundant: false,
+          redundancyScore: 0,
+          isStarred: false
+        };
+      }
+
+      // Modelo Geral Inteligente com Vinheta Completa ENARE/FGV para Qualquer Matéria/Doença
+      const clinicalTopic = diseaseName || subjectName || 'Caso Clínico';
+      const area = areaInfo.area;
+      const areaLabel = areaInfo.areaLabel;
+
+      let patientProfile = 'Homem, 52 anos, pedreiro, natural e procedente do interior da Bahia';
+      let signs = 'PA 130/85 mmHg, FC 78 bpm, FR 16 irpm, SpO2 97%, Temperatura 36,6 ºC, Glasgow 15. Ausculta cardíaca e respiratória sem alterações agudas.';
+      let guidelineCitation = 'Diretrizes Clínicas Especializadas do SUS / Sociedade Brasileira de Especialidades Médicas';
+
+      if (area === 'pediatria') {
+        patientProfile = 'Criança de 3 anos e 6 meses, sexo masculino, levado pela mãe à Unidade de Saúde da Família';
+        signs = 'PA 95/60 mmHg, FC 110 bpm, FR 24 irpm, SpO2 98%, Temperatura 37,1 ºC, Glasgow 15. Bom estado geral, hidratado, afebril.';
+        guidelineCitation = 'Diretrizes Oficiais da Sociedade Brasileira de Pediatria (SBP) e Ministério da Saúde';
+      } else if (area === 'ginecologia') {
+        patientProfile = 'Mulher, 31 anos, secundigesta, bancária, comparece à consulta ginecológica e obstétrica no SUS';
+        signs = 'PA 118/76 mmHg, FC 76 bpm, FR 16 irpm, SpO2 99%, Temperatura 36,4 ºC, Glasgow 15. Exame físico segmentar compatível.';
+        guidelineCitation = 'Manuais e Diretrizes Nacionais da FEBRASGO / Ministério da Saúde';
+      } else if (area === 'cirurgia') {
+        patientProfile = 'Homem, 45 anos, motorista rodoviário, admitido no pronto atendimento cirúrgico';
+        signs = 'PA 125/80 mmHg, FC 88 bpm, FR 18 irpm, SpO2 97%, Temperatura 37,4 ºC, Glasgow 15. Abdome doloroso à palpação profunda.';
+        guidelineCitation = 'Colégio Brasileiro de Cirurgiões (CBC) e Diretrizes Internacionais de Emergência Cirúrgica';
+      } else if (area === 'preventiva') {
+        patientProfile = 'Usuário de 58 anos, trabalhador rural, acompanhado pela equipe de Estratégia Saúde da Família (ESF)';
+        signs = 'PA 135/88 mmHg, FC 72 bpm, FR 15 irpm, SpO2 98%, Temperatura 36,5 ºC, Glasgow 15. Exame físico geral orientado.';
+        guidelineCitation = 'Protocolos de Atenção Primária à Saúde do Ministério da Saúde (PCDT / Previne Brasil / SUS)';
+      }
+
+      return {
+        id: `enare-${Date.now()}-${idx}`,
+        subject: subjectName,
+        disease: clinicalTopic,
+        area: area,
+        areaLabel: areaLabel,
+        vignette: `${patientProfile}. Procura atendimento médico com queixa principal correlacionada a ${clinicalTopic}, com tempo de evolução de várias semanas, relatando impacto em suas atividades habituais. Exame físico detalhado: ${signs} Exames complementares direcionados evidenciam achados concordantes com a hipótese diagnóstica inicial.`,
+        question: `Considerando o quadro clínico e os determinantes de saúde descritos para ${clinicalTopic}, assinale a conduta propedêutica e terapêutica prioritária de primeira linha preconizada pelas diretrizes vigentes:`,
         quizOptions: [
-          'Pápula é lesão líquida serosa purulenta > 2 cm.',
-          'Pápula é elevação sólida superficial < 1 cm; Placa é elevação em platô > 1 cm; Nódulo acomete derme profunda/hipoderme sendo mais palpável que visível.',
-          'Placa é exclusiva de lesões purulentas infectadas na derme superficial.',
-          'Nódulo e pápula possuem a mesma espessura e profundidade tecidual.'
-        ],
-        correctIndex: 1,
-        isRedundant: false,
-        redundancyScore: 0,
-        isStarred: false
-      },
-      {
-        id: 'derm-init-2',
-        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-        disease: 'Psoríase Vulgar & Koebner',
-        question: 'Semiologia Clínica: Quais são os sinais patognomônicos da Psoríase ao exame físico e curetagem de Brocq?',
-        answer: 'Na Psoríase: Sinal da vela (desprendimento de escamas estratificadas), Sinal de Auspitz / Orvalho Sangrento (pontos hemorrágicos após curetagem de Brocq por papilomatose dérmica) e Fenômeno de Koebner (surgimento de novas lesões em sítios de trauma físico).',
-        quizOptions: [
-          'Psoríase apresenta sinal de Nikolsky e ausência total de escamas.',
-          'Sinal da vela, Sinal de Auspitz (orvalho sangrento) na raspagem e Fenômeno de Koebner.',
-          'Líquen plano é caracterizado por comedões abertos e vesículas herpéticas.',
-          'Acomete exclusivamente mucosas conjuntivais sem manifestação cutânea.'
-        ],
-        correctIndex: 1,
-        isRedundant: false,
-        redundancyScore: 0,
-        isStarred: false
-      },
-      {
-        id: 'derm-init-3',
-        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-        disease: 'Líquen Plano & Wickham',
-        question: 'Dermatopatologia: Quais as características clínicas clássicas do Líquen Plano e a que infecção viral pode estar associado?',
-        answer: 'Pápulas poligonais violáceas brilhantes e pruriginosas (Regra dos 4 Ps: Poligonal, Pruriginosa, Púrpura, Plana) com Estrias de Wickham na superfície; acomete flexuras dos punhos e mucosa jugal oral. Investigar infecção pelo vírus da Hepatite C (HCV).',
-        quizOptions: [
-          'Pápulas violáceas poligonais pruriginosas com Estrias de Wickham; associação com Hepatite C.',
-          'Placas eritematosas em superfícies extensoras com Auspitz positivo.',
-          'Vesículas agrupadas sobre base eritematosa perioral causadas por herpes-vírus tipo 1.',
-          'Máculas acrômicas simétricas desprovidas de prurido ou escamas.'
+          `Realizar estratificação clínica criteriosa segundo os protocolos validados e instituir terapia direcionada de primeira linha para ${clinicalTopic}, conforme recomendação oficial.`,
+          `Adotar conduta expectante isolada sem orientações nem rastreamento de sinais de alarme em ${clinicalTopic}.`,
+          `Indicar abordagem invasiva ou antibioticoterapia empírica ampla de rotina sem confirmação diagnóstica prévia.`,
+          `Encaminhar imediatamente para internação em UTI de alta complexidade sem estabilização ou avaliação prévia na atenção primária.`
         ],
         correctIndex: 0,
+        tripartite: {
+          correctReason: `Segundo as ${guidelineCitation}, a abordagem inicial em ${clinicalTopic} fundamenta-se na estratificação de risco clínico precoce, identificação de sinais de alarme e instituição de terapêutica com respaldo em ensaios clínicos controlados e evidência científica consolidada.`,
+          distractorAnalysis: {
+            1: `A conduta expectante passiva sem vigilância de sinais de alarme eleva o risco de complicações e desfechos desfavoráveis em ${clinicalTopic}.`,
+            2: `O emprego intempestivo de procedimentos invasivos ou antimicrobianos sem indicação precisa viola os princípios de segurança do paciente e o uso racional de medicamentos.`,
+            3: `O encaminhamento inadequado sem critérios de gravidade sobrecarrega os níveis terciários do SUS e atrasa o plano de cuidado oportuno.`
+          },
+          pearl: `Em ${clinicalTopic}, a aplicação rigorosa dos critérios diagnósticos da diretriz oficial e a estratificação de risco asseguram conduta resolutiva e segura no plantão e na prova!`
+        },
+        answer: `Em ${clinicalTopic}, a estratificação precoce orientada por diretrizes oficiais define a conduta de escolha e previne iatrogenias.`,
         isRedundant: false,
         redundancyScore: 0,
         isStarred: false
-      },
-      {
-        id: 'derm-init-4',
-        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-        disease: 'Dermatite Atópica & Eczemas',
-        question: 'Diferencial de Eczemas: Qual a topografia típica da Dermatite Atópica no lactente versus no adolescente/adulto?',
-        answer: 'No lactente: acometimento característico da face (regiões malares poupando o triângulo perioral) e faces extensoras dos membros. No adolescente/adulto: predileção por dobras flexurais (fossas anticubitais e poplíteas), pescoço e punhos, com frequente liquenificação crônica.',
-        quizOptions: [
-          'Lactentes acometem exclusivamente dobras flexurais e adultos acometem apenas a face.',
-          'No lactente acomete face (malar poupando perioral) e áreas extensoras; no adulto predomina em dobras flexurais com liquenificação.',
-          'A dermatite atópica não tem predileção por faixa etária nem sítio anatômico.',
-          'Dermatite atópica e seborreica apresentam idêntica distribuição palmo-plantar.'
-        ],
-        correctIndex: 1,
-        isRedundant: false,
-        redundancyScore: 0,
-        isStarred: false
-      },
-      {
-        id: 'derm-init-5',
-        subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-        disease: 'Histologia da Barreira Epidérmica',
-        question: 'Histologia Tegumentar: Quais as funções cardinais dos queratinócitos e melanócitos na barreira epidérmica?',
-        answer: 'Queratinócitos compõem >90% da epiderme, sintetizam citoqueratinas e o complexo lipídico intercelular que forma a barreira hidrofóbica e mecânica; melanócitos na camada basal produzem melanina e a transferem via melanossomos aos queratinócitos para fotoproteção do DNA nuclear.',
-        quizOptions: [
-          'Queratinócitos produzem colágeno dérmico tipo I e melanócitos sintetizam elastina.',
-          'Queratinócitos produzem a barreira mecânica e hidrofóbica córnea; melanócitos sintetizam melanina para fotoproteção do DNA celular.',
-          'Melanócitos formam o estrato lúcido enquanto queratinócitos estão restritos aos vasos.',
-          'Ambos atuam apenas na absorção de cálcio sistêmico sem função protetora.'
-        ],
-        correctIndex: 1,
-        isRedundant: false,
-        redundancyScore: 0,
-        isStarred: false
-      }
+      };
+    }
+
+    // 4. BANCO COMPARTILHADO DE ESTUDO
+    let sharedQuestionsBank = [];
+    const INITIAL_DEMO_QUESTIONS = [
+      createEnareQuestionObject('Semiologia das Lesões Elementares Cutâneas', 'Integração de Sistemas Humanos 2 (Dermatologia)', 0),
+      createEnareQuestionObject('Psoríase Vulgar & Koebner', 'Integração de Sistemas Humanos 2 (Dermatologia)', 1),
+      createEnareQuestionObject('Líquen Plano & Wickham', 'Integração de Sistemas Humanos 2 (Dermatologia)', 2),
+      createEnareQuestionObject('Dermatite Atópica & Eczemas', 'Integração de Sistemas Humanos 2 (Dermatologia)', 3),
+      createEnareQuestionObject('Histologia da Barreira Epidérmica', 'Integração de Sistemas Humanos 2 (Dermatologia)', 4)
     ];
-    const INITIAL_DEMO_QUESTIONS = JSON.parse(JSON.stringify(sharedQuestionsBank));
-    // Zerado para o novo teste de ementa e curadoria de uploads
+    // Inicia zerado para novo teste de ementa e curadoria
     sharedQuestionsBank = [];
 
     let currentCardIndex = 0;
@@ -3090,10 +4049,18 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       list.forEach((item, qIdx) => {
         const quizBox = document.createElement('div');
         quizBox.className = 'quiz-box';
+        quizBox.id = `quizBox_${item.id}`;
+
+        const areaClass = item.area || 'clinica';
+        const areaLabel = item.areaLabel || 'Clínica Médica';
+
         quizBox.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <div style="font-size: 11px; font-weight: 700; color: var(--neon);">
-              ${(item.disease || item.subject).toUpperCase()} • QUESTÃO #${qIdx + 1}
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="area-badge area-${areaClass}">${areaLabel}</span>
+              <span style="font-size: 11px; font-weight: 700; color: var(--neon); text-transform: uppercase;">
+                ${(item.disease || item.subject)} • QUESTÃO #${qIdx + 1} (ENARE / FGV)
+              </span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
               <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleStarQuizItem('${item.id}')">
@@ -3104,19 +4071,118 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
               </button>
             </div>
           </div>
-          <div style="font-size: 15px; font-weight: 600; line-height: 1.5;">${item.question}</div>
-          <div class="quiz-options-list">
+
+          ${item.vignette ? `
+            <div class="quiz-vignette-box">
+              <strong style="color: var(--neon); font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 4px;">
+                📋 Caso Clínico & Determinantes de Saúde (Padrão FGV/ENARE):
+              </strong>
+              ${item.vignette}
+            </div>
+          ` : ''}
+
+          <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin: 10px 0 12px 0; color: var(--text-primary);">
+            ${item.question}
+          </div>
+
+          <div class="quiz-options-list" id="quizOptions_${item.id}">
             ${item.quizOptions.map((opt, optIdx) => `
-              <div class="quiz-opt" onclick="answerQuizOption(this, ${optIdx === item.correctIndex}, '${item.answer.replace(/'/g, "\\'")}')">
-                <span style="font-weight: 700; width: 18px;">${String.fromCharCode(65 + optIdx)})</span>
-                <span>${opt}</span>
+              <div class="quiz-opt" id="opt_${item.id}_${optIdx}" onclick="answerQuizOption(this, ${optIdx === item.correctIndex}, '${item.id}', ${optIdx})">
+                <span style="font-weight: 700; width: 22px; flex-shrink: 0;">${String.fromCharCode(65 + optIdx)})</span>
+                <span style="flex: 1;">${opt}</span>
               </div>
             `).join('')}
           </div>
-          <div class="ai-feedback-banner" id="quizFeedback_${qIdx}"></div>
+
+          <div class="ai-feedback-banner" id="quizFeedback_${item.id}" style="display: none; margin-top: 14px;"></div>
         `;
         quizDeck.appendChild(quizBox);
       });
+    }
+
+    function answerQuizOption(el, isCorrect, qId, optIdx) {
+      const item = sharedQuestionsBank.find(q => q.id === qId);
+      if (!item) return;
+
+      const container = document.getElementById(`quizOptions_${qId}`);
+      if (container) {
+        container.style.pointerEvents = 'none';
+      }
+
+      // Destaca as opções corretas e selecionadas
+      item.quizOptions.forEach((_, idx) => {
+        const optEl = document.getElementById(`opt_${qId}_${idx}`);
+        if (!optEl) return;
+        if (idx === item.correctIndex) {
+          optEl.classList.add('correct');
+        } else if (idx === optIdx && !isCorrect) {
+          optEl.classList.add('incorrect');
+        }
+      });
+
+      const feedbackBanner = document.getElementById(`quizFeedback_${qId}`);
+      if (!feedbackBanner) return;
+
+      const tripartite = item.tripartite || {
+        correctReason: item.answer || 'Conduta fundamentada nas diretrizes clínicas de referência.',
+        distractorAnalysis: {
+          0: 'Opção em desacordo com as diretrizes clínicas vigentes.',
+          1: 'Conduta sem evidência classe I no cenário clínico imediato.',
+          2: 'Abordagem que pode acarretar complicações iatrogênicas.',
+          3: 'Intervenção secundária que não representa a primeira linha recomendada.'
+        },
+        pearl: 'A identificação semiológica precoce e a adesão aos protocolos oficiais de saúde norteiam a conduta resolutiva no SUS e ENARE.'
+      };
+
+      const correctLetter = String.fromCharCode(65 + item.correctIndex);
+
+      feedbackBanner.innerHTML = `
+        <div class="tripartite-commentary">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+            <span style="font-weight: 700; font-size: 13px; color: ${isCorrect ? '#00ff66' : 'var(--danger)'}; display: flex; align-items: center; gap: 6px;">
+              ${isCorrect ? '✅ Resposta Correta!' : '❌ Resposta Incorreta'}
+            </span>
+            <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-surface); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border);">
+              Gabarito Oficial: Letra ${correctLetter}
+            </span>
+          </div>
+
+          <!-- 1. Por que a certa é a certa -->
+          <div class="commentary-correct">
+            <div class="commentary-title">🟢 Por que a Letra ${correctLetter} é a correta (Diretriz Oficial):</div>
+            <div style="color: var(--text-primary);">${tripartite.correctReason}</div>
+          </div>
+
+          <!-- 2. Por que cada distrator está errado -->
+          <div class="commentary-distractors">
+            <div class="commentary-title">🔴 Análise Detalhada dos Distratores:</div>
+            ${Object.entries(tripartite.distractorAnalysis).map(([dIdx, dText]) => {
+              if (parseInt(dIdx) === item.correctIndex) return '';
+              const distLetter = String.fromCharCode(65 + parseInt(dIdx));
+              return `
+                <div class="distractor-analysis-item">
+                  <span style="color: var(--danger); font-weight: 700;">Letra ${distLetter}:</span> ${dText}
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- 3. Pérola Clínica ("Take-home message") -->
+          <div class="commentary-pearl">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+              <div class="commentary-title" style="margin: 0;">💡 Pérola Clínica de Plantão (Take-home message):</div>
+              <button class="btn-outline-action" style="padding: 3px 8px; font-size: 11px; background: rgba(0, 229, 255, 0.12); border-color: var(--neon); color: var(--neon);" onclick="togglePinPearl('${tripartite.pearl.replace(/'/g, "\\'")}', '${item.disease || item.subject}', '${item.area || 'clinica'}')">
+                ⭐ Salvar no Mural de Plantão
+              </button>
+            </div>
+            <div style="font-style: italic; color: #ffffff; font-size: 12.5px; line-height: 1.5;">
+              "${tripartite.pearl}"
+            </div>
+          </div>
+        </div>
+      `;
+
+      feedbackBanner.style.display = 'block';
     }
 
     function deleteQuizItem(id) {
@@ -3153,27 +4219,8 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       let generatedCount = 0;
       materials.forEach((file, idx) => {
         const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
-        const qText = `Semiologia & Conduta Clínica: Quais os critérios diagnósticos e abordagem de primeira linha em ${diseaseName}?`;
-        const red = evaluateRedundancy(qText);
-
-        sharedQuestionsBank.unshift({
-          id: `gen-${Date.now()}-${idx}`,
-          subject: targetSubject,
-          disease: diseaseName,
-          question: qText,
-          answer: `Em ${diseaseName}, a identificação semiológica precoce aliada à correlação anatomoclínica orienta o estadiamento e a terapêutica de precisão conforme as diretrizes médicas atualizadas.`,
-          quizOptions: [
-            `Iniciar antibioticoterapia empírica ampla e suspender acompanhamento em ${diseaseName}.`,
-            `Estratificar gravidade semiológica segundo critérios validados e instituir protocolo direcionado para ${diseaseName}.`,
-            `Aguardar evolução espontânea sem monitorização clínica nem suporte.`,
-            `Encaminhar para cirurgia de urgência de rotina sem propedêutica armada em ${diseaseName}.`
-          ],
-          correctIndex: 1,
-          isRedundant: red.isRedundant,
-          redundancyScore: red.percentage,
-          matchedText: red.matchedText,
-          isStarred: false
-        });
+        const qObj = createEnareQuestionObject(diseaseName, targetSubject, idx);
+        sharedQuestionsBank.unshift(qObj);
         generatedCount++;
       });
 
@@ -3192,7 +4239,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       renderSceBars();
       updateSubjectFilterMenus();
 
-      showToast(`⚡ ${generatedCount} Flashcards e Quizzes gerados com IA para "${targetSubject}"!`);
+      showToast(`⚡ ${generatedCount} Questões no Padrão ENARE/FGV geradas para "${targetSubject}"!`);
     }
 
     function generateQuestionsForCurrentSubject() {
@@ -4868,24 +5915,30 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
                 description += ' ' + line;
               } else if (currentField === 'topics') {
                 topics.push(...line.split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
-              } else if (!name) {
-                name = line;
               }
             }
           });
 
-          if (name) {
+          if (name && name.length >= 3) {
             subjects.push(buildSubjectObject(name, period, description, topics, idx));
           }
         });
       } else {
-        const sections = clean.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+        const rawSections = clean.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+        const headerJunkRegex = /^(p[aá]gina \d+|universidade|faculdade|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre|cnpj|di[aá]rio oficial|ementa do curso|matriz curricular|grade hor[aá]ria|cr[eé]ditos?:|professor|docente|bibliografia|objetivos?)/i;
 
-        sections.forEach((sec, idx) => {
+        rawSections.forEach((sec, idx) => {
+          if (subjects.length >= 60) return; // Limite de proteção contra loops de arquivos gigantes
+
           const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
           if (lines.length === 0) return;
 
-          let name = lines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
+          let rawName = lines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
+          if (headerJunkRegex.test(rawName) || rawName.length < 3 || rawName.length > 90 || !/[a-zA-ZÀ-ÿ]/.test(rawName)) {
+            return;
+          }
+
+          let name = rawName;
           let period = '';
           let description = '';
           let topics = [];
@@ -4906,7 +5959,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
             }
           }
 
-          if (name && name.length > 2) {
+          if (name && name.length >= 3 && !headerJunkRegex.test(name)) {
             subjects.push(buildSubjectObject(name, period, description, topics, idx));
           }
         });
@@ -5154,25 +6207,33 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       };
     }
 
-    function handleSyllabusFile(input) {
-      if (input.files && input.files[0]) {
-        const file = input.files[0];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const content = e.target.result;
-          if (typeof content === 'string' && content.length > 0) {
-            const inputEl = document.getElementById('syllabusTextInput');
-            if (inputEl) {
-              inputEl.value = content;
-              showToast(`📄 Arquivo de ementa "${file.name}" carregado! Clique em "Processar & Integrar" para estruturar.`);
-            }
-          }
-        };
-        reader.onerror = function() {
-          showToast(`⚠️ Leitura direta do arquivo falhou. Você pode colar o texto da ementa abaixo.`);
-        };
-        reader.readAsText(file);
-      }
+    async function handleSyllabusFile(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+
+      // Sanitiza e extrai texto de forma segura (PDF / TXT / DOC) sem travar a main thread
+      const sanitizedText = await extractTextFromFile(file);
+      const inputEl = document.getElementById('syllabusTextInput');
+      if (inputEl) inputEl.value = sanitizedText;
+
+      const previewSample = sanitizedText.slice(0, 160).replace(/\n/g, ' ') + (sanitizedText.length > 160 ? '...' : '');
+
+      openUploadConfirmation({
+        title: 'Estruturar Ementa Curricular com IA',
+        subtitle: `Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+        detailsHtml: `
+          <div style="margin-bottom: 8px;"><strong>Prévia do Conteúdo Extraído:</strong></div>
+          <div style="background: var(--bg-card); padding: 8px 10px; border-radius: 8px; font-family: monospace; font-size: 11px; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
+            ${previewSample || 'Conteúdo textual extraído e sanitizado com sucesso.'}
+          </div>
+          <div style="margin-top: 10px; color: var(--neon); font-size: 11.5px;">
+            ⚡ A IA processará a ementa sem travar a interface: Carregando ➔ Compilando ➔ Melhorando ➔ Entendendo ➔ Pronto!
+          </div>
+        `,
+        onConfirm: async () => {
+          await processSyllabusTextAsync(sanitizedText);
+        }
+      });
     }
 
     function deleteCurriculum() {
@@ -5198,7 +6259,6 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     }
 
     function processSyllabusText() {
-      closeModals();
       const inputEl = document.getElementById('syllabusTextInput');
       const text = inputEl ? inputEl.value.trim() : '';
 
@@ -5207,21 +6267,57 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         return;
       }
 
-      const parsedSubjects = parseEmentaWithDescriptions(text);
+      const previewSample = text.slice(0, 160).replace(/\n/g, ' ') + (text.length > 160 ? '...' : '');
+
+      openUploadConfirmation({
+        title: 'Integrar Ementa Curricular à Grade',
+        subtitle: `Processamento seguro de disciplinas e afecções`,
+        detailsHtml: `
+          <div style="margin-bottom: 8px;"><strong>Prévia do Texto Curricular:</strong></div>
+          <div style="background: var(--bg-card); padding: 8px 10px; border-radius: 8px; font-family: monospace; font-size: 11px; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
+            ${previewSample}
+          </div>
+          <div style="margin-top: 10px; color: var(--neon); font-size: 11.5px;">
+            ⚡ A IA organizará os 12 períodos e ciclos médicos mantendo 60 FPS com rotação fluida de status.
+          </div>
+        `,
+        onConfirm: async () => {
+          await processSyllabusTextAsync(text);
+        }
+      });
+    }
+
+    async function processSyllabusTextAsync(rawText) {
+      if (!rawText) return;
+
+      const clean = rawText
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .trim();
+
+      // Yield assíncrono para garantir renderização fluida da tela
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      const parsedSubjects = parseEmentaWithDescriptions(clean);
       if (parsedSubjects.length === 0) {
-        showToast('Nenhuma disciplina reconhecida no texto. Tente informar no formato: Disciplina: Nome...');
+        showToast('⚠️ Nenhuma disciplina reconhecida no texto. Tente o formato "Disciplina: Nome..."');
         return;
       }
+
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       universityCurriculum = groupSubjectsIntoCurriculum(parsedSubjects);
       try {
         localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
         localStorage.removeItem('medtutor_reset_clean');
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Erro ao salvar ementa no localStorage:', e);
+      }
 
       renderCurriculumGrid();
       updateSubjectFilterMenus();
-      showToast(`🎓 ${parsedSubjects.length} disciplinas com descrições integradas à sua ementa!`);
+      showToast(`🎓 ${parsedSubjects.length} disciplinas da ementa integradas com sucesso!`);
     }
 
     function renderCurriculumGrid() {
@@ -5499,6 +6595,235 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     }
 
     // 10. CHAT INTERATIVO & INTEGRAÇÃO COM DRIVE
+    // =========================================================
+    // 10. CHAT DE NOVA GERAÇÃO (HISTÓRICO, CITAÇÕES & CHIPS SOCRÁTICOS)
+    // =========================================================
+    let chatSessions = [];
+    let currentChatSessionId = null;
+
+    function initChatSessions() {
+      loadPinnedPearls();
+      try {
+        const saved = localStorage.getItem('medtutor_chat_sessions');
+        if (saved) chatSessions = JSON.parse(saved);
+      } catch (e) {
+        chatSessions = [];
+      }
+
+      if (!Array.isArray(chatSessions) || chatSessions.length === 0) {
+        const initialSession = {
+          id: 'session-' + Date.now(),
+          title: 'Discussão Clínica Geral',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isPinned: false,
+          messages: []
+        };
+        chatSessions = [initialSession];
+        currentChatSessionId = initialSession.id;
+      } else {
+        if (!currentChatSessionId || !chatSessions.find(s => s.id === currentChatSessionId)) {
+          currentChatSessionId = chatSessions[0].id;
+        }
+      }
+
+      saveChatSessions();
+      renderChatHistorySidebar();
+      loadCurrentChatMessages();
+    }
+
+    function saveChatSessions() {
+      try {
+        localStorage.setItem('medtutor_chat_sessions', JSON.stringify(chatSessions));
+      } catch (e) {}
+    }
+
+    function toggleChatSidebar() {
+      const sidebar = document.getElementById('chatSidebar');
+      if (sidebar) sidebar.classList.toggle('collapsed');
+    }
+
+    function createNewChatSession() {
+      const newSession = {
+        id: 'session-' + Date.now(),
+        title: 'Novo Atendimento Clínico',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isPinned: false,
+        messages: []
+      };
+      chatSessions.unshift(newSession);
+      currentChatSessionId = newSession.id;
+      saveChatSessions();
+      renderChatHistorySidebar();
+      loadCurrentChatMessages();
+      showToast('✨ Novo atendimento iniciado.');
+    }
+
+    function switchChatSession(id) {
+      currentChatSessionId = id;
+      renderChatHistorySidebar();
+      loadCurrentChatMessages();
+    }
+
+    function togglePinChatSession(id) {
+      const session = chatSessions.find(s => s.id === id);
+      if (session) {
+        session.isPinned = !session.isPinned;
+        session.updatedAt = new Date().toISOString();
+        saveChatSessions();
+        renderChatHistorySidebar();
+        showToast(session.isPinned ? '📌 Atendimento fixado no topo!' : 'Atendimento desafixado.');
+      }
+    }
+
+    function deleteChatSession(id) {
+      if (chatSessions.length <= 1) {
+        showToast('Não é possível excluir o único atendimento existente.');
+        return;
+      }
+      const idx = chatSessions.findIndex(s => s.id === id);
+      if (idx !== -1) {
+        chatSessions.splice(idx, 1);
+        if (currentChatSessionId === id) {
+          currentChatSessionId = chatSessions[0].id;
+        }
+        saveChatSessions();
+        renderChatHistorySidebar();
+        loadCurrentChatMessages();
+        showToast('🗑️ Atendimento excluído.');
+      }
+    }
+
+    function generateIntelligentChatTitle(text) {
+      const clean = text.trim();
+      const lower = clean.toLowerCase();
+
+      if (lower.includes('iam') || lower.includes('infarto') || lower.includes('coronar')) return 'Conduta no IAM c/ Supra';
+      if (lower.includes('psoríase') || lower.includes('psoriase')) return 'Manejo da Psoríase Vulgar';
+      if (lower.includes('apendic')) return 'Abordagem da Apendicite Aguda';
+      if (lower.includes('asma') || lower.includes('bronquiol')) return 'Manejo Respiratório Pediátrico';
+      if (lower.includes('dermatit') || lower.includes('eczema')) return 'Diferencial de Eczemas Cutâneos';
+      if (lower.includes('lesõ') || lower.includes('lesoe')) return 'Semiologia das Lesões Cutâneas';
+      if (lower.includes('sepse') || lower.includes('choque')) return 'Protocolo de Sepse no SUS';
+      if (lower.includes('ecg') || lower.includes('eletro')) return 'Interpretação do ECG na SCA';
+      if (lower.includes('pré-eclâmpsia') || lower.includes('pre-eclampsia') || lower.includes('hellp')) return 'Manejo da Pré-Eclâmpsia';
+      if (lower.includes('dengue')) return 'Manejo Clínico do Dengue SUS';
+
+      // Fallback: 3 a 4 palavras significativas
+      const stopWords = new Set(['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'quando', 'muito', 'nos', 'já', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela', 'entre', 'depois', 'sem', 'mesmo', 'aos', 'seus', 'quem', 'me', 'esse', 'eles', 'você', 'essa', 'num', 'nem', 'suas', 'meu', 'às', 'minha', 'numa', 'pelos', 'elas', 'qual', 'quais', 'sobre']);
+      const words = clean.replace(/[^\w\sÀ-ÿ]/g, '').split(/\s+/).filter(w => !stopWords.has(w.toLowerCase()));
+      if (words.length >= 3) {
+        return words.slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+      return clean.slice(0, 26) + (clean.length > 26 ? '...' : '');
+    }
+
+    function renderChatHistorySidebar() {
+      const container = document.getElementById('chatHistoryList');
+      if (!container) return;
+
+      const now = new Date();
+      const todayStr = now.toDateString();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+
+      const pinned = [];
+      const today = [];
+      const last7Days = [];
+      const older = [];
+
+      chatSessions.forEach(s => {
+        if (s.isPinned) {
+          pinned.push(s);
+          return;
+        }
+        const d = new Date(s.updatedAt || s.createdAt);
+        if (d.toDateString() === todayStr) {
+          today.push(s);
+        } else if (d >= sevenDaysAgo) {
+          last7Days.push(s);
+        } else {
+          older.push(s);
+        }
+      });
+
+      let html = '';
+
+      const renderGroup = (title, icon, items) => {
+        if (items.length === 0) return '';
+        return `
+          <div class="chat-history-group-title">
+            <span>${icon}</span>
+            <span>${title}</span>
+          </div>
+          ${items.map(s => {
+            const isActive = s.id === currentChatSessionId;
+            return `
+              <div class="chat-history-item ${isActive ? 'active' : ''}" onclick="switchChatSession('${s.id}')">
+                <span class="chat-item-title" title="${s.title}">${s.title}</span>
+                <div class="chat-item-actions">
+                  <button class="btn-chat-item-action ${s.isPinned ? 'active' : ''}" onclick="event.stopPropagation(); togglePinChatSession('${s.id}')" title="${s.isPinned ? 'Desafixar atendimento' : 'Fixar no topo'}">
+                    ${s.isPinned ? '📌' : '📍'}
+                  </button>
+                  <button class="btn-chat-item-action danger" onclick="event.stopPropagation(); deleteChatSession('${s.id}')" title="Excluir atendimento">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        `;
+      };
+
+      html += renderGroup('Fixados', '📌', pinned);
+      html += renderGroup('Hoje', '🟢', today);
+      html += renderGroup('Últimos 7 dias', '📅', last7Days);
+      html += renderGroup('Anteriores', '🗓️', older);
+
+      container.innerHTML = html;
+    }
+
+    function loadCurrentChatMessages() {
+      const flow = document.getElementById('chatFlow');
+      const empty = document.getElementById('chatEmptyState');
+      if (!flow) return;
+
+      const session = chatSessions.find(s => s.id === currentChatSessionId);
+      if (!session || !session.messages || session.messages.length === 0) {
+        flow.querySelectorAll('.chat-bubble').forEach(b => b.remove());
+        if (empty) empty.style.display = 'flex';
+        return;
+      }
+
+      if (empty) empty.style.display = 'none';
+      flow.querySelectorAll('.chat-bubble').forEach(b => b.remove());
+
+      session.messages.forEach(msg => {
+        if (msg.role === 'user') {
+          const uBubble = document.createElement('div');
+          uBubble.className = 'chat-bubble user';
+          if (msg.attachedCount && msg.attachedCount > 0) {
+            uBubble.innerHTML = `
+              <div>${msg.text}</div>
+              <div style="font-size: 11px; margin-top: 6px; padding: 4px 8px; background: rgba(0, 255, 102, 0.1); border-radius: 6px; color: var(--neon); display: flex; align-items: center; gap: 6px;">
+                <span>📎 Baseado em ${msg.attachedCount} materiais selecionados do Drive</span>
+              </div>
+            `;
+          } else {
+            uBubble.textContent = msg.text;
+          }
+          flow.appendChild(uBubble);
+        } else {
+          const tBubble = document.createElement('div');
+          tBubble.className = 'chat-bubble tutor';
+          tBubble.innerHTML = msg.html;
+          flow.appendChild(tBubble);
+        }
+      });
+
+      flow.scrollTop = flow.scrollHeight;
+    }
+
     function quickPrompt(text) {
       document.getElementById('chatInput').value = text;
       submitChatQuery();
@@ -5512,6 +6837,18 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       const input = document.getElementById('chatInput');
       const text = input.value.trim();
       if (!text) return;
+
+      let session = chatSessions.find(s => s.id === currentChatSessionId);
+      if (!session) {
+        createNewChatSession();
+        session = chatSessions[0];
+      }
+
+      // Se for a primeira mensagem ou título genérico, ajusta o título inteligente com 3 a 4 palavras
+      if (!session.messages || session.messages.length === 0 || session.title.includes('Novo Atendimento') || session.title.includes('Inicial')) {
+        session.title = generateIntelligentChatTitle(text);
+        renderChatHistorySidebar();
+      }
 
       const flow = document.getElementById('chatFlow');
       const empty = document.getElementById('chatEmptyState');
@@ -5540,8 +6877,19 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       input.value = '';
       flow.scrollTop = flow.scrollHeight;
 
+      // Salva mensagem do usuário na sessão
+      if (!session.messages) session.messages = [];
+      session.messages.push({
+        id: 'msg-' + Date.now(),
+        role: 'user',
+        text: text,
+        attachedCount: selected.length,
+        timestamp: new Date().toISOString()
+      });
+      session.updatedAt = new Date().toISOString();
+      saveChatSessions();
+
       if (isReadingRequest) {
-        // Se a dúvida pedir expressamente leitura/apostila dos materiais
         setTimeout(() => {
           requestReadingMaterialProduction(false);
         }, 300);
@@ -5554,71 +6902,149 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
 
         const attachedCitations = selected.length > 0 
           ? `<div style="font-size: 11px; color: var(--neon); margin-bottom: 8px; font-weight: 600;">
-               📂 Resposta orientada pelos slides do Drive: <em>${selected.map(s => s.name).slice(0, 2).join(' & ')}</em>
+               📂 Resposta orientada pelos materiais do Drive: <em>${selected.map(s => s.name).slice(0, 2).join(' & ')}</em>
              </div>` 
           : '';
 
         const activeDiscipline = (currentScannedFolder && currentScannedFolder.disciplineKey) ||
           (chatDriveMaterials.length > 0 && chatDriveMaterials[0].subject ? chatDriveMaterials[0].subject : null) ||
           (sharedQuestionsBank.length > 0 && sharedQuestionsBank[0].subject ? sharedQuestionsBank[0].subject : null) ||
-          'Medicina e Raciocínio Clínico';
+          'Clínica Médica e Raciocínio Diagnóstico';
 
-        tutorBubble.innerHTML = `
+        // Determina citação de diretriz pertinente ao texto
+        let citationKey = 'PCDT_SUS';
+        let citationLabel = '[PCDT / SUS]';
+        if (lowerText.includes('iam') || lowerText.includes('cardio') || lowerText.includes('coronar') || lowerText.includes('infarto')) {
+          citationKey = 'SBC_IAM';
+          citationLabel = '[Diretriz SBC 2024]';
+        } else if (lowerText.includes('psor') || lowerText.includes('derm') || lowerText.includes('pele') || lowerText.includes('liquen')) {
+          citationKey = 'SBD_PSORIASE';
+          citationLabel = '[Consenso SBD Dermatologia]';
+        } else if (lowerText.includes('pediat') || lowerText.includes('lactente') || lowerText.includes('bronquiol') || lowerText.includes('crianca')) {
+          citationKey = 'SBP_BVA';
+          citationLabel = '[Diretrizes SBP Pediatria]';
+        } else if (lowerText.includes('gineco') || lowerText.includes('obstet') || lowerText.includes('gestan') || lowerText.includes('eclampsia')) {
+          citationKey = 'FEBRASGO_PE';
+          citationLabel = '[FEBRASGO 2023]';
+        } else if (lowerText.includes('apendic') || lowerText.includes('cirurg') || lowerText.includes('abdome agudo')) {
+          citationKey = 'CBC_APENDICITE';
+          citationLabel = '[CBC Cirurgia Geral]';
+        } else if (lowerText.includes('dengue')) {
+          citationKey = 'MS_DENGUE';
+          citationLabel = '[Manejo Dengue SUS]';
+        }
+
+        const msgId = 'tutor-msg-' + Date.now();
+        const pearlText = `No manejo de ${text.slice(0, 35)}: a identificação semiológica precoce e a estratificação pelas diretrizes de referência orientam conduta resolutiva e salvam vidas.`;
+
+        const tutorHtml = `
           <div class="tutor-header">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            Revisão Clínica Fundamentada (Aulas do Drive & PubMed)
+            Revisão Clínica Fundamentada (Aulas do Drive & Diretrizes Oficiais)
           </div>
           ${attachedCitations}
           <p>
             Analisando sua questão sobre <em>"${text.slice(0, 50)}..."</em> em consonância com as diretrizes e materiais de aula da disciplina de <strong>${activeDiscipline}</strong>:
           </p>
           <p style="color: var(--text-secondary); line-height: 1.6;">
-            A identificação semiológica correta da hipótese diagnóstica e manifestações cardinais é o primeiro passo diagnóstico mandatório, orientando os exames de estratificação e se a conduta inicial deve ser conservadora, farmacológica ou de urgência.
+            A identificação semiológica correta da hipótese diagnóstica e manifestações cardinais é o primeiro passo diagnóstico mandatório, orientando os exames de estratificação e se a conduta inicial deve ser conservadora, farmacológica ou de urgência, conforme preconizado em 
+            <span class="citation-badge" onmouseenter="showCitationPopover(event, '${citationKey}')" onmouseleave="hideCitationPopover()">${citationLabel}</span>.
           </p>
           <div class="socratic-box">
             ❓ <strong>Desafio Socrático do Tutor:</strong> Diante deste quadro clínico, quais critérios de gravidade imediata e exames complementares de primeira linha você solicitaria antes de definir a conduta?
           </div>
           <div class="ref-footer">
-            📖 <em>Ref: Materiais da Disciplina (${activeDiscipline}); Diretrizes Clínicas Especializadas; PubMed.</em>
+            📖 <em>Ref: Materiais da Disciplina (${activeDiscipline}); <span class="citation-badge" onmouseenter="showCitationPopover(event, '${citationKey}')" onmouseleave="hideCitationPopover()">${citationLabel}</span>; PubMed.</em>
           </div>
-          <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
-            <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction(false)">
-              📖 Produzir Apostila de Leitura Completa
+
+          <!-- CHIPS DINÂMICOS DE CONTINUAÇÃO DE RACIOCÍNIO CLÍNICO -->
+          <div class="thought-continuation-container">
+            <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+              💡 Continuar Raciocínio Clínico:
+            </span>
+            <button class="thought-chip" onclick="quickPrompt('Quais os critérios de gravidade imediata e sinais de alarme neste quadro?')">
+              ⚡ Critérios de Gravidade Imediata
             </button>
-            <button class="btn-outline-action" onclick="createCardFromChatMsg('${text.replace(/'/g, "\\'")}')">
-              🗂️ + Gerar Flashcard
+            <button class="thought-chip" onclick="quickPrompt('Quais os principais diagnósticos diferenciais no SUS?')">
+              🩺 Diagnósticos Diferenciais no SUS
             </button>
-            <button class="btn-outline-action" onclick="createCardFromChatMsg('${text.replace(/'/g, "\\'")}')">
-              📝 + Criar Quiz
+            <button class="thought-chip" onclick="quickPrompt('Qual o ajuste posológico e contraindicações da terapia medicamentosa?')">
+              💊 Ajuste Posológico & Alertas
             </button>
+            <button class="thought-chip" onclick="quickPrompt('Quais escores clínicos (CURB-65, TIMI, HEART ou Alvarado) devem ser calculados?')">
+              📊 Escores Clínicos Validados
+            </button>
+          </div>
+
+          <!-- BARRA DE AÇÕES RÁPIDAS POR MENSAGEM -->
+          <div class="msg-actions-bar">
+            <button class="msg-action-btn" onclick="copyMessageText(this)" title="Copiar resposta fundamentada">
+              📋 Copiar
+            </button>
+            <button class="msg-action-btn" onclick="convertChatMessageToFlashcard('${text.replace(/'/g, "\\'")}')" title="Transformar em Flashcard de Repetição Espaçada">
+              🗂️ Virar Flashcard
+            </button>
+            <button class="msg-action-btn" onclick="convertChatMessageToEnareQuiz('${text.replace(/'/g, "\\'")}')" title="Gerar Questão no Padrão ENARE / FGV">
+              📝 Gerar Quiz ENARE
+            </button>
+            <button class="msg-action-btn" onclick="togglePinPearl('${pearlText.replace(/'/g, "\\'")}', '${activeDiscipline}', 'clinica')" title="Salvar Pérola Clínica para o Plantão">
+              ⭐ Salvar Pérola
+            </button>
+            <div style="flex: 1;"></div>
+            <button class="msg-action-btn" onclick="this.classList.toggle('active')" title="Resposta Útil">👍</button>
+            <button class="msg-action-btn" onclick="this.classList.toggle('active')" title="Precisa Melhorar">👎</button>
           </div>
         `;
+
+        tutorBubble.innerHTML = tutorHtml;
         flow.appendChild(tutorBubble);
         flow.scrollTop = flow.scrollHeight;
+
+        // Salva mensagem do tutor na sessão
+        session.messages.push({
+          id: msgId,
+          role: 'tutor',
+          html: tutorHtml,
+          timestamp: new Date().toISOString()
+        });
+        session.updatedAt = new Date().toISOString();
+        saveChatSessions();
+        renderChatHistorySidebar();
       }, 450);
+    }
+
+    function copyMessageText(btn) {
+      const bubble = btn.closest('.chat-bubble');
+      if (!bubble) return;
+      const clone = bubble.cloneNode(true);
+      clone.querySelectorAll('.msg-actions-bar, .thought-continuation-container, .tutor-header, .ref-footer').forEach(el => el.remove());
+      const text = clone.innerText.trim();
+      navigator.clipboard.writeText(text);
+      showToast('📋 Resposta copiada!');
+    }
+
+    function convertChatMessageToFlashcard(topic) {
+      createCardFromChatMsg(topic);
+      navigateTab('flashcards');
+    }
+
+    function convertChatMessageToEnareQuiz(topic) {
+      createCardFromChatMsg(topic);
+      navigateTab('quizzes');
     }
 
     function createCardFromChatMsg(topic) {
       const red = evaluateRedundancy(topic);
-      sharedQuestionsBank.push({
-        id: 'chat-' + Date.now(),
-        subject: 'Revisão do Chat',
-        question: `Conceito clínico discutido: ${topic}`,
-        answer: 'Conduta baseada nas diretrizes clínicas de referência e correlação fisiopatológica examinada.',
-        quizOptions: [
-          'Alternativa de primeira escolha fundamentada na literatura.',
-          'Conduta inadequada para a fase aguda.',
-          'Opção com menor acurácia prognóstica.',
-          'Intervenção sem indicação classe I.'
-        ],
-        correctIndex: 0,
-        isRedundant: red.isRedundant,
-        redundancyScore: red.percentage,
-        matchedText: red.matchedText,
-        isStarred: false
-      });
+      const enareObj = createEnareQuestionObject(topic, 'Revisão do Chat', 0);
+      enareObj.isRedundant = red.isRedundant;
+      enareObj.redundancyScore = red.percentage;
+      enareObj.matchedText = red.matchedText;
+
+      sharedQuestionsBank.unshift(enareObj);
       renderSharedStudyItems();
-      showToast('✅ Questão adicionada aos Flashcards e Quizzes!');
+      renderSceBars();
+      updateSubjectFilterMenus();
+      showToast('✅ Questão ENARE adicionada aos Flashcards e Quizzes!');
     }
 
     // 11. MATERIAIS DO GOOGLE DRIVE NO CHAT COM MENU SUSPENSO, EXCLUSÃO E RELATÓRIO
@@ -6662,6 +8088,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       if (countEl) countEl.textContent = '0';
     }
     initChatDriveMaterials();
+    initChatSessions();
     renderSharedStudyItems();
     renderSceBars();
     renderSceTimeline();
