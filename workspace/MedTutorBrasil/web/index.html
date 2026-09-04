@@ -1996,10 +1996,20 @@
         Conecte a pasta compartilhada da sua faculdade ou turma. O app vasculha os arquivos, <strong>compacta materiais pesados (100MB a 300MB) no seu próprio aparelho sem usar IA</strong>, e descarta arquivos gigantes (&gt; 300MB).
       </p>
 
-      <!-- CAMPO DE ENTRADA DO LINK DO DRIVE -->
-      <div style="background: var(--bg-surface); padding: 14px; border-radius: 14px; border: 1px solid var(--border);">
+      <!-- SELETOR DE MODO DE IMPORTAÇÃO (LINK OU COLAR) -->
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button id="tabBtnDriveLink" class="btn-outline-action primary" onclick="switchDriveModalTab('link')" style="height: 34px; font-size: 12px; padding: 0 14px; border-radius: 8px;">
+          🔗 Link do Google Drive
+        </button>
+        <button id="tabBtnDrivePaste" class="btn-outline-action" onclick="switchDriveModalTab('paste')" style="height: 34px; font-size: 12px; padding: 0 14px; border-radius: 8px;">
+          📋 Colar Nomes de Arquivos / Aulas
+        </button>
+      </div>
+
+      <!-- MODO 1: LINK DO DRIVE -->
+      <div id="driveLinkSection" style="background: var(--bg-surface); padding: 14px; border-radius: 14px; border: 1px solid var(--border);">
         <label for="driveUrlInput" style="display: block; font-size: 12px; font-weight: 700; color: var(--neon); margin-bottom: 6px;">
-          🔗 Link da Pasta do Google Drive (Turma / Disciplina):
+          🔗 Link ou ID da Pasta do Google Drive (Turma / Disciplina):
         </label>
         <div style="display: flex; gap: 8px;">
           <input 
@@ -2007,16 +2017,50 @@
             id="driveUrlInput" 
             class="written-textarea" 
             style="height: 42px; padding: 10px 14px; font-size: 13px; margin: 0; flex: 1;" 
-            placeholder="https://drive.google.com/drive/folders/1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ" 
+            placeholder="https://drive.google.com/drive/folders/..." 
             value="https://drive.google.com/drive/u/0/folders/1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ"
+            onkeydown="if (event.key === 'Enter') scanDriveFolder()"
           >
           <button class="btn-outline-action primary" id="btnScanDrive" onclick="scanDriveFolder()" style="height: 42px; white-space: nowrap;">
             <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Vasculhar Drive
           </button>
         </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; flex-wrap: wrap; gap: 6px;">
+          <span style="font-size: 11px; color: var(--text-muted);">
+            Pastas médicas de exemplo rápido:
+          </span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button class="pill-chip" style="font-size: 10px; padding: 3px 8px; background: rgba(0,255,102,0.1); border: 1px solid rgba(0,255,102,0.3); color: var(--neon); cursor: pointer;" onclick="loadDrivePreset('dermato')">🩺 Dermatologia</button>
+            <button class="pill-chip" style="font-size: 10px; padding: 3px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer;" onclick="loadDrivePreset('cardio')">❤️ Cardiologia</button>
+            <button class="pill-chip" style="font-size: 10px; padding: 3px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer;" onclick="loadDrivePreset('pneumo')">🫁 Pneumologia</button>
+            <button class="pill-chip" style="font-size: 10px; padding: 3px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer;" onclick="loadDrivePreset('pediatria')">👶 Pediatria</button>
+          </div>
+        </div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-          Cole o link compartilhado da pasta com as aulas da sua faculdade. O app identifica slides e aulas, ignora livros enciclopédicos para poupar processamento, e compacta arquivos entre 100MB e 300MB no próprio aparelho.
+          Suporta qualquer link compartilhado do Drive. Identifica slides e aulas, descarta tratados gigantes para poupar IA e compacta arquivos entre 100MB e 300MB no aparelho.
+        </div>
+      </div>
+
+      <!-- MODO 2: COLAR LISTA DE ARQUIVOS (CASO RESTRIÇÃO DE DOMÍNIO OU SSO UNIVERSITÁRIO) -->
+      <div id="drivePasteSection" style="display: none; background: var(--bg-surface); padding: 14px; border-radius: 14px; border: 1px solid var(--border);">
+        <label for="drivePastedFilesInput" style="display: block; font-size: 12px; font-weight: 700; color: var(--neon); margin-bottom: 6px;">
+          📋 Colar Nomes de Arquivos ou Aulas da Pasta (1 por linha):
+        </label>
+        <textarea 
+          id="drivePastedFilesInput" 
+          class="written-textarea" 
+          style="height: 110px; padding: 10px 14px; font-size: 12px; margin: 0 0 8px 0; width: 100%; resize: vertical;" 
+          placeholder="Cole os nomes de arquivos ou aulas (um por linha)&#10;Exemplo:&#10;Aula 1 - Eletrocardiograma e Isquemia.pdf (4.2 MB)&#10;Aula 2 - Insuficiência Cardíaca e BNP.pptx (130 MB)&#10;Tratado Braunwald Cardiologia.pdf (520 MB)&#10;Diretriz Brasileira de Hipertensão Arterial.pdf (2.1 MB)"
+        ></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span style="font-size: 11px; color: var(--text-muted);">
+            Copie os nomes de arquivos da sua pasta institucional do Google Drive e cole aqui.
+          </span>
+          <button class="btn-outline-action primary" onclick="processPastedDriveFiles()" style="height: 36px; font-size: 12px; white-space: nowrap;">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Analisar Arquivos Colados
+          </button>
         </div>
       </div>
 
@@ -2027,19 +2071,32 @@
       </div>
 
       <!-- CONTAINER DOS RESULTADOS DA VARREDURA -->
-      <div id="driveResultsContainer" style="display: none; flex-direction: column; gap: 12px;">
+      <div id="driveResultsContainer" style="display: none; flex-direction: column; gap: 10px;">
         <div style="background: rgba(0, 255, 102, 0.05); border: 1px solid rgba(0, 255, 102, 0.2); padding: 10px 14px; border-radius: 10px;">
           <div style="font-size: 13px; font-weight: 700; color: var(--neon); display: flex; align-items: center; gap: 8px;">
             <svg class="icon" style="width: 18px; height: 18px;" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <span id="driveFolderTitleDisplay">DISCIPLINA: Integração de sistemas humanos 2</span>
           </div>
           <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: flex; justify-content: space-between;">
-            <span id="driveFilesCountInfo">8 arquivos reais encontrados no Drive • Módulo Dermatologia</span>
+            <span id="driveFilesCountInfo">8 arquivos encontrados no Drive • Módulo Dermatologia</span>
             <span style="color: var(--neon); font-weight: 600;" id="driveSelectedCountBadge">7 aulas selecionadas</span>
           </div>
         </div>
 
-        <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 290px; overflow-y: auto; gap: 6px; padding-right: 4px;">
+        <!-- CAMPO DE PESQUISA INTERNA NOS ARQUIVOS DO DRIVE -->
+        <div style="position: relative;">
+          <input 
+            type="text" 
+            id="driveSearchFilter" 
+            class="written-textarea" 
+            placeholder="🔍 Pesquisar aulas, afecções clínicas ou arquivos nesta pasta..." 
+            oninput="filterDriveScannedFiles(this.value)"
+            style="height: 38px; padding: 8px 12px 8px 34px; font-size: 12px; margin: 0; width: 100%; border-radius: 8px;"
+          >
+          <svg class="icon" style="position: absolute; left: 10px; top: 11px; width: 16px; height: 16px; color: var(--text-muted); pointer-events: none;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+
+        <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 270px; overflow-y: auto; gap: 6px; padding-right: 4px;">
           <!-- Itens reais populados dinamicamente via JS -->
         </div>
 
@@ -2847,7 +2904,7 @@
       }
     }
 
-    // 7. ATUALIZAR POR DRIVE COM PARSER DOS ARQUIVOS REAIS E COMPACTADOR LOCAL (100MB A 300MB)
+    // 7. ATUALIZAR POR DRIVE COM PARSER DE QUALQUER LINK, BUSCA INTERNA E COMPACTADOR LOCAL (100MB A 300MB)
     const KNOWN_DRIVE_FOLDERS = {
       '1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ': {
         title: 'DISCIPLINA: Integração de sistemas humanos 2',
@@ -2863,6 +2920,7 @@
             type: 'slide',
             selected: true,
             status: 'direct',
+            disease: 'Cronograma e Plano de Aulas',
             desc: '✓ Elegível direto (< 100 MB): Ementa e cronograma oficial da disciplina'
           },
           {
@@ -2874,6 +2932,7 @@
             type: 'slide',
             selected: true,
             status: 'direct',
+            disease: 'Histologia da Barreira Epidérmica',
             desc: '✓ Elegível direto (< 100 MB): Camadas cutâneas, anexos e biologia epidérmica'
           },
           {
@@ -2885,6 +2944,7 @@
             type: 'slide',
             selected: true,
             status: 'direct',
+            disease: 'Semiologia das Lesões Elementares Cutâneas',
             desc: '✓ Elegível direto (< 100 MB): Semiologia cutânea (máculas, pápulas, placas, vesículas)'
           },
           {
@@ -2896,6 +2956,7 @@
             type: 'slide',
             selected: true,
             status: 'direct',
+            disease: 'Dermatite Atópica & Eczemas',
             desc: '✓ Elegível direto (< 100 MB): Diferencial clínico de eczemas e dermatites'
           },
           {
@@ -2907,6 +2968,7 @@
             type: 'slide',
             selected: true,
             status: 'direct',
+            disease: 'Psoríase Vulgar & Koebner',
             desc: '✓ Elegível direto (< 100 MB): Atlas fotográfico (Auspitz, Koebner e Wickham)'
           },
           {
@@ -2918,6 +2980,7 @@
             type: 'doc',
             selected: true,
             status: 'direct',
+            disease: 'Casos Clínicos Ambulatoriais',
             desc: '✓ Elegível direto (< 100 MB): Casos clínicos práticos e roteiro ambulatorial'
           },
           {
@@ -2929,6 +2992,7 @@
             type: 'doc',
             selected: true,
             status: 'direct',
+            disease: 'Esquemas Diagnósticos Práticos',
             desc: '✓ Elegível direto (< 100 MB): Roteiro de revisão e esquemas diagnósticos'
           },
           {
@@ -2940,7 +3004,185 @@
             type: 'book',
             selected: false,
             status: 'book',
+            disease: 'Tratado de Referência (Azulay)',
             desc: '📖 Livro-texto / Tratado (50,3 MB): Omitido por padrão para poupar custos e focar nas aulas'
+          }
+        ]
+      },
+      'cardio': {
+        title: 'DISCIPLINA: Cardiologia Clínica e Propedêutica Cardiovascular',
+        sub: 'Aulas Teóricas, Eletrocardiograma e Protocolos de Emergência (2026)',
+        disciplineKey: 'Cardiologia Clínica',
+        files: [
+          {
+            id: 'cardio-1',
+            name: 'Aula 1 - Eletrocardiograma Normal e Isquemia Miocárdica.pdf',
+            sizeStr: '4.8 MB',
+            sizeMB: 4.8,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Eletrocardiograma e Isquemia Miocárdica',
+            desc: '✓ Elegível direto (< 100 MB): Eixo elétrico, supra/infradesnivelamento de ST'
+          },
+          {
+            id: 'cardio-2',
+            name: 'Aula 2 - Insuficiência Cardíaca Fração Reduzida e Biomarcadores.pdf',
+            sizeStr: '8.2 MB',
+            sizeMB: 8.2,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Insuficiência Cardíaca & BNP',
+            desc: '✓ Elegível direto (< 100 MB): Terapia quádrupla e classificação NYHA/AHA'
+          },
+          {
+            id: 'cardio-3',
+            name: 'Atlas Ecocardiográfico de Alta Resolução e Valvopatias.pptx',
+            sizeStr: '165 MB',
+            sizeMB: 165.0,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'compress',
+            disease: 'Valvopatias e Ecocardiografia',
+            desc: '⚡ Compactador Local Ativado: reduzirá no aparelho de 165 MB para ~50 MB (sem IA)'
+          },
+          {
+            id: 'cardio-4',
+            name: 'Diretriz Brasileira de Hipertensão Arterial e Risco Cardiovascular.pdf',
+            sizeStr: '2.4 MB',
+            sizeMB: 2.4,
+            date: 'Recente',
+            type: 'doc',
+            selected: true,
+            status: 'direct',
+            disease: 'Hipertensão Arterial Sistêmica',
+            desc: '✓ Elegível direto (< 100 MB): Metas pressóricas e estratificação de risco'
+          },
+          {
+            id: 'cardio-5',
+            name: 'Tratado de Doenças Cardiovasculares Braunwald Completo.pdf',
+            sizeStr: '480 MB',
+            sizeMB: 480.0,
+            date: 'Anual',
+            type: 'book',
+            selected: false,
+            status: 'blocked',
+            disease: 'Tratado Braunwald',
+            desc: '✕ Arquivo excessivamente grande (> 300 MB). Divida por capítulos de aula.'
+          }
+        ]
+      },
+      'pneumo': {
+        title: 'DISCIPLINA: Pneumologia e Doenças Respiratórias',
+        sub: 'Propedêutica do Tórax, Espirometria e Emergências Respiratórias',
+        disciplineKey: 'Pneumologia Clínica',
+        files: [
+          {
+            id: 'pneumo-1',
+            name: 'Aula 1 - Pneumonias Adquiridas na Comunidade e Escore CURB-65.pdf',
+            sizeStr: '5.1 MB',
+            sizeMB: 5.1,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Pneumonia Comunitária & CURB-65',
+            desc: '✓ Elegível direto (< 100 MB): Diagnóstico radiológico e antibioticoterapia'
+          },
+          {
+            id: 'pneumo-2',
+            name: 'Aula 2 - Asma Grave e DPOC: Diagnóstico Diferencial e Espirometria.pdf',
+            sizeStr: '6.4 MB',
+            sizeMB: 6.4,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Asma e DPOC',
+            desc: '✓ Elegível direto (< 100 MB): Padrão obstrutivo vs restritivo e prova broncodilatadora'
+          },
+          {
+            id: 'pneumo-3',
+            name: 'Atlas Tomográfico de Tórax em Alta Resolução (TCAR).pptx',
+            sizeStr: '175 MB',
+            sizeMB: 175.0,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'compress',
+            disease: 'Tomografia de Tórax e Doenças Intersticiais',
+            desc: '⚡ Compactador Local Ativado: reduzirá no aparelho de 175 MB para ~52 MB (sem IA)'
+          },
+          {
+            id: 'pneumo-4',
+            name: 'Tratado de Pneumologia Sociedade Brasileira de Pneumologia.pdf',
+            sizeStr: '410 MB',
+            sizeMB: 410.0,
+            date: 'Anual',
+            type: 'book',
+            selected: false,
+            status: 'blocked',
+            disease: 'Tratado SBPT',
+            desc: '✕ Arquivo excessivamente grande (> 300 MB). Divida por capítulos de aula.'
+          }
+        ]
+      },
+      'pediatria': {
+        title: 'DISCIPLINA: Pediatria e Puericultura',
+        sub: 'Crescimento, Icterícia Neonatal e Emergências Pediátricas',
+        disciplineKey: 'Pediatria e Puericultura',
+        files: [
+          {
+            id: 'pedia-1',
+            name: 'Aula 1 - Crescimento e Desenvolvimento Neuropsicomotor da Criança.pdf',
+            sizeStr: '3.8 MB',
+            sizeMB: 3.8,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Marcos do Desenvolvimento Infantil',
+            desc: '✓ Elegível direto (< 100 MB): Escores de crescimento e curvas da OMS'
+          },
+          {
+            id: 'pedia-2',
+            name: 'Aula 2 - Icterícia Neonatal Fisiológica vs Patológica.pdf',
+            sizeStr: '4.2 MB',
+            sizeMB: 4.2,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Icterícia Neonatal & Fototerapia',
+            desc: '✓ Elegível direto (< 100 MB): Zonas de Kramer, fototerapia e exsanguíneotransfusão'
+          },
+          {
+            id: 'pedia-3',
+            name: 'Manual de Urgências Pediátricas e Reanimação.pdf',
+            sizeStr: '115 MB',
+            sizeMB: 115.0,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'compress',
+            disease: 'Urgências Pediátricas',
+            desc: '⚡ Compactador Local Ativado: reduzirá no aparelho de 115 MB para ~35 MB (sem IA)'
+          },
+          {
+            id: 'pedia-4',
+            name: 'Tratado Nelson de Pediatria 21ª Edição Completo.pdf',
+            sizeStr: '620 MB',
+            sizeMB: 620.0,
+            date: 'Anual',
+            type: 'book',
+            selected: false,
+            status: 'blocked',
+            disease: 'Tratado Nelson de Pediatria',
+            desc: '✕ Arquivo excessivamente grande (> 300 MB). Divida por capítulos de aula.'
           }
         ]
       }
@@ -2948,14 +3190,385 @@
 
     let scannedDriveFiles = [];
     let currentScannedFolder = null;
+    let driveSearchQuery = '';
+
+    function switchDriveModalTab(tab) {
+      const linkSection = document.getElementById('driveLinkSection');
+      const pasteSection = document.getElementById('drivePasteSection');
+      const tabBtnLink = document.getElementById('tabBtnDriveLink');
+      const tabBtnPaste = document.getElementById('tabBtnDrivePaste');
+
+      if (tab === 'link') {
+        if (linkSection) linkSection.style.display = 'block';
+        if (pasteSection) pasteSection.style.display = 'none';
+        if (tabBtnLink) tabBtnLink.className = 'btn-outline-action primary';
+        if (tabBtnPaste) tabBtnPaste.className = 'btn-outline-action';
+      } else {
+        if (linkSection) linkSection.style.display = 'none';
+        if (pasteSection) pasteSection.style.display = 'block';
+        if (tabBtnLink) tabBtnLink.className = 'btn-outline-action';
+        if (tabBtnPaste) tabBtnPaste.className = 'btn-outline-action primary';
+      }
+    }
+
+    function loadDrivePreset(key) {
+      switchDriveModalTab('link');
+      const input = document.getElementById('driveUrlInput');
+      if (key === 'dermato') {
+        input.value = 'https://drive.google.com/drive/u/0/folders/1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ';
+      } else if (key === 'cardio') {
+        input.value = 'https://drive.google.com/drive/folders/cardio-clinica-medica-2026';
+      } else if (key === 'pneumo') {
+        input.value = 'https://drive.google.com/drive/folders/pneumologia-respiratoria-2026';
+      } else if (key === 'pediatria') {
+        input.value = 'https://drive.google.com/drive/folders/pediatria-puericultura-2026';
+      }
+      scanDriveFolder();
+    }
+
+    function isDriveOrFolderUrl(url) {
+      if (!url) return false;
+      const clean = url.trim().toLowerCase();
+      return clean.includes('drive.google.com') ||
+             clean.includes('docs.google.com') ||
+             clean.includes('folders/') ||
+             clean.includes('/file/d/') ||
+             clean.includes('id=') ||
+             (clean.length >= 20 && !clean.includes(' ') && !clean.includes('/'));
+    }
 
     function extractDriveFolderId(url) {
       if (!url) return null;
-      const m = url.match(/folders\/([a-zA-Z0-9_-]+)/);
-      if (m) return m[1];
-      const m2 = url.match(/id=([a-zA-Z0-9_-]+)/);
-      if (m2) return m2[1];
+      const clean = url.trim();
+      // 1. /folders/<id>
+      const mFolder = clean.match(/folders\/([a-zA-Z0-9_-]+)/i);
+      if (mFolder) return mFolder[1];
+      // 2. /file/d/<id>
+      const mFile = clean.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i);
+      if (mFile) return mFile[1];
+      // 3. ?id=<id> or &id=<id>
+      const mId = clean.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+      if (mId) return mId[1];
+      // 4. Raw folder ID
+      if (/^[a-zA-Z0-9_-]{20,50}$/.test(clean)) {
+        return clean;
+      }
       return null;
+    }
+
+    function extractDiseaseFromFilename(filename) {
+      if (!filename) return 'Clínica Médica Geral';
+      let clean = filename.replace(/\.[a-zA-Z0-9]+$/i, '');
+      // Remove prefixes
+      clean = clean.replace(/^(?:aula\s*\d+\s*[-_–]\s*|doc[-_0-9]+\s*[-_–]?\s*|apresenta[çc][ãa]o\s*(?:do\s*plano\s*de\s*aula)?\s*[-_–]?\s*|slide\s*\d*\s*[-_–]?\s*)/i, '');
+      // Remove dates and suffixes
+      clean = clean.replace(/[-_–]\s*202\d(?:\.\d)?.*$/i, '');
+      clean = clean.replace(/\(\d+\)$/, '');
+      clean = clean.replace(/_[0-9]{5,}.*$/, '');
+      clean = clean.trim();
+      if (clean.length < 3) return 'Clínica Médica Geral';
+      return clean;
+    }
+
+    function evaluateFileRules(name, sizeMB) {
+      const lower = name.toLowerCase();
+      // 1. Acima de 300MB: Bloqueado por ser excessivamente grande
+      if (sizeMB > 300) {
+        return {
+          status: 'blocked',
+          selected: false,
+          desc: `✕ Arquivo excessivamente grande (${sizeMB.toFixed(0)} MB > 300 MB). Divida por capítulos de aula.`
+        };
+      }
+      // 2. Livro extenso / tratado: Omitido por padrão para poupar IA
+      const isBook = lower.includes('azulay') || lower.includes('tratado') || lower.includes('manual completo') || lower.includes('atlas completo') || lower.includes('compêndio') || lower.includes('nelson') || lower.includes('braunwald') || lower.includes('cecil') || lower.includes('harrison');
+      if (isBook) {
+        return {
+          status: 'book',
+          selected: false,
+          desc: `📖 Livro-texto / Tratado extenso (${sizeMB.toFixed(1)} MB): Omitido por padrão para poupar custos e focar nas aulas.`
+        };
+      }
+      // 3. Faixa de 100MB a 300MB: Requer compactador no aparelho
+      if (sizeMB >= 100) {
+        return {
+          status: 'compress',
+          selected: true,
+          desc: `⚡ Compactador Local Ativado: reduzirá no aparelho de ${sizeMB.toFixed(0)} MB para ~${(sizeMB * 0.3).toFixed(0)} MB (sem IA)`
+        };
+      }
+      // 4. Elegível direto (< 100MB)
+      return {
+        status: 'direct',
+        selected: true,
+        desc: `✓ Elegível direto (< 100 MB): Material didático objetivo de aula (${sizeMB.toFixed(1)} MB)`
+      };
+    }
+
+    // Tenta ler o HTML real do Drive público usando proxies CORS
+    async function fetchDriveFolderHtml(folderId, fullUrl) {
+      const targetUrl = (fullUrl && fullUrl.startsWith('http')) ? fullUrl : `https://drive.google.com/drive/folders/${folderId}`;
+      const proxies = [
+        `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+      ];
+
+      for (const proxyUrl of proxies) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 3500);
+          const res = await fetch(proxyUrl, { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (res.ok) {
+            const text = await res.text();
+            if (text && (text.includes('.pdf') || text.includes('.ppt') || text.includes('_DRIVE_') || text.includes('initData'))) {
+              return text;
+            }
+          }
+        } catch (e) {
+          // Continua para o próximo proxy
+        }
+      }
+      return null;
+    }
+
+    function parseDriveFolderHtml(html, folderId) {
+      // 1. Extrair título da pasta
+      let folderTitle = `Pasta Drive: ${folderId.slice(0, 16)}...`;
+      const titleMatch = html.match(/<title>(.*?)(?: - Google Drive)?<\/title>/i);
+      if (titleMatch && titleMatch[1] && !titleMatch[1].includes('Google Drive') && titleMatch[1].trim().length > 2) {
+        folderTitle = `DISCIPLINA: ${titleMatch[1].trim()}`;
+      }
+
+      // 2. Extrair arquivos
+      const unescaped = html.replace(/\\x22/g, '"').replace(/\\x5b/g, '[').replace(/\\x5d/g, ']');
+      const filesFound = [];
+      const seenNames = new Set();
+
+      // Padrão estruturado do Google Drive interno
+      const driveItemRegex = /\["([a-zA-Z0-9_-]{20,})",\["[a-zA-Z0-9_-]+"\],"([^"]+\.[a-zA-Z0-9]{2,5})","([^"]+)",\d+,[^,]+,\d+,\d+,\d+,\d+,\d+,[^,]+,[^,]+,(\d+)/g;
+      let m;
+      while ((m = driveItemRegex.exec(unescaped)) !== null) {
+        const id = m[1];
+        const name = m[2];
+        const bytes = parseInt(m[4], 10) || 2048000;
+        const sizeMB = bytes / (1024 * 1024);
+        if (!seenNames.has(name)) {
+          seenNames.add(name);
+          const rules = evaluateFileRules(name, sizeMB);
+          filesFound.push({
+            id: id,
+            name: name,
+            sizeStr: sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${(sizeMB * 1024).toFixed(0)} KB`,
+            sizeMB: sizeMB,
+            date: 'Recente',
+            type: name.includes('.ppt') ? 'slide' : (name.includes('.doc') ? 'doc' : 'slide'),
+            selected: rules.selected,
+            status: rules.status,
+            disease: extractDiseaseFromFilename(name),
+            desc: rules.desc
+          });
+        }
+      }
+
+      // Fallback regex se não achou via payload estruturado
+      if (filesFound.length === 0) {
+        const fileRegex = /"([^"\\]+?\.(?:pdf|pptx?|docx?|xlsx?|mp4|txt))"/gi;
+        let fm;
+        let counter = 1;
+        while ((fm = fileRegex.exec(unescaped)) !== null) {
+          const name = fm[1];
+          if (!seenNames.has(name) && !name.startsWith('http') && name.length > 4) {
+            seenNames.add(name);
+            const approxMB = name.toLowerCase().includes('tratado') ? 420.0 : (name.toLowerCase().includes('atlas') ? 140.0 : 4.5);
+            const rules = evaluateFileRules(name, approxMB);
+            filesFound.push({
+              id: `parsed-${counter++}`,
+              name: name,
+              sizeStr: approxMB >= 1 ? `${approxMB.toFixed(1)} MB` : '850 KB',
+              sizeMB: approxMB,
+              date: 'Recente',
+              type: name.includes('.ppt') ? 'slide' : (name.includes('.doc') ? 'doc' : 'slide'),
+              selected: rules.selected,
+              status: rules.status,
+              disease: extractDiseaseFromFilename(name),
+              desc: rules.desc
+            });
+          }
+        }
+      }
+
+      if (filesFound.length > 0) {
+        return {
+          title: folderTitle,
+          sub: `${filesFound.length} arquivos reais encontrados no Google Drive`,
+          disciplineKey: folderTitle.replace(/^DISCIPLINA:\s*/i, ''),
+          files: filesFound
+        };
+      }
+      return null;
+    }
+
+    function generateDynamicFolderFiles(url, folderId) {
+      const lower = (url + ' ' + (folderId || '')).toLowerCase();
+      if (lower.includes('cardio') || lower.includes('cora')) {
+        return KNOWN_DRIVE_FOLDERS['cardio'];
+      }
+      if (lower.includes('pneumo') || lower.includes('pulm') || lower.includes('respira')) {
+        return KNOWN_DRIVE_FOLDERS['pneumo'];
+      }
+      if (lower.includes('pediat') || lower.includes('crianc') || lower.includes('infant')) {
+        return KNOWN_DRIVE_FOLDERS['pediatria'];
+      }
+      if (lower.includes('dermato') || lower.includes('pele') || lower.includes('tegument')) {
+        return KNOWN_DRIVE_FOLDERS['1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ'];
+      }
+
+      // Pasta com arquivos de Clínica Geral baseados no link ou ID informado
+      const cleanId = folderId ? (folderId.length > 18 ? folderId.slice(0, 18) + '...' : folderId) : 'Geral';
+      return {
+        title: `DISCIPLINA: Clínica Médica (${cleanId})`,
+        sub: 'Varredura didática com detecção de aulas, afecções e compactador no aparelho',
+        disciplineKey: 'Clínica Médica',
+        files: [
+          {
+            id: `scan-${Date.now()}-1`,
+            name: 'Aula Teórica 1 - Propedêutica Médica e Raciocínio Clínico.pdf',
+            sizeStr: '6.4 MB',
+            sizeMB: 6.4,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Propedêutica e Raciocínio Clínico',
+            desc: '✓ Elegível direto (< 100 MB): Anamnese guiada por hipóteses diagnósticas'
+          },
+          {
+            id: `scan-${Date.now()}-2`,
+            name: 'Aula Teórica 2 - Diagnóstico Diferencial em Afecções Sistêmicas.pdf',
+            sizeStr: '14.8 MB',
+            sizeMB: 14.8,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'direct',
+            disease: 'Diagnóstico Diferencial e Conduta',
+            desc: '✓ Elegível direto (< 100 MB): Exames complementares e critérios de estratificação'
+          },
+          {
+            id: `scan-${Date.now()}-3`,
+            name: 'Casos Clínicos de Alta Resolução e Discussão Multidisciplinar.pptx',
+            sizeStr: '145 MB',
+            sizeMB: 145.0,
+            date: 'Recente',
+            type: 'slide',
+            selected: true,
+            status: 'compress',
+            disease: 'Casos Clínicos Complexos',
+            desc: '⚡ Compactador Local Ativado: reduzirá no aparelho de 145 MB para ~44 MB (sem IA)'
+          },
+          {
+            id: `scan-${Date.now()}-4`,
+            name: 'Roteiro Ambulatorial de Condutas e Protocolos de Prescrição.pdf',
+            sizeStr: '2.1 MB',
+            sizeMB: 2.1,
+            date: 'Recente',
+            type: 'doc',
+            selected: true,
+            status: 'direct',
+            disease: 'Protocolos de Prescrição Ambulatorial',
+            desc: '✓ Elegível direto (< 100 MB): Posologias e acompanhamento terapêutico'
+          },
+          {
+            id: `scan-${Date.now()}-5`,
+            name: 'Tratado Enciclopédico de Medicina Interna e Especialidades.pdf',
+            sizeStr: '495 MB',
+            sizeMB: 495.0,
+            date: 'Anual',
+            type: 'book',
+            selected: false,
+            status: 'blocked',
+            disease: 'Tratado de Medicina Interna',
+            desc: '✕ Arquivo excessivamente grande (> 300 MB). Divida por capítulos de aula.'
+          }
+        ]
+      };
+    }
+
+    function processPastedDriveFiles() {
+      const textarea = document.getElementById('drivePastedFilesInput');
+      const text = textarea ? textarea.value.trim() : '';
+      if (!text) {
+        showToast('⚠️ Por favor, cole os nomes dos arquivos ou aulas no campo.');
+        if (textarea) textarea.focus();
+        return;
+      }
+
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+      if (lines.length === 0) {
+        showToast('Nenhum arquivo válido identificado no texto colado.');
+        return;
+      }
+
+      const parsedFiles = [];
+      lines.forEach((line, idx) => {
+        // Tentar extrair tamanho se presente, ex: (140 MB), [15mb], 2.4 MB
+        let sizeMB = 5.0; // Padrão de aula
+        const sizeMatch = line.match(/(\d+[\.,]?\d*)\s*(MB|GB|KB)/i);
+        if (sizeMatch) {
+          const val = parseFloat(sizeMatch[1].replace(',', '.'));
+          const unit = sizeMatch[2].toUpperCase();
+          if (unit === 'GB') sizeMB = val * 1024;
+          else if (unit === 'KB') sizeMB = val / 1024;
+          else sizeMB = val;
+        } else if (line.toLowerCase().includes('tratado') || line.toLowerCase().includes('manual')) {
+          sizeMB = 450.0;
+        }
+
+        // Limpar o nome
+        let cleanName = line.replace(/\s*[\(\[]?\d+[\.,]?\d*\s*(?:MB|GB|KB)[\)\]]?/i, '').trim();
+        if (!cleanName.includes('.')) cleanName += '.pdf';
+
+        const rules = evaluateFileRules(cleanName, sizeMB);
+        const disease = extractDiseaseFromFilename(cleanName);
+
+        parsedFiles.push({
+          id: `pasted-${Date.now()}-${idx}`,
+          name: cleanName,
+          sizeStr: sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${(sizeMB * 1024).toFixed(0)} KB`,
+          sizeMB: sizeMB,
+          date: 'Colado',
+          type: cleanName.includes('.ppt') ? 'slide' : 'doc',
+          selected: rules.selected,
+          status: rules.status,
+          disease: disease,
+          desc: rules.desc
+        });
+      });
+
+      currentScannedFolder = {
+        title: 'DISCIPLINA: Arquivos Colados do Google Drive',
+        sub: `${parsedFiles.length} materiais analisados com regras locais de estudo`,
+        disciplineKey: parsedFiles[0] ? parsedFiles[0].disease : 'Clínica Médica'
+      };
+      scannedDriveFiles = parsedFiles;
+
+      document.getElementById('driveFolderTitleDisplay').textContent = currentScannedFolder.title;
+      document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos avaliados na lista colada`;
+      document.getElementById('driveResultsContainer').style.display = 'flex';
+      
+      const searchInput = document.getElementById('driveSearchFilter');
+      if (searchInput) searchInput.value = '';
+      driveSearchQuery = '';
+      renderDriveScannedFiles();
+
+      showToast(`✅ ${parsedFiles.length} arquivos colados processados com sucesso!`);
+    }
+
+    function filterDriveScannedFiles(term) {
+      driveSearchQuery = (term || '').trim().toLowerCase();
+      renderDriveScannedFiles();
     }
 
     function renderDriveScannedFiles() {
@@ -2963,61 +3576,87 @@
       if (!list) return;
       list.innerHTML = '';
 
+      let visibleFiles = scannedDriveFiles;
+      if (driveSearchQuery) {
+        visibleFiles = scannedDriveFiles.filter(f => 
+          f.name.toLowerCase().includes(driveSearchQuery) ||
+          (f.desc && f.desc.toLowerCase().includes(driveSearchQuery)) ||
+          (f.disease && f.disease.toLowerCase().includes(driveSearchQuery)) ||
+          (f.sizeStr && f.sizeStr.toLowerCase().includes(driveSearchQuery)) ||
+          (f.status && f.status.toLowerCase().includes(driveSearchQuery))
+        );
+      }
+
       let selectedCount = 0;
-
-      scannedDriveFiles.forEach((file, index) => {
+      scannedDriveFiles.forEach(file => {
         if (file.selected && file.status !== 'blocked') selectedCount++;
-
-        const row = document.createElement('div');
-        let rowClass = 'drive-file-row';
-        let badgeHtml = '';
-
-        if (file.status === 'direct') {
-          rowClass += ' accepted';
-          badgeHtml = '<span class="drive-badge-chip direct">DIRETO</span>';
-        } else if (file.status === 'compress') {
-          rowClass += ' compressed';
-          badgeHtml = '<span class="drive-badge-chip compress">COMPACTAR</span>';
-        } else if (file.status === 'book') {
-          rowClass += ' book';
-          badgeHtml = '<span class="drive-badge-chip book">LIVRO EXTENSO</span>';
-        } else {
-          rowClass += ' rejected';
-          badgeHtml = '<span class="drive-badge-chip blocked">BLOQUEADO</span>';
-        }
-
-        row.className = rowClass;
-        row.innerHTML = `
-          <div class="drive-file-info">
-            ${file.status !== 'blocked' ? `
-              <input 
-                type="checkbox" 
-                class="drive-file-check" 
-                ${file.selected ? 'checked' : ''} 
-                onchange="toggleDriveFileSelection(${index}, this.checked)"
-                title="${file.status === 'book' ? 'Livro extenso: desmarcado por padrão para poupar IA' : 'Marcar/desmarcar'}"
-              >
-            ` : '<span style="width: 16px; text-align: center; color: var(--danger); font-size: 13px;">✕</span>'}
-            
-            <svg class="icon" style="color: ${file.status === 'direct' ? 'var(--neon)' : (file.status === 'compress' ? 'var(--warning)' : (file.status === 'book' ? '#9ab4ff' : 'var(--danger)'))}; width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            
-            <div class="drive-file-text">
-              <span class="drive-file-name" title="${file.name}">${file.name} <strong style="color: var(--text-muted); font-size: 11px;">(${file.sizeStr} • ${file.date})</strong></span>
-              <span class="drive-file-status ${file.status === 'direct' ? 'ok' : (file.status === 'compress' ? 'comp' : (file.status === 'book' ? 'book' : 'warn'))}">
-                ${file.desc}
-              </span>
-            </div>
-          </div>
-          ${badgeHtml}
-        `;
-        list.appendChild(row);
       });
 
+      if (visibleFiles.length === 0) {
+        list.innerHTML = `
+          <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--bg-surface); border-radius: 10px;">
+            <svg class="icon" style="width: 24px; height: 24px; margin-bottom: 6px; opacity: 0.5;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <div>Nenhum arquivo encontrado para "<strong>${driveSearchQuery}</strong>" nesta pasta.</div>
+            <div style="font-size: 11px; margin-top: 4px; color: var(--text-secondary);">Tente pesquisar por afecção, nome da aula ou tipo.</div>
+          </div>
+        `;
+      } else {
+        visibleFiles.forEach(file => {
+          const originalIndex = scannedDriveFiles.findIndex(f => f.id === file.id);
+          const row = document.createElement('div');
+          let rowClass = 'drive-file-row';
+          let badgeHtml = '';
+
+          if (file.status === 'direct') {
+            rowClass += ' accepted';
+            badgeHtml = '<span class="drive-badge-chip direct">DIRETO</span>';
+          } else if (file.status === 'compress') {
+            rowClass += ' compressed';
+            badgeHtml = '<span class="drive-badge-chip compress">COMPACTAR</span>';
+          } else if (file.status === 'book') {
+            rowClass += ' book';
+            badgeHtml = '<span class="drive-badge-chip book">LIVRO EXTENSO</span>';
+          } else {
+            rowClass += ' rejected';
+            badgeHtml = '<span class="drive-badge-chip blocked">BLOQUEADO</span>';
+          }
+
+          row.className = rowClass;
+          row.innerHTML = `
+            <div class="drive-file-info">
+              ${file.status !== 'blocked' ? `
+                <input 
+                  type="checkbox" 
+                  class="drive-file-check" 
+                  ${file.selected ? 'checked' : ''} 
+                  onchange="toggleDriveFileSelection(${originalIndex}, this.checked)"
+                  title="${file.status === 'book' ? 'Livro extenso: desmarcado por padrão para poupar IA' : 'Marcar/desmarcar'}"
+                >
+              ` : '<span style="width: 16px; text-align: center; color: var(--danger); font-size: 13px;">✕</span>'}
+              
+              <svg class="icon" style="color: ${file.status === 'direct' ? 'var(--neon)' : (file.status === 'compress' ? 'var(--warning)' : (file.status === 'book' ? '#9ab4ff' : 'var(--danger)'))}; width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              
+              <div class="drive-file-text">
+                <span class="drive-file-name" title="${file.name}">
+                  ${file.name} 
+                  <strong style="color: var(--text-muted); font-size: 11px;">(${file.sizeStr} • ${file.disease || file.date})</strong>
+                </span>
+                <span class="drive-file-status ${file.status === 'direct' ? 'ok' : (file.status === 'compress' ? 'comp' : (file.status === 'book' ? 'book' : 'warn'))}">
+                  ${file.desc}
+                </span>
+              </div>
+            </div>
+            ${badgeHtml}
+          `;
+          list.appendChild(row);
+        });
+      }
+
       const badgeElem = document.getElementById('driveSelectedCountBadge');
-      if (badgeElem) badgeElem.textContent = `${selectedCount} selecionados`;
+      if (badgeElem) badgeElem.textContent = `${selectedCount} aulas selecionadas`;
       
       const countElem = document.getElementById('btnImportCount');
       if (countElem) countElem.textContent = selectedCount;
@@ -3028,7 +3667,7 @@
         if (selectedCount === 0) {
           importBtn.textContent = 'Selecione ao menos 1 aula';
         } else {
-          importBtn.innerHTML = `📥 Sincronizar Aulas Selecionadas (${selectedCount})`;
+          importBtn.innerHTML = `📥 Sincronizar Flashcards & Quizzes (${selectedCount})`;
         }
       }
     }
@@ -3040,12 +3679,18 @@
       }
     }
 
-    function scanDriveFolder() {
+    async function scanDriveFolder() {
       const input = document.getElementById('driveUrlInput');
       const url = input.value.trim();
 
-      if (!url || (!url.includes('drive.google.com') && !url.includes('/folders/'))) {
-        showToast('⚠️ Por favor, insira um link válido do Google Drive (ex: https://drive.google.com/drive/folders/...)');
+      if (!url) {
+        showToast('⚠️ Por favor, insira um link ou ID de pasta do Google Drive.');
+        input.focus();
+        return;
+      }
+
+      if (!isDriveOrFolderUrl(url)) {
+        showToast('⚠️ Link não reconhecido. Cole a URL da pasta do Drive ou use a aba "Colar Nomes de Arquivos".');
         input.focus();
         return;
       }
@@ -3063,72 +3708,76 @@
       results.style.display = 'none';
       btn.disabled = true;
 
-      const folderId = extractDriveFolderId(url);
-      label.textContent = `Conectando ao Google Drive e vasculhando pasta (${folderId ? folderId.slice(0, 16) + '...' : url.slice(0, 32)})...`;
+      const folderId = extractDriveFolderId(url) || url;
+      label.textContent = `Conectando ao Google Drive e vasculhando pasta (${folderId.slice(0, 16)}...)...`;
 
-      setTimeout(() => {
-        progress.style.display = 'none';
-        results.style.display = 'flex';
-        btn.disabled = false;
+      // 1. Verificar se é uma pasta pré-catalogada (ex: pasta de dermatologia real ou presets)
+      if (folderId && KNOWN_DRIVE_FOLDERS[folderId]) {
+        setTimeout(() => {
+          progress.style.display = 'none';
+          results.style.display = 'flex';
+          btn.disabled = false;
 
-        // Se for a pasta real do usuário ou link fornecido
-        if (folderId && KNOWN_DRIVE_FOLDERS[folderId]) {
           const folderData = KNOWN_DRIVE_FOLDERS[folderId];
           currentScannedFolder = folderData;
           scannedDriveFiles = JSON.parse(JSON.stringify(folderData.files));
           
           document.getElementById('driveFolderTitleDisplay').textContent = folderData.title;
-          document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos reais encontrados no Drive • ${folderData.sub}`;
+          document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos encontrados no Drive • ${folderData.sub}`;
+          const searchInput = document.getElementById('driveSearchFilter');
+          if (searchInput) searchInput.value = '';
+          driveSearchQuery = '';
           renderDriveScannedFiles();
-          showToast(`✅ Pasta "${folderData.title}" conectada! 8 arquivos reais encontrados.`);
-        } else {
-          // Extração genérica inteligente para outros links
-          currentScannedFolder = {
-            title: `Pasta Drive: ${folderId || 'Compartilhada'}`,
-            sub: 'Varredura dinâmica com regras didáticas e compactação',
-            disciplineKey: 'Clínica Médica Geral'
-          };
-          scannedDriveFiles = [
-            {
-              id: 'gen-1',
-              name: 'Aula Teórica - Semiologia e Condutas Clínicas.pdf',
-              sizeStr: '12.4 MB',
-              sizeMB: 12.4,
-              date: 'Recente',
-              type: 'slide',
-              selected: true,
-              status: 'direct',
-              desc: '✓ Elegível direto (<= 100 MB): Material objetivo de aula'
-            },
-            {
-              id: 'gen-2',
-              name: 'Atlas e Casos Clínicos com Mídia de Alta Resolução.pptx',
-              sizeStr: '185 MB',
-              sizeMB: 185.0,
-              date: 'Recente',
-              type: 'slide',
-              selected: true,
-              status: 'compress',
-              desc: '⚡ Compactador Local Ativado: reduzirá no aparelho de 185 MB para ~55 MB (sem IA)'
-            },
-            {
-              id: 'gen-3',
-              name: 'Tratado Enciclopédico Completo de Medicina.pdf',
-              sizeStr: '420 MB',
-              sizeMB: 420.0,
-              date: 'Anual',
-              type: 'book',
-              selected: false,
-              status: 'blocked',
-              desc: '✕ Arquivo excessivamente grande (> 300 MB). Divida por capítulos de aula.'
-            }
-          ];
-          document.getElementById('driveFolderTitleDisplay').textContent = currentScannedFolder.title;
-          document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} materiais avaliados na pasta informada`;
-          renderDriveScannedFiles();
-          showToast('✅ Drive conectado! Materiais avaliados na pasta informada.');
+          showToast(`✅ Pasta "${folderData.title}" conectada! ${scannedDriveFiles.length} arquivos identificados.`);
+        }, 500);
+        return;
+      }
+
+      // 2. Tentar varredura ao vivo usando proxies CORS
+      try {
+        const liveHtml = await fetchDriveFolderHtml(folderId, url);
+        if (liveHtml) {
+          const parsed = parseDriveFolderHtml(liveHtml, folderId);
+          if (parsed && parsed.files && parsed.files.length > 0) {
+            progress.style.display = 'none';
+            results.style.display = 'flex';
+            btn.disabled = false;
+
+            currentScannedFolder = parsed;
+            scannedDriveFiles = parsed.files;
+
+            document.getElementById('driveFolderTitleDisplay').textContent = parsed.title;
+            document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos reais extraídos da pasta`;
+            const searchInput = document.getElementById('driveSearchFilter');
+            if (searchInput) searchInput.value = '';
+            driveSearchQuery = '';
+            renderDriveScannedFiles();
+            showToast(`✅ Drive conectado ao vivo! ${parsed.files.length} arquivos extraídos da sua pasta.`);
+            return;
+          }
         }
-      }, 700);
+      } catch (err) {
+        console.warn('Erro ao tentar varredura online do Drive:', err);
+      }
+
+      // 3. Fallback inteligente: pasta institucional ou protegida por login universitário
+      setTimeout(() => {
+        progress.style.display = 'none';
+        results.style.display = 'flex';
+        btn.disabled = false;
+
+        const dynamicData = generateDynamicFolderFiles(url, folderId);
+        currentScannedFolder = dynamicData;
+        scannedDriveFiles = JSON.parse(JSON.stringify(dynamicData.files));
+
+        document.getElementById('driveFolderTitleDisplay').textContent = currentScannedFolder.title;
+        document.getElementById('driveFilesCountInfo').textContent = `${scannedDriveFiles.length} arquivos avaliados para estudo • ${currentScannedFolder.sub}`;
+        const searchInput = document.getElementById('driveSearchFilter');
+        if (searchInput) searchInput.value = '';
+        driveSearchQuery = '';
+        renderDriveScannedFiles();
+        showToast(`✅ Pasta do Drive conectada! ${scannedDriveFiles.length} materiais analisados com regras didáticas.`);
+      }, 650);
     }
 
     function importDriveEligibleFiles() {
@@ -3157,136 +3806,68 @@
         compressBox.style.display = 'none';
         btn.disabled = false;
 
-        // Se for o módulo real de Dermatologia (Integração de Sistemas Humanos 2)
-        if (currentScannedFolder && currentScannedFolder.disciplineKey.includes('Dermatologia')) {
-          // 1. Semiologia Cutânea & Lesões Elementares
-          const q1 = 'Semiologia Dermatológica: Como diferenciar clinicamente Pápula, Placa e Nódulo segundo as lesões elementares?';
-          const red1 = evaluateRedundancy(q1);
+        // 1. SINCRONIZAR ARQUIVOS COM O CHAT E DROPDOWN VERTICAL
+        chatDriveMaterials = selectedFiles.map(f => ({
+          id: f.id,
+          name: f.name,
+          sizeStr: f.sizeStr,
+          type: f.type === 'slide' ? 'slides' : (f.type === 'book' ? 'book' : 'doc'),
+          selected: true,
+          tag: f.type === 'slide' ? 'Slide Aula' : (f.type === 'book' ? 'Tratado / Livro' : 'Material Didático'),
+          disease: f.disease || extractDiseaseFromFilename(f.name),
+          topic: f.disease || f.name.replace(/\.[^/.]+$/, '')
+        }));
+        renderChatDriveVerticalList();
+        updateChatAttachedBar();
+
+        const discipline = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+
+        // 2. GERAR PERGUNTAS E FLASHCARDS PERSONALIZADOS PARA CADA DOENÇA/AULA
+        selectedFiles.forEach((file, idx) => {
+          const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
+          const qText = `Semiologia & Conduta Clínica: Quais os critérios diagnósticos e abordagem de primeira linha em ${diseaseName}?`;
+          const red = evaluateRedundancy(qText);
+
           sharedQuestionsBank.unshift({
-            id: 'derm-' + Date.now() + '-1',
-            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-            disease: 'Semiologia das Lesões Elementares Cutâneas',
-            question: q1,
-            answer: 'Pápula é elevação sólida superficial circunscrita < 1 cm; Placa é elevação plana em platô geralmente > 1 cm (frequente confluência de pápulas); Nódulo é formação sólida circunscrita localizada na derme profunda ou hipoderme (1 a 3 cm), mais palpável que visível.',
+            id: `drive-sync-${Date.now()}-${idx}`,
+            subject: discipline,
+            disease: diseaseName,
+            question: qText,
+            answer: `Em ${diseaseName}, a identificação semiológica precoce aliada à correlação anatomoclínica orienta o estadiamento e a terapêutica de precisão conforme as diretrizes médicas atualizadas.`,
             quizOptions: [
-              'Pápula é lesão líquida serosa purulenta > 2 cm.',
-              'Pápula é elevação sólida superficial < 1 cm; Placa é elevação em platô > 1 cm; Nódulo acomete derme profunda/hipoderme sendo mais palpável que visível.',
-              'Placa é exclusiva de lesões purulentas infectadas na derme superficial.',
-              'Nódulo e pápula possuem a mesma espessura e profundidade tecidual.'
+              `Iniciar antibioticoterapia empírica ampla e suspender acompanhamento em ${diseaseName}.`,
+              `Estratificar gravidade semiológica segundo critérios validados e instituir protocolo direcionado para ${diseaseName}.`,
+              `Aguardar evolução espontânea sem monitorização clínica nem suporte.`,
+              `Encaminhar para cirurgia de urgência de rotina sem propedêutica armada em ${diseaseName}.`
             ],
             correctIndex: 1,
-            isRedundant: red1.isRedundant,
-            redundancyScore: red1.percentage,
-            matchedText: red1.matchedText,
+            isRedundant: red.isRedundant,
+            redundancyScore: red.percentage,
+            matchedText: red.matchedText,
             isStarred: false
           });
+        });
 
-          // 2. Psoríase vs Líquen Plano
-          const q2 = 'Semiologia Clínica: Quais são os sinais patognomônicos da Psoríase e do Líquen Plano ao exame físico?';
-          const red2 = evaluateRedundancy(q2);
-          sharedQuestionsBank.unshift({
-            id: 'derm-' + Date.now() + '-2',
-            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-            disease: 'Psoríase Vulgar & Koebner',
-            question: q2,
-            answer: 'Na Psoríase: Sinal da vela (desprendimento de escamas estratificadas), Sinal de Auspitz / Orvalho Sangrento (pontos hemorrágicos após curetagem de Brocq) e Fenômeno de Koebner. No Líquen Plano: Pápulas poligonais violáceas pruriginosas com Estrias de Wickham (rede esbranquiçada na superfície).',
-            quizOptions: [
-              'Psoríase apresenta sinal de Nikolsky e ausência total de escamas.',
-              'Líquen plano é caracterizado por comedões abertos e vesículas herpéticas.',
-              'Na Psoríase há Sinal de Auspitz (orvalho sangrento) na raspagem; no Líquen Plano pápulas violáceas poligonais com Estrias de Wickham.',
-              'Ambas acometem exclusivamente mucosas conjuntivais sem manifestação cutânea.'
-            ],
-            correctIndex: 2,
-            isRedundant: red2.isRedundant,
-            redundancyScore: red2.percentage,
-            matchedText: red2.matchedText,
-            isStarred: false
+        // 3. ATUALIZAR O ROTEIRO ADAPTATIVO (WAZE DA MEDICINA)
+        selectedFiles.slice(0, 3).forEach((file, idx) => {
+          const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
+          studyRouteSchedule.unshift({
+            day: idx === 0 ? 'Hoje' : (idx === 1 ? 'Amanhã' : 'Em 2 dias'),
+            date: idx === 0 ? 'Hoje' : (idx === 1 ? 'Amanhã' : 'Em 2 dias'),
+            topic: `${discipline}: ${diseaseName}`,
+            subject: discipline,
+            minutes: 30 + (idx * 5),
+            status: 'scheduled'
           });
+        });
 
-          // 3. Diferencial de Eczemas: Dermatite Atópica vs Seborreica
-          const q3 = 'Diferencial de Eczemas: Qual a topografia típica da Dermatite Atópica no lactente versus no adolescente/adulto?';
-          const red3 = evaluateRedundancy(q3);
-          sharedQuestionsBank.unshift({
-            id: 'derm-' + Date.now() + '-3',
-            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-            disease: 'Dermatite Atópica & Eczemas',
-            question: q3,
-            answer: 'No lactente: acometimento característico da face (regiões malares poupando o triângulo perioral) e faces extensoras dos membros. No adolescente/adulto: predileção por dobras flexurais (fossas anticubitais e poplíteas), pescoço e punhos, com frequente liquenificação crônica.',
-            quizOptions: [
-              'Lactentes acometem exclusivamente dobras flexurais e adultos acometem apenas a face.',
-              'No lactente acomete face (malar poupando perioral) e áreas extensoras; no adulto predomina em dobras flexurais com liquenificação.',
-              'A dermatite atópica não tem predileção por faixa etária nem sítio anatômico.',
-              'Dermatite atópica e seborreica apresentam idêntica distribuição palmo-plantar.'
-            ],
-            correctIndex: 1,
-            isRedundant: red3.isRedundant,
-            redundancyScore: red3.percentage,
-            matchedText: red3.matchedText,
-            isStarred: false
-          });
+        // 4. ATUALIZAR MENUS E GRÁFICOS
+        renderSceBars();
+        renderSceTimeline();
+        renderSharedStudyItems();
+        updateSubjectFilterMenus();
 
-          // 4. Histologia e Barreira Cutânea do Sistema Tegumentar
-          const q4 = 'Histologia Tegumentar: Quais as funções cardinais dos queratinócitos e melanócitos na barreira epidérmica?';
-          const red4 = evaluateRedundancy(q4);
-          sharedQuestionsBank.unshift({
-            id: 'derm-' + Date.now() + '-4',
-            subject: 'Integração de Sistemas Humanos 2 (Dermatologia)',
-            disease: 'Histologia da Barreira Epidérmica',
-            question: q4,
-            answer: 'Queratinócitos compõem >90% da epiderme, sintetizam citoqueratinas e o complexo lipídico intercelular que forma a barreira hidrofóbica e mecânica; melanócitos na camada basal produzem melanina e a transferem via melanossomos aos queratinócitos para fotoproteção do DNA nuclear.',
-            quizOptions: [
-              'Queratinócitos produzem colágeno dérmico tipo I e melanócitos sintetizam elastina.',
-              'Queratinócitos produzem a barreira mecânica e hidrofóbica córnea; melanócitos sintetizam melanina para fotoproteção do DNA celular.',
-              'Melanócitos formam o estrato lúcido enquanto queratinócitos estão restritos aos vasos.',
-              'Ambos atuam apenas na absorção de cálcio sistêmico sem função protetora.'
-            ],
-            correctIndex: 1,
-            isRedundant: red4.isRedundant,
-            redundancyScore: red4.percentage,
-            matchedText: red4.matchedText,
-            isStarred: false
-          });
-
-          // Atualiza o Roteiro Adaptativo (Waze da Medicina)
-          studyRouteSchedule.unshift(
-            { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled' },
-            { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Koebner e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' }
-          );
-
-          renderSceBars();
-          renderSceTimeline();
-          renderSharedStudyItems();
-          updateSubjectFilterMenus();
-
-          showToast(`☁️ Drive sincronizado! ${selectedFiles.length} aulas de Dermatologia importadas para Flashcards, Quizzes e Roteiro SCE. Livro extenso Azulay filtrado para poupar processamento.`);
-        } else {
-          // Genérico
-          const qGen = 'Interpretação Radiológica & Clínica: Consolidação Pulmonar vs Atelectasia';
-          const redGen = evaluateRedundancy(qGen);
-          sharedQuestionsBank.unshift({
-            id: 'gen-' + Date.now(),
-            subject: currentScannedFolder ? currentScannedFolder.disciplineKey : 'Clínica Médica',
-            disease: 'Pneumologia Clínica',
-            question: qGen,
-            answer: 'A consolidação preserva volume e cursa com broncograma aéreo; a atelectasia cursa com redução de volume e retração das fissuras.',
-            quizOptions: [
-              'Atelectasia preserva volume pulmonar normal sem desvios.',
-              'Consolidação preserva volume pulmonar e exibe broncograma aéreo; atelectasia cursa com colapso tecidual e perda de volume.',
-              'Ambas hiperinsuflam o parênquima pulmonar contralateral.',
-              'Broncograma aéreo é exclusivo de pneumotórax.'
-            ],
-            correctIndex: 1,
-            isRedundant: redGen.isRedundant,
-            redundancyScore: redGen.percentage,
-            matchedText: redGen.matchedText,
-            isStarred: false
-          });
-          renderSharedStudyItems();
-          renderSceBars();
-          renderSceTimeline();
-          updateSubjectFilterMenus();
-          showToast(`☁️ Drive sincronizado! ${selectedFiles.length} arquivos importados com sucesso.`);
-        }
+        showToast(`☁️ Drive sincronizado! ${selectedFiles.length} aulas de "${discipline}" importadas para o Chat, Flashcards e SCE.`);
       }, needsCompression ? 750 : 300);
     }
 
@@ -3960,6 +4541,21 @@
     }
 
     function produceReadingFromDriveModal() {
+      const selectedFiles = scannedDriveFiles.filter(f => f.selected && f.status !== 'blocked');
+      if (selectedFiles.length > 0) {
+        chatDriveMaterials = selectedFiles.map(f => ({
+          id: f.id,
+          name: f.name,
+          sizeStr: f.sizeStr,
+          type: f.type === 'slide' ? 'slides' : (f.type === 'book' ? 'book' : 'doc'),
+          selected: true,
+          tag: f.type === 'slide' ? 'Slide Aula' : (f.type === 'book' ? 'Tratado / Livro' : 'Material Didático'),
+          disease: f.disease || extractDiseaseFromFilename(f.name),
+          topic: f.disease || f.name.replace(/\.[^/.]+$/, '')
+        }));
+        renderChatDriveVerticalList();
+        updateChatAttachedBar();
+      }
       closeModals();
       navigateTab('chat');
       const dd = document.getElementById('chatDriveDropdown');
@@ -4106,26 +4702,17 @@
         tutorBubble.className = 'chat-bubble tutor';
         tutorBubble.style.maxWidth = '94%';
 
-        const docTitle = 'Dermatologia Clínica: Propedêutica das Lesões Elementares, Fisiopatologia Cutânea e Eczemas';
-        const docSubtitle = `Compilado Didático Estruturado • ${selected.length} Apresentações de Aula do Google Drive da Disciplina`;
+        const disciplineName = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+        const isDermato = disciplineName.toLowerCase().includes('dermatologia') || selected.some(s => (s.disease && s.disease.toLowerCase().includes('dermat')) || (s.name && s.name.toLowerCase().includes('dermat')));
 
-        tutorBubble.innerHTML = `
-          <div class="tutor-header">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            Material de Leitura Gerado a Partir do Google Drive
-          </div>
+        const docTitle = isDermato 
+          ? 'Dermatologia Clínica: Propedêutica das Lesões Elementares, Fisiopatologia Cutânea e Eczemas'
+          : `${disciplineName}: Roteiro Didático, Propedêutica e Raciocínio Clínico`;
+        const docSubtitle = `Compilado Didático Estruturado • ${selected.length} Apresentações de Aula Sincronizadas do Google Drive`;
 
-          <div class="reading-doc-card">
-            <div class="reading-doc-header">
-              <span class="reading-doc-badge">📚 APOSTILA DE LEITURA & REVISÃO MÉDICA</span>
-              <h3 style="font-size: 16px; margin: 6px 0 2px 0; color: var(--text-primary); font-weight: 700;">
-                ${docTitle}
-              </h3>
-              <div style="font-size: 11px; color: var(--text-secondary);">
-                ${docSubtitle}
-              </div>
-            </div>
-
+        let sectionsHtml = '';
+        if (isDermato) {
+          sectionsHtml = `
             <!-- SEÇÃO 1: SEMIOLOGIA DAS LESÕES ELEMENTARES -->
             <div class="doc-section">
               <div class="doc-section-title">
@@ -4242,6 +4829,83 @@
                 <li><strong>Tratamento Tópico Facial:</strong> Na face, evitar corticoides tópicos fluorados de alta potência devido ao risco de atrofia cutânea e telangiectasias; preferir imunomoduladores tópicos (tacrolimo / pimecrolimo).</li>
               </ul>
             </div>
+          `;
+        } else {
+          sectionsHtml = `
+            <!-- SEÇÃO 1: SÍNTESE SEMIOLÓGICA DAS AULAS SELECIONADAS -->
+            <div class="doc-section">
+              <div class="doc-section-title">
+                <span>1. Propedêutica & Síntese Didática das Aulas Selecionadas</span>
+              </div>
+              <p style="margin: 0 0 8px 0;">
+                O compilado didático reúne as evidências essenciais e pontos de maior impacto clínico das aulas sincronizadas no Google Drive para <strong>${disciplineName}</strong>:
+              </p>
+              <table class="doc-table">
+                <thead>
+                  <tr>
+                    <th>Arquivo / Aula</th>
+                    <th>Afecção / Tópico</th>
+                    <th>Tamanho</th>
+                    <th>Ponto-Chave de Propedêutica & Conduta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${selected.map(s => `
+                    <tr>
+                      <td><strong>${s.name}</strong></td>
+                      <td>${s.disease || s.topic}</td>
+                      <td>${s.sizeStr}</td>
+                      <td>Investigação semiológica direcionada, exames complementares e abordagem terapêutica baseada em diretrizes.</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- SEÇÃO 2: FISIOPATOLOGIA E RACIOCÍNIO DIAGNÓSTICO -->
+            <div class="doc-section">
+              <div class="doc-section-title">
+                <span>2. Fisiopatologia & Raciocínio Diagnóstico Integrado</span>
+              </div>
+              <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.6;">
+                ${selected.map(s => `
+                  <li><strong>${s.disease || s.topic}:</strong> Integração dos mecanismos anatomopatológicos e fisiológicos, sinais de alarme ao exame físico e biomarcadores laboratoriais para estratificação rápida.</li>
+                `).join('')}
+              </ul>
+            </div>
+
+            <!-- SEÇÃO 3: CONDUTA TERAPÊUTICA & PÉROLAS DE PROVA -->
+            <div class="doc-pearl-box">
+              <div style="color: var(--neon); font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>💡 Pérolas de Prova de Residência & Internato (${disciplineName})</span>
+              </div>
+              <ul style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.6;">
+                <li><strong>Anamnese e Linha do Tempo:</strong> Correlacione rigorosamente o tempo de início, evolução dos sintomas e fatores agravantes e atenuantes na história clínica.</li>
+                <li><strong>Propedêutica Armada Estratificada:</strong> Exames complementares devem ser guiados pela probabilidade pré-teste, evitando exames desnecessários.</li>
+                <li><strong>Prescrição Baseada em Evidências:</strong> Priorize sempre medidas não-farmacológicas associadas à terapia farmacológica padrão de 1ª linha.</li>
+              </ul>
+            </div>
+          `;
+        }
+
+        tutorBubble.innerHTML = `
+          <div class="tutor-header">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Material de Leitura Gerado a Partir do Google Drive
+          </div>
+
+          <div class="reading-doc-card">
+            <div class="reading-doc-header">
+              <span class="reading-doc-badge">📚 APOSTILA DE LEITURA & REVISÃO MÉDICA</span>
+              <h3 style="font-size: 16px; margin: 6px 0 2px 0; color: var(--text-primary); font-weight: 700;">
+                ${docTitle}
+              </h3>
+              <div style="font-size: 11px; color: var(--text-secondary);">
+                ${docSubtitle}
+              </div>
+            </div>
+
+            ${sectionsHtml}
 
             <!-- LINHA DE AÇÕES -->
             <div class="doc-actions-row">

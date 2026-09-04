@@ -257,7 +257,12 @@ class DriveSyncService {
 
   static bool validateDriveUrl(String url) {
     final clean = url.trim().toLowerCase();
-    return clean.contains('drive.google.com') || clean.contains('/folders/');
+    return clean.contains('drive.google.com') ||
+        clean.contains('docs.google.com') ||
+        clean.contains('folders/') ||
+        clean.contains('id=') ||
+        clean.contains('/file/d/') ||
+        (clean.length >= 20 && !clean.contains(' ') && !clean.contains('/'));
   }
 
   static DriveFileItem evaluateFile(String id, String name, double sizeMB, String mimeType) {
