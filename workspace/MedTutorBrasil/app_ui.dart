@@ -231,9 +231,14 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         final simulatedFiles = [
-          {'name': 'Aula 04 - Valvopatias e Sopros Mitrais.pdf', 'size': 24.5, 'eligible': true, 'needsComp': false, 'reason': 'Aceito direto: Tamanho ideal (24.5 MB <= 100 MB)'},
-          {'name': 'Casos Clínicos com Imagens e Lâminas.pptx', 'size': 185.0, 'eligible': true, 'needsComp': true, 'reason': 'Compactador Local Ativado: 185 MB reduzido para ~55 MB no dispositivo'},
-          {'name': 'Atlas e Tratado Integrado de Cirurgia Geral.pdf', 'size': 420.0, 'eligible': false, 'needsComp': false, 'reason': 'Arquivo excessivamente grande (420 MB > 300 MB). Divida por capítulos.'},
+          {'name': 'Apresentação do Plano de Aula - Dermatologia - 2026.2.pdf', 'size': '35 KB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Ementa e cronograma oficial da disciplina'},
+          {'name': 'Aula 2 - Sistema Tegumentar.pdf', 'size': '2.3 MB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Camadas da pele, histologia e queratinócitos'},
+          {'name': 'Lesoes-Elementares-em-Dermatologia - Aula 1.pdf', 'size': '3.4 MB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Semiologia cutânea (máculas, pápulas, placas, pústulas)'},
+          {'name': 'Dermatite Seborreica, Atópica e Contato - Aula 3.pdf', 'size': '279 KB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Diferencial clínico de eczemas e dermatites'},
+          {'name': 'Psoríase, liquen plano.pdf', 'size': '37.6 MB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Atlas clínico (Sinal de Auspitz, Koebner e Wickham)'},
+          {'name': 'DOC-20260814-WA0076.pdf', 'size': '2.6 MB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Casos clínicos e roteiro ambulatorial'},
+          {'name': 'DOC-20260814-WA0108.pdf', 'size': '1.6 MB', 'eligible': true, 'needsComp': false, 'isBook': false, 'reason': '✓ Elegível direto (< 100 MB): Roteiro de revisão e esquemas diagnósticos'},
+          {'name': 'Dermatologia - Azulay (8ª Edição)_260814_151238.pdf', 'size': '50.3 MB', 'eligible': false, 'needsComp': false, 'isBook': true, 'reason': '📖 Livro-texto extenso (50.3 MB): Omitido por padrão para poupar custos e focar nas aulas da prova'},
         ];
 
         return Padding(
@@ -257,7 +262,7 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                     onPressed: () => _showHelp(
                       context,
                       'Atualizar por Drive & Compactador',
-                      'Materiais de 100MB a 300MB são compactados localmente no seu dispositivo (sem IA). Arquivos acima de 300MB são informados como excessivamente grandes.',
+                      'Materiais de 100MB a 300MB são compactados localmente no seu dispositivo (sem IA). Livros enciclopédicos extensos são ignorados para focar no cronograma de aulas e economizar processamento.',
                     ),
                   ),
                 ],
@@ -278,8 +283,9 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                         border: Border.all(color: Theme.of(context).colorScheme.outline),
                       ),
                       child: const TextField(
+                        controller: null,
                         decoration: InputDecoration(
-                          hintText: 'https://drive.google.com/drive/folders/1abc...',
+                          hintText: 'https://drive.google.com/drive/u/0/folders/1tY7WG0g5QKGJRgqEWxrp43NhKEbSPenZ',
                           hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
                           border: InputBorder.none,
                           icon: Icon(Icons.link, size: 18),
@@ -296,7 +302,7 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                     ),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Drive conectado com sucesso! 3 materiais examinados.')),
+                        const SnackBar(content: Text('Drive conectado com sucesso! 8 arquivos reais encontrados na pasta DISCIPLINA: Integração de sistemas humanos 2.')),
                       );
                     },
                     child: const Text('Vasculhar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -304,58 +310,80 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                 ],
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Materiais identificados nesta pasta (Compactador local de 100MB a 300MB ativo):',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF66).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF00FF66).withOpacity(0.2)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.folder_open_outlined, color: Color(0xFF00FF66), size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'DISCIPLINA: Integração de sistemas humanos 2 (Dermatologia)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00FF66)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
-              ...simulatedFiles.map((file) {
-                final isEligible = file['eligible'] as bool;
-                final needsComp = file['needsComp'] as bool;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isEligible
-                          ? (needsComp ? Colors.amber.withOpacity(0.5) : const Color(0xFF00FF66).withOpacity(0.4))
-                          : Colors.red.withOpacity(0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isEligible
-                            ? (needsComp ? Icons.compress_outlined : Icons.check_circle_outline)
-                            : Icons.block_outlined,
-                        color: isEligible
-                            ? (needsComp ? Colors.amber : const Color(0xFF00FF66))
-                            : Colors.red,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(file['name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            Text(
-                              file['reason'] as String,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isEligible
-                                    ? (needsComp ? Colors.amber[300] : Colors.green[400])
-                                    : Colors.red[300],
-                              ),
-                            ),
-                          ],
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: simulatedFiles.map((file) {
+                    final isEligible = file['eligible'] as bool;
+                    final isBook = file['isBook'] as bool;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isEligible
+                              ? const Color(0xFF00FF66).withOpacity(0.4)
+                              : (isBook ? Colors.indigo.withOpacity(0.4) : Colors.red.withOpacity(0.4)),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              }),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isEligible
+                                ? Icons.check_circle_outline
+                                : (isBook ? Icons.menu_book_outlined : Icons.block_outlined),
+                            color: isEligible
+                                ? const Color(0xFF00FF66)
+                                : (isBook ? Colors.indigoAccent : Colors.red),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${file['name']} (${file['size']})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                Text(
+                                  file['reason'] as String,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isEligible
+                                        ? Colors.green[400]
+                                        : (isBook ? Colors.indigo[200] : Colors.red[300]),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -366,13 +394,26 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   icon: const Icon(Icons.sync_outlined),
-                  label: const Text('Sincronizar (1 Direto + 1 Compactado no Aparelho)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text('Sincronizar 7 Aulas de Dermatologia (Livro Extenso Filtrado)', style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _addMaterialItem('Mecanismos de Sopro na Insuficiência Mitral Aguda vs Crônica', 'Na fase crônica ocorre dilatação atrial progressiva mantendo pressões relativamente toleráveis; na aguda há congestão súbita.', 'Cardiologia');
-                    _addMaterialItem('Interpretação Radiológica de Consolidação Pulmonar vs Atelectasia', 'Consolidação preserva volume pulmonar e exibe broncograma aéreo; atelectasia cursa com perda de volume e desvio das fissuras.', 'Pneumologia');
+                    _addMaterialItem(
+                      'Semiologia Dermatológica: Pápula, Placa e Nódulo',
+                      'Pápula é elevação superficial < 1 cm; Placa é elevação plana em platô > 1 cm; Nódulo acomete derme profunda/hipoderme sendo mais palpável que visível.',
+                      'Dermatologia (Sistemas Humanos 2)',
+                    );
+                    _addMaterialItem(
+                      'Sinais Clínicos da Psoríase e Líquen Plano',
+                      'Na Psoríase: Sinal da vela, Sinal de Auspitz (orvalho sangrento) e Fenômeno de Koebner. No Líquen Plano: pápulas violáceas poligonais com Estrias de Wickham.',
+                      'Dermatologia (Sistemas Humanos 2)',
+                    );
+                    _addMaterialItem(
+                      'Diferencial de Eczemas: Atópica vs Seborreica',
+                      'No lactente acomete face malar poupando perioral e áreas extensoras; no adulto predomina em dobras flexurais com liquenificação.',
+                      'Dermatologia (Sistemas Humanos 2)',
+                    );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Drive sincronizado! Arquivo de 185MB compactado no dispositivo para 55MB. Arquivo >300MB ignorado.')),
+                      const SnackBar(content: Text('Drive sincronizado! 7 aulas de Dermatologia importadas para Flashcards e SCE. Livro extenso Azulay mantido de fora para poupar IA.')),
                     );
                   },
                 ),

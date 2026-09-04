@@ -196,6 +196,7 @@ class DriveFileItem {
   final bool needsCompression;
   final double compressedSizeMB;
   final String rejectionReason;
+  final bool isExtensiveBook;
 
   DriveFileItem({
     required this.id,
@@ -206,6 +207,7 @@ class DriveFileItem {
     this.needsCompression = false,
     double? compressedSizeMB,
     this.rejectionReason = '',
+    this.isExtensiveBook = false,
   }) : compressedSizeMB = compressedSizeMB ?? sizeMB;
 }
 
@@ -282,7 +284,21 @@ class DriveSyncService {
       );
     }
 
-    // Filtro 3: Faixa de 100MB a 300MB requer compactação no dispositivo
+    // Filtro 3: Detecção de livro extenso ou tratado (ex: Azulay, Tratados gerais) para poupar processamento
+    final isExtensiveBook = lowerName.contains('azulay') || lowerName.contains('tratado') || lowerName.contains('manual de') || lowerName.contains('atlas completo');
+    if (isExtensiveBook) {
+      return DriveFileItem(
+        id: id,
+        name: name,
+        sizeMB: sizeMB,
+        mimeType: mimeType,
+        isEligible: false,
+        isExtensiveBook: true,
+        rejectionReason: 'Livro-texto/tratado extenso (${sizeMB.toStringAsFixed(1)} MB). Omitido para focar nas aulas e poupar processamento.',
+      );
+    }
+
+    // Filtro 4: Faixa de 100MB a 300MB requer compactação no dispositivo
     final needsCompression = sizeMB >= minForCompressionBytes;
     final estimatedCompressed = needsCompression ? (sizeMB * 0.30) : sizeMB;
 
@@ -294,6 +310,7 @@ class DriveSyncService {
       isEligible: true,
       needsCompression: needsCompression,
       compressedSizeMB: estimatedCompressed,
+      isExtensiveBook: false,
     );
   }
 }
