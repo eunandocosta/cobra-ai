@@ -1,0 +1,1 @@
+[Context: Você é um auditor sênior de se...] [Simulated Response from gemini-3.7-flash] Processed request: "Você é um Engenheiro de Segurança e especialista em conformidade com LGPD e dado..."

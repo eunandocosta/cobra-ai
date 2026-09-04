@@ -1,0 +1,1 @@
+[Context: Você é uma QA lead focada em t...] [Simulated Response from gemini-3.7-flash] Processed request: "Você é uma Engenheira de QA sênior especializada em testes para aplicativos Flut..."

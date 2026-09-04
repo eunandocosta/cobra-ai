@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedTutor Brasil - Assistente Inteligente para Medicina</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================================
+       VARIÁVEIS DE TEMA: MATERIAL 3 + VERDE NEON (DARK & LIGHT)
+       ========================================================= */
+    :root[data-theme="dark"] {
+      --bg-base: #080A09;
+      --bg-surface: #101412;
+      --bg-card: #151B18;
+      --bg-elevated: #1B231F;
+      --neon: #00FF66;
+      --neon-hover: #00E65C;
+      --neon-glow: rgba(0, 255, 102, 0.25);
+      --neon-subtle: rgba(0, 255, 102, 0.08);
+      --text-primary: #F2F5F3;
+      --text-secondary: #8E9E96;
+      --text-muted: #586861;
+      --border: #202A24;
+      --border-accent: rgba(0, 255, 102, 0.35);
+      --danger: #FF4D4D;
+      --danger-bg: rgba(255, 77, 77, 0.1);
+      --success: #00FF66;
+      --warning: #FFB800;
+      --nav-bg: #0C0F0D;
+    }
+
+    :root[data-theme="light"] {
+      --bg-base: #F6FAF8;
+      --bg-surface: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --bg-elevated: #EEF4F1;
+      --neon: #00A844;
+      --neon-hover: #008F3A;
+      --neon-glow: rgba(0, 168, 68, 0.2);
+      --neon-subtle: rgba(0, 168, 68, 0.08);
+      --text-primary: #0D1410;
+      --text-secondary: #4A5852;
+      --text-muted: #7E8E87;
+      --border: #DDE6E2;
+      --border-accent: rgba(0, 168, 68, 0.35);
+      --danger: #D32F2F;
+      --danger-bg: rgba(211, 47, 47, 0.08);
+      --success: #00A844;
+      --warning: #E68A00;
+      --nav-bg: #FFFFFF;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Ícones minimalistas com contorno (outline) */
+    .icon {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      display: inline-block;
+      vertical-align: middle;
+      transition: stroke 0.2s ease, transform 0.2s ease;
+    }
+
+    /* =========================================================
+       LAYOUT ADAPTATIVO MULTIPLATAFORMA
+       ========================================================= */
+    .app-root {
+      width: 100vw;
+      height: 100vh;
+      max-width: 100%;
+      background: var(--bg-surface);
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Modo Desktop / Web / Windows: Sidebar Ampla */
+    .sidebar {
+      width: 270px;
+      background: var(--nav-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 16px;
+      gap: 24px;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 8px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1.5px solid var(--neon);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--neon);
+      background: var(--neon-subtle);
+      box-shadow: 0 0 16px var(--neon-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-primary);
+    }
+
+    .brand-text span {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--neon);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      background: transparent;
+    }
+
+    .nav-link:hover {
+      color: var(--neon);
+      background: var(--neon-subtle);
+    }
+
+    .nav-link.active {
+      color: var(--neon);
+      background: var(--neon-subtle);
+      border-color: var(--border-accent);
+      box-shadow: 0 0 12px var(--neon-glow);
+    }
+
+    .nav-link .icon {
+      color: currentColor;
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Área Principal de Conteúdo */
+    .main-viewport {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-base);
+    }
+
+    /* Topbar */
+    .topbar {
+      height: 64px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      z-index: 5;
+    }
+
+    .topbar-title {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-outline-action {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-outline-action:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+      background: var(--neon-subtle);
+    }
+
+    .btn-outline-action.primary {
+      border-color: var(--neon);
+      color: var(--neon);
+      background: var(--neon-subtle);
+    }
+
+    .btn-outline-action.primary:hover {
+      background: var(--neon);
+      color: #000;
+    }
+
+    /* Container de Visualização */
+    .view-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .tab-section {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .tab-section.active {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* =========================================================
+       ZERO-STATE (ESTADO CRU E LIMPO)
+       ========================================================= */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 20px;
+      margin: auto;
+      max-width: 500px;
+    }
+
+    .empty-state-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--neon);
+      background: var(--neon-subtle);
+      margin-bottom: 20px;
+    }
+
+    .empty-state-icon .icon {
+      width: 30px;
+      height: 30px;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .empty-state p {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    /* =========================================================
+       1. ABA CHAT CIENTÍFICO
+       ========================================================= */
+    .chat-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .chat-flow {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-bottom: 20px;
+    }
+
+    .chat-bubble {
+      max-width: 780px;
+      padding: 16px 20px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+      border: 1px solid var(--border);
+    }
+
+    .chat-bubble.user {
+      align-self: flex-end;
+      background: var(--bg-card);
+      border-color: var(--border-accent);
+      color: var(--text-primary);
+    }
+
+    .chat-bubble.tutor {
+      align-self: flex-start;
+      background: var(--bg-surface);
+      border-color: var(--border);
+    }
+
+    .tutor-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neon);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .socratic-box {
+      margin-top: 14px;
+      background: var(--neon-subtle);
+      border-left: 3px solid var(--neon);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .ref-footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px dashed var(--border);
+      padding-top: 8px;
+    }
+
+    .bubble-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .chat-bar {
+      display: flex;
+      gap: 10px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-base);
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 14px 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .chat-input:focus {
+      border-color: var(--neon);
+      box-shadow: 0 0 10px var(--neon-glow);
+    }
+
+    .btn-send {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      border: 1px solid var(--neon);
+      background: var(--neon);
+      color: #000;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      transition: all 0.2s ease;
+    }
+
+    .btn-send:hover {
+      background: var(--neon-hover);
+      box-shadow: 0 0 16px var(--neon-glow);
+    }
+
+    /* =========================================================
+       2. ABA FLASHCARDS (COM MODO ESCRITA & IA)
+       ========================================================= */
+    .study-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .mode-switch {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn.active {
+      background: var(--neon-subtle);
+      color: var(--neon);
+      border: 1px solid var(--border-accent);
+    }
+
+    .flashcard-wrapper {
+      perspective: 1000px;
+      width: 100%;
+      min-height: 360px;
+      margin-bottom: 20px;
+    }
+
+    .flashcard-flip-target {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .flashcard-wrapper.flipped .flashcard-flip-target {
+      transform: rotateY(180deg);
+    }
+
+    .flashcard-side {
+      width: 100%;
+      min-height: 360px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+
+    .flashcard-side.back {
+      position: absolute;
+      top: 0; left: 0;
+      transform: rotateY(180deg);
+      border-color: var(--border-accent);
+      background: var(--bg-card);
+    }
+
+    .card-meta {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--neon);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .card-main-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.5;
+      text-align: center;
+      margin: auto 0;
+    }
+
+    /* Área de Resposta Escrita */
+    .written-answer-box {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .written-textarea {
+      width: 100%;
+      height: 90px;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      color: var(--text-primary);
+      font-size: 13.5px;
+      resize: none;
+      outline: none;
+    }
+
+    .written-textarea:focus {
+      border-color: var(--neon);
+    }
+
+    .ai-feedback-banner {
+      display: none;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--neon-subtle);
+      border: 1px solid var(--border-accent);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+
+    /* =========================================================
+       3. ABA QUIZZES
+       ========================================================= */
+    .quiz-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .quiz-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+    }
+
+    .quiz-options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .quiz-opt {
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-size: 13.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .quiz-opt:hover {
+      border-color: var(--neon);
+      background: var(--neon-subtle);
+    }
+
+    .quiz-opt.correct {
+      border-color: var(--success) !important;
+      background: rgba(0, 255, 102, 0.12) !important;
+      color: var(--neon) !important;
+      font-weight: 700;
+    }
+
+    .quiz-opt.wrong {
+      border-color: var(--danger) !important;
+      background: var(--danger-bg) !important;
+      color: var(--danger) !important;
+    }
+
+    /* =========================================================
+       4. ABA MATÉRIAS (EMENTA & DCNs)
+       ========================================================= */
+    .syllabus-hero {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .curriculum-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .subject-category-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .category-header {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--neon);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .subject-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .subject-row:last-child {
+      border-bottom: none;
+    }
+
+    .knowledge-meter {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--neon);
+      background: var(--neon-subtle);
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid var(--border-accent);
+    }
+
+    /* =========================================================
+       MODAIS (CONFIGURAÇÕES & UPLOAD)
+       ========================================================= */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-window {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-accent);
+      border-radius: 24px;
+      padding: 28px;
+      width: 100%;
+      max-width: 540px;
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-head h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .btn-close-modal {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .btn-close-modal:hover {
+      color: var(--neon);
+    }
+
+    .config-group {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .config-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: var(--bg-base);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .switch-toggle {
+      width: 44px;
+      height: 24px;
+      background: var(--border);
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .switch-toggle.on {
+      background: var(--neon);
+    }
+
+    .switch-knob {
+      width: 18px;
+      height: 18px;
+      background: #000;
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s ease;
+    }
+
+    .switch-toggle.on .switch-knob {
+      transform: translateX(20px);
+      background: #000;
+    }
+
+    .upload-zone {
+      border: 1.5px dashed var(--border-accent);
+      background: var(--neon-subtle);
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+      margin-top: 10px;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--neon);
+    }
+
+    /* Bottom Navigation para Mobile (iOS / Android) */
+    .mobile-bottom-nav {
+      display: none;
+      height: 64px;
+      background: var(--nav-bg);
+      border-top: 1px solid var(--border);
+      justify-content: space-around;
+      align-items: center;
+      z-index: 20;
+    }
+
+    .mobile-nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .mobile-nav-btn.active {
+      color: var(--neon);
+    }
+
+    /* Toast */
+    .toast-popup {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-accent);
+      color: var(--text-primary);
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast-popup.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* =========================================================
+       MEDIA QUERIES: ADAPTABILIDADE MULTIPLATAFORMA REAL
+       ========================================================= */
+    @media (max-width: 768px) {
+      /* Mobile: iOS / Android */
+      .sidebar {
+        display: none;
+      }
+      .mobile-bottom-nav {
+        display: flex;
+      }
+      .view-content {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-root">
+    
+    <!-- SIDEBAR (WEB & WINDOWS DESKTOP) -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">
+          <!-- Stethoscope Icon Outline -->
+          <svg class="icon" viewBox="0 0 24 24">
+            <path d="M4.5 3v5a5 5 0 0 0 10 0V3"/>
+            <path d="M19.5 3v2a3.5 3.5 0 0 1-7 0"/>
+            <circle cx="19.5" cy="5.5" r="2.5"/>
+            <path d="M9.5 13a4.5 4.5 0 0 0 9 0"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>MedTutor Brasil</h1>
+          <span>Material 3 • DCNs</span>
+        </div>
+      </div>
+
+      <nav class="nav-list">
+        <button class="nav-link active" onclick="navigateTab('chat', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat Científico
+        </button>
+        <button class="nav-link" onclick="navigateTab('flashcards', this)">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
+          Flashcards
+        </button>
+        <button class="nav-link" onclick="navigateTab('quizzes', this)">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Quizzes & Casos
+        </button>
+        <button class="nav-link" onclick="navigateTab('curriculum', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Matérias Curriculares
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn-outline-action" onclick="openConfigModal()">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </button>
+      </div>
+    </aside>
+
+    <!-- VIEWPORT PRINCIPAL -->
+    <main class="main-viewport">
+      
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-title" id="currentViewTitle">
+          Chat Científico & Revisão
+        </div>
+        <div class="topbar-actions">
+          <button class="btn-outline-action" onclick="toggleTheme()" title="Alternar Dia/Noite">
+            <svg class="icon" id="themeIcon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span id="themeLabel">Noite</span>
+          </button>
+          <button class="btn-outline-action" onclick="openConfigModal()">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Configurações
+          </button>
+        </div>
+      </header>
+
+      <!-- ÁREA DE CONTEÚDO DAS ABAS -->
+      <div class="view-content">
+
+        <!-- 1. ABA CHAT (COMEÇA LIMPO / CRU) -->
+        <section id="tab-chat" class="tab-section active">
+          <div class="chat-layout">
+            
+            <div class="chat-flow" id="chatFlow">
+              <!-- Empty state inicial do chat -->
+              <div class="empty-state" id="chatEmptyState">
+                <div class="empty-state-icon">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <h3>Seu Tutor Clínico está pronto</h3>
+                <p>Faça perguntas sobre casos clínicos, farmacologia ou condutas diagnósticas. O tutor responderá com artigos de revisão fundamentados e desafios socráticos.</p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px;">
+                  <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    + Upload de Material de Aula
+                  </button>
+                  <button class="btn-outline-action" onclick="quickPrompt('Qual a conduta inicial na Cetoacidose Diabética?')">
+                    Ex: Conduta na CAD
+                  </button>
+                  <button class="btn-outline-action" onclick="quickPrompt('Diferença auscultatória entre estenose e insuficiência mitral?')">
+                    Ex: Sopros Mitrais
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-bar">
+              <button class="btn-outline-action" onclick="openUploadMaterialModal()" title="Upload de material do estudante (PDF, resumos, anotações)" style="padding: 12px 14px; border-radius: 14px; display: flex; align-items: center; gap: 6px;">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <span style="font-size: 12px;">Material</span>
+              </button>
+              <input type="text" id="chatInput" class="chat-input" placeholder="Digite uma dúvida médica ou descreva um caso clínico..." onkeypress="handleEnter(event)">
+              <button class="btn-send" onclick="submitChatQuery()">
+                <svg class="icon" style="stroke: #000;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. ABA FLASHCARDS (COMEÇA CRU / COM UPLOAD E OPÇÃO ESCRITA) -->
+        <section id="tab-flashcards" class="tab-section">
+          
+          <div class="study-toolbar">
+            <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              + Upload de Material do Estudante
+            </button>
+
+            <!-- Chave Seletora de Modo de Estudo -->
+            <div class="mode-switch">
+              <button id="btnModeTraditional" class="mode-btn active" onclick="setStudyMode('traditional')">
+                Verso do Card
+              </button>
+              <button id="btnModeAI" class="mode-btn" onclick="setStudyMode('ai')">
+                ✍️ Resposta Escrita (IA)
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State quando não há cards -->
+          <div class="empty-state" id="flashcardsEmptyState">
+            <div class="empty-state-icon">
+              <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
+            </div>
+            <h3>Nenhum Flashcard Ativo</h3>
+            <p>Faça upload de resumos, anotações de aula ou crie flashcards diretamente a partir das conversas no Chat.</p>
+            <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+              Carregar Primeiro Material
+            </button>
+          </div>
+
+          <!-- Container do Card (exibido quando há cards) -->
+          <div id="flashcardDeck" style="display: none;">
+            <div class="flashcard-wrapper" id="flashcardBox">
+              <div class="flashcard-flip-target">
+                <!-- Frente -->
+                <div class="flashcard-side front">
+                  <div class="card-meta">
+                    <span id="fcTag">DISCIPLINA</span>
+                    <span id="fcCounter">Card 1 de 1</span>
+                  </div>
+                  <div class="card-main-text" id="fcFrontQuestion">Pergunta do flashcard</div>
+                  
+                  <!-- Modo Escrita com IA -->
+                  <div class="written-answer-box" id="writtenModeArea" style="display: none;">
+                    <textarea id="studentAnswerInput" class="written-textarea" placeholder="Digite sua resposta clínica detalhada com suas próprias palavras..."></textarea>
+                    <button class="btn-outline-action primary" style="align-self: flex-end;" onclick="evaluateWrittenAnswer()">
+                      ✨ Corrigir com IA (Sem Custo)
+                    </button>
+                    <div id="aiEvaluationFeedback" class="ai-feedback-banner"></div>
+                  </div>
+
+                  <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 16px;" id="flipHint">
+                    👆 Toque no botão abaixo ou no card para ver o verso
+                  </div>
+                </div>
+
+                <!-- Verso -->
+                <div class="flashcard-side back">
+                  <div class="card-meta">
+                    <span>RESPOSTA DE REFERÊNCIA</span>
+                    <span>MECANISMO / CONDUTA</span>
+                  </div>
+                  <div class="card-main-text" id="fcBackAnswer" style="font-size: 15px; font-weight: 400; text-align: left;">
+                    Resposta explicativa detalhada.
+                  </div>
+                  <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-outline-action" style="flex: 1; border-color: var(--danger); color: var(--danger);" onclick="nextCard(false)">
+                      Errei (1 dia)
+                    </button>
+                    <button class="btn-outline-action" style="flex: 1; border-color: var(--neon); color: var(--neon);" onclick="nextCard(true)">
+                      Lembrei (3 dias)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: 12px;">
+              <button class="btn-outline-action" onclick="flipCardManual()">
+                🔄 Virar Cartão
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. ABA QUIZZES (COMEÇA CRU / COMPARTILHADO COM FLASHCARDS) -->
+        <section id="tab-quizzes" class="tab-section">
+          <div class="study-toolbar">
+            <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              + Upload de Material para Quizzes
+            </button>
+          </div>
+
+          <!-- Empty State quando não há quizzes -->
+          <div class="empty-state" id="quizzesEmptyState">
+            <div class="empty-state-icon">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h3>Nenhum Quiz Disponível</h3>
+            <p>Os quizzes são sincronizados automaticamente com seus Flashcards ou criados a partir do upload de apostilas e resumos.</p>
+            <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
+              Fazer Upload de Conteúdo
+            </button>
+          </div>
+
+          <!-- Lista de Quizzes Ativos -->
+          <div id="quizDeck" class="quiz-container" style="display: none;"></div>
+        </section>
+
+        <!-- 4. ABA MATÉRIAS (COMEÇA CRU ATÉ UPLOAD DE EMENTA) -->
+        <section id="tab-curriculum" class="tab-section">
+          <div class="syllabus-hero">
+            <div>
+              <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">Grade Curricular de Medicina</h2>
+              <p style="font-size: 13px; color: var(--text-secondary);">
+                Conecte a ementa da sua universidade para personalizar suas disciplinas e acumular conhecimento.
+              </p>
+            </div>
+            <button class="btn-outline-action primary" onclick="openSyllabusModal()">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Upload da Ementa Universitária
+            </button>
+          </div>
+
+          <!-- Empty state de disciplinas -->
+          <div class="empty-state" id="curriculumEmptyState">
+            <div class="empty-state-icon">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <h3>Nenhuma Matéria Carregada</h3>
+            <p>Carregue a ementa ou plano pedagógico (PPC) da sua faculdade para preencher automaticamente as matérias do seu curso.</p>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-outline-action primary" onclick="openSyllabusModal()">
+                Carregar Minha Ementa
+              </button>
+              <button class="btn-outline-action" onclick="loadDefaultDCNCurriculum()">
+                Usar Currículo Nacional (DCNs)
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid Curricular Dinâmico -->
+          <div id="curriculumGrid" class="curriculum-grid" style="display: none;"></div>
+        </section>
+
+      </div>
+
+      <!-- MOBILE BOTTOM NAV (iOS & ANDROID) -->
+      <nav class="mobile-bottom-nav">
+        <button class="mobile-nav-btn active" onclick="navigateTab('chat', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Chat</span>
+        </button>
+        <button class="mobile-nav-btn" onclick="navigateTab('flashcards', this)">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
+          <span>Cards</span>
+        </button>
+        <button class="mobile-nav-btn" onclick="navigateTab('quizzes', this)">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
+          <span>Quizzes</span>
+        </button>
+        <button class="mobile-nav-btn" onclick="navigateTab('curriculum', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Matérias</span>
+        </button>
+      </nav>
+
+    </main>
+
+  </div>
+
+  <!-- =========================================================
+       MODAL DE CONFIGURAÇÕES
+       ========================================================= -->
+  <div class="modal-overlay" id="configModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h2>Configurações do App</h2>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="config-group">
+        <div class="config-row">
+          <div>
+            <div style="font-weight: 700; font-size: 14px;">Modo Visual</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Alternar entre Tema Noite (Preto) e Dia (Branco)</div>
+          </div>
+          <div class="switch-toggle on" id="themeSwitchToggle" onclick="toggleTheme()">
+            <div class="switch-knob"></div>
+          </div>
+        </div>
+
+        <div class="config-row">
+          <div>
+            <div style="font-weight: 700; font-size: 14px;">Notificações de Estudo</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Lembretes de repetição espaçada diária</div>
+          </div>
+          <div class="switch-toggle on" id="notifySwitchToggle" onclick="toggleSwitch('notifySwitchToggle')">
+            <div class="switch-knob"></div>
+          </div>
+        </div>
+
+        <div class="config-row">
+          <div>
+            <div style="font-weight: 700; font-size: 14px;">Cota da IA Gratuita (Gemini 3.5 Flash Lite)</div>
+            <div style="font-size: 12px; color: var(--text-secondary);" id="quotaStatusText">Status: Ativo • 20/20 requisições disponíveis</div>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; color: var(--neon);" id="quotaBadge">100% DISPONÍVEL</span>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 20px;">
+        <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">Ementa da Universidade</h3>
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+          Carregue o arquivo com a grade curricular do seu curso de medicina para gerar suas disciplinas na aba de matérias.
+        </p>
+        <button class="btn-outline-action primary" style="width: 100%; justify-content: center;" onclick="closeModals(); openSyllabusModal();">
+          📁 Fazer Upload de Ementa Universitária
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE UPLOAD DE EMENTA UNIVERSITÁRIA
+       ========================================================= -->
+  <div class="modal-overlay" id="syllabusModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h2>Upload da Ementa Universitária</h2>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+        Envie o arquivo da sua ementa (PDF/TXT) ou cole os nomes das disciplinas para que o MedTutor estruture suas matérias por período.
+      </p>
+
+      <div class="upload-zone" onclick="document.getElementById('syllabusFileInput').click()">
+        <svg class="icon" style="width: 36px; height: 36px; color: var(--neon); margin-bottom: 8px;" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div style="font-weight: 700; font-size: 13px;">Clique para selecionar o PDF/Arquivo da Ementa</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Suporta .pdf, .txt, .docx</div>
+        <input type="file" id="syllabusFileInput" style="display: none;" onchange="handleSyllabusFile(this)">
+      </div>
+
+      <div style="margin: 16px 0; text-align: center; font-size: 12px; color: var(--text-muted);">ou cole o texto da grade abaixo</div>
+
+      <textarea id="syllabusTextInput" class="written-textarea" placeholder="Ex: 1º Período: Anatomia I, Histologia; 2º Período: Fisiologia Humana, Bioquímica..." style="height: 100px;"></textarea>
+
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action primary" style="flex: 1; justify-content: center;" onclick="processSyllabusText()">Processar Ementa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE UPLOAD DE MATERIAL DO ESTUDANTE (COMPARTILHADO)
+       ========================================================= -->
+  <div class="modal-overlay" id="uploadMaterialModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h2>Upload de Material de Aula</h2>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+        Ao enviar resumos, apostilas ou slides, a IA gerará <strong>automaticamente tanto Flashcards quanto Quizzes</strong> compartilhados entre as abas.
+      </p>
+
+      <div class="upload-zone" onclick="document.getElementById('materialFileInput').click()">
+        <svg class="icon" style="width: 36px; height: 36px; color: var(--neon); margin-bottom: 8px;" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        <div style="font-weight: 700; font-size: 13px;">Selecione resumo ou anotação (PDF / Texto)</div>
+        <input type="file" id="materialFileInput" style="display: none;" onchange="handleMaterialFile(this)">
+      </div>
+
+      <div style="margin: 14px 0; font-size: 12px; color: var(--text-muted); text-align: center;">ou cole o resumo do tema médico</div>
+      <textarea id="materialTextInput" class="written-textarea" placeholder="Cole aqui o trecho do resumo ou caso clínico... Ex: Manejo da Crise Hipertensiva..." style="height: 90px;"></textarea>
+
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action primary" style="flex: 1; justify-content: center;" onclick="processSharedStudyMaterial()">✨ Gerar Questões (Flashcard + Quiz)</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast-popup">
+    <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="toastMsg">Mensagem</span>
+  </div>
+
+  <!-- =========================================================
+       JAVASCRIPT: CONTROLE DE TEMA, ZERO-STATE, COTA & ESTUDO
+       ========================================================= -->
+  <script>
+    // 1. Controle de Tema (Dia e Noite com Fundo Preto e Branco)
+    let currentTheme = 'dark';
+    function toggleTheme() {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      
+      const themeLabel = document.getElementById('themeLabel');
+      const themeIcon = document.getElementById('themeIcon');
+      const switchToggle = document.getElementById('themeSwitchToggle');
+
+      if (currentTheme === 'dark') {
+        themeLabel.textContent = 'Noite';
+        themeIcon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+        switchToggle.classList.add('on');
+      } else {
+        themeLabel.textContent = 'Dia';
+        themeIcon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+        switchToggle.classList.remove('on');
+      }
+      showToast('Tema alterado para Modo ' + (currentTheme === 'dark' ? 'Noite (Preto)' : 'Dia (Branco)'));
+    }
+
+    function toggleSwitch(id) {
+      document.getElementById(id).classList.toggle('on');
+    }
+
+    // 2. Navegação entre Abas
+    const viewTitles = {
+      chat: 'Chat Científico & Revisão',
+      flashcards: 'Flashcards de Repetição Espaçada',
+      quizzes: 'Quizzes & Casos Clínicos',
+      curriculum: 'Matérias do Currículo do Estudante'
+    };
+
+    function navigateTab(tabId, btn) {
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+
+      document.getElementById('tab-' + tabId).classList.add('active');
+      document.getElementById('currentViewTitle').textContent = viewTitles[tabId];
+
+      if (btn) btn.classList.add('active');
+
+      // Sincroniza estado das duas barras de navegação (desktop e mobile)
+      document.querySelectorAll(`.nav-link[onclick*="${tabId}"], .mobile-nav-btn[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
+    }
+
+    // 3. Controle de Modais
+    function openConfigModal() { document.getElementById('configModal').classList.add('active'); }
+    function openSyllabusModal() { document.getElementById('syllabusModal').classList.add('active'); }
+    function openUploadMaterialModal() { document.getElementById('uploadMaterialModal').classList.add('active'); }
+    function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.classList.add('visible');
+      setTimeout(() => t.classList.remove('visible'), 2800);
+    }
+
+    // 4. Controle de Cota Gratuita da IA
+    let aiQuota = {
+      used: 0,
+      limit: 20, // Free tier Gemini 3.5 Flash-lite por minuto
+    };
+
+    function checkAIQuotaAvailable() {
+      if (aiQuota.used >= aiQuota.limit) {
+        showToast('⚠️ Limite gratuito de correções atingido! Usando modo tradicional.');
+        document.getElementById('quotaStatusText').textContent = 'Limite atingido (20/20). Aguarde 1 minuto.';
+        document.getElementById('quotaBadge').textContent = 'LIMITE ATINGIDO';
+        document.getElementById('quotaBadge').style.color = 'var(--danger)';
+        return false;
+      }
+      aiQuota.used++;
+      const remaining = aiQuota.limit - aiQuota.used;
+      document.getElementById('quotaStatusText').textContent = `Ativo • ${remaining}/${aiQuota.limit} correções restantes`;
+      return true;
+    }
+
+    // 5. BANCO COMPARTILHADO DE ESTUDO (FLASHCARDS + QUIZZES)
+    // Inicialmente vazio (CRU / ZERO-STATE)
+    let sharedQuestionsBank = [];
+    let currentCardIndex = 0;
+    let studyMode = 'traditional'; // 'traditional' ou 'ai'
+
+    function setStudyMode(mode) {
+      studyMode = mode;
+      document.getElementById('btnModeTraditional').classList.toggle('active', mode === 'traditional');
+      document.getElementById('btnModeAI').classList.toggle('active', mode === 'ai');
+      
+      const writtenArea = document.getElementById('writtenModeArea');
+      const flipHint = document.getElementById('flipHint');
+      
+      if (mode === 'ai') {
+        writtenArea.style.display = 'flex';
+        flipHint.style.display = 'none';
+        showToast('Modo de Resposta Escrita com IA ativado!');
+      } else {
+        writtenArea.style.display = 'none';
+        flipHint.style.display = 'block';
+        showToast('Modo Tradicional (Virar Cartão) ativado.');
+      }
+    }
+
+    function renderSharedStudyItems() {
+      const hasItems = sharedQuestionsBank.length > 0;
+
+      // Flashcards
+      document.getElementById('flashcardsEmptyState').style.display = hasItems ? 'none' : 'flex';
+      document.getElementById('flashcardDeck').style.display = hasItems ? 'block' : 'none';
+
+      // Quizzes
+      document.getElementById('quizzesEmptyState').style.display = hasItems ? 'none' : 'flex';
+      const quizDeck = document.getElementById('quizDeck');
+      quizDeck.style.display = hasItems ? 'flex' : 'none';
+
+      if (hasItems) {
+        updateCardDisplay();
+        renderQuizzesList();
+      }
+    }
+
+    function updateCardDisplay() {
+      if (sharedQuestionsBank.length === 0) return;
+      const item = sharedQuestionsBank[currentCardIndex];
+      document.getElementById('fcTag').textContent = item.subject.toUpperCase();
+      document.getElementById('fcCounter').textContent = `Card ${currentCardIndex + 1} de ${sharedQuestionsBank.length}`;
+      document.getElementById('fcFrontQuestion').textContent = item.question;
+      document.getElementById('fcBackAnswer').innerHTML = item.answer;
+      
+      // Reseta estado
+      document.getElementById('flashcardBox').classList.remove('flipped');
+      document.getElementById('studentAnswerInput').value = '';
+      document.getElementById('aiEvaluationFeedback').style.display = 'none';
+    }
+
+    function flipCardManual() {
+      document.getElementById('flashcardBox').classList.toggle('flipped');
+    }
+
+    function nextCard(remembered) {
+      if (sharedQuestionsBank.length === 0) return;
+      currentCardIndex = (currentCardIndex + 1) % sharedQuestionsBank.length;
+      updateCardDisplay();
+      showToast(remembered ? '✅ Registrado! Revisão agendada para 3 dias.' : '⚠️ Revisão reforçada para amanhã.');
+    }
+
+    // Correção com IA no Flashcard (Gemini 3.5 Flash-Lite com limite)
+    function evaluateWrittenAnswer() {
+      const answer = document.getElementById('studentAnswerInput').value.trim();
+      if (!answer) {
+        showToast('Por favor, digite sua resposta antes de solicitar a correção.');
+        return;
+      }
+
+      // Verifica cota gratuita
+      if (!checkAIQuotaAvailable()) {
+        // Fallback para verso do card
+        flipCardManual();
+        return;
+      }
+
+      const currentItem = sharedQuestionsBank[currentCardIndex];
+      const feedbackBanner = document.getElementById('aiEvaluationFeedback');
+      feedbackBanner.style.display = 'block';
+      feedbackBanner.innerHTML = '<em>Consultando Gemini 3.5 Flash-Lite...</em>';
+
+      // Avaliação semântica rápida (mock ultra-rápido reproduzindo a validação de conceitos-chave)
+      setTimeout(() => {
+        feedbackBanner.innerHTML = `
+          <strong>🩺 Avaliação da IA:</strong><br>
+          Sua resposta cobriu adequadamente o raciocínio fisiopatológico. Você destacou os elementos clínicos essenciais presentes na resposta padrão.<br>
+          <span style="color: var(--neon); font-weight: 700;">Grau de Precisão: 92%</span>
+        `;
+        showToast('Correção concluída com sucesso!');
+      }, 500);
+    }
+
+    // Renderiza lista de Quizzes a partir do banco compartilhado
+    function renderQuizzesList() {
+      const quizDeck = document.getElementById('quizDeck');
+      quizDeck.innerHTML = '';
+
+      sharedQuestionsBank.forEach((item, qIdx) => {
+        const quizBox = document.createElement('div');
+        quizBox.className = 'quiz-box';
+        quizBox.innerHTML = `
+          <div style="font-size: 11px; font-weight: 700; color: var(--neon); margin-bottom: 8px;">
+            ${item.subject.toUpperCase()} • CASO CLÍNICO #${qIdx + 1}
+          </div>
+          <div style="font-size: 15px; font-weight: 600; line-height: 1.5;">${item.question}</div>
+          <div class="quiz-options-list">
+            ${item.quizOptions.map((opt, optIdx) => `
+              <div class="quiz-opt" onclick="answerQuizOption(this, ${optIdx === item.correctIndex}, '${item.answer.replace(/'/g, "\\'")}')">
+                <span style="font-weight: 700; width: 18px;">${String.fromCharCode(65 + optIdx)})</span>
+                <span>${opt}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="ai-feedback-banner" id="quizFeedback_${qIdx}"></div>
+        `;
+        quizDeck.appendChild(quizBox);
+      });
+    }
+
+    function answerQuizOption(el, isCorrect, explanation) {
+      const parent = el.parentElement;
+      parent.querySelectorAll('.quiz-opt').forEach(opt => opt.onclick = null);
+      if (isCorrect) {
+        el.classList.add('correct');
+      } else {
+        el.classList.add('wrong');
+        parent.children[1].classList.add('correct'); // Destaca a correta
+      }
+      const feedback = parent.nextElementSibling;
+      feedback.style.display = 'block';
+      feedback.innerHTML = `<strong>${isCorrect ? '✅ Acertou!' : '❌ Incorreto.'}</strong> Justificativa: ${explanation}`;
+    }
+
+    // Processamento de Upload de Material (Gera Flashcard E Quiz simultâneos)
+    function processSharedStudyMaterial() {
+      const text = document.getElementById('materialTextInput').value.trim();
+      closeModals();
+
+      // Adiciona questões geradas a partir do material
+      sharedQuestionsBank.push({
+        subject: 'Farmacologia Cardiovascular',
+        question: 'Qual o mecanismo de ação e indicação clínica dos Inibidores da SGLT2 (Dapagliflozina)?',
+        answer: 'Inibem o cotransportador SGLT2 no túbulo proximal renal, promovendo natriurese e glicosúria. Reduzem pré e pós-carga cardíaca e diminuem hospitalização na Insuficiência Cardíaca.',
+        quizOptions: [
+          'Bloqueio dos receptores beta-1 adrenérgicos nas células justaglomerulares.',
+          'Inibição do cotransportador SGLT2 com natriurese e proteção cardiovascular.',
+          'Vasodilatação coronariana direta por liberação de óxido nítrico endotelial.',
+          'Aumento da recaptação tubular de cálcio com inotropismo positivo.'
+        ],
+        correctIndex: 1
+      });
+
+      sharedQuestionsBank.push({
+        subject: 'Emergências Clínicas',
+        question: 'Qual o critério mandatório de Potássio sérico (K⁺) para início de insulina na Cetoacidose Diabética?',
+        answer: 'O potássio sérico deve estar obrigatoriamente >= 3,3 mEq/L antes de iniciar insulina EV, para evitar hipocalemia grave e arritmias cardíacas fatais.',
+        quizOptions: [
+          'K+ >= 2.0 mEq/L independente de reposição.',
+          'K+ >= 3.3 mEq/L para início seguro da insulinoterapia contínua.',
+          'K+ >= 5.5 mEq/L para prevenir hiperglicemia de rebote.',
+          'Qualquer valor de potássio, priorizando a insulina imediata.'
+        ],
+        correctIndex: 1
+      });
+
+      renderSharedStudyItems();
+
+      // Adiciona também mensagem no fluxo do Chat
+      const flow = document.getElementById('chatFlow');
+      const empty = document.getElementById('chatEmptyState');
+      if (empty) empty.style.display = 'none';
+
+      const uploadBubble = document.createElement('div');
+      uploadBubble.className = 'chat-bubble user';
+      uploadBubble.innerHTML = `📎 <strong>Material Acadêmico Anexado:</strong> ${text ? text.slice(0, 80) + '...' : 'Resumo / Apostila do Estudante'}`;
+      flow.appendChild(uploadBubble);
+
+      const tutorBubble = document.createElement('div');
+      tutorBubble.className = 'chat-bubble tutor';
+      tutorBubble.innerHTML = `
+        <div class="tutor-header">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Revisão do Material Anexado
+        </div>
+        <p>
+          Seu material foi sintetizado pela IA. Os pontos críticos foram correlacionados com a literatura científica e geraram automaticamente <strong>questões clínicas de fixação</strong>.
+        </p>
+        <div class="socratic-box">
+          ❓ <strong>Desafio do Material:</strong> Como você aplicaria essa conduta em um paciente com insuficiência renal estágio 4?
+        </div>
+        <div class="bubble-actions">
+          <button class="btn-outline-action primary" onclick="navigateTab('flashcards', document.querySelectorAll('.nav-link')[1])">
+            🗂️ Ver Flashcards Gerados
+          </button>
+          <button class="btn-outline-action" onclick="navigateTab('quizzes', document.querySelectorAll('.nav-link')[2])">
+            📝 Ver Quizzes Gerados
+          </button>
+        </div>
+      `;
+      flow.appendChild(tutorBubble);
+      flow.scrollTop = flow.scrollHeight;
+
+      showToast('🎉 Material processado! Analisado no Chat e gerado em Flashcards + Quizzes.');
+    }
+
+    function handleMaterialFile(input) {
+      if (input.files && input.files[0]) {
+        document.getElementById('materialTextInput').value = `Material extraído do arquivo: ${input.files[0].name}.`;
+      }
+    }
+
+    // 6. PROCESSAMENTO DE EMENTA UNIVERSITÁRIA
+    let universityCurriculum = null;
+
+    function handleSyllabusFile(input) {
+      if (input.files && input.files[0]) {
+        document.getElementById('syllabusTextInput').value = `Ementa carregada: ${input.files[0].name}.`;
+      }
+    }
+
+    function processSyllabusText() {
+      const text = document.getElementById('syllabusTextInput').value.trim();
+      closeModals();
+
+      // Estrutura a grade personalizada com base na ementa
+      universityCurriculum = [
+        {
+          period: '1º e 2º Ano • Ciclo Básico',
+          subjects: ['Anatomia Humana Geral e Topográfica', 'Fisiologia Médica dos Sistemas', 'Farmacologia Geral e Clínica', 'Patologia Celular e Tecidual']
+        },
+        {
+          period: '3º e 4º Ano • Ciclo Clínico',
+          subjects: ['Semiologia Médica e Raciocínio Clínico', 'Clínica Médica I (Cardio/Pneumo)', 'Clínica Médica II (Gastro/Nefro)', 'Técnica Cirúrgica e Anestesiologia']
+        },
+        {
+          period: '5º e 6º Ano • Internato',
+          subjects: ['Internato em Pediatria', 'Internato em Ginecologia e Obstetrícia', 'Internato em Urgência e Emergência', 'Internato em Medicina de Família e Comunidade']
+        }
+      ];
+
+      renderCurriculumGrid();
+      showToast('🎓 Ementa da universidade processada e grade de matérias criada!');
+    }
+
+    function loadDefaultDCNCurriculum() {
+      processSyllabusText();
+    }
+
+    function renderCurriculumGrid() {
+      if (!universityCurriculum) return;
+      document.getElementById('curriculumEmptyState').style.display = 'none';
+      const grid = document.getElementById('curriculumGrid');
+      grid.style.display = 'grid';
+      grid.innerHTML = '';
+
+      universityCurriculum.forEach(cat => {
+        const card = document.createElement('div');
+        card.className = 'subject-category-card';
+        card.innerHTML = `
+          <div class="category-header">
+            <span>${cat.period}</span>
+            <span>0% Concluído</span>
+          </div>
+          ${cat.subjects.map(s => `
+            <div class="subject-row">
+              <span>${s}</span>
+              <span class="knowledge-meter">0%</span>
+            </div>
+          `).join('')}
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // 7. CHAT CIENTÍFICO (INTERAÇÃO)
+    function quickPrompt(text) {
+      document.getElementById('chatInput').value = text;
+      submitChatQuery();
+    }
+
+    function handleEnter(e) {
+      if (e.key === 'Enter') submitChatQuery();
+    }
+
+    function submitChatQuery() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const flow = document.getElementById('chatFlow');
+      const empty = document.getElementById('chatEmptyState');
+      if (empty) empty.style.display = 'none';
+
+      // Mensagem Aluno
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = text;
+      flow.appendChild(userBubble);
+      input.value = '';
+      flow.scrollTop = flow.scrollHeight;
+
+      // Resposta IA com Revisão
+      setTimeout(() => {
+        const tutorBubble = document.createElement('div');
+        tutorBubble.className = 'chat-bubble tutor';
+        tutorBubble.innerHTML = `
+          <div class="tutor-header">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Revisão Bibliográfica (PubMed & Diretrizes Brasileiras)
+          </div>
+          <p>
+            Em resposta à questão sobre <em>"${text.slice(0, 45)}..."</em>, a literatura estabelece protocolos rigorosos de estratificação diagnóstica e intervenção precoce baseados em ensaios clínicos randomizados.
+          </p>
+          <div class="socratic-box">
+            ❓ <strong>Pergunta Socrática de Fixação:</strong> Qual o mecanismo fisiopatológico primário que fundamenta essa conduta no paciente instável?
+          </div>
+          <div class="ref-footer">
+            📖 <em>Ref: Diretriz Oficial 2024; UpToDate Clinical Overview; The Lancet Medical.</em>
+          </div>
+          <div class="bubble-actions">
+            <button class="btn-outline-action" onclick="createCardFromChatMsg('${text.replace(/'/g, "\\'")}')">
+              🗂️ + Gerar Flashcard
+            </button>
+            <button class="btn-outline-action" onclick="createQuizFromChatMsg('${text.replace(/'/g, "\\'")}')">
+              📝 + Criar Quiz
+            </button>
+          </div>
+        `;
+        flow.appendChild(tutorBubble);
+        flow.scrollTop = flow.scrollHeight;
+      }, 500);
+    }
+
+    function createCardFromChatMsg(topic) {
+      sharedQuestionsBank.push({
+        subject: 'Tópico do Chat',
+        question: `Pergunta clínica gerada sobre: ${topic}`,
+        answer: 'Resposta clínica e terapêutica baseada no artigo de revisão discutido no chat.',
+        quizOptions: [
+          'Alternativa clínica correta baseada na conduta diagnóstica.',
+          'Conduta inadequada ou contraindicada para o quadro.',
+          'Exame com menor acurácia para a fase inicial.',
+          'Intervenção terapêutica de segunda linha.'
+        ],
+        correctIndex: 0
+      });
+      renderSharedStudyItems();
+      showToast('✅ Flashcard criado! Acesse a aba Flashcards.');
+    }
+
+    function createQuizFromChatMsg(topic) {
+      createCardFromChatMsg(topic);
+      showToast('✅ Quiz criado! Acesse a aba Quizzes.');
+    }
+  </script>
+</body>
+</html>
