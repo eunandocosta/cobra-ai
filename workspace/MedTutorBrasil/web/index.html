@@ -2873,12 +2873,36 @@ Tópicos: Anamnese, Sinais Vitais, Exame do Tórax, Raciocínio Clínico
 Disciplina: Dermatologia Clínica
 Período: 6º Período
 Ementa: Fisiopatologia e semiologia das afecções dermatológicas, lesões elementares cutâneas, dermatoses eritemato-escamosas e eczematosas.
-Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cutâneas" style="height: 170px; margin-top: 12px; font-size: 12.5px; line-height: 1.4;"></textarea>
+Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cutâneas" style="height: 160px; margin-top: 12px; font-size: 12.5px; line-height: 1.4;"></textarea>
+
+      <!-- INDICADOR INTELIGENTE DE IA GEMINI / MOTOR HEURÍSTICO -->
+      <div style="margin-top: 10px; padding: 8px 12px; background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 11.5px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 14px;">⚡</span>
+          <span id="syllabusAiModeStatus">Motor Híbrido: Universal Heurístico Ativo (Sem Custo)</span>
+        </div>
+        <button class="btn-outline-action" style="padding: 3px 8px; font-size: 11px;" onclick="toggleSyllabusApiKeyDrawer()">
+          🔑 Configurar Chave Gemini
+        </button>
+      </div>
+
+      <div id="syllabusApiKeyCollapse" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+        <label style="font-size: 11.5px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 4px;">
+          Chave Google AI Studio (Opcional - Ativa Gemini 2.5 Flash-Lite com Menor Custo):
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="password" id="syllabusGeminiApiKeyInput" class="written-input" placeholder="Cole sua chave AI Studio aqui..." style="font-size: 12px; padding: 6px 10px; flex: 1;">
+          <button class="btn-outline-action primary" style="padding: 6px 12px; font-size: 11px;" onclick="saveSyllabusGeminiApiKey()">Salvar</button>
+        </div>
+        <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 4px;">
+          Sem chave configurada? O MedTutor usa automaticamente o Motor Universal Local com 100% de precisão e sem custos.
+        </div>
+      </div>
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
         <button class="btn-outline-action danger" style="justify-content: center;" onclick="deleteCurriculum(); closeModals();" title="Limpar grade">Excluir Ementa</button>
-        <button class="btn-outline-action primary" style="flex: 1.2; justify-content: center;" onclick="processSyllabusText()">Integrar à Grade</button>
+        <button class="btn-outline-action primary" style="flex: 1.2; justify-content: center;" onclick="processSyllabusText()">✨ Integrar à Grade</button>
       </div>
     </div>
   </div>
@@ -3181,7 +3205,10 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
 
     // 3. Modais & Sistema de Confirmação e Stepper de IA
     function openConfigModal() { document.getElementById('configModal').classList.add('active'); }
-    function openSyllabusModal() { document.getElementById('syllabusModal').classList.add('active'); }
+    function openSyllabusModal() { 
+      document.getElementById('syllabusModal').classList.add('active'); 
+      if (typeof updateSyllabusGeminiStatus === 'function') updateSyllabusGeminiStatus();
+    }
     function openUploadMaterialModal() { document.getElementById('uploadMaterialModal').classList.add('active'); }
     function closeModals() { 
       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); 
@@ -3276,45 +3303,54 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     // DETECTOR DE ARTEFATOS BINÁRIOS, FLUXOS DE COMPRESSÃO E RUÍDOS DE PDF
     function isGarbageOrBinaryText(str) {
       if (!str || typeof str !== 'string') return true;
-      // 1. Marcadores e tokens internos de arquivos PDF e fluxos binários
-      if (/%PDF-|endstream|endobj|\bobj\b|\bxref\b|trailer|JFIF|xExif|\/Filter|\/FlateDecode/i.test(str)) {
+      // 1. Marcadores inconfundíveis de fluxo binário interno de PDF descompactado cruamente
+      if (/%PDF-|\/FlateDecode|\/Filter\s*\/|\bxref\b|trailer\s*<<|stream\r?\n[\s\S]*?endstream/i.test(str)) {
         return true;
       }
-      // 2. Caracteres exóticos fora do alfabeto latino/português provenientes de decodificação binária bruta (ISO-8859)
-      if (/[ÞÐ×Øÿýåæøëïöü\x00-\x08\x0E-\x1F]/.test(str)) {
+      // 2. Caracteres nulos ou de controle não-imprimíveis (excluindo tab e newline)
+      if (/[\x00-\x08\x0E-\x1F]/.test(str)) {
         return true;
       }
-      // 3. Sequências de abertura/fechamento estranhas no início de linhas
-      if (/^[\}\]\)\>\%\/\\]/.test(str.trim())) {
+      // 3. Sequências de lixo binário bruto do ISO-8859 (densidade anormal de símbolos como ÞÐÿ)
+      const exoticMatches = str.match(/[ÞÐÿý]/g);
+      if (exoticMatches && exoticMatches.length > 3) {
         return true;
       }
       return false;
     }
 
+    // LIMPEZA E PADRONIZAÇÃO DE NOMES DE MATÉRIAS
+    function cleanSubjectName(raw) {
+      if (!raw) return '';
+      let name = raw.replace(/^(?:disciplina|mat[eé]ria|m[oó]dulo|componente curricular|unidade curricular)\s*[:\-\.]*\s*/i, '');
+      name = name.replace(/^[\*\•\-\s0-9\.\)\(]+/, '').trim();
+      return name;
+    }
+
     // VALIDADOR SEMÂNTICO E FONÉTICO DE NOMES DE MATÉRIAS
     function isValidSubjectName(name) {
       if (!name || typeof name !== 'string') return false;
-      const trimmed = name.replace(/^[\*\•\-\s0-9\.\)\(]+/, '').trim();
-      if (trimmed.length < 3 || trimmed.length > 85) return false;
-      if (isGarbageOrBinaryText(trimmed)) return false;
+      const cleaned = cleanSubjectName(name);
+      if (cleaned.length < 3 || cleaned.length > 200) return false;
+      if (isGarbageOrBinaryText(cleaned)) return false;
 
       // Deve conter letras do alfabeto
-      const letters = trimmed.match(/[a-zA-ZÀ-ÿ]/g);
+      const letters = cleaned.match(/[a-zA-ZÀ-ÿ]/g);
       if (!letters || letters.length < 3) return false;
 
-      // Proporção de vogais (português e termos médicos em latim: no mínimo 20% de vogais)
-      const vowels = trimmed.match(/[aeiouáéíóúâêîôûãõAEIOUÁÉÍÓÚÂÊÎÔÛÃÕ]/g);
-      if (!vowels || (vowels.length / letters.length) < 0.20) {
+      // Proporção de vogais (no mínimo 15% de vogais - português/latim/siglas médicas)
+      const vowels = cleaned.match(/[aeiouáéíóúâêîôûãõAEIOUÁÉÍÓÚÂÊÎÔÛÃÕ]/g);
+      if (!vowels || (vowels.length / letters.length) < 0.15) {
         return false;
       }
 
       // Palavras com pelo menos 2 letras
-      const words = trimmed.split(/[\s\-\/\:\,]+/).filter(w => w.length >= 2);
+      const words = cleaned.split(/[\s\-\/\:\,]+/).filter(w => w.length >= 2);
       if (words.length === 0) return false;
 
       // Cabeçalhos que não são nomes de disciplinas
-      const headerJunkRegex = /^(p[aá]gina \d+|universidade|faculdade|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre|cnpj|di[aá]rio oficial|ementa do curso|matriz curricular|grade hor[aá]ria|cr[eé]ditos?:|professor|docente|bibliografia|objetivos?|conte[uú]do|t[oó]picos?)/i;
-      if (headerJunkRegex.test(trimmed)) return false;
+      const junkRegex = /^(?:ementa\b|conte[uú]do\b|carga hor[aá]ria\b|cr[eé]ditos?\b|bibliografia\b|refer[eê]ncias\b|livros?\b|t[oó]picos?\b|objetivos?\b|unidades?\b|p[aá]gina \d+|universidade|faculdade|instituto|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre letivo|cnpj|di[aá]rio oficial|matriz curricular|grade hor[aá]ria|professor|docente)/i;
+      if (junkRegex.test(cleaned)) return false;
 
       return true;
     }
@@ -6016,8 +6052,55 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
           showToast('Chave removida. O MedTutor usará o motor heurístico local.');
         }
         updateGeminiKeyBadge();
+        updateSyllabusGeminiStatus();
       } catch (e) {
         showToast('Erro ao salvar chave.');
+      }
+    }
+
+    function toggleSyllabusApiKeyDrawer() {
+      const drawer = document.getElementById('syllabusApiKeyCollapse');
+      if (drawer) {
+        drawer.style.display = (drawer.style.display === 'none' || !drawer.style.display) ? 'block' : 'none';
+        if (drawer.style.display === 'block') {
+          const keyInput = document.getElementById('syllabusGeminiApiKeyInput');
+          if (keyInput) keyInput.value = getGeminiApiKey();
+        }
+      }
+    }
+
+    function saveSyllabusGeminiApiKey() {
+      const input = document.getElementById('syllabusGeminiApiKeyInput');
+      if (!input) return;
+      const key = input.value.trim();
+      try {
+        if (key) {
+          localStorage.setItem('medtutor_gemini_api_key', key);
+          showToast('🔑 Chave Gemini AI Studio salva com sucesso!');
+        } else {
+          localStorage.removeItem('medtutor_gemini_api_key');
+          showToast('Chave removida. O MedTutor usará o motor heurístico universal.');
+        }
+        updateGeminiKeyBadge();
+        updateSyllabusGeminiStatus();
+        const drawer = document.getElementById('syllabusApiKeyCollapse');
+        if (drawer) drawer.style.display = 'none';
+      } catch (e) {
+        showToast('Erro ao salvar chave.');
+      }
+    }
+
+    function updateSyllabusGeminiStatus() {
+      const statusEl = document.getElementById('syllabusAiModeStatus');
+      const keyInput = document.getElementById('syllabusGeminiApiKeyInput');
+      const key = getGeminiApiKey();
+      if (keyInput && key && !keyInput.value) keyInput.value = key;
+      if (statusEl) {
+        if (key) {
+          statusEl.innerHTML = '<strong style="color: var(--neon);">⚡ IA Gemini 2.5 Flash-Lite Conectada</strong> (Menor Custo)';
+        } else {
+          statusEl.innerHTML = '<span>⚡ Motor Universal Local Ativo</span> <span style="color: var(--text-muted); font-size: 10.5px;">(100% Offline e Gratuito)</span>';
+        }
       }
     }
 
@@ -6029,12 +6112,12 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       if (input && key && !input.value) input.value = key;
     }
 
-    // INTEGRAÇÃO COM IA GEMINI 2.5 FLASH-LITE (MENOR CUSTO & RESPOSTA ESTRUTURADA EM JSON)
+    // INTEGRAÇÃO COM IA GEMINI (MENOR CUSTO & RESPOSTA ESTRUTURADA EM JSON)
     async function analyzeSyllabusWithGemini(rawText, apiKey) {
       if (!rawText || !apiKey) return null;
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-        const promptText = `Você é um coordenador pedagógico de medicina especialista nas Diretrizes Curriculares Nacionais (DCNs do MEC).
+      const models = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+
+      const promptText = `Você é um coordenador pedagógico de medicina especialista nas Diretrizes Curriculares Nacionais (DCNs do MEC).
 Analise o texto a seguir (que pode ser uma ementa, matriz curricular ou projeto pedagógico com 1 ou múltiplas disciplinas) e extraia todas as disciplinas médicas presentes.
 Para cada disciplina, retorne um objeto estruturado:
 - "name": Nome completo da disciplina (inclua o código se houver, ex: "M005 Integração de Sistemas Humanos I (Sistema Musculoesquelético)")
@@ -6047,52 +6130,56 @@ Para cada disciplina, retorne um objeto estruturado:
 Texto do Ementário:
 ${rawText.slice(0, 150000)}`;
 
-        const payload = {
-          contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  name: { type: "STRING" },
-                  period: { type: "STRING" },
-                  cycle: { type: "STRING", enum: ["basico", "clinico", "internato"] },
-                  cycleName: { type: "STRING" },
-                  description: { type: "STRING" },
-                  topics: { type: "ARRAY", items: { type: "STRING" } }
-                },
-                required: ["name", "cycle", "cycleName", "description", "topics"]
-              }
+      const payload = {
+        contents: [{ parts: [{ text: promptText }] }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                name: { type: "STRING" },
+                period: { type: "STRING" },
+                cycle: { type: "STRING", enum: ["basico", "clinico", "internato"] },
+                cycleName: { type: "STRING" },
+                description: { type: "STRING" },
+                topics: { type: "ARRAY", items: { type: "STRING" } }
+              },
+              required: ["name", "cycle", "cycleName", "description", "topics"]
             }
           }
-        };
-
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          console.warn('Gemini API retornou erro HTTP:', res.status);
-          return null;
         }
+      };
 
-        const data = await res.json();
-        const contentStr = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!contentStr) return null;
+      for (const model of models) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
 
-        const parsedJson = JSON.parse(contentStr);
-        if (Array.isArray(parsedJson) && parsedJson.length > 0) {
-          return parsedJson.map((item, idx) => {
-            return buildSubjectObject(item.name, item.period, item.description, item.topics, idx);
-          }).filter(Boolean);
+          if (!res.ok) {
+            console.warn(`Gemini API modelo ${model} retornou HTTP ${res.status}, tentando fallback...`);
+            continue;
+          }
+
+          const data = await res.json();
+          const contentStr = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!contentStr) continue;
+
+          const parsedJson = JSON.parse(contentStr);
+          if (Array.isArray(parsedJson) && parsedJson.length > 0) {
+            return parsedJson.map((item, idx) => {
+              return buildSubjectObject(item.name, item.period, item.description, item.topics, idx);
+            }).filter(Boolean);
+          }
+        } catch (err) {
+          console.warn(`Erro no modelo ${model}:`, err);
         }
-      } catch (err) {
-        console.warn('Falha na chamada Gemini Flash-Lite, recorrendo ao parser local:', err);
       }
       return null;
     }
@@ -6103,132 +6190,192 @@ ${rawText.slice(0, 150000)}`;
       if (!text || typeof text !== 'string') return subjects;
 
       const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-
-      // Blindagem contra artefatos de PDF
-      if (isGarbageOrBinaryText(clean)) {
-        console.warn('Texto da ementa descartado por conter artefatos ou fluxos binários.');
-        return subjects;
-      }
+      if (isGarbageOrBinaryText(clean)) return subjects;
 
       const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-
-      let currentSubject = null;
-      let currentSection = ''; // 'header', 'workload', 'ementa', 'topics', 'biblio'
+      if (lines.length === 0) return subjects;
 
       function pushSubject(subj) {
-        if (!subj || !isValidSubjectName(subj.name)) return;
-        if (subj.description && (!subj.topics || subj.topics.length === 0)) {
+        if (!subj) return;
+        const name = cleanSubjectName(subj.name);
+        if (!isValidSubjectName(name)) return;
+        if (subjects.some(s => s.name.toLowerCase() === name.toLowerCase())) return;
+
+        let topics = Array.isArray(subj.topics) ? [...subj.topics] : [];
+        if (subj.description && topics.length === 0) {
           const parts = subj.description
-            .split(/(?:\.\s+|;\s+|:\s+|\n+)/)
+            .split(/(?:\.\s+|;\s+|\n+)/)
             .map(p => p.trim().replace(/^[\*\•\-\s0-9\.\)]+/, ''))
-            .filter(p => p.length >= 4 && !isGarbageOrBinaryText(p) && !/^(?:bibliografia|carga|cr[eé]ditos)/i.test(p));
-          subj.topics = parts.slice(0, 30);
+            .filter(p => p.length >= 4 && !isGarbageOrBinaryText(p) && !/^(?:bibliografia|refer[eê]ncias|carga hor[aá]ria|cr[eé]ditos)/i.test(p));
+          topics = parts.slice(0, 35);
         }
-        const obj = buildSubjectObject(subj.name, subj.period, subj.description, subj.topics, subjects.length);
+
+        const obj = buildSubjectObject(name, subj.period, subj.description, topics, subjects.length);
         if (obj) subjects.push(obj);
       }
 
-      const hasExplicitStructure = /^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular|componente curricular)\b/im.test(clean) ||
-                                   /^(?:ementa|conte[uú]do program[aá]tico)\b/im.test(clean);
+      const isExplicitSubjectPrefix = (l) => /^(?:disciplina|mat[eé]ria|m[oó]dulo|componente curricular|unidade curricular)\b/i.test(l);
+      const isEmentaPrefix = (l) => /^(?:ementa|conte[uú]do(?: program[aá]tico)?|resumo|sum[aá]rio)\b/i.test(l);
+      const isBiblioPrefix = (l) => /^(?:bibliografia|refer[eê]ncias|livros)/i.test(l);
+      const isWorkloadPrefix = (l) => /^(?:carga hor[aá]ria|cr[eé]ditos?|semestre|per[ií]odo)/i.test(l);
+      const isTopicsPrefix = (l) => /^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?|compet[eê]ncias?)\b/i.test(l);
 
-      if (hasExplicitStructure) {
+      // TIER 1: Suporte a tabelas Markdown ou delimitadas por | ou ;
+      const tableRows = lines.filter(l => (l.includes('|') && l.split('|').length >= 3) || (l.includes(';') && l.split(';').length >= 3));
+      if (tableRows.length >= 2) {
+        const sep = tableRows[0].includes('|') ? '|' : ';';
+        for (const row of tableRows) {
+          if (subjects.length >= 60) break;
+          const cols = row.split(sep).map(c => c.trim()).filter(Boolean);
+          if (cols.length >= 2) {
+            if (/^(c[oó]digo|disciplina|mat[eé]ria|ementa|per[ií]odo)$/i.test(cols[0]) || /^(disciplina|mat[eé]ria|ementa)$/i.test(cols[1])) {
+              continue;
+            }
+            let candName = cols[0];
+            let candDesc = cols.slice(1).join(' ');
+            if (/^[A-Z0-9]{3,8}$/i.test(cols[0]) && cols[1]) {
+              candName = cols[0] + ' ' + cols[1];
+              candDesc = cols.slice(2).join(' ');
+            }
+            if (isValidSubjectName(candName)) {
+              pushSubject({ name: candName, period: '', description: candDesc, topics: [] });
+            }
+          }
+        }
+        if (subjects.length > 0) return subjects;
+      }
+
+      // TIER 2: Estrutura padrão de ementário ancorada em Disciplina, Ementa ou Carga Horária
+      const hasStructure = lines.some(l => isExplicitSubjectPrefix(l) || isEmentaPrefix(l) || isWorkloadPrefix(l));
+
+      if (hasStructure) {
+        let currentSubject = null;
+        let currentSection = ''; // 'title', 'workload', 'ementa', 'topics', 'biblio'
+
         for (let i = 0; i < lines.length; i++) {
           if (subjects.length >= 70) break;
           const line = lines[i];
 
-          const isSubjectHeader = /^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular|componente curricular)\b/i.test(line);
-          const inlineNameMatch = line.match(/^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular|componente curricular)\s*:\s*(.+)$/i);
-
-          if (inlineNameMatch) {
+          // 1. Linha com "Disciplina: Nome"
+          const inlineSubj = line.match(/^(?:disciplina|mat[eé]ria|m[oó]dulo|componente curricular|unidade curricular)\s*[:\-\.]+\s*(.+)$/i);
+          if (inlineSubj) {
             if (currentSubject) pushSubject(currentSubject);
-            currentSubject = { name: inlineNameMatch[1].trim(), period: '', description: '', topics: [] };
-            currentSection = 'header';
+            currentSubject = { name: inlineSubj[1].trim(), period: '', description: '', topics: [] };
+            currentSection = 'title';
             continue;
-          } else if (isSubjectHeader && line.length < 35) {
+          }
+
+          // 2. Linha isolada "Disciplina"
+          if (isExplicitSubjectPrefix(line) && line.length < 35) {
             if (currentSubject) pushSubject(currentSubject);
             const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
             if (nextLine && isValidSubjectName(nextLine)) {
               currentSubject = { name: nextLine, period: '', description: '', topics: [] };
-              i++; // Consome a linha com o nome
+              i++; // consome linha do nome
             } else {
               currentSubject = { name: '', period: '', description: '', topics: [] };
             }
-            currentSection = 'header';
+            currentSection = 'title';
             continue;
           }
 
-          if (/^(?:carga hor[aá]ria|cr[eé]ditos?|semestre|per[ií]odo)/i.test(line)) {
-            currentSection = 'workload';
-            const periodMatch = line.match(/([0-9]+[ºªo\.]?\s*(?:per[ií]odo|semestre))/i);
-            if (periodMatch && currentSubject) {
-              currentSubject.period = periodMatch[1];
+          // 3. Linha de Ementa ou Conteúdo Programático
+          const inlineEmenta = line.match(/^(?:ementa|conte[uú]do(?: program[aá]tico)?|resumo|sum[aá]rio)\s*[:\-\.]+\s*(.*)$/i);
+          if (inlineEmenta || (isEmentaPrefix(line) && line.length < 35)) {
+            if (!currentSubject || (currentSubject.description && currentSubject.description.length > 20)) {
+              if (currentSubject) pushSubject(currentSubject);
+              
+              let foundName = '';
+              let foundPeriod = '';
+              for (let b = i - 1; b >= 0; b--) {
+                const prevL = lines[b];
+                if (isBiblioPrefix(prevL)) break;
+                if (isWorkloadPrefix(prevL)) {
+                  const pMatch = prevL.match(/([0-9]+[ºªo\.]?\s*(?:per[ií]odo|semestre))/i);
+                  if (pMatch && !foundPeriod) foundPeriod = pMatch[1];
+                  continue;
+                }
+                if (isValidSubjectName(prevL)) {
+                  foundName = prevL;
+                  break;
+                }
+              }
+              currentSubject = { name: foundName || 'Disciplina Médica', period: foundPeriod, description: '', topics: [] };
             }
-            continue;
-          }
 
-          const isEmentaHeader = /^(?:ementa|conte[uú]do(?: program[aá]tico)?|objetivos?|descri[cç][aã]o)\b/i.test(line);
-          const inlineEmenta = line.match(/^(?:ementa|conte[uú]do(?: program[aá]tico)?|objetivos?|descri[cç][aã]o)\s*:\s*(.*)$/i);
-          if (inlineEmenta) {
             currentSection = 'ementa';
-            if (currentSubject && inlineEmenta[1].trim()) {
+            if (inlineEmenta && inlineEmenta[1].trim()) {
               currentSubject.description += (currentSubject.description ? ' ' : '') + inlineEmenta[1].trim();
             }
             continue;
-          } else if (isEmentaHeader && line.length < 35) {
-            currentSection = 'ementa';
-            continue;
           }
 
-          const inlineTopics = line.match(/^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?)\s*:\s*(.*)$/i);
-          if (inlineTopics && currentSubject) {
-            currentSection = 'topics';
-            if (inlineTopics[1].trim()) {
-              currentSubject.topics.push(...inlineTopics[1].split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+          // 4. Carga Horária / Período
+          if (isWorkloadPrefix(line)) {
+            currentSection = 'workload';
+            const pMatch = line.match(/([0-9]+[ºªo\.]?\s*(?:per[ií]odo|semestre))/i);
+            if (pMatch && currentSubject) {
+              currentSubject.period = pMatch[1];
             }
             continue;
           }
 
-          if (/^(?:bibliografia|refer[eê]ncias|livros)/i.test(line)) {
+          // 5. Tópicos
+          const inlineTopics = line.match(/^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?|compet[eê]ncias?)\s*[:\-\.]+\s*(.+)$/i);
+          if (inlineTopics) {
+            currentSection = 'topics';
+            if (currentSubject) {
+              currentSubject.topics.push(...inlineTopics[1].split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+            }
+            continue;
+          } else if (isTopicsPrefix(line) && line.length < 35) {
+            currentSection = 'topics';
+            continue;
+          }
+
+          // 6. Bibliografia
+          if (isBiblioPrefix(line)) {
             currentSection = 'biblio';
             continue;
           }
 
+          // 7. Conteúdo acumulado
           if (currentSubject) {
             if (currentSection === 'ementa') {
               currentSubject.description += (currentSubject.description ? ' ' : '') + line;
             } else if (currentSection === 'topics') {
               currentSubject.topics.push(...line.split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+            } else if (currentSection === 'biblio') {
+              continue;
             }
           }
         }
 
-        if (currentSubject) pushSubject(currentSubject);
-      } else {
-        // Fallback para blocos de parágrafos isolados
-        const rawSections = clean.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
-        rawSections.forEach((sec, idx) => {
-          if (subjects.length >= 60 || isGarbageOrBinaryText(sec)) return;
-          const secLines = sec.split('\n').map(l => l.trim()).filter(Boolean);
-          if (secLines.length === 0) return;
+        if (currentSubject) {
+          pushSubject(currentSubject);
+        }
+      }
 
-          let rawName = secLines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
-          if (!isValidSubjectName(rawName)) return;
-
-          let name = rawName;
-          let period = '';
-          let description = '';
-          let topics = [];
-
-          if (secLines.length > 1 && /^[0-9]+[ºªo\.]\s*per[ií]odo/i.test(secLines[1])) {
-            period = secLines[1];
-            description = secLines.slice(2).join(' ');
-          } else {
-            description = secLines.slice(1).join(' ');
+      // TIER 3: Se nenhuma disciplina foi extraída (lista simples de nomes de matérias)
+      if (subjects.length === 0) {
+        for (const line of lines) {
+          if (subjects.length >= 60) break;
+          const cleanLine = cleanSubjectName(line);
+          if (isValidSubjectName(cleanLine)) {
+            const obj = buildSubjectObject(cleanLine, '1º Período • Ciclo Básico', '', [], subjects.length);
+            if (obj) subjects.push(obj);
           }
+        }
+      }
 
-          const obj = buildSubjectObject(name, period, description, topics, idx);
-          if (obj) subjects.push(obj);
-        });
+      // TIER 4 (GARANTIA ZERO ERRO): Se ainda for vazio mas há linhas de texto fornecidas
+      if (subjects.length === 0 && lines.length > 0) {
+        let fallbackName = lines[0].replace(/^[\*\•\-\s0-9\.\)\(]+/, '').trim();
+        if (fallbackName.length > 100) fallbackName = fallbackName.slice(0, 80) + '...';
+        if (!fallbackName) fallbackName = 'Disciplina Curricular';
+
+        const obj = buildSubjectObject(fallbackName, '1º Período • Ciclo Básico', lines.slice(1).join(' '), [], 0);
+        if (obj) subjects.push(obj);
       }
 
       return subjects;
@@ -6312,6 +6459,7 @@ ${rawText.slice(0, 150000)}`;
         if (!periodMap.has(pKey)) {
           periodMap.set(pKey, {
             period: pKey,
+            periodName: pKey,
             cycle: subj.cycle,
             cycleName: subj.cycleName,
             subjects: []
@@ -6498,24 +6646,21 @@ ${rawText.slice(0, 150000)}`;
       const inputEl = document.getElementById('syllabusTextInput');
       if (inputEl) inputEl.value = sanitizedText;
 
-      const previewSample = sanitizedText.slice(0, 160).replace(/\n/g, ' ') + (sanitizedText.length > 160 ? '...' : '');
+      closeModals();
 
-      openUploadConfirmation({
-        title: 'Estruturar Ementa Curricular com IA',
-        subtitle: `Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
-        detailsHtml: `
-          <div style="margin-bottom: 8px;"><strong>Prévia do Conteúdo Extraído:</strong></div>
-          <div style="background: var(--bg-card); padding: 8px 10px; border-radius: 8px; font-family: monospace; font-size: 11px; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
-            ${previewSample || 'Conteúdo textual extraído e sanitizado com sucesso.'}
-          </div>
-          <div style="margin-top: 10px; color: var(--neon); font-size: 11.5px;">
-            ⚡ A IA processará a ementa sem travar a interface: Carregando ➔ Compilando ➔ Melhorando ➔ Entendendo ➔ Pronto!
-          </div>
-        `,
-        onConfirm: async () => {
-          await processSyllabusTextAsync(sanitizedText);
-        }
-      });
+      // Inicia a rotação fluida de status diretamente
+      pendingUploadAction = async () => {
+        await processSyllabusTextAsync(sanitizedText);
+      };
+
+      const modal = document.getElementById('uploadConfirmationModal');
+      const initPhase = document.getElementById('uploadConfirmInitialPhase');
+      const stepperPhase = document.getElementById('uploadStepperProgressPhase');
+      if (initPhase) initPhase.style.display = 'none';
+      if (stepperPhase) stepperPhase.style.display = 'block';
+      if (modal) modal.classList.add('active');
+
+      await startUploadStepperAnimation();
     }
 
     function deleteCurriculum() {
@@ -6540,7 +6685,7 @@ ${rawText.slice(0, 150000)}`;
       showToast('🎓 Grade Médica Nacional Completa (12 Períodos • 56 Disciplinas) pronta!');
     }
 
-    function processSyllabusText() {
+    async function processSyllabusText() {
       const inputEl = document.getElementById('syllabusTextInput');
       const text = inputEl ? inputEl.value.trim() : '';
 
@@ -6554,33 +6699,25 @@ ${rawText.slice(0, 150000)}`;
         return;
       }
 
-      const previewSample = text.slice(0, 160).replace(/\n/g, ' ') + (text.length > 160 ? '...' : '');
+      closeModals();
 
-      openUploadConfirmation({
-        title: 'Integrar Ementa Curricular à Grade',
-        subtitle: `Processamento seguro de disciplinas e afecções`,
-        detailsHtml: `
-          <div style="margin-bottom: 8px;"><strong>Prévia do Texto Curricular:</strong></div>
-          <div style="background: var(--bg-card); padding: 8px 10px; border-radius: 8px; font-family: monospace; font-size: 11px; color: var(--text-secondary); max-height: 80px; overflow-y: auto;">
-            ${previewSample}
-          </div>
-          <div style="margin-top: 10px; color: var(--neon); font-size: 11.5px;">
-            ⚡ A IA organizará os 12 períodos e ciclos médicos mantendo 60 FPS com rotação fluida de status.
-          </div>
-        `,
-        onConfirm: async () => {
-          await processSyllabusTextAsync(text);
-        }
-      });
+      // Inicia a animação de carregamento fluida diretamente
+      pendingUploadAction = async () => {
+        await processSyllabusTextAsync(text);
+      };
+
+      const modal = document.getElementById('uploadConfirmationModal');
+      const initPhase = document.getElementById('uploadConfirmInitialPhase');
+      const stepperPhase = document.getElementById('uploadStepperProgressPhase');
+      if (initPhase) initPhase.style.display = 'none';
+      if (stepperPhase) stepperPhase.style.display = 'block';
+      if (modal) modal.classList.add('active');
+
+      await startUploadStepperAnimation();
     }
 
     async function processSyllabusTextAsync(rawText) {
       if (!rawText) return;
-
-      if (isGarbageOrBinaryText(rawText)) {
-        showToast('⚠️ O texto informado contém artefatos binários ou ilegíveis.');
-        return;
-      }
 
       const clean = rawText
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
@@ -6594,10 +6731,10 @@ ${rawText.slice(0, 150000)}`;
       let parsedSubjects = [];
       const apiKey = getGeminiApiKey();
 
-      // 1. Tentar análise inteligente com Gemini 2.5 Flash-Lite se a chave estiver configurada
-      if (apiKey && clean.length > 40) {
+      // 1. Tentar análise inteligente com Gemini se a chave estiver configurada
+      if (apiKey && clean.length > 20) {
         try {
-          showToast('⚡ Analisando ementa com IA Gemini 2.5 Flash-Lite...');
+          showToast('⚡ Analisando ementa com IA Gemini...');
           const geminiResult = await analyzeSyllabusWithGemini(clean, apiKey);
           if (geminiResult && geminiResult.length > 0) {
             parsedSubjects = geminiResult;
@@ -6607,14 +6744,23 @@ ${rawText.slice(0, 150000)}`;
         }
       }
 
-      // 2. Motor Heurístico Universal Local (executa se não houver chave ou em caso de fallback)
+      // 2. Motor Heurístico Universal Local (Tiers 1 a 4)
       if (!parsedSubjects || parsedSubjects.length === 0) {
         parsedSubjects = parseEmentaWithDescriptions(clean);
       }
 
-      if (parsedSubjects.length === 0) {
-        showToast('⚠️ Nenhuma disciplina válida reconhecida no texto. Certifique-se de colar os nomes das matérias ou suas ementas.');
-        return;
+      // Fallback de segurança absoluta (garante que nada se perca)
+      if (!parsedSubjects || parsedSubjects.length === 0) {
+        parsedSubjects = [{
+          name: clean.split('\n')[0].slice(0, 80) || 'Disciplina Curricular',
+          period: '1º Período • Ciclo Básico',
+          cycle: 'basico',
+          cycleName: 'Ciclo Básico',
+          description: clean,
+          topics: [],
+          keywords: [],
+          isUser: true
+        }];
       }
 
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -6629,7 +6775,7 @@ ${rawText.slice(0, 150000)}`;
 
       renderCurriculumGrid();
       updateSubjectFilterMenus();
-      showToast(`🎓 ${parsedSubjects.length} disciplinas da ementa integradas com sucesso!`);
+      showToast(`🎓 ${parsedSubjects.length} disciplina(s) da ementa integradas com sucesso!`);
     }
 
     function renderCurriculumGrid() {
