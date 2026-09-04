@@ -2801,6 +2801,23 @@
           </div>
           <button class="btn-outline-action" onclick="restoreDemoData()">Restaurar Demo</button>
         </div>
+
+        <div style="padding: 14px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+              <span>⚡ Google Gemini IA (Menor Custo)</span>
+              <span style="font-size: 10px; background: rgba(0, 255, 102, 0.15); color: var(--neon); padding: 2px 6px; border-radius: 4px; font-weight: 700;">2.5 Flash-Lite</span>
+            </div>
+            <span id="geminiKeySavedBadge" style="font-size: 11px; color: var(--neon); font-weight: 700; display: none;">✓ Ativo</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.35;">
+            Conecte sua chave do Google AI Studio para que o Gemini analise qualquer ementário (mesmo layouts complexos ou tabelas) com custo reduzido e retorno estruturado em JSON. Se não informada, a IA usa o parser heurístico local gratuito.
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input type="password" id="geminiApiKeyInput" placeholder="Chave AI Studio (AIzaSy...)" style="flex: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text-primary); outline: none;">
+            <button class="btn-outline-action primary" onclick="saveGeminiApiKey()">Salvar Chave</button>
+          </div>
+        </div>
       </div>
 
       <div style="border-top: 1px solid var(--border); padding-top: 16px;">
@@ -5977,113 +5994,240 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       renderCurriculumGrid();
     }
 
-    // PARSER AVANÇADO DE EMENTA UNIVERSITÁRIA (ARMAZENA DESCRIÇÕES E TÓPICOS COM BLINDAGEM ANTI-RUÍDO)
+    // GERENCIADOR DE CHAVE GEMINI AI STUDIO (MODELO 2.5 FLASH-LITE)
+    function getGeminiApiKey() {
+      try {
+        return localStorage.getItem('medtutor_gemini_api_key') || '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function saveGeminiApiKey() {
+      const input = document.getElementById('geminiApiKeyInput');
+      if (!input) return;
+      const key = input.value.trim();
+      try {
+        if (key) {
+          localStorage.setItem('medtutor_gemini_api_key', key);
+          showToast('🔑 Chave Gemini 2.5 Flash-Lite salva com sucesso!');
+        } else {
+          localStorage.removeItem('medtutor_gemini_api_key');
+          showToast('Chave removida. O MedTutor usará o motor heurístico local.');
+        }
+        updateGeminiKeyBadge();
+      } catch (e) {
+        showToast('Erro ao salvar chave.');
+      }
+    }
+
+    function updateGeminiKeyBadge() {
+      const badge = document.getElementById('geminiKeySavedBadge');
+      const input = document.getElementById('geminiApiKeyInput');
+      const key = getGeminiApiKey();
+      if (badge) badge.style.display = key ? 'inline-block' : 'none';
+      if (input && key && !input.value) input.value = key;
+    }
+
+    // INTEGRAÇÃO COM IA GEMINI 2.5 FLASH-LITE (MENOR CUSTO & RESPOSTA ESTRUTURADA EM JSON)
+    async function analyzeSyllabusWithGemini(rawText, apiKey) {
+      if (!rawText || !apiKey) return null;
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+        const promptText = `Você é um coordenador pedagógico de medicina especialista nas Diretrizes Curriculares Nacionais (DCNs do MEC).
+Analise o texto a seguir (que pode ser uma ementa, matriz curricular ou projeto pedagógico com 1 ou múltiplas disciplinas) e extraia todas as disciplinas médicas presentes.
+Para cada disciplina, retorne um objeto estruturado:
+- "name": Nome completo da disciplina (inclua o código se houver, ex: "M005 Integração de Sistemas Humanos I (Sistema Musculoesquelético)")
+- "period": Período ou semestre recomendado (ex: "1º Período • Ciclo Básico", "5º Período • Ciclo Clínico")
+- "cycle": Ciclo ("basico", "clinico" ou "internato")
+- "cycleName": Nome do ciclo ("Ciclo Básico", "Ciclo Clínico" ou "Internato Médico")
+- "description": Ementa e resumo dos objetivos de aprendizagem
+- "topics": Array com a lista de afecções, doenças, tecidos, sistemas anatômicos e competências abordadas
+
+Texto do Ementário:
+${rawText.slice(0, 150000)}`;
+
+        const payload = {
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  name: { type: "STRING" },
+                  period: { type: "STRING" },
+                  cycle: { type: "STRING", enum: ["basico", "clinico", "internato"] },
+                  cycleName: { type: "STRING" },
+                  description: { type: "STRING" },
+                  topics: { type: "ARRAY", items: { type: "STRING" } }
+                },
+                required: ["name", "cycle", "cycleName", "description", "topics"]
+              }
+            }
+          }
+        };
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          console.warn('Gemini API retornou erro HTTP:', res.status);
+          return null;
+        }
+
+        const data = await res.json();
+        const contentStr = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!contentStr) return null;
+
+        const parsedJson = JSON.parse(contentStr);
+        if (Array.isArray(parsedJson) && parsedJson.length > 0) {
+          return parsedJson.map((item, idx) => {
+            return buildSubjectObject(item.name, item.period, item.description, item.topics, idx);
+          }).filter(Boolean);
+        }
+      } catch (err) {
+        console.warn('Falha na chamada Gemini Flash-Lite, recorrendo ao parser local:', err);
+      }
+      return null;
+    }
+
+    // PARSER UNIVERSAL DE EMENTA UNIVERSITÁRIA (ADAPTÁVEL A QUALQUER LAYOUT DE FACULDADE)
     function parseEmentaWithDescriptions(text) {
       const subjects = [];
       if (!text || typeof text !== 'string') return subjects;
 
       const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
-      // Blindagem imediata contra arquivos binários ou fluxos brutos de PDF
+      // Blindagem contra artefatos de PDF
       if (isGarbageOrBinaryText(clean)) {
         console.warn('Texto da ementa descartado por conter artefatos ou fluxos binários.');
         return subjects;
       }
 
-      const hasExplicitLabels = /(disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:/i.test(clean);
+      const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
 
-      if (hasExplicitLabels) {
-        const blocks = clean.split(/(?=(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:)/i)
-          .map(b => b.trim())
-          .filter(b => b.length > 3);
+      let currentSubject = null;
+      let currentSection = ''; // 'header', 'workload', 'ementa', 'topics', 'biblio'
 
-        blocks.forEach((block, idx) => {
-          if (isGarbageOrBinaryText(block)) return;
+      function pushSubject(subj) {
+        if (!subj || !isValidSubjectName(subj.name)) return;
+        if (subj.description && (!subj.topics || subj.topics.length === 0)) {
+          const parts = subj.description
+            .split(/(?:\.\s+|;\s+|:\s+|\n+)/)
+            .map(p => p.trim().replace(/^[\*\•\-\s0-9\.\)]+/, ''))
+            .filter(p => p.length >= 4 && !isGarbageOrBinaryText(p) && !/^(?:bibliografia|carga|cr[eé]ditos)/i.test(p));
+          subj.topics = parts.slice(0, 30);
+        }
+        const obj = buildSubjectObject(subj.name, subj.period, subj.description, subj.topics, subjects.length);
+        if (obj) subjects.push(obj);
+      }
 
-          let name = '';
-          let period = '';
-          let description = '';
-          let topics = [];
+      const hasExplicitStructure = /^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular|componente curricular)\b/im.test(clean) ||
+                                   /^(?:ementa|conte[uú]do program[aá]tico)\b/im.test(clean);
 
-          const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-          let currentField = '';
+      if (hasExplicitStructure) {
+        for (let i = 0; i < lines.length; i++) {
+          if (subjects.length >= 70) break;
+          const line = lines[i];
 
-          lines.forEach(line => {
-            const nameMatch = line.match(/^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:\s*(.+)$/i);
-            const periodMatch = line.match(/^(?:per[ií]odo|semestre|ciclo|ano)\s*:\s*(.+)$/i);
-            const ementaMatch = line.match(/^(?:ementa|descri[cç][aã]o|objetivos?|conte[uú]do(?: program[aá]tico)?)\s*:\s*(.*)$/i);
-            const topicsMatch = line.match(/^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?|habilidades)\s*:\s*(.*)$/i);
+          const isSubjectHeader = /^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular|componente curricular)\b/i.test(line);
+          const inlineNameMatch = line.match(/^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular|componente curricular)\s*:\s*(.+)$/i);
 
-            if (nameMatch) {
-              name = nameMatch[1].trim();
-              currentField = 'name';
-            } else if (periodMatch) {
-              period = periodMatch[1].trim();
-              currentField = 'period';
-            } else if (ementaMatch) {
-              description = ementaMatch[1].trim();
-              currentField = 'description';
-            } else if (topicsMatch) {
-              if (topicsMatch[1].trim()) {
-                topics.push(...topicsMatch[1].split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
-              }
-              currentField = 'topics';
+          if (inlineNameMatch) {
+            if (currentSubject) pushSubject(currentSubject);
+            currentSubject = { name: inlineNameMatch[1].trim(), period: '', description: '', topics: [] };
+            currentSection = 'header';
+            continue;
+          } else if (isSubjectHeader && line.length < 35) {
+            if (currentSubject) pushSubject(currentSubject);
+            const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+            if (nextLine && isValidSubjectName(nextLine)) {
+              currentSubject = { name: nextLine, period: '', description: '', topics: [] };
+              i++; // Consome a linha com o nome
             } else {
-              if (currentField === 'description') {
-                description += ' ' + line;
-              } else if (currentField === 'topics') {
-                topics.push(...line.split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
-              }
+              currentSubject = { name: '', period: '', description: '', topics: [] };
             }
-          });
-
-          if (isValidSubjectName(name)) {
-            const subjObj = buildSubjectObject(name, period, description, topics, idx);
-            if (subjObj) subjects.push(subjObj);
+            currentSection = 'header';
+            continue;
           }
-        });
+
+          if (/^(?:carga hor[aá]ria|cr[eé]ditos?|semestre|per[ií]odo)/i.test(line)) {
+            currentSection = 'workload';
+            const periodMatch = line.match(/([0-9]+[ºªo\.]?\s*(?:per[ií]odo|semestre))/i);
+            if (periodMatch && currentSubject) {
+              currentSubject.period = periodMatch[1];
+            }
+            continue;
+          }
+
+          const isEmentaHeader = /^(?:ementa|conte[uú]do(?: program[aá]tico)?|objetivos?|descri[cç][aã]o)\b/i.test(line);
+          const inlineEmenta = line.match(/^(?:ementa|conte[uú]do(?: program[aá]tico)?|objetivos?|descri[cç][aã]o)\s*:\s*(.*)$/i);
+          if (inlineEmenta) {
+            currentSection = 'ementa';
+            if (currentSubject && inlineEmenta[1].trim()) {
+              currentSubject.description += (currentSubject.description ? ' ' : '') + inlineEmenta[1].trim();
+            }
+            continue;
+          } else if (isEmentaHeader && line.length < 35) {
+            currentSection = 'ementa';
+            continue;
+          }
+
+          const inlineTopics = line.match(/^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?)\s*:\s*(.*)$/i);
+          if (inlineTopics && currentSubject) {
+            currentSection = 'topics';
+            if (inlineTopics[1].trim()) {
+              currentSubject.topics.push(...inlineTopics[1].split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+            }
+            continue;
+          }
+
+          if (/^(?:bibliografia|refer[eê]ncias|livros)/i.test(line)) {
+            currentSection = 'biblio';
+            continue;
+          }
+
+          if (currentSubject) {
+            if (currentSection === 'ementa') {
+              currentSubject.description += (currentSubject.description ? ' ' : '') + line;
+            } else if (currentSection === 'topics') {
+              currentSubject.topics.push(...line.split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+            }
+          }
+        }
+
+        if (currentSubject) pushSubject(currentSubject);
       } else {
+        // Fallback para blocos de parágrafos isolados
         const rawSections = clean.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
-
         rawSections.forEach((sec, idx) => {
-          if (subjects.length >= 60) return; // Limite de proteção contra loops de arquivos gigantes
-          if (isGarbageOrBinaryText(sec)) return;
+          if (subjects.length >= 60 || isGarbageOrBinaryText(sec)) return;
+          const secLines = sec.split('\n').map(l => l.trim()).filter(Boolean);
+          if (secLines.length === 0) return;
 
-          const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
-          if (lines.length === 0) return;
-
-          let rawName = lines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
-          if (!isValidSubjectName(rawName)) {
-            return;
-          }
+          let rawName = secLines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
+          if (!isValidSubjectName(rawName)) return;
 
           let name = rawName;
           let period = '';
           let description = '';
           let topics = [];
 
-          if (/^[0-9]+[ºªo\.]\s*per[ií]odo/i.test(name) && lines.length > 1) {
-            period = name;
-            name = lines[1].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
-            description = lines.slice(2).join(' ');
+          if (secLines.length > 1 && /^[0-9]+[ºªo\.]\s*per[ií]odo/i.test(secLines[1])) {
+            period = secLines[1];
+            description = secLines.slice(2).join(' ');
           } else {
-            description = lines.slice(1).join(' ');
+            description = secLines.slice(1).join(' ');
           }
 
-          if (!isValidSubjectName(name)) return;
-
-          if (description.includes('Tópicos:') || description.includes('tópicos:')) {
-            const parts = description.split(/t[oó]picos?\s*:/i);
-            description = parts[0].trim();
-            if (parts[1]) {
-              topics = parts[1].split(/[,;•\n]+/).map(t => t.trim()).filter(Boolean);
-            }
-          }
-
-          const subjObj = buildSubjectObject(name, period, description, topics, idx);
-          if (subjObj) {
-            subjects.push(subjObj);
-          }
+          const obj = buildSubjectObject(name, period, description, topics, idx);
+          if (obj) subjects.push(obj);
         });
       }
 
@@ -6447,9 +6591,29 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       // Yield assíncrono para garantir renderização fluida da tela
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      const parsedSubjects = parseEmentaWithDescriptions(clean);
+      let parsedSubjects = [];
+      const apiKey = getGeminiApiKey();
+
+      // 1. Tentar análise inteligente com Gemini 2.5 Flash-Lite se a chave estiver configurada
+      if (apiKey && clean.length > 40) {
+        try {
+          showToast('⚡ Analisando ementa com IA Gemini 2.5 Flash-Lite...');
+          const geminiResult = await analyzeSyllabusWithGemini(clean, apiKey);
+          if (geminiResult && geminiResult.length > 0) {
+            parsedSubjects = geminiResult;
+          }
+        } catch (e) {
+          console.warn('Falha na IA Gemini, recorrendo ao motor heurístico local:', e);
+        }
+      }
+
+      // 2. Motor Heurístico Universal Local (executa se não houver chave ou em caso de fallback)
+      if (!parsedSubjects || parsedSubjects.length === 0) {
+        parsedSubjects = parseEmentaWithDescriptions(clean);
+      }
+
       if (parsedSubjects.length === 0) {
-        showToast('⚠️ Nenhuma disciplina válida reconhecida no texto. Certifique-se de usar o formato "Disciplina: Nome..." ou colar os nomes das matérias.');
+        showToast('⚠️ Nenhuma disciplina válida reconhecida no texto. Certifique-se de colar os nomes das matérias ou suas ementas.');
         return;
       }
 
@@ -8242,6 +8406,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     renderSceTimeline();
     updateSubjectFilterMenus();
     renderCurriculumGrid();
+    updateGeminiKeyBadge();
   </script>
 </body>
 </html>
