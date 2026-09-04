@@ -1502,68 +1502,68 @@
       </div>
 
       <p style="font-size: 13px; color: var(--text-secondary);">
-        O MedTutor vasculha o Google Drive da sua turma, <strong>filtrando livros volumosos (>15MB)</strong> e manuais extensos para poupar custos e focar exclusivamente em slides, resumos e apostilas de aula.
+        O MedTutor vasculha o Google Drive da sua turma com <strong>Compactador Local no Dispositivo (sem IA)</strong>:
+        Arquivos de até 100 MB entram direto; arquivos de <strong>100 MB a 300 MB</strong> são compactados no próprio aparelho (-70% de peso). Arquivos acima de 300 MB são avisados como excessivamente grandes.
       </p>
 
       <div id="driveScanProgress" style="padding: 10px; background: var(--bg-surface); border-radius: 10px; font-size: 12px; color: var(--neon); display: flex; align-items: center; gap: 8px;">
         <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        <span>Varredura concluída • 4 arquivos examinados no Drive</span>
+        <span>Varredura do Drive • 3 arquivos encontrados</span>
       </div>
 
-      <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 250px; overflow-y: auto;">
-        <!-- Arquivo Aceito 1 -->
+      <div id="driveFileList" style="display: flex; flex-direction: column; max-height: 270px; overflow-y: auto;">
+        <!-- Arquivo 1: <= 100 MB (Aceito direto) -->
         <div class="drive-file-row accepted">
           <div class="drive-file-info">
             <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <div class="drive-file-text">
-              <span class="drive-file-name">Aula 04 - Valvopatias e Sopros Mitrais.pdf (3.4 MB)</span>
-              <span class="drive-file-status ok">✓ Elegível: Apostila de aula teórica</span>
+              <span class="drive-file-name">Aula 04 - Valvopatias e Sopros Mitrais.pdf (24.5 MB)</span>
+              <span class="drive-file-status ok">✓ Elegível direto (&lt;= 100 MB): Apostila de aula teórica</span>
             </div>
           </div>
-          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">NOVO</span>
+          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">DIRETO</span>
         </div>
 
-        <!-- Arquivo Aceito 2 -->
-        <div class="drive-file-row accepted">
+        <!-- Arquivo 2: 100 MB a 300 MB (Compactador no dispositivo) -->
+        <div class="drive-file-row" style="border-color: rgba(255, 184, 0, 0.4);">
           <div class="drive-file-info">
-            <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <svg class="icon" style="color: var(--warning);" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             <div class="drive-file-text">
-              <span class="drive-file-name">Resumo Clínico - Manejo da Sepse e Choque Séptico.pptx (5.2 MB)</span>
-              <span class="drive-file-status ok">✓ Elegível: Apresentação resumida de condutas</span>
+              <span class="drive-file-name">Apresentação com Lâminas e Casos de Radiologia.pptx (185 MB)</span>
+              <span class="drive-file-status" style="color: var(--warning);">⚡ Compactador Local Ativado: reduzirá no aparelho de 185 MB para ~52 MB</span>
             </div>
           </div>
-          <span style="font-size: 11px; font-weight: 700; color: var(--neon);">NOVO</span>
+          <span style="font-size: 11px; font-weight: 700; color: var(--warning);">COMPACTAR</span>
         </div>
 
-        <!-- Arquivo Rejeitado 1 (Livro pesado) -->
+        <!-- Arquivo 3: > 300 MB (Excessivamente grande) -->
         <div class="drive-file-row rejected">
           <div class="drive-file-info">
             <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
             <div class="drive-file-text">
-              <span class="drive-file-name">Tratado de Medicina Interna Cecil (88 MB)</span>
-              <span class="drive-file-status warn">✕ Ignorado: Livro volumoso (>15MB). Poupando tokens.</span>
+              <span class="drive-file-name">Tratado Enciclopédico de Medicina e Cirurgia (420 MB)</span>
+              <span class="drive-file-status warn">✕ Arquivo excessivamente grande (&gt; 300 MB). Divida por capítulos de aula.</span>
             </div>
           </div>
-          <span style="font-size: 11px; color: var(--danger);">FILTRADO</span>
+          <span style="font-size: 11px; color: var(--danger);">BLOQUEADO</span>
         </div>
+      </div>
 
-        <!-- Arquivo Rejeitado 2 (Atlas extenso) -->
-        <div class="drive-file-row rejected">
-          <div class="drive-file-info">
-            <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-            <div class="drive-file-text">
-              <span class="drive-file-name">Atlas de Anatomia Humana Netter 7ed (120 MB)</span>
-              <span class="drive-file-status warn">✕ Ignorado: Tratado abrangente. Foco em aulas objetivas.</span>
-            </div>
-          </div>
-          <span style="font-size: 11px; color: var(--danger);">FILTRADO</span>
+      <!-- Barra de compressão no dispositivo -->
+      <div id="deviceCompressingBox" style="display: none; padding: 12px; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 12px; font-size: 12px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="color: var(--neon); font-weight: 700;">⚙️ Processando no dispositivo (sem IA):</span>
+          <span id="compressProgressLabel">185 MB ➔ 52 MB (-72%)</span>
+        </div>
+        <div style="width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+          <div id="compressProgressBar" style="width: 20%; height: 100%; background: var(--neon); transition: width 0.4s ease;"></div>
         </div>
       </div>
 
       <div style="display: flex; gap: 10px; margin-top: 10px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
-        <button class="btn-outline-action primary" style="flex: 1.5; justify-content: center;" onclick="importDriveEligibleFiles()">
-          📥 Importar 2 Aulas Elegíveis
+        <button id="btnImportDriveFiles" class="btn-outline-action primary" style="flex: 1.6; justify-content: center;" onclick="importDriveEligibleFiles()">
+          📥 Importar Aulas (1 Direta + 1 Compactada)
         </button>
       </div>
     </div>
@@ -2044,58 +2044,92 @@
 
     function handleMaterialFile(input) {
       if (input.files && input.files[0]) {
-        document.getElementById('materialTextInput').value = `Material extraído do arquivo: ${input.files[0].name}`;
+        const file = input.files[0];
+        const sizeMB = file.size / (1024 * 1024);
+
+        if (sizeMB > 300) {
+          showToast(`⚠️ Arquivo de ${sizeMB.toFixed(0)} MB é excessivamente grande (> 300 MB). Divida por capítulos.`);
+          input.value = '';
+          return;
+        }
+
+        if (sizeMB >= 100) {
+          showToast(`⚡ Compactador Local Ativo: ${sizeMB.toFixed(0)} MB será reduzido no seu aparelho em ~70% (sem IA).`);
+          document.getElementById('materialTextInput').value = `Material extraído do arquivo: ${file.name} [Compactado no aparelho: ${sizeMB.toFixed(0)} MB ➔ ${(sizeMB * 0.3).toFixed(0)} MB]`;
+          return;
+        }
+
+        document.getElementById('materialTextInput').value = `Material extraído do arquivo: ${file.name} (${sizeMB.toFixed(1)} MB)`;
       }
     }
 
-    // 7. ATUALIZAR POR DRIVE COM FILTRO INTELIGENTE
+    // 7. ATUALIZAR POR DRIVE COM COMPACTADOR LOCAL (100MB A 300MB)
     function importDriveEligibleFiles() {
-      closeModals();
+      const compressBox = document.getElementById('deviceCompressingBox');
+      const progressBar = document.getElementById('compressProgressBar');
+      const btn = document.getElementById('btnImportDriveFiles');
 
-      // Questão 1 de Aula
-      const q1 = 'Manejo Inicial do Choque Séptico: Metas hemodinâmicas nas primeiras horas';
-      const red1 = evaluateRedundancy(q1);
-      sharedQuestionsBank.push({
-        id: 'drive-' + Date.now() + '-1',
-        subject: 'Medicina de Emergência',
-        question: q1,
-        answer: 'Ressuscitação volêmica (30 mL/kg de cristaloides), coleta de culturas pré-antibiótico, noradrenalina se PAM < 65 mmHg e dosagem de lactato seriado.',
-        quizOptions: [
-          'Administração exclusiva de coloides sintéticos e dopamina em altas doses.',
-          'Cristaloides 30 mL/kg, antibiótico de largo espectro e noradrenalina precoce se PAM < 65 mmHg.',
-          'Bicarbonato de sódio endovenoso profilático imediato para todo paciente.',
-          'Aguardar o resultado dos exames antes de iniciar reposição volêmica.'
-        ],
-        correctIndex: 1,
-        isRedundant: red1.isRedundant,
-        redundancyScore: red1.percentage,
-        matchedText: red1.matchedText,
-        isStarred: false
-      });
+      compressBox.style.display = 'block';
+      btn.disabled = true;
+      btn.textContent = 'Processando no Aparelho...';
 
-      // Questão 2 com redundância proposital para demonstrar o alerta >= 50%
-      const q2 = 'Mecanismo de ação dos Inibidores de SGLT2 na insuficiência cardíaca crônica';
-      const red2 = evaluateRedundancy(q2);
-      sharedQuestionsBank.push({
-        id: 'drive-' + Date.now() + '-2',
-        subject: 'Cardiologia Clínica',
-        question: q2,
-        answer: 'Promovem natriurese e glicosúria renal, atuando na descompressão cardiovascular e melhora do metabolismo miocárdico.',
-        quizOptions: [
-          'Agonismo direto dos receptores de angiotensina II.',
-          'Inibição de SGLT2 com natriurese osmótica e alívio de sobrecarga.',
-          'Vasodilatação arterial direta por liberação de bradicinina.',
-          'Redução da glicemia sem qualquer repercussão hemodinâmica.'
-        ],
-        correctIndex: 1,
-        isRedundant: red2.isRedundant,
-        redundancyScore: red2.percentage,
-        matchedText: red2.matchedText,
-        isStarred: false
-      });
+      // Animação do compactador local (client-side, sem IA)
+      progressBar.style.width = '45%';
+      setTimeout(() => {
+        progressBar.style.width = '100%';
+      }, 350);
 
-      renderSharedStudyItems();
-      showToast('☁️ Drive sincronizado! 2 aulas importadas. Livros volumosos foram ignorados para poupar tokens.');
+      setTimeout(() => {
+        closeModals();
+        compressBox.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = '📥 Importar Aulas (1 Direta + 1 Compactada)';
+
+        // Questão 1 (Aula de 24.5 MB - Aceita direta)
+        const q1 = 'Manejo Inicial do Choque Séptico: Metas hemodinâmicas nas primeiras horas';
+        const red1 = evaluateRedundancy(q1);
+        sharedQuestionsBank.push({
+          id: 'drive-' + Date.now() + '-1',
+          subject: 'Medicina de Emergência',
+          question: q1,
+          answer: 'Ressuscitação volêmica (30 mL/kg de cristaloides), coleta de culturas pré-antibiótico, noradrenalina se PAM < 65 mmHg e dosagem de lactato seriado.',
+          quizOptions: [
+            'Administração exclusiva de coloides sintéticos e dopamina em altas doses.',
+            'Cristaloides 30 mL/kg, antibiótico de largo espectro e noradrenalina precoce se PAM < 65 mmHg.',
+            'Bicarbonato de sódio endovenoso profilático imediato para todo paciente.',
+            'Aguardar o resultado dos exames antes de iniciar reposição volêmica.'
+          ],
+          correctIndex: 1,
+          isRedundant: red1.isRedundant,
+          redundancyScore: red1.percentage,
+          matchedText: red1.matchedText,
+          isStarred: false
+        });
+
+        // Questão 2 (Apresentação de 185 MB compactada no dispositivo para 52 MB)
+        const q2 = 'Interpretação Radiológica: Diferenciação entre Consolidação Pulmonar e Atelectasia';
+        const red2 = evaluateRedundancy(q2);
+        sharedQuestionsBank.push({
+          id: 'drive-' + Date.now() + '-2',
+          subject: 'Pneumologia & Radiologia',
+          question: q2,
+          answer: 'A consolidação preserva a arquitetura e volume pulmonar com presença de broncograma aéreo típico; a atelectasia cursa com colapso tecidual, retração das fissuras e desvio ipsilateral de estruturas mediastinais.',
+          quizOptions: [
+            'Atelectasia mantém volume pulmonar normal sem desvio de traqueia.',
+            'Consolidação preserva volume pulmonar e apresenta broncograma aéreo; atelectasia cursa com perda de volume e retração.',
+            'Ambas apresentam hiperinsuflação compensatória no lobo afetado.',
+            'Broncograma aéreo é exclusivo de pneumotórax hipertensivo.'
+          ],
+          correctIndex: 1,
+          isRedundant: red2.isRedundant,
+          redundancyScore: red2.percentage,
+          matchedText: red2.matchedText,
+          isStarred: false
+        });
+
+        renderSharedStudyItems();
+        showToast('☁️ Drive sincronizado! 1 aula direta + 1 compactada no aparelho (185 MB ➔ 52 MB). Arquivo >300 MB bloqueado.');
+      }, 750);
     }
 
     // 8. EMENTA UNIVERSITÁRIA

@@ -231,10 +231,9 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         final simulatedFiles = [
-          {'name': 'Aula 04 - Valvopatias e Sopros Mitrais.pdf', 'size': 3.4, 'eligible': true, 'reason': 'Aceito: Apostila de aula objetiva'},
-          {'name': 'Resumo Clínico - Conduta em Sepse.pptx', 'size': 5.2, 'eligible': true, 'reason': 'Aceito: Resumo em slides de aula'},
-          {'name': 'Tratado Completo de Cardiologia Braunwald (12ª Ed).pdf', 'size': 85.0, 'eligible': false, 'reason': 'Ignorado: Livro volumoso (>15MB). Poupando tokens e dados.'},
-          {'name': 'Atlas de Anatomia Humana Netter 7ed.pdf', 'size': 120.0, 'eligible': false, 'reason': 'Ignorado: Atlas/Tratado extenso. Foco em materiais de aula objetivos.'},
+          {'name': 'Aula 04 - Valvopatias e Sopros Mitrais.pdf', 'size': 24.5, 'eligible': true, 'needsComp': false, 'reason': 'Aceito direto: Tamanho ideal (24.5 MB <= 100 MB)'},
+          {'name': 'Casos Clínicos com Imagens e Lâminas.pptx', 'size': 185.0, 'eligible': true, 'needsComp': true, 'reason': 'Compactador Local Ativado: 185 MB reduzido para ~55 MB no dispositivo'},
+          {'name': 'Atlas e Tratado Integrado de Cirurgia Geral.pdf', 'size': 420.0, 'eligible': false, 'needsComp': false, 'reason': 'Arquivo excessivamente grande (420 MB > 300 MB). Divida por capítulos.'},
         ];
 
         return Padding(
@@ -257,34 +256,41 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                     icon: const Icon(Icons.help_outline, size: 20),
                     onPressed: () => _showHelp(
                       context,
-                      'Atualizar por Drive',
-                      'Vasculha o Google Drive da sua turma, filtrando livros volumosos (>15MB) para poupar custos e importando apenas apostilas e slides de aula.',
+                      'Atualizar por Drive & Compactador',
+                      'Materiais de 100MB a 300MB são compactados localmente no seu dispositivo (sem IA). Arquivos acima de 300MB são informados como excessivamente grandes.',
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               const Text(
-                'Filtro Inteligente Anti-Desperdício ativo: Livros extensos e manuais volumosos são ignorados para manter o estudo 100% focado e econômico.',
+                'Compactador Local Ativo: Arquivos de 100MB a 300MB são reduzidos no próprio aparelho (downsampling de imagens a 150 DPI) sem gastar tokens. Limite máximo: 300 MB.',
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               ...simulatedFiles.map((file) {
                 final isEligible = file['eligible'] as bool;
+                final needsComp = file['needsComp'] as bool;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isEligible ? const Color(0xFF00FF66).withOpacity(0.3) : Colors.red.withOpacity(0.3),
+                      color: isEligible
+                          ? (needsComp ? Colors.amber.withOpacity(0.5) : const Color(0xFF00FF66).withOpacity(0.4))
+                          : Colors.red.withOpacity(0.4),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        isEligible ? Icons.check_circle_outline : Icons.block_outlined,
-                        color: isEligible ? const Color(0xFF00FF66) : Colors.red,
+                        isEligible
+                            ? (needsComp ? Icons.compress_outlined : Icons.check_circle_outline)
+                            : Icons.block_outlined,
+                        color: isEligible
+                            ? (needsComp ? Colors.amber : const Color(0xFF00FF66))
+                            : Colors.red,
                         size: 22,
                       ),
                       const SizedBox(width: 12),
@@ -293,7 +299,15 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(file['name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            Text(file['reason'] as String, style: TextStyle(fontSize: 11, color: isEligible ? Colors.green[400] : Colors.red[300])),
+                            Text(
+                              file['reason'] as String,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isEligible
+                                    ? (needsComp ? Colors.amber[300] : Colors.green[400])
+                                    : Colors.red[300],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -311,13 +325,13 @@ class _MainAdaptiveScaffoldState extends State<MainAdaptiveScaffold> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   icon: const Icon(Icons.sync_outlined),
-                  label: const Text('Sincronizar 2 Aulas Identificadas', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text('Sincronizar (1 Direto + 1 Compactado no Aparelho)', style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () {
                     Navigator.pop(ctx);
                     _addMaterialItem('Mecanismos de Sopro na Insuficiência Mitral Aguda vs Crônica', 'Na fase crônica ocorre dilatação atrial progressiva mantendo pressões relativamente toleráveis; na aguda há congestão súbita.', 'Cardiologia');
-                    _addMaterialItem('Fórmulas e Metas no Manejo de Choque Séptico (Protocolo Sepse)', 'Ressuscitação volêmica guiada por lactato, PAM >= 65 mmHg e antibioticoterapia na primeira hora.', 'Emergência');
+                    _addMaterialItem('Interpretação Radiológica de Consolidação Pulmonar vs Atelectasia', 'Consolidação preserva volume pulmonar e exibe broncograma aéreo; atelectasia cursa com perda de volume e desvio das fissuras.', 'Pneumologia');
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Drive sincronizado: 2 apostilas convertidas em cards/quizzes! Livros pesados ignorados.')),
+                      const SnackBar(content: Text('Drive sincronizado! Arquivo de 185MB compactado no dispositivo para 55MB. Arquivo >300MB ignorado.')),
                     );
                   },
                 ),
