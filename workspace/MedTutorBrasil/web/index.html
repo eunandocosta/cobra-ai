@@ -3331,8 +3331,11 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     function isValidSubjectName(name) {
       if (!name || typeof name !== 'string') return false;
       const cleaned = cleanSubjectName(name);
-      if (cleaned.length < 3 || cleaned.length > 200) return false;
+      if (cleaned.length < 3 || cleaned.length > 95) return false;
       if (isGarbageOrBinaryText(cleaned)) return false;
+
+      // Rejeita fragmentos de frases em prosa iniciados por preposição ou conjunção
+      if (/^(?:de|da|do|dos|das|em|na|no|com|para|por|e|ou|conforme|segundo)\s+/i.test(cleaned)) return false;
 
       // Deve conter letras do alfabeto
       const letters = cleaned.match(/[a-zA-ZÀ-ÿ]/g);
@@ -3348,8 +3351,8 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       const words = cleaned.split(/[\s\-\/\:\,]+/).filter(w => w.length >= 2);
       if (words.length === 0) return false;
 
-      // Cabeçalhos que não são nomes de disciplinas
-      const junkRegex = /^(?:ementa\b|conte[uú]do\b|carga hor[aá]ria\b|cr[eé]ditos?\b|bibliografia\b|refer[eê]ncias\b|livros?\b|t[oó]picos?\b|objetivos?\b|unidades?\b|p[aá]gina \d+|universidade|faculdade|instituto|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre letivo|cnpj|di[aá]rio oficial|matriz curricular|grade hor[aá]ria|professor|docente)/i;
+      // Cabeçalhos e seções administrativas que não são nomes de disciplinas
+      const junkRegex = /^(?:ementa\b|conte[uú]do\b|carga hor[aá]ria\b|cr[eé]ditos?\b|bibliografia\b|refer[eê]ncias\b|livros?\b|t[oó]picos?\b|objetivos?\b|unidades?\b|p[aá]gina \d+|universidade|faculdade|instituto|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre letivo|cnpj|di[aá]rio oficial|matriz curricular|grade hor[aá]ria|professor|docente|ch te[oó]rica|total hora aula|aviso legal|sum[aá]rio|dirigentes|colegiado|eixos curriculares|tabela \d+)/i;
       if (junkRegex.test(cleaned)) return false;
 
       return true;
@@ -6184,271 +6187,304 @@ ${rawText.slice(0, 150000)}`;
       return null;
     }
 
-    // PARSER UNIVERSAL DE EMENTA UNIVERSITÁRIA (ADAPTÁVEL A QUALQUER LAYOUT DE FACULDADE)
-    function parseEmentaWithDescriptions(text) {
-      const subjects = [];
-      if (!text || typeof text !== 'string') return subjects;
+    // NORMALIZAÇÃO DE TEXTO DA EMENTA (REMOÇÃO DE CABEÇALHOS PDF E DESAGREGAÇÃO ESTRUTURAL DE LINHAS)
+    function normalizeSyllabusText(text) {
+      if (!text || typeof text !== 'string') return '';
+      let clean = text
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
 
-      const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-      if (isGarbageOrBinaryText(clean)) return subjects;
+      // Remove resíduos de prompts ou tags de metadados inseridos acidentalmente
+      clean = clean.replace(/<\/?(?:USER_REQUEST|ADDITIONAL_METADATA)>[\s\S]*?(?:$|\n)/gi, '\n');
+      clean = clean.replace(/\best[aá]\s+gerando\s+um\s+[uú]nico\s+card[^\n\r]*/gi, '');
 
-      const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-      if (lines.length === 0) return subjects;
+      // Remove cabeçalhos e rodapés repetitivos de páginas de PDF
+      clean = clean.replace(/\b\d+\s*[-–—]\s*\d+\s+Universidade\s+Salgado\s+de\s+Oliveira[^\n\r]*?EMENTÁ\s*RIO/gi, '\n\n');
+      clean = clean.replace(/\b\d+\s*[-–—]\s*\d+\s+[A-Za-zÀ-ÿ\s\-–—]+?(?:ESTRUTURA\s+CURRICULAR|EMENT[AÁ]RIO|PROJETO\s+PEDAG[OÓ]GICO)[^\n\r]*/gi, '\n\n');
+      clean = clean.replace(/\b\d+\s*[-–—]\s*\d+\s+Universidade\b[^\n\r]*/gi, '\n\n');
+      clean = clean.replace(/\bP[aá]gina\s+\d+\s+de\s+\d+\b/gi, '\n\n');
 
-      function pushSubject(subj) {
-        if (!subj) return;
-        const name = cleanSubjectName(subj.name);
-        if (!isValidSubjectName(name)) return;
-        if (subjects.some(s => s.name.toLowerCase() === name.toLowerCase())) return;
+      // Quebra linhas contínuas de PDFs onde seções estruturais ficaram aglutinadas
+      const markers = [
+        '(?:[0-9]+º|[0-9]+o|[0-9]+ª)\\s+(?:Semestre|Per[ií]odo)(?:\\s*\\([A-Za-z\\s]+\\))?',
+        '(?:PRIMEIRO|SEGUNDO|TERCEIRO|QUARTO|QUINTO|SEXTO|S[EÉ]TIMO|OITAVO|NONO|D[EÉ]CIMO(?:\\s+PRIMEIRO|\\s+SEGUNDO)?)\\s+PER[IÍ]ODO',
+        'Optativas?\\s+(?:I|II|III|IV|V|VI|[0-9]+)?\\s+(?:CÓD|UNIDADE)',
+        'Internato\\s+Optativo',
+        'Disciplina\\s+(?:M\\d{3}|[A-Z0-9]{3,8})?',
+        'Unidade\\s+Curricular\\s+(?:M\\d{3}|[A-Z0-9]{3,8})?',
+        'Carga\\s+Hor[aá]ria\\s*/\\s*Cr[eé]ditos',
+        'Carga\\s+Hor[aá]ria\\s+Te[oó]rica',
+        'Carga\\s+Hor[aá]ria\\s+Total',
+        'Ementa\\b',
+        'Conte[uú]do\\s+Program[aá]tico',
+        'Bibliografia\\s+B[aá]sica',
+        'Bibliografia\\s+Complementar'
+      ];
 
-        let topics = Array.isArray(subj.topics) ? [...subj.topics] : [];
-        if (subj.description && topics.length === 0) {
-          const parts = subj.description
-            .split(/(?:\.\s+|;\s+|\n+)/)
-            .map(p => p.trim().replace(/^[\*\•\-\s0-9\.\)]+/, ''))
-            .filter(p => p.length >= 4 && !isGarbageOrBinaryText(p) && !/^(?:bibliografia|refer[eê]ncias|carga hor[aá]ria|cr[eé]ditos)/i.test(p));
-          topics = parts.slice(0, 35);
-        }
-
-        const obj = buildSubjectObject(name, subj.period, subj.description, topics, subjects.length);
-        if (obj) subjects.push(obj);
+      for (const m of markers) {
+        const regex = new RegExp('([\\s;•]+)(' + m + ')', 'gi');
+        clean = clean.replace(regex, '\n$2\n');
       }
 
-      const isExplicitSubjectPrefix = (l) => /^(?:disciplina|mat[eé]ria|m[oó]dulo|componente curricular|unidade curricular)\b/i.test(l);
-      const isEmentaPrefix = (l) => /^(?:ementa|conte[uú]do(?: program[aá]tico)?|resumo|sum[aá]rio)\b/i.test(l);
-      const isBiblioPrefix = (l) => /^(?:bibliografia|refer[eê]ncias|livros)/i.test(l);
-      const isWorkloadPrefix = (l) => /^(?:carga hor[aá]ria|cr[eé]ditos?|semestre|per[ií]odo)/i.test(l);
-      const isTopicsPrefix = (l) => /^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?|compet[eê]ncias?)\b/i.test(l);
+      return clean;
+    }
 
-      // TIER 1: Suporte a tabelas Markdown ou delimitadas por | ou ;
-      const tableRows = lines.filter(l => (l.includes('|') && l.split('|').length >= 3) || (l.includes(';') && l.split(';').length >= 3));
-      if (tableRows.length >= 2) {
-        const sep = tableRows[0].includes('|') ? '|' : ';';
-        for (const row of tableRows) {
-          if (subjects.length >= 60) break;
-          const cols = row.split(sep).map(c => c.trim()).filter(Boolean);
-          if (cols.length >= 2) {
-            if (/^(c[oó]digo|disciplina|mat[eé]ria|ementa|per[ií]odo)$/i.test(cols[0]) || /^(disciplina|mat[eé]ria|ementa)$/i.test(cols[1])) {
-              continue;
-            }
-            let candName = cols[0];
-            let candDesc = cols.slice(1).join(' ');
-            if (/^[A-Z0-9]{3,8}$/i.test(cols[0]) && cols[1]) {
-              candName = cols[0] + ' ' + cols[1];
-              candDesc = cols.slice(2).join(' ');
-            }
-            if (isValidSubjectName(candName)) {
-              pushSubject({ name: candName, period: '', description: candDesc, topics: [] });
-            }
-          }
+    // RESOLUÇÃO PRECISA DE PERÍODOS E CICLOS MÉDICOS CONFORME AS DCNS
+    function resolvePeriodAndCycle(periodRaw, name, description) {
+      let p = (periodRaw || '').trim();
+      const combined = (p + ' ' + (name || '') + ' ' + (description || '')).toLowerCase();
+
+      // Identifica número de período explícito (1 a 12)
+      const pNumMatch = p.match(/\b(1[0-2]|[1-9])[ºªo\.]?\s*(?:semestre|per[ií]odo)/i) ||
+                         p.match(/^(?:semestre|per[ií]odo)\s*(1[0-2]|[1-9])\b/i) ||
+                         p.match(/\b(1[0-2]|[1-9])\b/);
+
+      if (pNumMatch) {
+        const num = parseInt(pNumMatch[1], 10);
+        if (!p || p === '' + num) {
+          p = `${num}º Período`;
         }
-        if (subjects.length > 0) return subjects;
-      }
-
-      // TIER 2: Estrutura padrão de ementário ancorada em Disciplina, Ementa ou Carga Horária
-      const hasStructure = lines.some(l => isExplicitSubjectPrefix(l) || isEmentaPrefix(l) || isWorkloadPrefix(l));
-
-      if (hasStructure) {
-        let currentSubject = null;
-        let currentSection = ''; // 'title', 'workload', 'ementa', 'topics', 'biblio'
-
-        for (let i = 0; i < lines.length; i++) {
-          if (subjects.length >= 70) break;
-          const line = lines[i];
-
-          // 1. Linha com "Disciplina: Nome"
-          const inlineSubj = line.match(/^(?:disciplina|mat[eé]ria|m[oó]dulo|componente curricular|unidade curricular)\s*[:\-\.]+\s*(.+)$/i);
-          if (inlineSubj) {
-            if (currentSubject) pushSubject(currentSubject);
-            currentSubject = { name: inlineSubj[1].trim(), period: '', description: '', topics: [] };
-            currentSection = 'title';
-            continue;
-          }
-
-          // 2. Linha isolada "Disciplina"
-          if (isExplicitSubjectPrefix(line) && line.length < 35) {
-            if (currentSubject) pushSubject(currentSubject);
-            const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
-            if (nextLine && isValidSubjectName(nextLine)) {
-              currentSubject = { name: nextLine, period: '', description: '', topics: [] };
-              i++; // consome linha do nome
-            } else {
-              currentSubject = { name: '', period: '', description: '', topics: [] };
-            }
-            currentSection = 'title';
-            continue;
-          }
-
-          // 3. Linha de Ementa ou Conteúdo Programático
-          const inlineEmenta = line.match(/^(?:ementa|conte[uú]do(?: program[aá]tico)?|resumo|sum[aá]rio)\s*[:\-\.]+\s*(.*)$/i);
-          if (inlineEmenta || (isEmentaPrefix(line) && line.length < 35)) {
-            if (!currentSubject || (currentSubject.description && currentSubject.description.length > 20)) {
-              if (currentSubject) pushSubject(currentSubject);
-              
-              let foundName = '';
-              let foundPeriod = '';
-              for (let b = i - 1; b >= 0; b--) {
-                const prevL = lines[b];
-                if (isBiblioPrefix(prevL)) break;
-                if (isWorkloadPrefix(prevL)) {
-                  const pMatch = prevL.match(/([0-9]+[ºªo\.]?\s*(?:per[ií]odo|semestre))/i);
-                  if (pMatch && !foundPeriod) foundPeriod = pMatch[1];
-                  continue;
-                }
-                if (isValidSubjectName(prevL)) {
-                  foundName = prevL;
-                  break;
-                }
-              }
-              currentSubject = { name: foundName || 'Disciplina Médica', period: foundPeriod, description: '', topics: [] };
-            }
-
-            currentSection = 'ementa';
-            if (inlineEmenta && inlineEmenta[1].trim()) {
-              currentSubject.description += (currentSubject.description ? ' ' : '') + inlineEmenta[1].trim();
-            }
-            continue;
-          }
-
-          // 4. Carga Horária / Período
-          if (isWorkloadPrefix(line)) {
-            currentSection = 'workload';
-            const pMatch = line.match(/([0-9]+[ºªo\.]?\s*(?:per[ií]odo|semestre))/i);
-            if (pMatch && currentSubject) {
-              currentSubject.period = pMatch[1];
-            }
-            continue;
-          }
-
-          // 5. Tópicos
-          const inlineTopics = line.match(/^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?|compet[eê]ncias?)\s*[:\-\.]+\s*(.+)$/i);
-          if (inlineTopics) {
-            currentSection = 'topics';
-            if (currentSubject) {
-              currentSubject.topics.push(...inlineTopics[1].split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
-            }
-            continue;
-          } else if (isTopicsPrefix(line) && line.length < 35) {
-            currentSection = 'topics';
-            continue;
-          }
-
-          // 6. Bibliografia
-          if (isBiblioPrefix(line)) {
-            currentSection = 'biblio';
-            continue;
-          }
-
-          // 7. Conteúdo acumulado
-          if (currentSubject) {
-            if (currentSection === 'ementa') {
-              currentSubject.description += (currentSubject.description ? ' ' : '') + line;
-            } else if (currentSection === 'topics') {
-              currentSubject.topics.push(...line.split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
-            } else if (currentSection === 'biblio') {
-              continue;
-            }
-          }
-        }
-
-        if (currentSubject) {
-          pushSubject(currentSubject);
+        if (num >= 1 && num <= 4) {
+          return { period: p, cycle: 'basico', cycleName: 'Ciclo Básico' };
+        } else if (num >= 5 && num <= 8) {
+          return { period: p, cycle: 'clinico', cycleName: 'Ciclo Clínico' };
+        } else if (num >= 9 && num <= 12) {
+          return { period: p, cycle: 'internato', cycleName: 'Internato Médico' };
         }
       }
 
-      // TIER 3: Se nenhuma disciplina foi extraída (lista simples de nomes de matérias)
-      if (subjects.length === 0) {
-        for (const line of lines) {
-          if (subjects.length >= 60) break;
-          const cleanLine = cleanSubjectName(line);
-          if (isValidSubjectName(cleanLine)) {
-            const obj = buildSubjectObject(cleanLine, '1º Período • Ciclo Básico', '', [], subjects.length);
-            if (obj) subjects.push(obj);
-          }
-        }
+      if (/internato|est[aá]gio\s+supervisionado/i.test(p)) {
+        return { period: p || 'Internato Médico', cycle: 'internato', cycleName: 'Internato Médico' };
       }
 
-      // TIER 4 (GARANTIA ZERO ERRO): Se ainda for vazio mas há linhas de texto fornecidas
-      if (subjects.length === 0 && lines.length > 0) {
-        let fallbackName = lines[0].replace(/^[\*\•\-\s0-9\.\)\(]+/, '').trim();
-        if (fallbackName.length > 100) fallbackName = fallbackName.slice(0, 80) + '...';
-        if (!fallbackName) fallbackName = 'Disciplina Curricular';
-
-        const obj = buildSubjectObject(fallbackName, '1º Período • Ciclo Básico', lines.slice(1).join(' '), [], 0);
-        if (obj) subjects.push(obj);
+      if (/optativ|eletiv/i.test(p)) {
+        return { period: p, cycle: 'clinico', cycleName: 'Disciplinas Optativas' };
       }
 
-      return subjects;
+      // Fallback por palavras-chave semânticas apenas se o período não constar no documento
+      if (/\b(?:1º|1o|primeiro)\b|anatomia|histologia|bioqu[ií]mica|citologia/i.test(combined)) {
+        return { period: p || '1º Período • Ciclo Básico', cycle: 'basico', cycleName: 'Ciclo Básico' };
+      }
+      if (/\b(?:2º|2o|segundo)\b|fisiologia|gen[eé]tica|imunologia/i.test(combined)) {
+        return { period: p || '2º Período • Ciclo Básico', cycle: 'basico', cycleName: 'Ciclo Básico' };
+      }
+      if (/\b(?:3º|3o|terceiro)\b|microbiologia|parasitologia|patologia\s+geral/i.test(combined)) {
+        return { period: p || '3º Período • Ciclo Básico', cycle: 'basico', cycleName: 'Ciclo Básico' };
+      }
+      if (/\b(?:4º|4o|quarto)\b|semiologia|farmacologia|patologia\s+especial/i.test(combined)) {
+        return { period: p || '4º Período • Ciclo Básico', cycle: 'basico', cycleName: 'Ciclo Básico' };
+      }
+      if (/\b(?:5º|5o|quinto)\b|cardiologia|pneumologia|nefrologia|gastro/i.test(combined)) {
+        return { period: p || '5º Período • Ciclo Clínico', cycle: 'clinico', cycleName: 'Ciclo Clínico' };
+      }
+      if (/\b(?:6º|6o|sexto)\b|dermatologia|endocrinologia|hematologia|reumatologia|infectologia/i.test(combined)) {
+        return { period: p || '6º Período • Ciclo Clínico', cycle: 'clinico', cycleName: 'Ciclo Clínico' };
+      }
+      if (/\b(?:7º|7o|s[eé]timo)\b|cirurgia|ortopedia|oftalmologia|otorrino|neurologia/i.test(combined)) {
+        return { period: p || '7º Período • Ciclo Clínico', cycle: 'clinico', cycleName: 'Ciclo Clínico' };
+      }
+      if (/\b(?:8º|8o|oitavo)\b|ginecologia|obstetr[ií]cia|pediatria|psiquiatria|urg[eê]ncia/i.test(combined)) {
+        return { period: p || '8º Período • Ciclo Clínico', cycle: 'clinico', cycleName: 'Ciclo Clínico' };
+      }
+      if (/\b(?:9º|10º|11º|12º|nono|d[eé]cimo)\b|internato/i.test(combined)) {
+        return { period: p || 'Internato Médico', cycle: 'internato', cycleName: 'Internato Médico' };
+      }
+
+      return { period: p || 'Disciplinas da Ementa', cycle: 'clinico', cycleName: 'Ciclo Universitário' };
     }
 
     function buildSubjectObject(name, periodRaw, description, topics, index) {
       if (!isValidSubjectName(name) || isGarbageOrBinaryText(name)) return null;
-
-      let period = periodRaw || '';
-      let cycle = 'clinico';
-      let cycleName = 'Ciclo Clínico';
 
       let cleanDesc = (typeof description === 'string' && !isGarbageOrBinaryText(description)) ? description.trim() : '';
       const cleanTopics = Array.isArray(topics)
         ? topics.filter(t => typeof t === 'string' && t.trim().length >= 2 && !isGarbageOrBinaryText(t)).map(t => t.trim())
         : [];
 
-      const lower = (name + ' ' + period + ' ' + cleanDesc).toLowerCase();
-
-      if (lower.includes('1º') || lower.includes('1o') || lower.includes('primeiro') || lower.includes('anatomia') || lower.includes('histologia') || lower.includes('bioquimica') || lower.includes('biologia celular')) {
-        period = period || '1º Período • Ciclo Básico';
-        cycle = 'basico';
-        cycleName = 'Ciclo Básico';
-      } else if (lower.includes('2º') || lower.includes('2o') || lower.includes('segundo') || lower.includes('fisiologia') || lower.includes('genetica') || lower.includes('imunologia')) {
-        period = period || '2º Período • Ciclo Básico';
-        cycle = 'basico';
-        cycleName = 'Ciclo Básico';
-      } else if (lower.includes('3º') || lower.includes('3o') || lower.includes('terceiro') || lower.includes('microbiologia') || lower.includes('parasitologia') || lower.includes('patologia geral')) {
-        period = period || '3º Período • Ciclo Básico';
-        cycle = 'basico';
-        cycleName = 'Ciclo Básico';
-      } else if (lower.includes('4º') || lower.includes('4o') || lower.includes('quarto') || lower.includes('semiologia i') || lower.includes('patologia especial') || lower.includes('farmacologia')) {
-        period = period || '4º Período • Ciclo Básico';
-        cycle = 'basico';
-        cycleName = 'Ciclo Básico';
-      } else if (lower.includes('5º') || lower.includes('5o') || lower.includes('quinto') || lower.includes('cardio') || lower.includes('pneumo') || lower.includes('nefro') || lower.includes('gastro') || lower.includes('radiologia')) {
-        period = period || '5º Período • Ciclo Clínico';
-        cycle = 'clinico';
-        cycleName = 'Ciclo Clínico';
-      } else if (lower.includes('6º') || lower.includes('6o') || lower.includes('sexto') || lower.includes('derma') || lower.includes('endocrino') || lower.includes('hemato') || lower.includes('reumato') || lower.includes('infecto') || lower.includes('sistemas 2')) {
-        period = period || '6º Período • Ciclo Clínico';
-        cycle = 'clinico';
-        cycleName = 'Ciclo Clínico';
-      } else if (lower.includes('7º') || lower.includes('7o') || lower.includes('setimo') || lower.includes('cirurg') || lower.includes('ortop') || lower.includes('oftalmo') || lower.includes('otorrino') || lower.includes('neuro')) {
-        period = period || '7º Período • Ciclo Clínico';
-        cycle = 'clinico';
-        cycleName = 'Ciclo Clínico';
-      } else if (lower.includes('8º') || lower.includes('8o') || lower.includes('oitavo') || lower.includes('gineco') || lower.includes('obstet') || lower.includes('pediat') || lower.includes('psiquiat') || lower.includes('urgencia')) {
-        period = period || '8º Período • Ciclo Clínico';
-        cycle = 'clinico';
-        cycleName = 'Ciclo Clínico';
-      } else if (lower.includes('internato') || lower.includes('estagio') || lower.includes('9º') || lower.includes('10º') || lower.includes('11º') || lower.includes('12º')) {
-        period = period || 'Internato Médico • Ciclo Prático';
-        cycle = 'internato';
-        cycleName = 'Internato Médico';
-      } else {
-        period = period || 'Disciplinas da Ementa';
-        cycle = 'clinico';
-        cycleName = 'Ciclo Universitário';
-      }
-
+      const periodCycle = resolvePeriodAndCycle(periodRaw, name, cleanDesc);
       const textKeywords = extractKeywords(`${name} ${cleanDesc} ${cleanTopics.join(' ')}`);
 
       return {
         name: name,
-        period: period,
-        cycle: cycle,
-        cycleName: cycleName,
+        period: periodCycle.period,
+        cycle: periodCycle.cycle,
+        cycleName: periodCycle.cycleName,
         description: cleanDesc,
         topics: cleanTopics,
         keywords: textKeywords,
         isUser: true
       };
+    }
+
+    // PARSER UNIVERSAL DE EMENTA UNIVERSITÁRIA E PROJETO PEDAGÓGICO DE CURSO (PPC)
+    function parseEmentaWithDescriptions(text) {
+      if (!text || typeof text !== 'string') return [];
+      if (isGarbageOrBinaryText(text)) return [];
+
+      const clean = normalizeSyllabusText(text);
+      const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) return [];
+
+      const subjectMap = new Map();
+
+      function addOrUpdateSubject(candidate) {
+        if (!candidate || !candidate.name) return;
+        const cleanName = cleanSubjectName(candidate.name);
+        if (!isValidSubjectName(cleanName)) return;
+
+        const codeMatch = candidate.name.match(/\b(M\d{3}|[A-Z]{3,4}\d{2,4})\b/i);
+        const code = candidate.code || (codeMatch ? codeMatch[1].toUpperCase() : '');
+        const key = code || cleanName.toLowerCase();
+
+        let topics = Array.isArray(candidate.topics) ? [...candidate.topics] : [];
+        if (candidate.description && topics.length === 0) {
+          const parts = candidate.description
+            .split(/(?:\.\s+|;\s+|\n+)/)
+            .map(p => p.trim().replace(/^[\*\•\-\s0-9\.\)]+/, ''))
+            .filter(p => p.length >= 4 && !isGarbageOrBinaryText(p) && !/^(?:bibliografia|refer[eê]ncias|carga hor[aá]ria|cr[eé]ditos)/i.test(p));
+          topics = parts.slice(0, 35);
+        }
+
+        if (subjectMap.has(key)) {
+          const existing = subjectMap.get(key);
+          if (!existing.description && candidate.description) {
+            existing.description = candidate.description;
+          }
+          if (existing.topics.length === 0 && topics.length > 0) {
+            existing.topics = topics;
+          }
+          if ((!existing.period || existing.period.includes('Disciplinas')) && candidate.period) {
+            existing.period = candidate.period;
+          }
+        } else {
+          const obj = buildSubjectObject(candidate.name, candidate.period, candidate.description, topics, subjectMap.size);
+          if (obj) {
+            subjectMap.set(key, obj);
+          }
+        }
+      }
+
+      // SUB-PARSER 1: Matriz Curricular (1º ao 12º Semestre/Internato e Optativas)
+      let currentPeriod = '';
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const pMatch = line.match(/^((?:[0-9]+º|[0-9]+o|[0-9]+ª)\s+(?:Semestre|Per[ií]odo)(?:\s*\([A-Za-z\s]+\))?|Optativas?\s*(?:I|II|III|IV|V|VI|[0-9]+)?)/i);
+        if (pMatch && !/^(?:OPT\s+)?Optativa\s+[I|V|X\d]+\s+\d+\s+\d+/i.test(line)) {
+          currentPeriod = pMatch[1].trim();
+        }
+
+        if (/(?:CÓD\.\s*UNIDADE|CH\s*Te[oó]rica|Total Hora Aula)/i.test(line) || currentPeriod) {
+          const rowRegex = /\b(M\d{3}|OPT(?:\s+[A-Za-z0-9]+)?|AC)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\(\)\:\,\-\–\.\/]+?)\s+(\d+)\s+(\d+)/g;
+          let m;
+          while ((m = rowRegex.exec(line)) !== null) {
+            const code = m[1].trim();
+            let name = m[2].trim().replace(/\s+(?:Total|CH|Hora|Aula|hora\s*-\s*relógio)$/i, '');
+            if (!name.toUpperCase().includes('UNIDADE CURRICULAR') && !name.toUpperCase().includes('TOTAL')) {
+              addOrUpdateSubject({
+                code: code,
+                name: `${code} ${name}`,
+                period: currentPeriod || '1º Semestre',
+                description: '',
+                topics: []
+              });
+            }
+          }
+        }
+      }
+
+      // SUB-PARSER 2: Ementário Detalhado por Disciplina
+      let currentBlock = null;
+      let blockSection = '';
+      let blockPeriod = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        const pMatch = line.match(/^(\d+[\.ºªo\s]+(?:PERÍODO|SEMESTRE)[^\n]*)/i);
+        if (pMatch) {
+          blockPeriod = pMatch[1].trim();
+        }
+
+        const discMatch = line.match(/^(?:Disciplina|Unidade Curricular)\s*(M\d{3}|[A-Z0-9]{3,8})?\s*(.*)$/i);
+        if (discMatch) {
+          if (currentBlock) addOrUpdateSubject(currentBlock);
+          const code = discMatch[1] || '';
+          let name = discMatch[2] ? discMatch[2].trim() : '';
+          if (!name && lines[i + 1] && !/^(?:Carga|Ementa|Bibliografia)/i.test(lines[i + 1])) {
+            name = lines[i + 1].trim();
+            i++;
+          }
+          currentBlock = {
+            code: code,
+            name: code ? `${code} ${name}` : name,
+            period: blockPeriod,
+            description: '',
+            topics: []
+          };
+          blockSection = 'title';
+          continue;
+        }
+
+        if (/^Ementa\b/i.test(line)) {
+          blockSection = 'ementa';
+          const inline = line.replace(/^Ementa\b\s*[:\-\.]*\s*/i, '').trim();
+          if (currentBlock && inline) {
+            currentBlock.description += (currentBlock.description ? ' ' : '') + inline;
+          }
+          continue;
+        }
+
+        if (/^Bibliografia/i.test(line)) {
+          blockSection = 'biblio';
+          continue;
+        }
+
+        if (/^Carga Horária/i.test(line)) {
+          blockSection = 'workload';
+          continue;
+        }
+
+        if (currentBlock && blockSection === 'ementa') {
+          currentBlock.description += (currentBlock.description ? ' ' : '') + line;
+        }
+      }
+      if (currentBlock) addOrUpdateSubject(currentBlock);
+
+      // SUB-PARSER 3: Fallback para tabelas delimitadas por | ou ;
+      if (subjectMap.size === 0) {
+        const tableRows = lines.filter(l => (l.includes('|') && l.split('|').length >= 3) || (l.includes(';') && l.split(';').length >= 3));
+        if (tableRows.length >= 2) {
+          const sep = tableRows[0].includes('|') ? '|' : ';';
+          for (const row of tableRows) {
+            const cols = row.split(sep).map(c => c.trim()).filter(Boolean);
+            if (cols.length >= 2) {
+              if (!/^(c[oó]digo|disciplina|mat[eé]ria|ementa|per[ií]odo)$/i.test(cols[0])) {
+                let candName = cols[0];
+                let candDesc = cols.slice(1).join(' ');
+                if (/^[A-Z0-9]{3,8}$/i.test(cols[0]) && cols[1]) {
+                  candName = cols[0] + ' ' + cols[1];
+                  candDesc = cols.slice(2).join(' ');
+                }
+                addOrUpdateSubject({ name: candName, period: 'Disciplinas da Ementa', description: candDesc, topics: [] });
+              }
+            }
+          }
+        }
+      }
+
+      // SUB-PARSER 4: Fallback para listas simples de disciplinas
+      if (subjectMap.size === 0) {
+        for (const line of lines) {
+          if (subjectMap.size >= 70) break;
+          const cleanLine = cleanSubjectName(line);
+          if (isValidSubjectName(cleanLine)) {
+            addOrUpdateSubject({ name: cleanLine, period: '1º Período • Ciclo Básico', description: '', topics: [] });
+          }
+        }
+      }
+
+      return Array.from(subjectMap.values());
     }
 
     function groupSubjectsIntoCurriculum(subjects) {
@@ -6468,7 +6504,19 @@ ${rawText.slice(0, 150000)}`;
         periodMap.get(pKey).subjects.push(subj);
       });
 
-      return Array.from(periodMap.values());
+      const list = Array.from(periodMap.values());
+
+      // Ordenação cronológica perfeita: 1º ao 12º Semestre, depois Optativas e Eletivas
+      const getOrder = (p) => {
+        const m = (p.period || '').match(/\b(1[0-2]|[1-9])\b/);
+        if (m) return parseInt(m[1], 10);
+        if (/internato/i.test(p.period)) return 100;
+        if (/optativ|eletiv/i.test(p.period)) return 200;
+        return 300;
+      };
+
+      list.sort((a, b) => getOrder(a) - getOrder(b));
+      return list;
     }
 
     // MOTOR DE CURADORIA E DISTRIBUIÇÃO INTELIGENTE DE ARQUIVOS PELA EMENTA
