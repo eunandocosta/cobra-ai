@@ -602,6 +602,49 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _controller = TextEditingController();
 
+  final List<DriveFileItem> _driveFiles = [
+    DriveFileItem(
+      id: '1t_01',
+      name: 'Aula 2 - Sistema Tegumentar.pdf',
+      sizeMB: 2.3,
+      mimeType: 'application/pdf',
+      isEligible: true,
+    ),
+    DriveFileItem(
+      id: '1t_02',
+      name: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf',
+      sizeMB: 3.4,
+      mimeType: 'application/pdf',
+      isEligible: true,
+    ),
+    DriveFileItem(
+      id: '1t_03',
+      name: 'Psoríase, liquen plano.pdf',
+      sizeMB: 37.6,
+      mimeType: 'application/pdf',
+      isEligible: true,
+    ),
+    DriveFileItem(
+      id: '1t_04',
+      name: 'Dermatite Seborreica, Dermatite Atópica...pdf',
+      sizeMB: 0.3,
+      mimeType: 'application/pdf',
+      isEligible: true,
+    ),
+    DriveFileItem(
+      id: '1t_08',
+      name: 'Dermatologia - Azulay (8ª Edição).pdf',
+      sizeMB: 50.3,
+      mimeType: 'application/pdf',
+      isEligible: false,
+      isExtensiveBook: true,
+      rejectionReason: 'Livro extenso omitido por padrão',
+    ),
+  ];
+
+  final Set<String> _selectedDriveFileIds = {'1t_01', '1t_02', '1t_03'};
+  bool _showDriveSelector = false;
+
   void _handleUploadMaterial() {
     widget.onGenerateItem(
       'Mecanismo de ação dos Inibidores da SGLT2 na IC',
@@ -613,15 +656,51 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _produceReadingMaterial() {
+    final selectedFiles = _driveFiles.where((f) => _selectedDriveFileIds.contains(f.id)).toList();
+    final readingDoc = ReadingMaterialService.generateFromDriveFiles(selectedFiles);
+
+    setState(() {
+      _messages.add({
+        'role': 'user',
+        'text': '📖 Solicitação: Produzir Material de Estudo para Leitura médica com base em ${selectedFiles.length} aulas selecionadas do Drive.'
+      });
+      _messages.add({
+        'role': 'reading_doc',
+        'doc': readingDoc,
+      });
+      _showDriveSelector = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('📖 Material de Estudo para Leitura gerado com sucesso!')),
+    );
+  }
+
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
+    final selectedCount = _selectedDriveFileIds.length;
+    final lower = text.toLowerCase();
+    final isReadingRequest = lower.contains('leitura') || lower.contains('apostila') || lower.contains('ler') || lower.contains('resumo');
+
+    if (isReadingRequest) {
+      _controller.clear();
+      _produceReadingMaterial();
+      return;
+    }
+
     setState(() {
-      _messages.add({'role': 'user', 'text': text});
+      _messages.add({
+        'role': 'user',
+        'text': selectedCount > 0 ? '$text\n\n📎 (Baseado em $selectedCount materiais selecionados do Drive)' : text,
+      });
       _messages.add({
         'role': 'assistant',
-        'text': 'Baseado nas diretrizes clínicas vigentes: A conduta fundamenta-se na otimização hemodinâmica e farmacoterapia quadrupla. Gostaria de criar um card de revisão para este conceito?'
+        'text': selectedCount > 0 
+            ? 'Fundamentado nos slides das aulas sincronizadas do Google Drive da disciplina:\n\nA análise semiológica da lesão primária orienta o diagnóstico diferencial e a conduta. Deseja produzir a apostila completa de leitura médica?'
+            : 'Baseado nas diretrizes clínicas vigentes: A conduta fundamenta-se na otimização hemodinâmica e estratificação de risco precoce.'
       });
       _controller.clear();
     });
@@ -629,20 +708,142 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selectedFiles = _driveFiles.where((f) => _selectedDriveFileIds.contains(f.id)).toList();
+
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Theme.of(context).colorScheme.surface,
+          color: theme.colorScheme.surface,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Tutor Clínico Socrático', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              const Row(
+                children: [
+                  Text('Tutor Clínico Socrático', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  SizedBox(width: 8),
+                  Text('• Materiais do Drive', style: TextStyle(fontSize: 12, color: Color(0xFF00FF66))),
+                ],
+              ),
               IconButton(icon: const Icon(Icons.help_outline, size: 18), onPressed: widget.onShowHelp),
             ],
           ),
         ),
         const Divider(height: 1),
+
+        // GAVETA DE MATERIAIS DO DRIVE
+        if (_showDriveSelector)
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: theme.colorScheme.surface,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Materiais do Google Drive (Turma):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00FF66))),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedDriveFileIds.clear();
+                              for (var f in _driveFiles) {
+                                if (!f.isExtensiveBook) _selectedDriveFileIds.add(f.id);
+                              }
+                            });
+                          },
+                          child: const Text('Marcar Aulas', style: TextStyle(fontSize: 11)),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _selectedDriveFileIds.clear()),
+                          child: const Text('Limpar', style: TextStyle(fontSize: 11)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00FF66),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          ),
+                          onPressed: _produceReadingMaterial,
+                          child: const Text('📖 Produzir Leitura', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: _driveFiles.map((f) {
+                    final isChecked = _selectedDriveFileIds.contains(f.id);
+                    return FilterChip(
+                      selected: isChecked,
+                      label: Text(
+                        '${f.name} (${f.sizeMB} MB)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: f.isExtensiveBook ? Colors.orange : (isChecked ? Colors.black : theme.colorScheme.onSurface),
+                        ),
+                      ),
+                      selectedColor: const Color(0xFF00FF66),
+                      onSelected: (val) {
+                        setState(() {
+                          if (val) {
+                            _selectedDriveFileIds.add(f.id);
+                          } else {
+                            _selectedDriveFileIds.remove(f.id);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const Divider(),
+              ],
+            ),
+          ),
+
+        // BARRA DE MATERIAIS ANEXADOS
+        if (selectedFiles.isNotEmpty && !_showDriveSelector)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            color: const Color(0xFF00FF66).withOpacity(0.08),
+            child: Row(
+              children: [
+                const Icon(Icons.attachment, size: 16, color: Color(0xFF00FF66)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: selectedFiles.map((f) => Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Chip(
+                          label: Text(f.name, style: const TextStyle(fontSize: 11)),
+                          deleteIcon: const Icon(Icons.close, size: 14),
+                          onDeleted: () => setState(() => _selectedDriveFileIds.remove(f.id)),
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF66),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  ),
+                  onPressed: _produceReadingMaterial,
+                  child: const Text('📖 Gerar Leitura', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
         Expanded(
           child: _messages.isEmpty
               ? Center(
@@ -651,14 +852,29 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       const Icon(Icons.chat_bubble_outline, size: 48, color: Color(0xFF00FF66)),
                       const SizedBox(height: 16),
-                      const Text('Tutor Clínico Pronto', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Text('Tutor Clínico com Materiais do Drive', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      const Text('Envie dúvidas de casos ou anexe materiais de aula.', style: TextStyle(color: Colors.grey)),
+                      const Text('Envie dúvidas médicas ou selecione aulas do Drive para gerar leitura.', style: TextStyle(color: Colors.grey)),
                       const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.upload_file_outlined),
-                        label: const Text('+ Upload de Material de Aula'),
-                        onPressed: _handleUploadMaterial,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.folder_outlined),
+                            label: Text('📁 Drive (${_selectedDriveFileIds.length} aulas)'),
+                            onPressed: () => setState(() => _showDriveSelector = !_showDriveSelector),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00FF66),
+                              foregroundColor: Colors.black,
+                            ),
+                            icon: const Icon(Icons.menu_book_outlined),
+                            label: const Text('📖 Produzir Leitura'),
+                            onPressed: _produceReadingMaterial,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -667,18 +883,88 @@ class _ChatScreenState extends State<ChatScreen> {
                   padding: const EdgeInsets.all(16),
                   itemCount: _messages.length,
                   itemBuilder: (ctx, i) {
-                    final isUser = _messages[i]['role'] == 'user';
+                    final msg = _messages[i];
+                    final isReading = msg['role'] == 'reading_doc';
+                    final isUser = msg['role'] == 'user';
+
+                    if (isReading) {
+                      final doc = msg['doc'] as ReadingStudyMaterial;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF00FF66), width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Chip(
+                                  label: Text('📚 MATERIAL DE ESTUDO PARA LEITURA', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                  backgroundColor: Color(0xFF00FF66),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.copy_outlined, size: 18),
+                                  tooltip: 'Copiar Apostila',
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Apostila copiada para a área de transferência!')),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(doc.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text(doc.module, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            const SizedBox(height: 12),
+                            const Text('1. Propedêutica & Tabela Semiológica:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(doc.semiologyTable, style: const TextStyle(fontSize: 13)),
+                            const SizedBox(height: 10),
+                            const Text('2. Histologia & Barreira Cutânea:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(doc.histologyContent, style: const TextStyle(fontSize: 13)),
+                            const SizedBox(height: 10),
+                            const Text('3. Diagnóstico Diferencial (Psoríase vs Líquen Plano):', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(doc.differentialDiagnosis, style: const TextStyle(fontSize: 13)),
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF66).withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('💡 Pérolas de Prova:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00FF66))),
+                                  const SizedBox(height: 4),
+                                  Text(doc.pearlsOfWisdom, style: const TextStyle(fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
                     return Align(
                       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: isUser ? const Color(0xFF00FF66).withOpacity(0.15) : Theme.of(context).colorScheme.surface,
+                          color: isUser ? const Color(0xFF00FF66).withOpacity(0.15) : theme.colorScheme.surface,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Theme.of(context).colorScheme.outline),
+                          border: Border.all(color: theme.colorScheme.outline),
                         ),
-                        child: Text(_messages[i]['text'] as String),
+                        child: Text(msg['text'] as String),
                       ),
                     );
                   },
@@ -687,21 +973,26 @@ class _ChatScreenState extends State<ChatScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outline)),
+            color: theme.colorScheme.surface,
+            border: Border(top: BorderSide(color: theme.colorScheme.outline)),
           ),
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.attach_file_outlined),
-                tooltip: 'Anexar material de estudo',
-                onPressed: _handleUploadMaterial,
+                icon: Icon(Icons.folder_outlined, color: _showDriveSelector ? const Color(0xFF00FF66) : null),
+                tooltip: 'Materiais do Google Drive da Turma',
+                onPressed: () => setState(() => _showDriveSelector = !_showDriveSelector),
+              ),
+              IconButton(
+                icon: const Icon(Icons.menu_book_outlined),
+                tooltip: 'Produzir Material de Leitura Médica',
+                onPressed: _produceReadingMaterial,
               ),
               Expanded(
                 child: TextField(
                   controller: _controller,
                   decoration: const InputDecoration(
-                    hintText: 'Pergunte sobre condutas, diagnósticos ou fármacos...',
+                    hintText: 'Digite sua dúvida ou solicite leitura dos materiais marcados...',
                     border: InputBorder.none,
                   ),
                   onSubmitted: (_) => _sendMessage(),

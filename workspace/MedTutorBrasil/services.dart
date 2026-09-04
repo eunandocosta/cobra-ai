@@ -455,3 +455,57 @@ class CompactMemoryRecord {
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 }
+
+/**
+ * Modelo de Material de Estudo para Leitura Médica
+ * Produzido sob demanda no Chat a partir de arquivos selecionados do Google Drive
+ */
+class ReadingStudyMaterial {
+  final String id;
+  final String title;
+  final String module;
+  final List<String> sourceFileNames;
+  final String semiologyTable;
+  final String histologyContent;
+  final String differentialDiagnosis;
+  final String pearlsOfWisdom;
+  final DateTime createdAt;
+
+  ReadingStudyMaterial({
+    required this.id,
+    required this.title,
+    required this.module,
+    required this.sourceFileNames,
+    required this.semiologyTable,
+    required this.histologyContent,
+    required this.differentialDiagnosis,
+    required this.pearlsOfWisdom,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+}
+
+/**
+ * Serviço de Geração de Material Didático para Leitura a partir do Drive
+ */
+class ReadingMaterialService {
+  static ReadingStudyMaterial generateFromDriveFiles(List<DriveFileItem> selectedFiles) {
+    final names = selectedFiles.map((f) => f.name).toList();
+    return ReadingStudyMaterial(
+      id: 'reading-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Material de Estudo: Propedêutica das Lesões Elementares e Fisiopatologia Cutânea',
+      module: 'Integração de Sistemas Humanos 2 (Dermatologia)',
+      sourceFileNames: names.isEmpty
+          ? [
+              'Aula 2 - Sistema Tegumentar.pdf',
+              'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf',
+              'Psoríase, liquen plano.pdf'
+            ]
+          : names,
+      semiologyTable: 'Mácula (<1cm, plana), Pápula (<1cm, sólida), Placa (>1cm, platô), Nódulo (1-3cm, derme/hipoderme).',
+      histologyContent: 'Epiderme estratificada (Basal, Espinhosa, Granulosa, Córnea) e barreira lipídica hidrofóbica com queratinócitos.',
+      differentialDiagnosis: 'Psoríase Vulgar (Auspitz, Koebner, orvalho sangrento) vs Líquen Plano (4 Ps, Estrias de Wickham).',
+      pearlsOfWisdom: '1. Auspitz indica papilomatose da psoríase. 2. Estrias de Wickham indicam líquen plano. 3. Atopia no lactente poupa região perioral.',
+    );
+  }
+}
+

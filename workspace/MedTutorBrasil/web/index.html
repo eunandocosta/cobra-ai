@@ -479,6 +479,230 @@
       transform: scale(1.04);
     }
 
+    /* Gaveta de Materiais do Drive no Chat */
+    .chat-drive-drawer {
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-top: 10px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.25s ease;
+    }
+
+    .chat-drive-drawer.visible {
+      display: flex;
+    }
+
+    .chat-drive-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neon);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chat-drive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .chat-drive-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 12px;
+      user-select: none;
+    }
+
+    .chat-drive-card:hover {
+      border-color: var(--neon);
+      background: rgba(0, 255, 102, 0.05);
+    }
+
+    .chat-drive-card.selected {
+      border-color: var(--neon);
+      background: var(--neon-subtle);
+    }
+
+    .chat-drive-card.book {
+      border-color: rgba(140, 150, 255, 0.3);
+      opacity: 0.85;
+    }
+
+    .chat-attached-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(0, 255, 102, 0.06);
+      border: 1px solid var(--border-accent);
+      border-radius: 12px;
+      margin-top: 10px;
+      font-size: 12px;
+      gap: 10px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .chat-attached-bar.visible {
+      display: flex;
+    }
+
+    .attached-chips-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .attached-doc-chip {
+      background: var(--neon-subtle);
+      border: 1px solid var(--border-accent);
+      color: var(--neon);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+    }
+
+    /* Cartão do Material de Estudo para Leitura (Gerado via IA / Drive) */
+    .reading-doc-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 18px;
+      padding: 24px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+    }
+
+    .reading-doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .reading-doc-title-box h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .reading-meta-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 11px;
+    }
+
+    .reading-meta-pill {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .reading-meta-pill.highlight {
+      border-color: var(--border-accent);
+      color: var(--neon);
+      background: var(--neon-subtle);
+    }
+
+    .doc-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+
+    .doc-section h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--neon);
+      margin: 0 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 12.5px;
+    }
+
+    .doc-table th {
+      background: var(--bg-elevated);
+      color: var(--neon);
+      text-align: left;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      font-weight: 700;
+    }
+
+    .doc-table td {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .doc-pearl-box {
+      background: rgba(255, 184, 0, 0.08);
+      border-left: 3px solid var(--warning);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #ffe699;
+      margin-top: 10px;
+    }
+
+    .doc-actions-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
     /* 2. Flashcards */
     .study-toolbar {
       display: flex;
@@ -1253,13 +1477,54 @@
               </div>
             </div>
 
+            <!-- GAVETA / SELETOR DE MATERIAIS DO DRIVE NO CHAT -->
+            <div class="chat-drive-drawer" id="chatDriveDrawer">
+              <div class="chat-drive-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span>Materiais do Google Drive • Selecione para Produzir Estudo para Leitura:</span>
+                  <button class="btn-help-icon" onclick="openHelpModal('Materiais do Drive para Leitura', 'Marque as caixas das aulas que deseja estudar e clique em \'Produzir Material de Leitura\' ou envie uma mensagem no chat. O Tutor gerará uma apostila didática completa de leitura com tabelas semiológicas, diferenciais e pérolas de prova.')">?</button>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="selectAllDriveAulasForReading(true)">Marcar Aulas</button>
+                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="selectAllDriveAulasForReading(false)">Limpar</button>
+                  <button class="btn-outline-action primary" style="padding: 4px 12px; font-size: 11px;" onclick="requestReadingMaterialProduction()">
+                    📖 Produzir Material de Leitura
+                  </button>
+                </div>
+              </div>
+              <div class="chat-drive-grid" id="chatDriveGrid">
+                <!-- Populado dinamicamente via JS com os arquivos reais do Drive -->
+              </div>
+            </div>
+
+            <!-- BARRA DE MATERIAIS ANEXADOS / SELECIONADOS NO CHAT -->
+            <div class="chat-attached-bar" id="chatAttachedBar">
+              <div class="attached-chips-wrapper">
+                <span style="color: var(--text-secondary); font-size: 11px; font-weight: 700;">📎 Base para Leitura:</span>
+                <div id="chatAttachedChipsList" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px;" onclick="requestReadingMaterialProduction()">
+                  📖 Gerar Leitura Completa
+                </button>
+                <button class="btn-close-modal" style="width: 24px; height: 24px;" onclick="clearChatDriveSelection()" title="Desmarcar materiais">
+                  <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+
             <div class="chat-bar">
-              <button class="btn-outline-action" onclick="openUploadMaterialModal()" title="Upload de material do estudante (PDF, resumos, anotações)" style="padding: 12px 14px; border-radius: 14px; display: flex; align-items: center; gap: 6px;">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                <span style="font-size: 12px;">Material</span>
+              <button class="btn-outline-action primary" id="btnToggleChatDrive" onclick="toggleChatDriveDrawer()" title="Selecionar materiais do Google Drive da turma para produzir material de leitura" style="padding: 10px 14px; border-radius: 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span style="font-size: 12px;">📁 Drive (<span id="chatDriveCount">7</span>)</span>
               </button>
-              <input type="text" id="chatInput" class="chat-input" placeholder="Digite uma dúvida médica ou descreva um caso clínico..." onkeypress="handleEnter(event)">
-              <button class="btn-send" onclick="submitChatQuery()">
+              <button class="btn-outline-action" onclick="openUploadMaterialModal()" title="Upload de material do estudante (PDF, resumos, anotações)" style="padding: 10px 12px; border-radius: 14px; display: flex; align-items: center; gap: 6px;">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <span style="font-size: 12px;">Upload</span>
+              </button>
+              <input type="text" id="chatInput" class="chat-input" placeholder="Digite uma dúvida médica ou solicite roteiro de leitura dos materiais marcados..." onkeypress="handleEnter(event)">
+              <button class="btn-send" onclick="submitChatQuery()" title="Enviar mensagem">
                 <svg class="icon" style="stroke: #000;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             </div>
@@ -1557,6 +1822,7 @@
         <div style="display: flex; align-items: center; gap: 10px;">
           <svg class="icon" style="color: var(--neon); width: 26px; height: 26px;" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <h2>Atualizar por Google Drive</h2>
+          <button class="btn-help-icon" onclick="openHelpModal('Sincronização com Google Drive', 'Conecte a pasta com as aulas da sua faculdade. O app sincroniza slides e notas, ignora livros extensos para poupar processamento, compacta arquivos de 100MB a 300MB no próprio aparelho sem IA e disponibiliza os materiais para Flashcards, Quizzes e para gerar materiais completos de leitura no Chat.')">?</button>
         </div>
         <button class="btn-close-modal" onclick="closeModals()">
           <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1625,12 +1891,43 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 10px; margin-top: 6px;">
+        <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
           <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
-          <button id="btnImportDriveFiles" class="btn-outline-action primary" style="flex: 1.8; justify-content: center;" onclick="importDriveEligibleFiles()">
-            📥 Sincronizar Aulas Selecionadas (<span id="btnImportCount">7</span>)
+          <button id="btnProduceReadingFromModal" class="btn-outline-action" style="flex: 1.4; justify-content: center; border-color: var(--neon); color: var(--neon);" onclick="produceReadingFromDriveModal()">
+            📖 Produzir Leitura no Chat
+          </button>
+          <button id="btnImportDriveFiles" class="btn-outline-action primary" style="flex: 1.6; justify-content: center;" onclick="importDriveEligibleFiles()">
+            📥 Sincronizar Flashcards & Quizzes (<span id="btnImportCount">7</span>)
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE LEITURA FOCADA (CLEAN READER MODE)
+       ========================================================= -->
+  <div class="modal-overlay" id="readerModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 820px; max-height: 88vh; display: flex; flex-direction: column;">
+      <div class="modal-head" style="border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 22px;">📖</span>
+          <div>
+            <h2 id="readerModalTitle" style="font-size: 16px; margin: 0;">Material de Estudo para Leitura Médica</h2>
+            <span id="readerModalSubtitle" style="font-size: 11px; color: var(--text-secondary);">Integração de Sistemas Humanos 2 • Módulo Dermatologia</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn-outline-action" style="padding: 4px 10px; font-size: 12px;" onclick="changeReaderFontSize(-1)" title="Diminuir fonte">A-</button>
+          <button class="btn-outline-action" style="padding: 4px 10px; font-size: 12px;" onclick="changeReaderFontSize(1)" title="Aumentar fonte">A+</button>
+          <button class="btn-outline-action primary" style="padding: 4px 12px; font-size: 12px;" onclick="copyReaderModalText()">📋 Copiar</button>
+          <button class="btn-close-modal" onclick="closeModals()">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="readerModalContent" style="flex: 1; overflow-y: auto; padding: 18px 6px; font-size: 14px; line-height: 1.7; color: var(--text-primary);">
+        <!-- Conteúdo dinâmico da leitura -->
       </div>
     </div>
   </div>
@@ -1777,8 +2074,8 @@
 
     const tabHelpDescriptions = {
       chat: {
-        title: 'Chat Científico',
-        text: 'Tire dúvidas clínicas e terapêuticas com um tutor socrático que responde fundamentado em diretrizes e artigos científicos do PubMed.'
+        title: 'Chat Científico & Materiais do Drive',
+        text: 'Tire dúvidas clínicas com o tutor socrático ou anexe arquivos do Google Drive da sua turma para solicitar a produção de materiais didáticos completos para leitura (com tabelas semiológicas, diferenciais clínicos e pérolas de prova).'
       },
       flashcards: {
         title: 'Flashcards de Repetição Espaçada',
@@ -2743,7 +3040,7 @@
       `).join('');
     }
 
-    // 10. CHAT INTERATIVO
+    // 10. CHAT INTERATIVO & INTEGRAÇÃO COM DRIVE
     function quickPrompt(text) {
       document.getElementById('chatInput').value = text;
       submitChatQuery();
@@ -2762,31 +3059,69 @@
       const empty = document.getElementById('chatEmptyState');
       if (empty) empty.style.display = 'none';
 
+      const selected = chatDriveMaterials.filter(m => m.selected);
+      const lowerText = text.toLowerCase();
+      const isReadingRequest = lowerText.includes('leitura') || lowerText.includes('apostila') || lowerText.includes('ler') || lowerText.includes('roteiro de leitura') || lowerText.includes('resumo');
+
       const userBubble = document.createElement('div');
       userBubble.className = 'chat-bubble user';
-      userBubble.textContent = text;
+
+      if (selected.length > 0) {
+        userBubble.innerHTML = `
+          <div>${text}</div>
+          <div style="font-size: 11px; margin-top: 6px; padding: 4px 8px; background: rgba(0, 255, 102, 0.1); border-radius: 6px; color: var(--neon); display: flex; align-items: center; gap: 6px;">
+            <span>📎 Baseado em ${selected.length} materiais selecionados do Drive:</span>
+            <strong>${selected.map(s => s.name.length > 22 ? s.name.slice(0, 20) + '...' : s.name).join(', ')}</strong>
+          </div>
+        `;
+      } else {
+        userBubble.textContent = text;
+      }
+
       flow.appendChild(userBubble);
       input.value = '';
       flow.scrollTop = flow.scrollHeight;
 
+      if (isReadingRequest) {
+        // Se a dúvida pedir expressamente leitura/apostila dos materiais
+        setTimeout(() => {
+          requestReadingMaterialProduction(false);
+        }, 300);
+        return;
+      }
+
       setTimeout(() => {
         const tutorBubble = document.createElement('div');
         tutorBubble.className = 'chat-bubble tutor';
+
+        const attachedCitations = selected.length > 0 
+          ? `<div style="font-size: 11px; color: var(--neon); margin-bottom: 8px; font-weight: 600;">
+               📂 Resposta orientada pelos slides do Drive: <em>${selected.map(s => s.name).slice(0, 2).join(' & ')}</em>
+             </div>` 
+          : '';
+
         tutorBubble.innerHTML = `
           <div class="tutor-header">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            Revisão Bibliográfica (PubMed & Diretrizes Brasileiras)
+            Revisão Clínica Fundamentada (Aulas do Drive & PubMed)
           </div>
+          ${attachedCitations}
           <p>
-            Em resposta à questão sobre <em>"${text.slice(0, 45)}..."</em>, a literatura preconiza protocolos de estratificação rápida e conduta orientada por metas hemodinâmicas.
+            Analisando sua questão sobre <em>"${text.slice(0, 50)}..."</em> em consonância com as diretrizes e materiais de aula da disciplina de <strong>Integração de Sistemas Humanos 2</strong>:
+          </p>
+          <p style="color: var(--text-secondary); line-height: 1.6;">
+            A identificação semiológica correta da lesão elementar (ex: mácula plana vs placa infiltrada) é o primeiro passo diagnóstico mandatório, orientando se a biópsia deve ser incisional, excisional ou se a conduta inicial pode ser eminentemente tópica.
           </p>
           <div class="socratic-box">
-            ❓ <strong>Pergunta Socrática de Fixação:</strong> Qual a principal complicação iatrogênica que devemos monitorar nas primeiras 2 horas dessa conduta?
+            ❓ <strong>Desafio Socrático do Tutor:</strong> Na vigência de lesões eritemato-descamativas pruriginosas no couro cabeludo e cotovelos, que sinal clínico você pesquisaria na curetagem de Brocq para fechar o diagnóstico?
           </div>
           <div class="ref-footer">
-            📖 <em>Ref: Diretriz Oficial 2024; UpToDate Clinical Overview; The Lancet Medical.</em>
+            📖 <em>Ref: Slides da Turma (Dermatologia 2026.2); Diretrizes Brasileiras de Dermatologia; PubMed.</em>
           </div>
-          <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+            <button class="btn-outline-action primary" onclick="requestReadingMaterialProduction(false)">
+              📖 Produzir Apostila de Leitura Completa
+            </button>
             <button class="btn-outline-action" onclick="createCardFromChatMsg('${text.replace(/'/g, "\\'")}')">
               🗂️ + Gerar Flashcard
             </button>
@@ -2822,6 +3157,493 @@
       renderSharedStudyItems();
       showToast('✅ Questão adicionada aos Flashcards e Quizzes!');
     }
+
+    // 11. MATERIAIS DO GOOGLE DRIVE NO CHAT & GERAÇÃO DE LEITURA MÉDICA
+    const DEFAULT_DRIVE_FOLDER_FILES = [
+      {
+        id: '1XjD8B4j8Q7U8R1bA4C5D6E7F8G9H0J1',
+        name: 'Aula 2 - Sistema Tegumentar.pdf',
+        sizeStr: '2,3 MB',
+        type: 'slides',
+        selected: true,
+        tag: 'Slide Aula',
+        topic: 'Sistema Tegumentar, Epiderme e Derme'
+      },
+      {
+        id: '1x88R5i6B3qFmZp6fU4cZ8W4K1L2M3N4',
+        name: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf',
+        sizeStr: '3,4 MB',
+        type: 'slides',
+        selected: true,
+        tag: 'Slide Aula',
+        topic: 'Semiologia e Lesões Elementares (Mácula, Pápula, Placa, Nódulo)'
+      },
+      {
+        id: '1a5Z5l9B9C8X7W6V5U4T3S2R1Q0P9O8N',
+        name: 'Psoríase, liquen plano.pdf',
+        sizeStr: '37,6 MB',
+        type: 'slides',
+        selected: true,
+        tag: 'Slide Aula',
+        topic: 'Psoríase (Auspitz, Koebner) & Líquen Plano (Wickham)'
+      },
+      {
+        id: '1L9mK8j7H6g5F4d3S2a1Z0X9C8V7B6N5',
+        name: 'Dermatite Seborreica, Dermatite Atópica, Dermatite de Contato Alérgica...pdf',
+        sizeStr: '279 KB',
+        type: 'slides',
+        selected: true,
+        tag: 'Slide Aula',
+        topic: 'Eczemas, Fisiopatologia e Diagnóstico Diferencial'
+      },
+      {
+        id: '1yZ4m6K2L9x1W8v7U3t5S4r3Q2p1O0n9',
+        name: 'Apresentação do Plano de Aula - Dermatologia - 2026.2 - Aula 1.pdf',
+        sizeStr: '35 KB',
+        type: 'doc',
+        selected: false,
+        tag: 'Cronograma',
+        topic: 'Plano Pedagógico Semestral'
+      },
+      {
+        id: '1J0N9m7K4v3W2x1L8u6T5s4R3q2P1o0N',
+        name: 'DOC-20260814-WA0076.pdf',
+        sizeStr: '2,6 MB',
+        type: 'doc',
+        selected: false,
+        tag: 'Casos Clínicos',
+        topic: 'Roteiro de Casos Ambulatoriais'
+      },
+      {
+        id: '1YxMHcUSCNYyW_8t6WOw9Bv8JvYKVIBOF',
+        name: 'DOC-20260814-WA0108.pdf',
+        sizeStr: '1,6 MB',
+        type: 'doc',
+        selected: false,
+        tag: 'Resumo Ambulatório',
+        topic: 'Esquemas Diagnósticos Práticos'
+      },
+      {
+        id: '1XCjuoqYcWCCb_wNiQVA31x9RNnL27Kr9',
+        name: 'Dermatologia - Azulay (8ª Edição)_260814_151238.pdf',
+        sizeStr: '50,3 MB',
+        type: 'book',
+        selected: false,
+        isBook: true,
+        tag: 'Tratado / Livro',
+        topic: 'Tratado de Referência (Omitido por padrão para poupar processamento)'
+      }
+    ];
+
+    let chatDriveMaterials = JSON.parse(JSON.stringify(DEFAULT_DRIVE_FOLDER_FILES));
+    let currentReaderFontSize = 14;
+
+    function initChatDriveMaterials() {
+      renderChatDriveGrid();
+      updateChatAttachedBar();
+    }
+
+    function toggleChatDriveDrawer() {
+      const drawer = document.getElementById('chatDriveDrawer');
+      if (!drawer) return;
+      drawer.classList.toggle('active');
+      const btn = document.getElementById('btnToggleChatDrive');
+      if (btn) {
+        btn.classList.toggle('active', drawer.classList.contains('active'));
+      }
+    }
+
+    function renderChatDriveGrid() {
+      const grid = document.getElementById('chatDriveGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      chatDriveMaterials.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'chat-drive-item' + (file.selected ? ' selected' : '');
+        item.onclick = (e) => {
+          if (e.target.tagName.toLowerCase() !== 'input') {
+            toggleChatDriveFile(index);
+          }
+        };
+
+        item.innerHTML = `
+          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleChatDriveFile(${index})">
+          <div style="flex: 1; min-width: 0;">
+            <div class="chat-drive-item-title" title="${file.name}">
+              ${file.isBook ? '📖' : '📄'} ${file.name}
+            </div>
+            <div class="chat-drive-item-meta">
+              <span>${file.sizeStr}</span>
+              <span style="color: ${file.isBook ? '#f59e0b' : 'var(--neon)'}; font-weight: 600;">• ${file.tag}</span>
+              <span style="color: var(--text-muted);">• ${file.topic}</span>
+            </div>
+          </div>
+        `;
+        grid.appendChild(item);
+      });
+
+      const selectedCount = chatDriveMaterials.filter(m => m.selected).length;
+      const countEl = document.getElementById('chatDriveCount');
+      if (countEl) countEl.textContent = selectedCount;
+    }
+
+    function toggleChatDriveFile(index) {
+      if (chatDriveMaterials[index]) {
+        chatDriveMaterials[index].selected = !chatDriveMaterials[index].selected;
+        renderChatDriveGrid();
+        updateChatAttachedBar();
+      }
+    }
+
+    function removeChatDriveFile(id) {
+      const item = chatDriveMaterials.find(m => m.id === id);
+      if (item) {
+        item.selected = false;
+        renderChatDriveGrid();
+        updateChatAttachedBar();
+      }
+    }
+
+    function updateChatAttachedBar() {
+      const selected = chatDriveMaterials.filter(m => m.selected);
+      const bar = document.getElementById('chatAttachedBar');
+      const chipsList = document.getElementById('chatAttachedChipsList');
+      const countEl = document.getElementById('chatDriveCount');
+
+      if (countEl) countEl.textContent = selected.length;
+
+      if (selected.length === 0) {
+        if (bar) bar.style.display = 'none';
+        return;
+      }
+
+      if (bar) bar.style.display = 'flex';
+      if (chipsList) {
+        chipsList.innerHTML = selected.map(m => `
+          <div class="chat-file-chip" title="${m.name}">
+            <span>${m.name.length > 25 ? m.name.slice(0, 23) + '...' : m.name}</span>
+            <button class="chip-remove" onclick="removeChatDriveFile('${m.id}')" title="Desmarcar">×</button>
+          </div>
+        `).join('');
+      }
+    }
+
+    function selectAllDriveAulasForReading(select) {
+      chatDriveMaterials.forEach(m => {
+        if (select) {
+          m.selected = !m.isBook; // Seleciona todas as 7 aulas, preservando o livro extenso Azulay desmarcado
+        } else {
+          m.selected = false;
+        }
+      });
+      renderChatDriveGrid();
+      updateChatAttachedBar();
+      showToast(select ? '✅ Todas as 7 aulas marcadas para leitura!' : 'Materiais do Drive desmarcados.');
+    }
+
+    function clearChatDriveSelection() {
+      selectAllDriveAulasForReading(false);
+    }
+
+    function produceReadingFromDriveModal() {
+      closeModals();
+      navigateTab('chat');
+      const drawer = document.getElementById('chatDriveDrawer');
+      if (drawer && !drawer.classList.contains('active')) {
+        drawer.classList.add('active');
+      }
+      requestReadingMaterialProduction(true);
+    }
+
+    // GERAÇÃO DO MATERIAL COMPLETO DE ESTUDO PARA LEITURA
+    function requestReadingMaterialProduction(includeUserBubble = true) {
+      let selected = chatDriveMaterials.filter(m => m.selected);
+      if (selected.length === 0) {
+        selectAllDriveAulasForReading(true);
+        selected = chatDriveMaterials.filter(m => m.selected);
+      }
+
+      const flow = document.getElementById('chatFlow');
+      const empty = document.getElementById('chatEmptyState');
+      if (empty) empty.style.display = 'none';
+
+      // 1. Bolha do usuário solicitando a leitura (se solicitado diretamente)
+      if (includeUserBubble) {
+        const userBubble = document.createElement('div');
+        userBubble.className = 'chat-bubble user';
+        userBubble.innerHTML = `
+          <div style="font-weight: 600; margin-bottom: 4px;">📖 Solicitação de Material de Estudo para Leitura:</div>
+          <div>Por favor, produza um roteiro/apostila didática de leitura médica aprofundado com base nos <strong>${selected.length} materiais marcados do Drive</strong>:</div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 4px; line-height: 1.4;">
+            ${selected.map(s => `• ${s.name}`).join('<br>')}
+          </div>
+        `;
+        flow.appendChild(userBubble);
+        flow.scrollTop = flow.scrollHeight;
+      }
+
+      // 2. Bolha do Tutor com o Material Estruturado de Leitura
+      setTimeout(() => {
+        const tutorBubble = document.createElement('div');
+        tutorBubble.className = 'chat-bubble tutor';
+        tutorBubble.style.maxWidth = '94%';
+
+        const docTitle = 'Dermatologia Clínica: Propedêutica das Lesões Elementares, Fisiopatologia Cutânea e Eczemas';
+        const docSubtitle = `Compilado Didático Estruturado • ${selected.length} Apresentações de Aula do Google Drive da Disciplina`;
+
+        tutorBubble.innerHTML = `
+          <div class="tutor-header">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Material de Leitura Gerado a Partir do Google Drive
+          </div>
+
+          <div class="reading-doc-card">
+            <div class="reading-doc-header">
+              <span class="reading-doc-badge">📚 APOSTILA DE LEITURA & REVISÃO MÉDICA</span>
+              <h3 style="font-size: 16px; margin: 6px 0 2px 0; color: var(--text-primary); font-weight: 700;">
+                ${docTitle}
+              </h3>
+              <div style="font-size: 11px; color: var(--text-secondary);">
+                ${docSubtitle}
+              </div>
+            </div>
+
+            <!-- SEÇÃO 1: SEMIOLOGIA DAS LESÕES ELEMENTARES -->
+            <div class="doc-section">
+              <div class="doc-section-title">
+                <span>1. Propedêutica & Semiologia das Lesões Elementares Cutâneas</span>
+              </div>
+              <p style="margin: 0 0 8px 0;">
+                A semiologia dermatológica fundamenta-se na inspeção dinâmica e palpação tecidual minuciosa. As lesões dividem-se conforme alteração anatômica primária:
+              </p>
+              <table class="doc-table">
+                <thead>
+                  <tr>
+                    <th>Categoria Semiológica</th>
+                    <th>Tipo de Lesão</th>
+                    <th>Tamanho & Profundidade</th>
+                    <th>Correlação Fisiopatológica & Exemplo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Modificação de Cor</strong></td>
+                    <td>Mácula / Mancha</td>
+                    <td>Mácula &lt; 1 cm; Mancha &gt; 1 cm (planas)</td>
+                    <td>Vascular (eritema, telangiectasia) ou pigmentar (vitiligo, melasma). Não há relevo ou espessamento palpável.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Elevação Sólida</strong></td>
+                    <td>Pápula / Placa</td>
+                    <td>Pápula &lt; 1 cm; Placa &gt; 1 cm (platô)</td>
+                    <td>Infiltrado celular inflamatório na derme superficial ou hiperplasia epidérmica com queratinização acelerada (ex: Psoríase).</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Formação Profunda</strong></td>
+                    <td>Nódulo / Tumor</td>
+                    <td>Nódulo (1 a 3 cm); Derme profunda/hipoderme</td>
+                    <td>Mais palpável que visível. Infiltrado inflamatório denso, granuloma ou proliferação neoplásica (ex: Eritema nodoso).</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Conteúdo Líquido</strong></td>
+                    <td>Vesícula / Bolha / Pústula</td>
+                    <td>Vesícula &lt; 1 cm; Bolha &gt; 1 cm; Pústula (pus)</td>
+                    <td>Clivagem intraepidérmica (acantólise em Pênfigo Vulgar) ou subepidérmica (Pênfigo Bolhoso). Vesículas no Herpes simples.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- SEÇÃO 2: HISTOLOGIA E BARREIRA TEGUMENTAR -->
+            <div class="doc-section">
+              <div class="doc-section-title">
+                <span>2. Histologia & Barreira Cutânea do Sistema Tegumentar</span>
+              </div>
+              <p style="margin: 0 0 6px 0;">
+                A epiderme é um epitélio estratificado pavimentoso queratinizado avascular com 4 estratos principais funcionais:
+              </p>
+              <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.6;">
+                <li><strong>Camada Basal (Germinativa):</strong> Células-tronco com alta taxa mitótica intercaladas por melanócitos dendríticos (sintetizam e transferem grânulos de melanina aos queratinócitos para fotoproteção do DNA nuclear).</li>
+                <li><strong>Camada Espinhosa:</strong> Queratinócitos unidos fortemente por desmossomos (tonofilamentos de citoqueratina) conferindo resistência mecânica contra forças de cisalhamento.</li>
+                <li><strong>Camada Granulosa:</strong> Acúmulo de grânulos basofílicos de querato-hialina e corpos lamelares (liberação de ceramidas, colesterol e ácidos graxos livres na matriz intercelular).</li>
+                <li><strong>Camada Córnea:</strong> Corneócitos anucleados imersos na matriz lipídica hidrofóbica ("modelo de tijolos e argamassa"), garantindo baixa perda transepidérmica de água (TEWL).</li>
+              </ul>
+            </div>
+
+            <!-- SEÇÃO 3: PSORÍASE VS LÍQUEN PLANO -->
+            <div class="doc-section">
+              <div class="doc-section-title">
+                <span>3. Diagnóstico Diferencial: Psoríase Vulgar vs Líquen Plano</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+                  <strong style="color: var(--neon);">Psoríase Vulgar</strong>
+                  <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
+                    • <strong>Lesão Típica:</strong> Placas eritemato-descamativas bem delimitadas com escamas micáceas prateadas.<br>
+                    • <strong>Topografia:</strong> Superfícies extensoras (cotovelos, joelhos, couro cabeludo, região lombo-sacra).<br>
+                    • <strong>Curetagem de Brocq:</strong> Sinal da vela ➔ Sinal da película de Duncan-Dulck ➔ <strong>Sinal de Auspitz (Orvalho Sangrento)</strong> por papilomatose dérmica.<br>
+                    • <strong>Fenômeno de Koebner:</strong> Surgimento de novas lesões em sítios de trauma físico.
+                  </p>
+                </div>
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+                  <strong style="color: #60a5fa;">Líquen Plano</strong>
+                  <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
+                    • <strong>Lesão Típica:</strong> Pápulas violáceas poligonais brilhantes, intensamente pruriginosas (Regra dos 4 Ps: Poligonal, Pruriginosa, Púrpura/violácea, Plana).<br>
+                    • <strong>Topografia:</strong> Superfícies flexoras dos punhos, tornozelos e mucosa oral jugal.<br>
+                    • <strong>Estrias de Wickham:</strong> Rede reticulada de linhas esbranquiçadas na superfície da pápula.<br>
+                    • <strong>Associação Sistêmica:</strong> Sorologia para Hepatite C recomendada na investigação.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEÇÃO 4: ECZEMAS E DERMATITES -->
+            <div class="doc-section">
+              <div class="doc-section-title">
+                <span>4. Eczemas: Diferencial entre Dermatite Atópica, Seborreica e de Contato</span>
+              </div>
+              <p style="margin: 0 0 6px 0;">
+                O padrão inflamatório eczematoso evolui em fases aguda (eritema, vesiculação e exsudação "pele fervente") e crônica (ressecamento e liquenificação pelo prurido contínuo):
+              </p>
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+                • <strong>Dermatite Atópica:</strong> No lactente predomina na face (áreas malares poupando o triângulo perioral) e superfícies extensoras; na infância/adulto migra para dobras flexurais (fossas cubitais e poplíteas) com intensa xerose cutânea e prurido.<br>
+                • <strong>Dermatite Seborreica:</strong> Lesões eritemato-descamativas untuosas amareladas em áreas seborreicas (couro cabeludo, sulco nasogeniano, sobrancelhas e pré-esternal). Associação fisiopatológica com a levedura lipofílica <em>Malassezia</em>.<br>
+                • <strong>Dermatite de Contato:</strong> Alérgica (hipersensibilidade tipo IV celular mediada por linfócitos T, ultrapassa limites do agente causador, ex: níquel) vs Irritativa primária (dano químico direto à barreira, restrita à área de contato).
+              </div>
+            </div>
+
+            <!-- SEÇÃO 5: PÉROLAS DE PROVA & PRÁTICA MÉDICA -->
+            <div class="doc-pearl-box">
+              <div style="color: var(--neon); font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>💡 Pérolas de Prova de Residência & Internato</span>
+              </div>
+              <ul style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.6;">
+                <li><strong>Auspitz / Orvalho Sangrento:</strong> Corresponde a capilares dilatados nas papilas dérmicas expostos após raspagem da película de Duncan; altamente característico de psoríase.</li>
+                <li><strong>Psoríase Pustulosa Aguda:</strong> Pode ser precipitada pelo desmame ou interrupção abrupta de corticoterapia sistêmica oral! Nunca usar prednisona oral como primeira linha na psoríase em placas.</li>
+                <li><strong>Poupação Perioral no Lactente:</strong> Eczema exsudativo malar poupando o triângulo centro-facial em bebê é o achado clássico de dermatite atópica infantil.</li>
+                <li><strong>Tratamento Tópico Facial:</strong> Na face, evitar corticoides tópicos fluorados de alta potência devido ao risco de atrofia cutânea e telangiectasias; preferir imunomoduladores tópicos (tacrolimo / pimecrolimo).</li>
+              </ul>
+            </div>
+
+            <!-- LINHA DE AÇÕES -->
+            <div class="doc-actions-row">
+              <button class="btn-outline-action primary" onclick="openReaderModalFromCard()" title="Visualizar a apostila completa em tela limpa sem distrações">
+                📖 Abrir no Modo Leitura Focada
+              </button>
+              <button class="btn-outline-action" onclick="extractFlashcardsFromReadingDoc()" title="Gerar novos Flashcards a partir deste texto">
+                🗂️ + Extrair Flashcards
+              </button>
+              <button class="btn-outline-action" onclick="extractQuizzesFromReadingDoc()" title="Gerar novo Quiz de Múltipla Escolha">
+                📝 + Gerar Simulado
+              </button>
+              <button class="btn-outline-action" onclick="copyReadingDocText()" title="Copiar texto formatado da apostila">
+                📋 Copiar Apostila
+              </button>
+            </div>
+          </div>
+        `;
+
+        flow.appendChild(tutorBubble);
+        flow.scrollTop = flow.scrollHeight;
+        showToast('📖 Material de Estudo para Leitura gerado com sucesso!');
+      }, 500);
+    }
+
+    // MODAL DE LEITURA FOCADA
+    function openReaderModalFromCard() {
+      const modal = document.getElementById('readerModal');
+      const content = document.getElementById('readerModalContent');
+      if (!modal || !content) return;
+
+      const card = document.querySelector('.reading-doc-card');
+      if (card) {
+        const clone = card.cloneNode(true);
+        const actions = clone.querySelector('.doc-actions-row');
+        if (actions) actions.remove();
+        content.innerHTML = clone.innerHTML;
+      }
+      modal.classList.add('active');
+    }
+
+    function changeReaderFontSize(delta) {
+      currentReaderFontSize = Math.min(24, Math.max(11, currentReaderFontSize + delta));
+      const content = document.getElementById('readerModalContent');
+      if (content) {
+        content.style.fontSize = currentReaderFontSize + 'px';
+      }
+    }
+
+    function copyReaderModalText() {
+      const content = document.getElementById('readerModalContent');
+      if (!content) return;
+      navigator.clipboard.writeText(content.innerText).then(() => {
+        showToast('📋 Conteúdo da apostila copiado para a área de transferência!');
+      }).catch(() => {
+        showToast('Texto copiado com sucesso.');
+      });
+    }
+
+    function copyReadingDocText() {
+      const card = document.querySelector('.reading-doc-card');
+      if (!card) return;
+      navigator.clipboard.writeText(card.innerText).then(() => {
+        showToast('📋 Material de leitura copiado com sucesso!');
+      }).catch(() => {
+        showToast('Texto copiado.');
+      });
+    }
+
+    function extractFlashcardsFromReadingDoc() {
+      const q = 'Quais são os sinais patognomônicos obtidos na curetagem de Brocq na Psoríase e no exame do Líquen Plano?';
+      const red = evaluateRedundancy(q);
+      sharedQuestionsBank.unshift({
+        id: 'read-fc-' + Date.now(),
+        subject: 'Dermatologia (Leitura)',
+        question: q,
+        answer: 'Na Psoríase: Sinal da vela (escamas estratificadas), Sinal da película de Duncan-Dulck e Sinal de Auspitz (orvalho sangrento). No Líquen Plano: Pápulas violáceas poligonais pruriginosas com Estrias de Wickham.',
+        quizOptions: [
+          'Sinal de Auspitz (orvalho sangrento) na Psoríase; Estrias de Wickham no Líquen Plano.',
+          'Sinal de Nikolsky na Psoríase e pústulas no Líquen Plano.',
+          'Ambos apresentam comedões abertos e vesículas herpéticas.',
+          'Ausência de escamas ou linhas em ambas as patologias.'
+        ],
+        correctIndex: 0,
+        isRedundant: red.isRedundant,
+        redundancyScore: red.percentage,
+        matchedText: red.matchedText,
+        isStarred: false
+      });
+      renderSharedStudyItems();
+      showToast('🗂️ Flashcard extraído do material de leitura e adicionado ao seu deck!');
+    }
+
+    function extractQuizzesFromReadingDoc() {
+      const q = 'Diferencial de Eczemas: Qual a topografia clássica da Dermatite Atópica no lactente versus no adulto?';
+      const red = evaluateRedundancy(q);
+      sharedQuestionsBank.unshift({
+        id: 'read-qz-' + Date.now(),
+        subject: 'Dermatologia (Leitura)',
+        question: q,
+        answer: 'No lactente acomete face (malares poupando região perioral) e faces extensoras; no adulto predomina em dobras flexurais (fossas cubitais e poplíteas) com liquenificação crônica.',
+        quizOptions: [
+          'No lactente acomete exclusivamente dobras flexurais e no adulto a face.',
+          'No lactente acomete malares poupando perioral e áreas extensoras; no adulto predomina em dobras flexurais.',
+          'Ambos apresentam a mesma distribuição sem variação etária.',
+          'Dermatite atópica não acomete a infância.'
+        ],
+        correctIndex: 1,
+        isRedundant: red.isRedundant,
+        redundancyScore: red.percentage,
+        matchedText: red.matchedText,
+        isStarred: false
+      });
+      renderSharedStudyItems();
+      showToast('📝 Novo caso/quiz extraído para o seu simulado!');
+    }
+
+    // Inicialização ao carregar a página
+    initChatDriveMaterials();
   </script>
 </body>
 </html>
