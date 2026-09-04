@@ -1938,18 +1938,20 @@
             </div>
           </div>
 
-          <div class="empty-state" id="curriculumEmptyState" style="display: none;">
+          <div class="empty-state" id="curriculumEmptyState" style="display: none; padding: 40px 20px;">
             <div class="empty-state-icon">
               <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             </div>
-            <h3>Grade Curricular Limpa</h3>
-            <p>Carregue a grade curricular completa ou envie a ementa da sua universidade para personalizar suas disciplinas.</p>
+            <h3 style="font-size: 18px; margin-bottom: 6px;">Ementa Zerada & Pronta para Novo Teste</h3>
+            <p style="max-width: 560px; margin: 0 auto 16px auto; font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;">
+              Cole ou envie o texto com as ementas e descrições das suas disciplinas. O sistema armazenará todas as informações relevantes (objetivos, tópicos e competências) e fará a <strong>curadoria automática</strong> para distribuir seus uploads nas matérias certas!
+            </p>
             <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-              <button class="btn-outline-action primary" onclick="loadCompleteMedicalCurriculumDCN()">
-                🎓 Carregar Grade Médica Oficial (DCNs)
+              <button class="btn-outline-action primary" onclick="openSyllabusModal()" style="padding: 10px 18px; font-weight: 700;">
+                📝 Inserir Nova Ementa com Descrições
               </button>
-              <button class="btn-outline-action" onclick="openSyllabusModal()">
-                📁 Upload da Ementa
+              <button class="btn-outline-action" onclick="loadCompleteMedicalCurriculumDCN()">
+                🎓 Carregar Grade Médica Padrão (DCNs)
               </button>
             </div>
           </div>
@@ -2420,12 +2422,22 @@
         <svg class="icon" style="width: 32px; height: 32px; color: var(--neon); margin-bottom: 6px;" viewBox="0 0 24 24">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        <div style="font-weight: 700; font-size: 13px;">Clique para selecionar PDF ou TXT da Ementa</div>
-        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Lê e mapeia suas disciplinas na grade completa de 12 períodos</div>
+        <div style="font-weight: 700; font-size: 13px;">Clique para selecionar arquivo TXT, PDF ou DOC da Ementa</div>
+        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Extrai disciplinas, períodos, descrições e objetivos programáticos</div>
         <input type="file" id="syllabusFileInput" accept=".pdf,.txt,.docx,.doc" style="display: none;" onchange="handleSyllabusFile(this)">
       </div>
 
-      <textarea id="syllabusTextInput" class="written-textarea" placeholder="Ou cole aqui nomes de matérias da sua faculdade (ex: Semiologia Médica, Integração de Sistemas 2, Clínica Cirúrgica...)..." style="height: 80px; margin-top: 12px; font-size: 12px;"></textarea>
+      <textarea id="syllabusTextInput" class="written-textarea" placeholder="Cole aqui a ementa completa da sua faculdade com nomes e descrições. Exemplo:
+
+Disciplina: Semiologia Médica
+Período: 4º Período
+Ementa: Propedêutica médica, anamnese clínica estruturada, exame físico geral e dos sistemas cardiovascular e respiratório.
+Tópicos: Anamnese, Sinais Vitais, Exame do Tórax, Raciocínio Clínico
+
+Disciplina: Dermatologia Clínica
+Período: 6º Período
+Ementa: Fisiopatologia e semiologia das afecções dermatológicas, lesões elementares cutâneas, dermatoses eritemato-escamosas e eczematosas.
+Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cutâneas" style="height: 170px; margin-top: 12px; font-size: 12.5px; line-height: 1.4;"></textarea>
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
@@ -2799,20 +2811,16 @@
       }
     ];
     const INITIAL_DEMO_QUESTIONS = JSON.parse(JSON.stringify(sharedQuestionsBank));
+    // Zerado para o novo teste de ementa e curadoria de uploads
+    sharedQuestionsBank = [];
 
     let currentCardIndex = 0;
     let studyMode = 'traditional';
     let currentDiseaseFilter = 'all';
 
     // GERENCIAMENTO DE MATÉRIAS, DIVISÃO DE ESTUDO & STATUS DE GERAÇÃO
-    let currentStudySubject = 'Integração de Sistemas Humanos 2 (Dermatologia)';
-    let subjectGenerationStatus = {
-      'Integração de Sistemas Humanos 2 (Dermatologia)': {
-        status: 'ready',
-        materialsCount: 8,
-        questionsCount: 5
-      }
-    };
+    let currentStudySubject = '';
+    let subjectGenerationStatus = {};
 
     function getAvailableStudySubjects() {
       const set = new Set();
@@ -2823,8 +2831,7 @@
       if (Array.isArray(sharedQuestionsBank)) {
         sharedQuestionsBank.forEach(q => { if (q.subject) set.add(q.subject); });
       }
-      const arr = Array.from(set).filter(Boolean);
-      return arr.length > 0 ? arr : ['Integração de Sistemas Humanos 2 (Dermatologia)'];
+      return Array.from(set).filter(Boolean);
     }
 
     function ensureCurrentSubjectValid() {
@@ -3424,49 +3431,39 @@
         return;
       }
 
-      let defaultSubject = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
-      let subjectName = defaultSubject;
-      let diseaseName = 'Semiologia e Propedêutica Geral';
+      let subjectName = '';
+      let diseaseName = '';
 
       if (mode === 'manual') {
         const inputVal = document.getElementById('manualDirectionInput').value.trim();
         if (inputVal) {
           subjectName = inputVal;
           diseaseName = inputVal.includes('(') ? (inputVal.split('(')[1]?.replace(')', '') || inputVal) : inputVal;
+        } else {
+          subjectName = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+          diseaseName = extractDiseaseFromFilename(pendingUploadMaterial.fileName);
         }
       } else {
-        // Classificação inteligente da IA
-        const combinedText = (pendingUploadMaterial.text + ' ' + pendingUploadMaterial.fileName).toLowerCase();
-        if (combinedText.includes('psoríase') || combinedText.includes('psoriase')) {
-          subjectName = 'Dermatologia Clínica';
-          diseaseName = 'Psoríase Vulgar & Koebner';
-        } else if (combinedText.includes('líquen') || combinedText.includes('liquen')) {
-          subjectName = 'Dermatologia Clínica';
-          diseaseName = 'Líquen Plano & Wickham';
-        } else if (combinedText.includes('eczem') || combinedText.includes('atópica') || combinedText.includes('atopica')) {
-          subjectName = 'Dermatologia Clínica';
-          diseaseName = 'Dermatite Atópica & Eczemas';
-        } else if (combinedText.includes('cardio') || combinedText.includes('eletrocardio') || combinedText.includes('infarto')) {
-          subjectName = 'Cardiologia Clínica';
-          diseaseName = 'Eletrocardiograma & Isquemia Miocárdica';
-        } else if (combinedText.includes('pneumo') || combinedText.includes('asma') || combinedText.includes('dpoc')) {
-          subjectName = 'Pneumologia Clínica';
-          diseaseName = 'Asma, DPOC & Espirometria';
-        } else if (combinedText.includes('pediat') || combinedText.includes('lactente') || combinedText.includes('puericultura')) {
-          subjectName = 'Pediatria & Puericultura';
-          diseaseName = 'Crescimento e Desenvolvimento Infantil';
-        } else if (combinedText.includes('lesão') || combinedText.includes('lesao') || combinedText.includes('mácula') || combinedText.includes('pápula')) {
-          subjectName = 'Dermatologia Clínica';
-          diseaseName = 'Semiologia das Lesões Elementares Cutâneas';
+        // Curadoria inteligente pela ementa cadastrada
+        const tempFile = {
+          name: pendingUploadMaterial.fileName,
+          disease: extractDiseaseFromFilename(pendingUploadMaterial.fileName),
+          topic: pendingUploadMaterial.fileName.replace(/\.[^/.]+$/, ''),
+          folderPath: ''
+        };
+        const { curatedFiles } = curateAndDistributeFilesToCurriculum([tempFile]);
+        if (curatedFiles && curatedFiles.length > 0) {
+          subjectName = curatedFiles[0].subject;
+          diseaseName = curatedFiles[0].disease;
         } else {
-          subjectName = defaultSubject;
+          subjectName = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
           diseaseName = extractDiseaseFromFilename(pendingUploadMaterial.fileName);
         }
       }
 
       closeModals();
 
-      // Adiciona o material enviado ao menu suspenso do Chat
+      // Adiciona o material enviado aos materiais do Chat associado à disciplina correta
       chatDriveMaterials.unshift({
         id: 'upload-mat-' + Date.now(),
         name: pendingUploadMaterial.fileName,
@@ -3478,36 +3475,24 @@
         topic: diseaseName,
         subject: subjectName
       });
+
+      currentStudySubject = subjectName;
+      const countInSubj = chatDriveMaterials.filter(m => m.subject === subjectName).length;
+      const questionsInSubj = sharedQuestionsBank.filter(q => q.subject === subjectName).length;
+      subjectGenerationStatus[subjectName] = {
+        status: questionsInSubj > 0 ? 'ready' : 'pending',
+        materialsCount: countInSubj,
+        questionsCount: questionsInSubj
+      };
+
       renderChatDriveVerticalList();
       updateChatAttachedBar();
-
-      const qCandidate = `${diseaseName}: Conduta propedêutica e correlação fisiopatológica essencial`;
-      const red = evaluateRedundancy(qCandidate);
-
-      sharedQuestionsBank.unshift({
-        id: 'upload-' + Date.now(),
-        subject: subjectName,
-        disease: diseaseName,
-        question: `[${diseaseName}] ${qCandidate}`,
-        answer: `Conduta diagnóstica e terapêutica validada pelas diretrizes clínicas para ${diseaseName}.`,
-        quizOptions: [
-          `Conduta de primeira linha padrão-ouro para ${diseaseName}.`,
-          `Abordagem contraindicada para a fase aguda.`,
-          `Diagnóstico diferencial de menor probabilidade.`,
-          `Tratamento adjuvante sem evidência científica nível A.`
-        ],
-        correctIndex: 0,
-        isRedundant: red.isRedundant,
-        redundancyScore: red.percentage,
-        matchedText: red.matchedText,
-        isStarred: false
-      });
 
       // Atualiza roteiro do Waze da Medicina
       studyRouteSchedule.unshift({
         day: 'Hoje',
         date: 'Hoje',
-        topic: `${diseaseName}: Roteiro de Fixação`,
+        topic: `${subjectName}: ${diseaseName}`,
         subject: subjectName,
         minutes: 30,
         status: 'scheduled'
@@ -3517,9 +3502,10 @@
       renderSceBars();
       renderSceTimeline();
       updateSubjectFilterMenus();
+      renderCurriculumGrid();
 
-      const modeStr = mode === 'auto' ? '🤖 Classificação Inteligente da IA' : '✍️ Direcionamento Manual';
-      showToast(`${modeStr}: Material direcionado para "${subjectName}" [${diseaseName}]!`);
+      const modeStr = mode === 'auto' ? '🤖 Curadoria da IA' : '✍️ Direcionamento Manual';
+      showToast(`${modeStr}: Material distribuído para "${subjectName}" [${diseaseName}]! Flashcards sob demanda.`);
       pendingUploadMaterial = null;
     }
 
@@ -4580,51 +4566,47 @@
         compressBox.style.display = 'none';
         btn.disabled = false;
 
-        const discipline = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
+        // 1. CURADORIA E DISTRIBUIÇÃO INTELIGENTE PELA EMENTA CADASTRADA
+        const { curatedFiles, distributionSummary } = curateAndDistributeFilesToCurriculum(selectedFiles);
 
-        // 1. SINCRONIZAR ARQUIVOS COM O CHAT E LISTAS DE MATERIAIS
-        const newMaterials = selectedFiles.map(f => ({
-          id: f.id,
-          name: f.name,
-          sizeStr: f.sizeStr,
-          type: f.type === 'slide' ? 'slides' : (f.type === 'book' ? 'book' : 'doc'),
-          selected: true,
-          tag: f.type === 'slide' ? 'Slide Aula' : (f.type === 'book' ? 'Tratado / Livro' : 'Material Didático'),
-          disease: f.disease || extractDiseaseFromFilename(f.name),
-          topic: f.disease || f.name.replace(/\.[^/.]+$/, ''),
-          folderPath: f.folderPath || '',
-          subject: discipline
-        }));
+        // Sincronizar arquivos com chatDriveMaterials preservando IDs únicos
+        const curatedIds = new Set(curatedFiles.map(c => c.id || c.name));
+        chatDriveMaterials = chatDriveMaterials.filter(m => !curatedIds.has(m.id || m.name)).concat(curatedFiles);
 
-        // Mantém materiais de outras disciplinas e atualiza os desta disciplina
-        chatDriveMaterials = chatDriveMaterials.filter(m => m.subject !== discipline).concat(newMaterials);
+        // Atualiza status de pendência de geração para CADA disciplina que recebeu materiais
+        const distributedSubjects = Object.keys(distributionSummary);
+        distributedSubjects.forEach(subj => {
+          const countInSubj = chatDriveMaterials.filter(m => m.subject === subj).length;
+          const questionsInSubj = sharedQuestionsBank.filter(q => q.subject === subj).length;
+          subjectGenerationStatus[subj] = {
+            status: 'pending',
+            materialsCount: countInSubj,
+            questionsCount: questionsInSubj
+          };
+        });
 
-        // Define a disciplina ativa e sinaliza PENDÊNCIA DE GERAÇÃO (sem gerar tudo de uma vez)
-        currentStudySubject = discipline;
-        subjectGenerationStatus[discipline] = {
-          status: 'pending',
-          materialsCount: selectedFiles.length,
-          questionsCount: 0
-        };
+        if (distributedSubjects.length > 0) {
+          currentStudySubject = distributedSubjects[0];
+        }
 
         renderChatDriveVerticalList();
         updateChatAttachedBar();
 
         const chatSubjectLabel = document.getElementById('chatSubjectCurrentName');
-        if (chatSubjectLabel) chatSubjectLabel.textContent = discipline;
+        if (chatSubjectLabel && currentStudySubject) chatSubjectLabel.textContent = currentStudySubject;
         const driveFolderTitle = document.getElementById('driveFolderTitleDisplay');
-        if (driveFolderTitle) driveFolderTitle.textContent = currentScannedFolder ? currentScannedFolder.title : `DISCIPLINA: ${discipline}`;
+        if (driveFolderTitle) driveFolderTitle.textContent = currentScannedFolder ? currentScannedFolder.title : `DISCIPLINA: ${currentStudySubject || 'Ementa'}`;
         const readerModalSub = document.getElementById('readerModalSubtitle');
-        if (readerModalSub) readerModalSub.textContent = currentScannedFolder ? currentScannedFolder.sub : `Disciplina: ${discipline}`;
+        if (readerModalSub) readerModalSub.textContent = currentScannedFolder ? currentScannedFolder.sub : `Disciplina: ${currentStudySubject || 'Ementa'}`;
 
         // 2. ATUALIZAR O ROTEIRO ADAPTATIVO (WAZE DA MEDICINA)
-        selectedFiles.slice(0, 3).forEach((file, idx) => {
+        curatedFiles.slice(0, 4).forEach((file, idx) => {
           const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
           studyRouteSchedule.unshift({
             day: idx === 0 ? 'Hoje' : (idx === 1 ? 'Amanhã' : 'Em 2 dias'),
             date: idx === 0 ? 'Hoje' : (idx === 1 ? 'Amanhã' : 'Em 2 dias'),
-            topic: `${discipline}: ${diseaseName}`,
-            subject: discipline,
+            topic: `${file.subject}: ${diseaseName}`,
+            subject: file.subject,
             minutes: 30 + (idx * 5),
             status: 'scheduled'
           });
@@ -4637,7 +4619,8 @@
         updateSubjectFilterMenus();
         renderCurriculumGrid();
 
-        showToast(`☁️ Drive sincronizado! ${selectedFiles.length} aulas de "${discipline}" prontas. Geração de Flashcards & Quizzes sob demanda.`);
+        const summaryParts = distributedSubjects.map(s => `"${s}": ${distributionSummary[s]}`);
+        showToast(`✨ Curadoria Concluída! ${curatedFiles.length} aulas distribuídas pela ementa (${summaryParts.join(' • ')}). Flashcards e Quizzes sob demanda.`);
       }, needsCompression ? 750 : 300);
     }
 
@@ -4789,26 +4772,35 @@
       }
     ];
 
-    let universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
+    const savedCurriculum = localStorage.getItem('medtutor_saved_curriculum');
+    let universityCurriculum = (localStorage.getItem('medtutor_reset_clean') === 'true' || !savedCurriculum)
+      ? []
+      : JSON.parse(savedCurriculum || '[]');
     let currentCurriculumCycleFilter = 'all';
+
+    function getAllCurriculumSubjects() {
+      if (!universityCurriculum || universityCurriculum.length === 0) return [];
+      const list = [];
+      universityCurriculum.forEach(p => {
+        (p.subjects || []).forEach(s => {
+          const sObj = typeof s === 'string'
+            ? { name: s, period: p.period, cycle: p.cycle, cycleName: p.cycleName, description: '', topics: [] }
+            : { period: p.period, cycle: p.cycle, cycleName: p.cycleName, ...s };
+          list.push(sObj);
+        });
+      });
+      return list;
+    }
 
     function getDisciplineMaterialsCount(subjectName) {
       if (!chatDriveMaterials || chatDriveMaterials.length === 0) return 0;
       const sLower = subjectName.toLowerCase();
       return chatDriveMaterials.filter(m => {
-        const mSub = (m.subject || '').toLowerCase();
-        const mTopic = (m.topic || '').toLowerCase();
-        const mName = (m.name || '').toLowerCase();
-        const mDis = (m.disease || '').toLowerCase();
-
-        if (sLower.includes('dermatolog') && (mSub.includes('dermatolog') || mSub.includes('sistemas 2') || mDis.includes('dermat') || mName.includes('dermat'))) return true;
-        if (sLower.includes('cardio') && (mSub.includes('cardio') || mDis.includes('cardio') || mName.includes('cardio'))) return true;
-        if (sLower.includes('semiol') && (mSub.includes('semiol') || mDis.includes('semiol') || mName.includes('semiol'))) return true;
-        if (sLower.includes('cirurg') && (mSub.includes('cirurg') || mName.includes('cirurg'))) return true;
-        if (sLower.includes('pediat') && (mSub.includes('pediat') || mName.includes('pediat'))) return true;
-        if (sLower.includes('gineco') && (mSub.includes('gineco') || mName.includes('gineco'))) return true;
-
-        return mSub.includes(sLower) || sLower.includes(mSub) || mName.includes(sLower);
+        if (!m.subject) return false;
+        const mSub = m.subject.toLowerCase();
+        if (mSub === sLower) return true;
+        if (mSub.includes(sLower) || sLower.includes(mSub)) return true;
+        return false;
       }).length;
     }
 
@@ -4830,6 +4822,338 @@
       renderCurriculumGrid();
     }
 
+    // PARSER AVANÇADO DE EMENTA UNIVERSITÁRIA (ARMAZENA DESCRIÇÕES E TÓPICOS)
+    function parseEmentaWithDescriptions(text) {
+      const subjects = [];
+      const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      const hasExplicitLabels = /(disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:/i.test(clean);
+
+      if (hasExplicitLabels) {
+        const blocks = clean.split(/(?=(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:)/i)
+          .map(b => b.trim())
+          .filter(b => b.length > 3);
+
+        blocks.forEach((block, idx) => {
+          let name = '';
+          let period = '';
+          let description = '';
+          let topics = [];
+
+          const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+          let currentField = '';
+
+          lines.forEach(line => {
+            const nameMatch = line.match(/^(?:disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:\s*(.+)$/i);
+            const periodMatch = line.match(/^(?:per[ií]odo|semestre|ciclo|ano)\s*:\s*(.+)$/i);
+            const ementaMatch = line.match(/^(?:ementa|descri[cç][aã]o|objetivos?|conte[uú]do(?: program[aá]tico)?)\s*:\s*(.*)$/i);
+            const topicsMatch = line.match(/^(?:t[oó]picos?|unidades?|afec[cç][oõ]es|temas?|habilidades)\s*:\s*(.*)$/i);
+
+            if (nameMatch) {
+              name = nameMatch[1].trim();
+              currentField = 'name';
+            } else if (periodMatch) {
+              period = periodMatch[1].trim();
+              currentField = 'period';
+            } else if (ementaMatch) {
+              description = ementaMatch[1].trim();
+              currentField = 'description';
+            } else if (topicsMatch) {
+              if (topicsMatch[1].trim()) {
+                topics.push(...topicsMatch[1].split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+              }
+              currentField = 'topics';
+            } else {
+              if (currentField === 'description') {
+                description += ' ' + line;
+              } else if (currentField === 'topics') {
+                topics.push(...line.split(/[,;•]+/).map(t => t.trim()).filter(Boolean));
+              } else if (!name) {
+                name = line;
+              }
+            }
+          });
+
+          if (name) {
+            subjects.push(buildSubjectObject(name, period, description, topics, idx));
+          }
+        });
+      } else {
+        const sections = clean.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+
+        sections.forEach((sec, idx) => {
+          const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
+          if (lines.length === 0) return;
+
+          let name = lines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
+          let period = '';
+          let description = '';
+          let topics = [];
+
+          if (/^[0-9]+[ºªo\.]\s*per[ií]odo/i.test(name) && lines.length > 1) {
+            period = name;
+            name = lines[1].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
+            description = lines.slice(2).join(' ');
+          } else {
+            description = lines.slice(1).join(' ');
+          }
+
+          if (description.includes('Tópicos:') || description.includes('tópicos:')) {
+            const parts = description.split(/t[oó]picos?\s*:/i);
+            description = parts[0].trim();
+            if (parts[1]) {
+              topics = parts[1].split(/[,;•\n]+/).map(t => t.trim()).filter(Boolean);
+            }
+          }
+
+          if (name && name.length > 2) {
+            subjects.push(buildSubjectObject(name, period, description, topics, idx));
+          }
+        });
+      }
+
+      return subjects;
+    }
+
+    function buildSubjectObject(name, periodRaw, description, topics, index) {
+      let period = periodRaw || '';
+      let cycle = 'clinico';
+      let cycleName = 'Ciclo Clínico';
+
+      const lower = (name + ' ' + period + ' ' + description).toLowerCase();
+
+      if (lower.includes('1º') || lower.includes('1o') || lower.includes('primeiro') || lower.includes('anatomia') || lower.includes('histologia') || lower.includes('bioquimica') || lower.includes('biologia celular')) {
+        period = period || '1º Período • Ciclo Básico';
+        cycle = 'basico';
+        cycleName = 'Ciclo Básico';
+      } else if (lower.includes('2º') || lower.includes('2o') || lower.includes('segundo') || lower.includes('fisiologia') || lower.includes('genetica') || lower.includes('imunologia')) {
+        period = period || '2º Período • Ciclo Básico';
+        cycle = 'basico';
+        cycleName = 'Ciclo Básico';
+      } else if (lower.includes('3º') || lower.includes('3o') || lower.includes('terceiro') || lower.includes('microbiologia') || lower.includes('parasitologia') || lower.includes('patologia geral')) {
+        period = period || '3º Período • Ciclo Básico';
+        cycle = 'basico';
+        cycleName = 'Ciclo Básico';
+      } else if (lower.includes('4º') || lower.includes('4o') || lower.includes('quarto') || lower.includes('semiologia i') || lower.includes('patologia especial') || lower.includes('farmacologia')) {
+        period = period || '4º Período • Ciclo Básico';
+        cycle = 'basico';
+        cycleName = 'Ciclo Básico';
+      } else if (lower.includes('5º') || lower.includes('5o') || lower.includes('quinto') || lower.includes('cardio') || lower.includes('pneumo') || lower.includes('nefro') || lower.includes('gastro') || lower.includes('radiologia')) {
+        period = period || '5º Período • Ciclo Clínico';
+        cycle = 'clinico';
+        cycleName = 'Ciclo Clínico';
+      } else if (lower.includes('6º') || lower.includes('6o') || lower.includes('sexto') || lower.includes('derma') || lower.includes('endocrino') || lower.includes('hemato') || lower.includes('reumato') || lower.includes('infecto') || lower.includes('sistemas 2')) {
+        period = period || '6º Período • Ciclo Clínico';
+        cycle = 'clinico';
+        cycleName = 'Ciclo Clínico';
+      } else if (lower.includes('7º') || lower.includes('7o') || lower.includes('setimo') || lower.includes('cirurg') || lower.includes('ortop') || lower.includes('oftalmo') || lower.includes('otorrino') || lower.includes('neuro')) {
+        period = period || '7º Período • Ciclo Clínico';
+        cycle = 'clinico';
+        cycleName = 'Ciclo Clínico';
+      } else if (lower.includes('8º') || lower.includes('8o') || lower.includes('oitavo') || lower.includes('gineco') || lower.includes('obstet') || lower.includes('pediat') || lower.includes('psiquiat') || lower.includes('urgencia')) {
+        period = period || '8º Período • Ciclo Clínico';
+        cycle = 'clinico';
+        cycleName = 'Ciclo Clínico';
+      } else if (lower.includes('internato') || lower.includes('estagio') || lower.includes('9º') || lower.includes('10º') || lower.includes('11º') || lower.includes('12º')) {
+        period = period || 'Internato Médico • Ciclo Prático';
+        cycle = 'internato';
+        cycleName = 'Internato Médico';
+      } else {
+        period = period || 'Disciplinas da Ementa';
+        cycle = 'clinico';
+        cycleName = 'Ciclo Universitário';
+      }
+
+      const textKeywords = extractKeywords(`${name} ${description} ${topics.join(' ')}`);
+
+      return {
+        name: name,
+        period: period,
+        cycle: cycle,
+        cycleName: cycleName,
+        description: description.trim(),
+        topics: topics,
+        keywords: textKeywords,
+        isUser: true
+      };
+    }
+
+    function groupSubjectsIntoCurriculum(subjects) {
+      const periodMap = new Map();
+
+      subjects.forEach(subj => {
+        const pKey = subj.period || 'Disciplinas da Ementa';
+        if (!periodMap.has(pKey)) {
+          periodMap.set(pKey, {
+            period: pKey,
+            cycle: subj.cycle,
+            cycleName: subj.cycleName,
+            subjects: []
+          });
+        }
+        periodMap.get(pKey).subjects.push(subj);
+      });
+
+      return Array.from(periodMap.values());
+    }
+
+    // MOTOR DE CURADORIA E DISTRIBUIÇÃO INTELIGENTE DE ARQUIVOS PELA EMENTA
+    function evaluateDomainAffinity(disciplineLower, candidateText) {
+      let bonus = 0;
+      const d = disciplineLower;
+      const c = candidateText;
+
+      // Dermatologia / Tegumentar
+      if ((d.includes('derma') || d.includes('tegument') || d.includes('sistemas 2')) && 
+          (c.includes('pele') || c.includes('cutan') || c.includes('derma') || c.includes('psori') || c.includes('liquen') || c.includes('tegument') || c.includes('auspitz') || c.includes('eczema') || c.includes('lesoes elementares') || c.includes('papula') || c.includes('placa') || c.includes('nodulo') || c.includes('epiderm') || c.includes('acne') || c.includes('micose'))) {
+        bonus += 12;
+      }
+      // Cardiologia
+      if (d.includes('cardio') && (c.includes('cardio') || c.includes('coracao') || c.includes('ecg') || c.includes('eletrocardio') || c.includes('infarto') || c.includes('iam') || c.includes('isquemia') || c.includes('arritmia') || c.includes('insuficiencia cardiaca') || c.includes('miocard') || c.includes('valvopatia') || c.includes('sopros'))) {
+        bonus += 12;
+      }
+      // Pneumologia
+      if (d.includes('pneumo') && (c.includes('pneumo') || c.includes('pulmao') || c.includes('respirat') || c.includes('espirometria') || c.includes('asma') || c.includes('dpoc') || c.includes('dispneia') || c.includes('tosse') || c.includes('pleura') || c.includes('pneumonia'))) {
+        bonus += 12;
+      }
+      // Semiologia / Propedêutica
+      if ((d.includes('semiol') || d.includes('proped')) && (c.includes('semiol') || c.includes('proped') || c.includes('anamnese') || c.includes('exame fisico') || c.includes('ausculta') || c.includes('palpacao') || c.includes('sinais vitais') || c.includes('sindrome') || c.includes('raciocinio clinico'))) {
+        bonus += 12;
+      }
+      // Nefrologia
+      if (d.includes('nefro') && (c.includes('nefro') || c.includes('rim') || c.includes('renal') || c.includes('dialise') || c.includes('glicosuria') || c.includes('proteinuria') || c.includes('glomerulo'))) {
+        bonus += 12;
+      }
+      // Gastroenterologia
+      if ((d.includes('gastro') || d.includes('hepat')) && (c.includes('gastro') || c.includes('hepat') || c.includes('figado') || c.includes('cirrose') || c.includes('endoscopia') || c.includes('ictericia') || c.includes('pancreas') || c.includes('refluxo'))) {
+        bonus += 12;
+      }
+      // Pediatria
+      if (d.includes('pediat') && (c.includes('pediat') || c.includes('lactente') || c.includes('crianca') || c.includes('puericultura') || c.includes('neonat') || c.includes('apgar') || c.includes('vacinacao'))) {
+        bonus += 12;
+      }
+      // Ginecologia e Obstetrícia
+      if ((d.includes('gineco') || d.includes('obstet')) && (c.includes('gineco') || c.includes('obstet') || c.includes('parto') || c.includes('gestac') || c.includes('utero') || c.includes('prenatal') || c.includes('ovario'))) {
+        bonus += 12;
+      }
+      // Cirurgia
+      if (d.includes('cirurg') && (c.includes('cirurg') || c.includes('laparotomia') || c.includes('pre-op') || c.includes('pos-op') || c.includes('apendicite') || c.includes('colecistite') || c.includes('hernia') || c.includes('trauma') || c.includes('sutura'))) {
+        bonus += 12;
+      }
+      // Neurologia
+      if (d.includes('neuro') && (c.includes('neuro') || c.includes('cerebro') || c.includes('avc') || c.includes('epilepsia') || c.includes('cefaleia') || c.includes('convulsao') || c.includes('paresia'))) {
+        bonus += 12;
+      }
+      // Infectologia
+      if (d.includes('infecto') && (c.includes('infecto') || c.includes('antibiot') || c.includes('sepse') || c.includes('dengue') || c.includes('hiv') || c.includes('tuberculose') || c.includes('meningite'))) {
+        bonus += 12;
+      }
+      // Anatomia
+      if (d.includes('anatom') && (c.includes('anatom') || c.includes('musculo') || c.includes('osso') || c.includes('esqueleto') || c.includes('plexo') || c.includes('locomotor') || c.includes('articulacao'))) {
+        bonus += 12;
+      }
+      // Fisiologia
+      if (d.includes('fisio') && (c.includes('fisio') || c.includes('potencial de acao') || c.includes('homeostase') || c.includes('receptores') || c.includes('sinapse'))) {
+        bonus += 12;
+      }
+      // Farmacologia
+      if (d.includes('farmaco') && (c.includes('farmaco') || c.includes('farmacocinetica') || c.includes('posologia') || c.includes('mecanismo de acao') || c.includes('agonista') || c.includes('antagonista'))) {
+        bonus += 12;
+      }
+      // Patologia
+      if (d.includes('patol') && (c.includes('patol') || c.includes('necrose') || c.includes('apoptose') || c.includes('inflamacao') || c.includes('biopsia') || c.includes('neoplasia'))) {
+        bonus += 12;
+      }
+
+      return bonus;
+    }
+
+    function curateAndDistributeFilesToCurriculum(filesList) {
+      if (!filesList || filesList.length === 0) return { curatedFiles: [], distributionSummary: {} };
+
+      const allSubjects = getAllCurriculumSubjects();
+      const distributionSummary = {};
+
+      const curatedFiles = filesList.map(f => {
+        const fileName = f.name || '';
+        const fileDisease = f.disease || extractDiseaseFromFilename(fileName);
+        const fileTopic = f.topic || '';
+        const folderPath = f.folderPath || '';
+
+        const candidateText = `${fileName} ${fileDisease} ${fileTopic} ${folderPath}`.toLowerCase();
+        const candidateKeywords = extractKeywords(candidateText);
+
+        let bestMatchSubject = null;
+        let highestScore = 0;
+
+        if (allSubjects.length > 0) {
+          allSubjects.forEach(subj => {
+            const sName = typeof subj === 'string' ? subj : subj.name;
+            const sDesc = subj.description || '';
+            const sTopics = Array.isArray(subj.topics) ? subj.topics.join(' ') : (subj.topics || '');
+            const sLower = sName.toLowerCase();
+
+            let score = 0;
+
+            // 1. Correspondência direta pelo nome da disciplina
+            const nameKeywords = extractKeywords(sName);
+            nameKeywords.forEach(kw => {
+              if (candidateText.includes(kw)) score += 5;
+            });
+
+            // 2. Correspondência com a descrição da ementa
+            if (sDesc) {
+              const descKeywords = extractKeywords(sDesc);
+              candidateKeywords.forEach(ckw => {
+                if (descKeywords.includes(ckw)) score += 3;
+              });
+            }
+
+            // 3. Correspondência com tópicos da disciplina
+            if (sTopics) {
+              const topicKeywords = extractKeywords(sTopics);
+              candidateKeywords.forEach(ckw => {
+                if (topicKeywords.includes(ckw)) score += 4;
+              });
+            }
+
+            // 4. Afinidade médica especializada
+            score += evaluateDomainAffinity(sLower, candidateText);
+
+            if (score > highestScore) {
+              highestScore = score;
+              bestMatchSubject = sName;
+            }
+          });
+        }
+
+        let finalSubject = (bestMatchSubject && highestScore >= 3)
+          ? bestMatchSubject
+          : (allSubjects.length > 0 ? allSubjects[0].name : (currentScannedFolder?.disciplineKey || 'Clínica Médica'));
+
+        distributionSummary[finalSubject] = (distributionSummary[finalSubject] || 0) + 1;
+
+        return {
+          id: f.id,
+          name: f.name,
+          sizeStr: f.sizeStr,
+          type: f.type === 'slide' ? 'slides' : (f.type === 'book' ? 'book' : 'doc'),
+          selected: true,
+          tag: f.type === 'slide' ? 'Slide Aula' : (f.type === 'book' ? 'Tratado / Livro' : 'Material Didático'),
+          disease: fileDisease,
+          topic: fileTopic || fileDisease,
+          folderPath: folderPath,
+          subject: finalSubject,
+          matchScore: highestScore
+        };
+      });
+
+      return {
+        curatedFiles,
+        distributionSummary
+      };
+    }
+
     function handleSyllabusFile(input) {
       if (input.files && input.files[0]) {
         const file = input.files[0];
@@ -4837,43 +5161,36 @@
         reader.onload = function(e) {
           const content = e.target.result;
           if (typeof content === 'string' && content.length > 0) {
-            const cleanText = content.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
-            const lines = cleanText.split(/[\r\n]+/)
-              .map(l => l.replace(/^[0-9\.\-\*\•\s\(\)\[\]]+/, '').trim())
-              .filter(l => l.length > 3 && l.length < 90 && !l.includes('---') && !l.toLowerCase().startsWith('http'));
-            
             const inputEl = document.getElementById('syllabusTextInput');
             if (inputEl) {
-              if (lines.length > 0) {
-                inputEl.value = lines.slice(0, 35).join('\n');
-                showToast(`📄 Arquivo "${file.name}" lido! ${lines.length} disciplinas detectadas.`);
-              } else {
-                inputEl.value = `Disciplina: ${file.name.replace(/\.[^/.]+$/, '')}`;
-                showToast(`📄 Arquivo "${file.name}" selecionado.`);
-              }
+              inputEl.value = content;
+              showToast(`📄 Arquivo de ementa "${file.name}" carregado! Clique em "Processar & Integrar" para estruturar.`);
             }
           }
         };
         reader.onerror = function() {
-          showToast(`⚠️ Leitura direta do arquivo falhou. Você pode colar as disciplinas abaixo.`);
+          showToast(`⚠️ Leitura direta do arquivo falhou. Você pode colar o texto da ementa abaixo.`);
         };
         reader.readAsText(file);
       }
     }
 
     function deleteCurriculum() {
-      universityCurriculum = null;
-      const grid = document.getElementById('curriculumGrid');
-      const headerBar = document.getElementById('curriculumHeaderBar');
-      const empty = document.getElementById('curriculumEmptyState');
-      if (grid) grid.style.display = 'none';
-      if (headerBar) headerBar.style.display = 'none';
-      if (empty) empty.style.display = 'flex';
-      showToast('🗑️ Grade da tela limpa. Clique em "Grade Completa" para reativar os 12 períodos.');
+      universityCurriculum = [];
+      try {
+        localStorage.removeItem('medtutor_saved_curriculum');
+      } catch (e) {}
+      renderCurriculumGrid();
+      updateSubjectFilterMenus();
+      showToast('🗑️ Ementa removida. O ambiente está limpo para receber uma nova ementa.');
     }
 
     function loadCompleteMedicalCurriculumDCN() {
       universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
+      try {
+        localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
+        localStorage.removeItem('medtutor_reset_clean');
+      } catch (e) {}
       currentCurriculumCycleFilter = 'all';
       filterCurriculumCycle('all');
       renderCurriculumGrid();
@@ -4885,78 +5202,26 @@
       const inputEl = document.getElementById('syllabusTextInput');
       const text = inputEl ? inputEl.value.trim() : '';
 
-      // Começa SEMPRE com a base integral dos 12 períodos das DCNs
-      const newCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
-
-      let userLines = [];
-      if (text && !text.toLowerCase().includes('ementa carregada:')) {
-        userLines = text.split(/[\n,;]+/)
-          .map(s => s.replace(/^[0-9\.\-\*\•\s]+/, '').trim())
-          .filter(s => s.length > 2);
+      if (!text) {
+        showToast('Por favor, cole a ementa ou envie um arquivo.');
+        return;
       }
 
-      if (userLines.length > 0) {
-        let matchedCount = 0;
-        userLines.forEach(userSubj => {
-          const lower = userSubj.toLowerCase();
-          let matched = false;
-
-          // Procura nas disciplinas dos 12 períodos se há correspondência
-          for (const period of newCurriculum) {
-            for (let i = 0; i < period.subjects.length; i++) {
-              const sName = typeof period.subjects[i] === 'string' ? period.subjects[i] : period.subjects[i].name;
-              const sLower = sName.toLowerCase();
-
-              if (sLower.includes(lower) || lower.includes(sLower.slice(0, 8)) || (lower.includes('derm') && sLower.includes('derm')) || (lower.includes('cardio') && sLower.includes('cardio')) || (lower.includes('pediat') && sLower.includes('pediat')) || (lower.includes('cirurg') && sLower.includes('cirurg'))) {
-                period.subjects[i] = {
-                  name: sName,
-                  isUser: true,
-                  userAlias: userSubj
-                };
-                matched = true;
-                matchedCount++;
-                break;
-              }
-            }
-            if (matched) break;
-          }
-
-          // Se não encontrou correspondência exata, insere a disciplina do aluno como destaque no período correspondente
-          if (!matched) {
-            let targetPeriodIndex = 5; // Padrão: 6º período (Ciclo Clínico)
-            if (lower.includes('anatom') || lower.includes('histo') || lower.includes('bioqu') || lower.includes('biol')) {
-              targetPeriodIndex = 0;
-            } else if (lower.includes('fisio') || lower.includes('imuno') || lower.includes('genet')) {
-              targetPeriodIndex = 1;
-            } else if (lower.includes('patol') || lower.includes('farmaco') || lower.includes('parasito')) {
-              targetPeriodIndex = 2;
-            } else if (lower.includes('semiol') || lower.includes('proped')) {
-              targetPeriodIndex = 3;
-            } else if (lower.includes('cirurg') || lower.includes('ortop') || lower.includes('neuro')) {
-              targetPeriodIndex = 6;
-            } else if (lower.includes('gineco') || lower.includes('obstet') || lower.includes('pediat')) {
-              targetPeriodIndex = 7;
-            } else if (lower.includes('internato') || lower.includes('estágio') || lower.includes('estagio')) {
-              targetPeriodIndex = 9;
-            }
-
-            newCurriculum[targetPeriodIndex].subjects.unshift({
-              name: userSubj,
-              isUser: true,
-              customAdded: true
-            });
-            matchedCount++;
-          }
-        });
-
-        universityCurriculum = newCurriculum;
-        showToast(`🎓 ${matchedCount} disciplinas integradas à Grade Completa de 12 Períodos!`);
-      } else {
-        universityCurriculum = newCurriculum;
-        showToast('🎓 Grade Médica Integral de 12 Períodos pronta!');
+      const parsedSubjects = parseEmentaWithDescriptions(text);
+      if (parsedSubjects.length === 0) {
+        showToast('Nenhuma disciplina reconhecida no texto. Tente informar no formato: Disciplina: Nome...');
+        return;
       }
+
+      universityCurriculum = groupSubjectsIntoCurriculum(parsedSubjects);
+      try {
+        localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
+        localStorage.removeItem('medtutor_reset_clean');
+      } catch (e) {}
 
       renderCurriculumGrid();
+      updateSubjectFilterMenus();
+      showToast(`🎓 ${parsedSubjects.length} disciplinas com descrições integradas à sua ementa!`);
     }
 
     function renderCurriculumGrid() {
@@ -4981,7 +5246,6 @@
           ? universityCurriculum
           : universityCurriculum.filter(p => p.cycleName === currentCurriculumCycleFilter || (p.period && p.period.includes(currentCurriculumCycleFilter)));
 
-        // Estatísticas reais de matérias com materiais vinculados
         let totalDisciplines = 0;
         let activeWithMaterials = 0;
         universityCurriculum.forEach(p => {
@@ -4995,8 +5259,8 @@
         const badgeLabel = document.getElementById('curriculumBadgeLabel');
         if (badgeLabel) {
           badgeLabel.textContent = activeWithMaterials > 0 
-            ? `${activeWithMaterials} de ${totalDisciplines} com Aulas no Drive`
-            : `DCNs do MEC • ${totalDisciplines} Disciplinas`;
+            ? `${activeWithMaterials} de ${totalDisciplines} com Aulas Ativas`
+            : `Ementa Universitária • ${totalDisciplines} Disciplinas`;
         }
 
         filtered.forEach(cat => {
@@ -5020,14 +5284,14 @@
                 ${cat.cycleName || 'Obrigatória'}
               </span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
               ${cat.subjects.map(s => {
                 const sName = typeof s === 'string' ? s : s.name;
-                const isUser = typeof s === 'object' && s.isUser;
+                const sDesc = typeof s === 'object' && s.description ? s.description : '';
+                const sTopics = typeof s === 'object' && Array.isArray(s.topics) ? s.topics : [];
                 const matCount = getDisciplineMaterialsCount(sName);
                 const hasMaterials = matCount > 0;
                 
-                // Busca status da matéria
                 let matchedSubjectKey = sName;
                 if (subjectGenerationStatus[sName]) {
                   matchedSubjectKey = sName;
@@ -5066,18 +5330,30 @@
                       </div>
                     `;
                   }
-                } else if (isUser) {
-                  rightTag = `<span style="background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">🎯 Ementa do Aluno</span>`;
                 } else {
-                  rightTag = `<span style="color: var(--text-muted); font-size: 11px; opacity: 0.6; white-space: nowrap;">Sem materiais</span>`;
+                  rightTag = `<span style="color: var(--text-muted); font-size: 11px; opacity: 0.65; white-space: nowrap;">Sem materiais</span>`;
                 }
 
                 return `
-                  <div class="subject-row" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 7px 10px; border: 1px solid rgba(0, 255, 102, 0.2);' : (isUser ? 'background: rgba(0, 229, 255, 0.05); border-radius: 8px; padding: 6px 8px; border: 1px solid rgba(0, 229, 255, 0.2);' : '')}">
-                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1; min-width: 130px;">
-                      <span style="font-size: 12px; color: ${hasMaterials ? '#00ff66' : (isUser ? 'var(--neon)' : 'var(--text-primary)')}; font-weight: ${hasMaterials || isUser ? '700' : '500'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${sName}">
-                        ${hasMaterials ? '🟢 ' : (isUser ? '⭐ ' : '• ')}${sName}
-                      </span>
+                  <div class="subject-row" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 8px 12px; border: 1px solid rgba(0, 255, 102, 0.2);' : 'background: var(--bg-surface); border-radius: 8px; padding: 8px 12px; border: 1px solid var(--border);'}">
+                    <div style="display: flex; flex-direction: column; gap: 3px; overflow: hidden; flex: 1; min-width: 130px;">
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${sName}">
+                          ${hasMaterials ? '🟢 ' : '• '}${sName}
+                        </span>
+                      </div>
+                      ${sDesc ? `
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.35; max-height: 38px; overflow: hidden; text-overflow: ellipsis;" title="${sDesc}">
+                          📖 ${sDesc}
+                        </div>
+                      ` : ''}
+                      ${sTopics && sTopics.length > 0 ? `
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px;">
+                          ${sTopics.slice(0, 3).map(t => `
+                            <span style="font-size: 9px; background: rgba(0, 229, 255, 0.1); color: var(--neon); padding: 1px 5px; border-radius: 4px;">${t}</span>
+                          `).join('')}
+                        </div>
+                      ` : ''}
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                       ${rightTag}
@@ -5438,7 +5714,7 @@
       }
     ];
 
-    let chatDriveMaterials = JSON.parse(JSON.stringify(DEFAULT_DRIVE_FOLDER_FILES));
+    let chatDriveMaterials = [];
     let currentReaderFontSize = 14;
 
     function initChatDriveMaterials() {
@@ -6212,6 +6488,7 @@
 
       try {
         localStorage.setItem('medtutor_reset_clean', 'true');
+        localStorage.removeItem('medtutor_saved_curriculum');
         localStorage.removeItem('medtutor_saved_drive_url');
         localStorage.removeItem('medtutor_chat_materials');
         localStorage.removeItem('medtutor_custom_questions');
@@ -6232,7 +6509,7 @@
       currentDiseaseFilter = 'all';
 
       // 3. Limpar ementa universitária
-      universityCurriculum = null;
+      universityCurriculum = [];
       const currGrid = document.getElementById('curriculumGrid');
       const currHeader = document.getElementById('curriculumHeaderBar');
       const currEmpty = document.getElementById('curriculumEmptyState');
@@ -6366,14 +6643,14 @@
       showToast('✨ Demonstração padrão restaurada!');
     }
 
-    // Inicialização ao carregar a página (respeita o estado de reset se ativado)
-    if (localStorage.getItem('medtutor_reset_clean') === 'true') {
+    // Inicialização ao carregar a página (respeita o estado de reset ou ementa salva)
+    if (localStorage.getItem('medtutor_reset_clean') === 'true' || !savedCurriculum) {
       chatDriveMaterials = [];
       sharedQuestionsBank = [];
       studyRouteSchedule = [];
       subjectGenerationStatus = {};
       currentStudySubject = '';
-      universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
+      universityCurriculum = savedCurriculum ? JSON.parse(savedCurriculum) : [];
       currentScannedFolder = null;
       const subLabel = document.getElementById('chatSubjectCurrentName');
       if (subLabel) subLabel.textContent = 'Geral (Aguardando Upload)';
