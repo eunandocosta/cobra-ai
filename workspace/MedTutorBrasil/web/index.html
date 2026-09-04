@@ -1434,20 +1434,24 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 18px;
+      padding: 16px 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .subject-category-card.collapsed {
+      padding: 14px 18px;
     }
 
     .category-header {
       font-size: 12px;
       font-weight: 700;
       color: var(--neon);
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 8px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
 
     .subject-row {
@@ -1455,7 +1459,14 @@
       justify-content: space-between;
       align-items: center;
       font-size: 13px;
-      padding: 6px 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .subject-row:hover {
+      border-color: var(--neon) !important;
+      background: rgba(0, 229, 255, 0.04) !important;
     }
 
     .knowledge-meter {
@@ -2348,7 +2359,10 @@
               <h3 style="font-size: 14px; margin: 0; font-weight: 700;">Grade Médica Nacional (12 Períodos • 56 Disciplinas)</h3>
               <span class="disease-tag" id="curriculumBadgeLabel" style="background: rgba(0, 255, 102, 0.1); color: var(--neon); font-size: 11px; font-weight: 700;">DCNs do MEC • Integral</span>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn-outline-action" id="btnToggleAllCurriculum" onclick="toggleAllCurriculumPeriods()" title="Expandir ou recolher todas as listas de matérias">
+                ▼ Expandir Todas
+              </button>
               <button class="btn-outline-action" onclick="openSyllabusModal()">Personalizar</button>
               <button class="btn-outline-action danger" onclick="deleteCurriculum()" title="Limpar grade da tela">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
@@ -2919,6 +2933,39 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         </button>
       </div>
       <div id="subjectRedundancyContent" style="margin-top: 8px;"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE DETALHES DA DISCIPLINA (EMENTA E TÓPICOS)
+       ========================================================= -->
+  <div class="modal-overlay" id="subjectDetailModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 650px;">
+      <div class="modal-head">
+        <h2 id="modalSubjectDetailTitle" style="font-size: 16px; color: var(--text-primary);">Disciplina</h2>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; margin: 6px 0 14px 0; flex-wrap: wrap;">
+        <span id="modalSubjectPeriodBadge" class="disease-tag" style="background: rgba(0, 229, 255, 0.12); color: var(--neon); font-size: 11px; font-weight: 700;">Período</span>
+        <span id="modalSubjectCycleBadge" class="disease-tag" style="background: rgba(0, 255, 102, 0.12); color: #00ff66; font-size: 11px; font-weight: 700;">Ciclo</span>
+        <span id="modalSubjectMaterialsBadge" class="disease-tag" style="background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); font-size: 11px;">0 Aulas</span>
+      </div>
+      <div id="modalSubjectDescContainer" style="margin-bottom: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--neon); margin-bottom: 4px;">📖 Ementa Oficial:</div>
+        <div id="modalSubjectDescText" style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; background: var(--bg-surface); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); max-height: 160px; overflow-y: auto; white-space: pre-wrap;"></div>
+      </div>
+      <div id="modalSubjectTopicsContainer" style="margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--neon); margin-bottom: 6px;">🎯 Tópicos Programáticos Mapeados:</div>
+        <div id="modalSubjectTopicsList" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto;"></div>
+      </div>
+      <div id="modalSubjectActionsBar" style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn-outline-action" onclick="closeModals()">Fechar</button>
+        <button class="btn-outline-action primary" id="modalSubjectAddMaterialBtn" onclick="closeModals(); openUploadMaterialModal();">📁 + Adicionar Aula</button>
+        <button class="btn-outline-action" id="modalSubjectFlashcardsBtn" style="display: none;">🗂️ Flashcards</button>
+        <button class="btn-outline-action" id="modalSubjectQuizzesBtn" style="display: none;">📝 Quizzes</button>
+      </div>
     </div>
   </div>
 
@@ -6713,6 +6760,7 @@ ${rawText.slice(0, 150000)}`;
 
     function deleteCurriculum() {
       universityCurriculum = [];
+      if (typeof expandedCurriculumPeriods !== 'undefined') expandedCurriculumPeriods.clear();
       try {
         localStorage.removeItem('medtutor_saved_curriculum');
       } catch (e) {}
@@ -6723,6 +6771,7 @@ ${rawText.slice(0, 150000)}`;
 
     function loadCompleteMedicalCurriculumDCN() {
       universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
+      if (typeof expandedCurriculumPeriods !== 'undefined') expandedCurriculumPeriods.clear();
       try {
         localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
         localStorage.removeItem('medtutor_reset_clean');
@@ -6814,6 +6863,7 @@ ${rawText.slice(0, 150000)}`;
       await new Promise(resolve => setTimeout(resolve, 50));
 
       universityCurriculum = groupSubjectsIntoCurriculum(parsedSubjects);
+      expandedCurriculumPeriods.clear();
       try {
         localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
         localStorage.removeItem('medtutor_reset_clean');
@@ -6824,6 +6874,115 @@ ${rawText.slice(0, 150000)}`;
       renderCurriculumGrid();
       updateSubjectFilterMenus();
       showToast(`🎓 ${parsedSubjects.length} disciplina(s) da ementa integradas com sucesso!`);
+    }
+
+    // CONTROLE DE ACORDEÃO E DETALHES DE DISCIPLINAS
+    var expandedCurriculumPeriods = new Set();
+
+    function toggleCurriculumPeriod(periodName) {
+      if (expandedCurriculumPeriods.has(periodName)) {
+        expandedCurriculumPeriods.delete(periodName);
+      } else {
+        expandedCurriculumPeriods.add(periodName);
+      }
+      renderCurriculumGrid();
+    }
+
+    function toggleAllCurriculumPeriods() {
+      if (!universityCurriculum || universityCurriculum.length === 0) return;
+      const filtered = (currentCurriculumCycleFilter === 'all')
+        ? universityCurriculum
+        : universityCurriculum.filter(p => p.cycleName === currentCurriculumCycleFilter || (p.period && p.period.includes(currentCurriculumCycleFilter)));
+      
+      const allExpanded = filtered.length > 0 && filtered.every(p => expandedCurriculumPeriods.has(p.period));
+      if (allExpanded) {
+        expandedCurriculumPeriods.clear();
+      } else {
+        filtered.forEach(p => expandedCurriculumPeriods.add(p.period));
+      }
+      renderCurriculumGrid();
+    }
+
+    function openSubjectDetailModal(subjectName) {
+      if (!subjectName) return;
+      let foundObj = null;
+      let foundPeriod = '';
+      let foundCycleName = '';
+
+      if (universityCurriculum && Array.isArray(universityCurriculum)) {
+        for (const cat of universityCurriculum) {
+          for (const s of (cat.subjects || [])) {
+            const sName = typeof s === 'string' ? s : s.name;
+            if (sName === subjectName || sName.toLowerCase() === subjectName.toLowerCase()) {
+              foundObj = s;
+              foundPeriod = cat.period || '';
+              foundCycleName = cat.cycleName || '';
+              break;
+            }
+          }
+          if (foundObj) break;
+        }
+      }
+
+      const titleEl = document.getElementById('modalSubjectDetailTitle');
+      const periodEl = document.getElementById('modalSubjectPeriodBadge');
+      const cycleEl = document.getElementById('modalSubjectCycleBadge');
+      const matBadge = document.getElementById('modalSubjectMaterialsBadge');
+      const descText = document.getElementById('modalSubjectDescText');
+      const topicsList = document.getElementById('modalSubjectTopicsList');
+      const fcBtn = document.getElementById('modalSubjectFlashcardsBtn');
+      const qzBtn = document.getElementById('modalSubjectQuizzesBtn');
+
+      if (titleEl) titleEl.textContent = subjectName;
+      if (periodEl) periodEl.textContent = foundPeriod || (foundObj && foundObj.period) || 'Matéria Curricular';
+      if (cycleEl) cycleEl.textContent = foundCycleName || (foundObj && foundObj.cycleName) || 'Ciclo da Graduação';
+
+      const matCount = getDisciplineMaterialsCount(subjectName);
+      if (matBadge) {
+        matBadge.textContent = matCount > 0 ? `🟢 ${matCount} ${matCount === 1 ? 'Aula Ativa' : 'Aulas Ativas'}` : 'Nenhuma aula anexada';
+        matBadge.style.color = matCount > 0 ? '#00ff66' : 'var(--text-secondary)';
+      }
+
+      const desc = (foundObj && foundObj.description) ? foundObj.description : 'Ementa e conteúdo programático da disciplina a serem desenvolvidos nas aulas.';
+      if (descText) descText.textContent = desc;
+
+      const topics = (foundObj && Array.isArray(foundObj.topics) && foundObj.topics.length > 0)
+        ? foundObj.topics
+        : [];
+      if (topicsList) {
+        topicsList.innerHTML = '';
+        if (topics.length > 0) {
+          topics.forEach(t => {
+            const chip = document.createElement('span');
+            chip.style.cssText = 'font-size: 10px; background: rgba(0, 229, 255, 0.1); color: var(--neon); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(0, 229, 255, 0.2);';
+            chip.textContent = t;
+            topicsList.appendChild(chip);
+          });
+        } else {
+          topicsList.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Nenhum tópico individual cadastrado.</span>';
+        }
+      }
+
+      if (fcBtn) {
+        if (matCount > 0) {
+          fcBtn.style.display = 'inline-flex';
+          fcBtn.onclick = () => { closeModals(); openSubjectInTab(subjectName, 'flashcards'); };
+        } else {
+          fcBtn.style.display = 'none';
+        }
+      }
+
+      if (qzBtn) {
+        if (matCount > 0) {
+          qzBtn.style.display = 'inline-flex';
+          qzBtn.onclick = () => { closeModals(); openSubjectInTab(subjectName, 'quizzes'); };
+        } else {
+          qzBtn.style.display = 'none';
+        }
+      }
+
+      const modal = document.getElementById('subjectDetailModal');
+      if (modal) modal.classList.add('active');
     }
 
     function renderCurriculumGrid() {
@@ -6865,9 +7024,18 @@ ${rawText.slice(0, 150000)}`;
             : `Ementa Universitária • ${totalDisciplines} Disciplinas`;
         }
 
+        const toggleAllBtn = document.getElementById('btnToggleAllCurriculum');
+        if (toggleAllBtn) {
+          const isAllExpanded = filtered.length > 0 && filtered.every(p => expandedCurriculumPeriods.has(p.period));
+          toggleAllBtn.innerHTML = isAllExpanded 
+            ? '<svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="18 15 12 9 6 15"/></svg> Recolher Todas' 
+            : '<svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="6 9 12 15 18 9"/></svg> Expandir Todas';
+        }
+
         filtered.forEach(cat => {
           const card = document.createElement('div');
-          card.className = 'subject-category-card';
+          const isExpanded = expandedCurriculumPeriods.has(cat.period);
+          card.className = `subject-category-card ${isExpanded ? 'expanded' : 'collapsed'}`;
           
           let cycleColor = 'var(--neon)';
           let cycleBg = 'rgba(0, 229, 255, 0.12)';
@@ -6879,92 +7047,102 @@ ${rawText.slice(0, 150000)}`;
             cycleBg = 'rgba(255, 170, 0, 0.14)';
           }
 
-          card.innerHTML = `
-            <div class="category-header">
-              <span style="font-weight: 700; color: var(--text-primary); font-size: 13px;">${cat.period}</span>
-              <span style="background: ${cycleBg}; color: ${cycleColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.3px;">
-                ${cat.cycleName || 'Obrigatória'}
-              </span>
+          const subjCount = (cat.subjects || []).length;
+          const escapedPeriod = (cat.period || '').replace(/'/g, "\\'");
+
+          let headerHtml = `
+            <div class="category-header" onclick="toggleCurriculumPeriod('${escapedPeriod}')" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; ${isExpanded ? 'border-bottom: 1px solid var(--border); padding-bottom: 10px;' : ''}" title="Clique para ${isExpanded ? 'recolher' : 'abrir'} a lista de matérias deste período">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-weight: 700; color: var(--text-primary); font-size: 13.5px;">${cat.period}</span>
+                <span style="background: ${cycleBg}; color: ${cycleColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.3px;">
+                  ${cat.cycleName || 'Obrigatória'}
+                </span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">
+                  ${subjCount} ${subjCount === 1 ? 'matéria' : 'matérias'}
+                </span>
+                <span class="btn-outline-action" style="font-size: 10px; padding: 2px 8px; border-radius: 12px; color: ${isExpanded ? 'var(--text-secondary)' : 'var(--neon)'}; pointer-events: none; border-color: ${isExpanded ? 'var(--border)' : 'var(--border-accent)'};">
+                  ${isExpanded ? '▲ Recolher' : '▼ Ver Matérias'}
+                </span>
+              </div>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
-              ${cat.subjects.map(s => {
-                const sName = typeof s === 'string' ? s : s.name;
-                const sDesc = typeof s === 'object' && s.description ? s.description : '';
-                const sTopics = typeof s === 'object' && Array.isArray(s.topics) ? s.topics : [];
-                const matCount = getDisciplineMaterialsCount(sName);
-                const hasMaterials = matCount > 0;
-                
-                let matchedSubjectKey = sName;
-                if (subjectGenerationStatus[sName]) {
-                  matchedSubjectKey = sName;
-                } else {
-                  const sLower = sName.toLowerCase();
-                  for (const k of Object.keys(subjectGenerationStatus)) {
-                    const kLower = k.toLowerCase();
-                    if (sLower.includes(kLower) || kLower.includes(sLower) || (sLower.includes('dermatolog') && kLower.includes('sistemas 2'))) {
-                      matchedSubjectKey = k;
-                      break;
+          `;
+
+          let subjectsListHtml = '';
+          if (isExpanded) {
+            subjectsListHtml = `
+              <div class="subject-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                ${cat.subjects.map(s => {
+                  const sName = typeof s === 'string' ? s : s.name;
+                  const escapedName = sName.replace(/'/g, "\\'");
+                  const matCount = getDisciplineMaterialsCount(sName);
+                  const hasMaterials = matCount > 0;
+                  
+                  let matchedSubjectKey = sName;
+                  if (subjectGenerationStatus[sName]) {
+                    matchedSubjectKey = sName;
+                  } else {
+                    const sLower = sName.toLowerCase();
+                    for (const k of Object.keys(subjectGenerationStatus)) {
+                      const kLower = k.toLowerCase();
+                      if (sLower.includes(kLower) || kLower.includes(sLower) || (sLower.includes('dermatolog') && kLower.includes('sistemas 2'))) {
+                        matchedSubjectKey = k;
+                        break;
+                      }
                     }
                   }
-                }
-                const statusObj = subjectGenerationStatus[matchedSubjectKey];
-                const isPending = hasMaterials && (!statusObj || statusObj.status === 'pending');
+                  const statusObj = subjectGenerationStatus[matchedSubjectKey];
+                  const isPending = hasMaterials && (!statusObj || statusObj.status === 'pending');
 
-                let rightTag = '';
-                if (hasMaterials) {
-                  if (isPending) {
-                    rightTag = `
-                      <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
-                        <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
-                        <button class="btn-outline-action primary" style="padding: 2px 7px; font-size: 10px; font-weight: 700;" onclick="generateQuestionsForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Flashcards e Quizzes sob demanda com IA">⚡ Gerar IA</button>
-                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
-                        <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
-                      </div>
-                    `;
+                  let rightTag = '';
+                  if (hasMaterials) {
+                    if (isPending) {
+                      rightTag = `
+                        <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                          <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
+                          <button class="btn-outline-action primary" style="padding: 2px 7px; font-size: 10px; font-weight: 700;" onclick="generateQuestionsForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Flashcards e Quizzes sob demanda com IA">⚡ Gerar IA</button>
+                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
+                          <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
+                        </div>
+                      `;
+                    } else {
+                      rightTag = `
+                        <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                          <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
+                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'flashcards')" title="Estudar Flashcards desta matéria">🗂️ Flashcards</button>
+                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Estudar Quizzes desta matéria">📝 Quizzes</button>
+                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
+                          <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
+                        </div>
+                      `;
+                    }
                   } else {
                     rightTag = `
-                      <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
-                        <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
-                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'flashcards')" title="Estudar Flashcards desta matéria">🗂️ Flashcards</button>
-                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Estudar Quizzes desta matéria">📝 Quizzes</button>
-                        <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
-                        <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
-                      </div>
+                      <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px; border-radius: 6px;" onclick="openSubjectDetailModal('${escapedName}')" title="Ver ementa e detalhes desta disciplina">
+                        ℹ️ Ementa
+                      </button>
                     `;
                   }
-                } else {
-                  rightTag = `<span style="color: var(--text-muted); font-size: 11px; opacity: 0.65; white-space: nowrap;">Sem materiais</span>`;
-                }
 
-                return `
-                  <div class="subject-row" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 8px 12px; border: 1px solid rgba(0, 255, 102, 0.2);' : 'background: var(--bg-surface); border-radius: 8px; padding: 8px 12px; border: 1px solid var(--border);'}">
-                    <div style="display: flex; flex-direction: column; gap: 3px; overflow: hidden; flex: 1; min-width: 130px;">
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${sName}">
+                  return `
+                    <div class="subject-row" onclick="openSubjectDetailModal('${escapedName}')" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 8px 12px; border: 1px solid rgba(0, 255, 102, 0.25);' : 'background: var(--bg-surface); border-radius: 8px; padding: 8px 12px; border: 1px solid var(--border);'} display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: all 0.15s ease;" title="Clique para ver ementa e detalhes de ${escapedName}">
+                      <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+                        <span style="font-size: 12.5px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: normal;">
                           ${hasMaterials ? '🟢 ' : '• '}${sName}
                         </span>
                       </div>
-                      ${sDesc ? `
-                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.35; max-height: 38px; overflow: hidden; text-overflow: ellipsis;" title="${sDesc}">
-                          📖 ${sDesc}
-                        </div>
-                      ` : ''}
-                      ${sTopics && sTopics.length > 0 ? `
-                        <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px;">
-                          ${sTopics.slice(0, 3).map(t => `
-                            <span style="font-size: 9px; background: rgba(0, 229, 255, 0.1); color: var(--neon); padding: 1px 5px; border-radius: 4px;">${t}</span>
-                          `).join('')}
-                        </div>
-                      ` : ''}
+                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;" onclick="event.stopPropagation()">
+                        ${rightTag}
+                      </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-                      ${rightTag}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          `;
+                  `;
+                }).join('')}
+              </div>
+            `;
+          }
+
+          card.innerHTML = headerHtml + subjectsListHtml;
           grid.appendChild(card);
         });
       }
@@ -8442,6 +8620,7 @@ ${rawText.slice(0, 150000)}`;
 
       // 3. Limpar ementa universitária
       universityCurriculum = [];
+      if (typeof expandedCurriculumPeriods !== 'undefined') expandedCurriculumPeriods.clear();
       const currGrid = document.getElementById('curriculumGrid');
       const currHeader = document.getElementById('curriculumHeaderBar');
       const currEmpty = document.getElementById('curriculumEmptyState');
