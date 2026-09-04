@@ -1426,8 +1426,9 @@
 
     .curriculum-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
       gap: 16px;
+      align-items: start;
     }
 
     .subject-category-card {
@@ -1439,10 +1440,18 @@
       flex-direction: column;
       gap: 10px;
       transition: all 0.2s ease;
+      height: fit-content;
+      box-sizing: border-box;
     }
 
     .subject-category-card.collapsed {
       padding: 14px 18px;
+      cursor: pointer;
+    }
+
+    .subject-category-card.collapsed:hover {
+      border-color: var(--neon);
+      box-shadow: 0 4px 16px rgba(0, 229, 255, 0.08);
     }
 
     .category-header {
@@ -1459,14 +1468,34 @@
       justify-content: space-between;
       align-items: center;
       font-size: 13px;
-      padding: 8px 12px;
+      padding: 10px 12px;
       border-radius: 8px;
       transition: all 0.15s ease;
+      width: 100%;
+      box-sizing: border-box;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .subject-row:hover {
       border-color: var(--neon) !important;
-      background: rgba(0, 229, 255, 0.04) !important;
+      background: rgba(0, 229, 255, 0.05) !important;
+    }
+
+    @media (max-width: 640px) {
+      .curriculum-grid {
+        grid-template-columns: 1fr;
+      }
+      .subject-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px;
+      }
+      .subject-actions-box {
+        width: 100%;
+        justify-content: flex-start !important;
+      }
     }
 
     .knowledge-meter {
@@ -2165,6 +2194,33 @@
             </div>
           </div>
 
+          <!-- SELETOR DE MATÉRIA ESPECÍFICA / SLIDE EM FLASHCARDS -->
+          <div class="active-subject-header-card" id="fcSlideSelectorCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(0, 229, 255, 0.15); color: var(--neon); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">MATÉRIA ESPECÍFICA / SLIDE</span>
+                  <h4 style="font-size: 13.5px; margin: 0; font-weight: 700; color: var(--text-primary);">Selecione o Slide ou Aula</h4>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="font-size: 11.5px; font-weight: 700; padding: 5px 12px;" title="Gerar Flashcards e Quizzes sob demanda para o slide selecionado">
+                  ⚡ Gerar Estudo (Quiz & Flashcard)
+                </button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+              <select id="fcTargetSlideSelect" class="form-select" onchange="handleSlideSelectChange(this.value)" style="flex: 1; min-width: 220px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;">
+                <option value="all">📚 Todos os Slides / Matéria Completa</option>
+              </select>
+            </div>
+            <div id="fcSlidePillsList" style="display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; flex-wrap: wrap;"></div>
+            <div id="fcActiveSlideBanner" style="display: none; margin-top: 10px; padding: 8px 12px; background: rgba(0, 229, 255, 0.08); border: 1px solid var(--border-accent); border-radius: 8px; font-size: 12px; justify-content: space-between; align-items: center;">
+              <span id="fcActiveSlideBannerText" style="color: var(--neon); font-weight: 600;"></span>
+              <button class="btn-outline-action" onclick="clearSlideFilter()" style="padding: 2px 8px; font-size: 10px;">✕ Ver Todos os Slides</button>
+            </div>
+          </div>
+
           <!-- BANNER DE PENDÊNCIA DE GERAÇÃO EM FLASHCARDS -->
           <div class="pending-generation-banner" id="fcPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 22px; margin-bottom: 20px; text-align: center;">
             <div style="font-size: 15px; font-weight: 700; color: #ffaa00; margin-bottom: 6px;">
@@ -2286,6 +2342,33 @@
                   Excluir Matéria
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- SELETOR DE MATÉRIA ESPECÍFICA / SLIDE EM QUIZZES -->
+          <div class="active-subject-header-card" id="quizSlideSelectorCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">MATÉRIA ESPECÍFICA / SLIDE</span>
+                  <h4 style="font-size: 13.5px; margin: 0; font-weight: 700; color: var(--text-primary);">Selecione o Slide ou Aula</h4>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="font-size: 11.5px; font-weight: 700; padding: 5px 12px;" title="Gerar Flashcards e Quizzes sob demanda para o slide selecionado">
+                  ⚡ Gerar Estudo (Quiz & Flashcard)
+                </button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+              <select id="quizTargetSlideSelect" class="form-select" onchange="handleSlideSelectChange(this.value)" style="flex: 1; min-width: 220px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;">
+                <option value="all">📚 Todos os Slides / Matéria Completa</option>
+              </select>
+            </div>
+            <div id="quizSlidePillsList" style="display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; flex-wrap: wrap;"></div>
+            <div id="quizActiveSlideBanner" style="display: none; margin-top: 10px; padding: 8px 12px; background: rgba(0, 229, 255, 0.08); border: 1px solid var(--border-accent); border-radius: 8px; font-size: 12px; justify-content: space-between; align-items: center;">
+              <span id="quizActiveSlideBannerText" style="color: var(--neon); font-weight: 600;"></span>
+              <button class="btn-outline-action" onclick="clearSlideFilter()" style="padding: 2px 8px; font-size: 10px;">✕ Ver Todos os Slides</button>
             </div>
           </div>
 
@@ -2960,11 +3043,67 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         <div style="font-size: 12px; font-weight: 700; color: var(--neon); margin-bottom: 6px;">🎯 Tópicos Programáticos Mapeados:</div>
         <div id="modalSubjectTopicsList" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto;"></div>
       </div>
+
+      <!-- SEÇÃO DE MATÉRIAS ESPECÍFICAS / SLIDES / AULAS COM BOTÃO ÚNICO DE GERAÇÃO -->
+      <div id="modalSubjectMaterialsContainer" style="margin-bottom: 16px; display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--neon);">📁 Matérias Específicas & Slides Disponíveis:</div>
+          <span style="font-size: 11px; color: var(--text-secondary);">Gere Quizzes e Flashcards direcionados</span>
+        </div>
+        <div id="modalSubjectMaterialsList" style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;"></div>
+      </div>
+
       <div id="modalSubjectActionsBar" style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 14px;">
         <button class="btn-outline-action" onclick="closeModals()">Fechar</button>
         <button class="btn-outline-action primary" id="modalSubjectAddMaterialBtn" onclick="closeModals(); openUploadMaterialModal();">📁 + Adicionar Aula</button>
         <button class="btn-outline-action" id="modalSubjectFlashcardsBtn" style="display: none;">🗂️ Flashcards</button>
         <button class="btn-outline-action" id="modalSubjectQuizzesBtn" style="display: none;">📝 Quizzes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE QUANTIDADE DE QUESTÕES (BOTÃO ÚNICO QUIZ ⇄ FLASHCARD)
+       ========================================================= -->
+  <div class="modal-overlay" id="modalGenerateStudyCount" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 480px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">⚡</span>
+          <h3 id="generateStudyModalTitle" style="font-size: 16px; margin: 0; color: var(--text-primary);">Gerar Estudo (Quiz & Flashcard)</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p id="generateStudyModalTargetName" style="font-size: 13px; color: var(--neon); font-weight: 600; margin: 6px 0 12px 0;">
+        Matéria / Slide Selecionado
+      </p>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <label for="generateStudyQuestionsCountInput" style="display: block; font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+          Quantas questões você deseja gerar? (Máximo: 30)
+        </label>
+        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+          <input type="number" id="generateStudyQuestionsCountInput" min="1" max="30" value="5" class="written-textarea" style="width: 90px; height: 42px; font-size: 18px; font-weight: 700; text-align: center; padding: 4px;" oninput="validateGenerateStudyCount(this)">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(5)" style="padding: 4px 10px; font-size: 11px;">5 questões</button>
+            <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(10)" style="padding: 4px 10px; font-size: 11px;">10 questões</button>
+            <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(15)" style="padding: 4px 10px; font-size: 11px;">15 questões</button>
+            <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(30)" style="padding: 4px 10px; font-size: 11px;">30 questões (Máx)</button>
+          </div>
+        </div>
+        <p style="font-size: 11.5px; color: var(--text-secondary); margin: 0; line-height: 1.45;">
+          ✨ <strong>Engenharia Unificada:</strong> Cada questão gerada cria simultaneamente um <strong>Quiz de Múltipla Escolha</strong> (com 4 distratores plausíveis) e um <strong>Flashcard</strong> (Frente: Pergunta Clínica / Verso: Resposta Sintética), garantindo 100% de consistência conceitual.
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn-outline-action" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action primary" id="btnConfirmGenerateStudy" onclick="confirmGenerateStudyCount()" style="font-weight: 700;">
+          ⚡ Confirmar & Gerar Estudo
+        </button>
       </div>
     </div>
   </div>
@@ -3944,25 +4083,28 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       };
     }
 
-    // 4. BANCO COMPARTILHADO DE ESTUDO
-    let sharedQuestionsBank = [];
-    const INITIAL_DEMO_QUESTIONS = [
-      createEnareQuestionObject('Semiologia das Lesões Elementares Cutâneas', 'Integração de Sistemas Humanos 2 (Dermatologia)', 0),
-      createEnareQuestionObject('Psoríase Vulgar & Koebner', 'Integração de Sistemas Humanos 2 (Dermatologia)', 1),
-      createEnareQuestionObject('Líquen Plano & Wickham', 'Integração de Sistemas Humanos 2 (Dermatologia)', 2),
-      createEnareQuestionObject('Dermatite Atópica & Eczemas', 'Integração de Sistemas Humanos 2 (Dermatologia)', 3),
-      createEnareQuestionObject('Histologia da Barreira Epidérmica', 'Integração de Sistemas Humanos 2 (Dermatologia)', 4)
+    // 4. BANCO COMPARTILHADO DE ESTUDO & FOCO DE SLIDE (UNIFICADO QUIZ ⇄ FLASHCARD)
+    var sharedQuestionsBank = [];
+    var currentQuizSlideFilter = 'all';
+    var pendingGenerateStudyContext = { materialName: '', subjectName: '' };
+
+    var INITIAL_DEMO_QUESTIONS = [
+      Object.assign(createEnareQuestionObject('Semiologia das Lesões Elementares Cutâneas', 'Integração de Sistemas Humanos 2 (Dermatologia)', 0), { slideName: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf' }),
+      Object.assign(createEnareQuestionObject('Psoríase Vulgar & Koebner', 'Integração de Sistemas Humanos 2 (Dermatologia)', 1), { slideName: 'Psoríase, liquen plano.pdf' }),
+      Object.assign(createEnareQuestionObject('Líquen Plano & Wickham', 'Integração de Sistemas Humanos 2 (Dermatologia)', 2), { slideName: 'Psoríase, liquen plano.pdf' }),
+      Object.assign(createEnareQuestionObject('Dermatite Atópica & Eczemas', 'Integração de Sistemas Humanos 2 (Dermatologia)', 3), { slideName: 'Dermatite Seborreica, Dermatite Atópica, Dermatite de Contato Alérgica...pdf' }),
+      Object.assign(createEnareQuestionObject('Histologia da Barreira Epidérmica', 'Integração de Sistemas Humanos 2 (Dermatologia)', 4), { slideName: 'Aula 2 - Sistema Tegumentar.pdf' })
     ];
     // Inicia zerado para novo teste de ementa e curadoria
     sharedQuestionsBank = [];
 
-    let currentCardIndex = 0;
-    let studyMode = 'traditional';
-    let currentDiseaseFilter = 'all';
+    var currentCardIndex = 0;
+    var studyMode = 'traditional';
+    var currentDiseaseFilter = 'all';
 
     // GERENCIAMENTO DE MATÉRIAS, DIVISÃO DE ESTUDO & STATUS DE GERAÇÃO
-    let currentStudySubject = '';
-    let subjectGenerationStatus = {};
+    var currentStudySubject = '';
+    var subjectGenerationStatus = {};
 
     function getAvailableStudySubjects() {
       const set = new Set();
@@ -3986,6 +4128,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     function selectStudySubject(subjectName) {
       currentStudySubject = subjectName;
       currentDiseaseFilter = 'all';
+      currentQuizSlideFilter = 'all';
       currentCardIndex = 0;
       updateSubjectFilterMenus();
       renderSharedStudyItems();
@@ -4015,16 +4158,181 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       }
     }
 
+    function getMaterialsForSubject(subjectName) {
+      const sName = subjectName || currentStudySubject;
+      if (!sName) return [];
+      if (typeof chatDriveMaterials === 'undefined' || !Array.isArray(chatDriveMaterials)) return [];
+      return chatDriveMaterials.filter(m => {
+        if (!m.subject) return false;
+        if (m.subject === sName) return true;
+        const mLower = m.subject.toLowerCase();
+        const sLower = sName.toLowerCase();
+        return mLower.includes(sLower) || sLower.includes(mLower) || (sLower.includes('dermatolog') && mLower.includes('sistemas 2'));
+      });
+    }
+
     function getFilteredQuestions() {
       ensureCurrentSubjectValid();
       let list = sharedQuestionsBank;
       if (currentStudySubject) {
-        list = list.filter(q => q.subject === currentStudySubject);
+        list = list.filter(q => q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase()));
+      }
+      if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
+        list = list.filter(q => {
+          if (q.slideName === currentQuizSlideFilter) return true;
+          if (q.materialName === currentQuizSlideFilter) return true;
+          const sLower = currentQuizSlideFilter.toLowerCase();
+          const dLower = (q.disease || '').toLowerCase();
+          if (sLower.includes('psori') && dLower.includes('psor')) return true;
+          if (sLower.includes('liquen') && dLower.includes('liquen')) return true;
+          if (sLower.includes('tegument') && dLower.includes('barreira')) return true;
+          if (sLower.includes('les') && dLower.includes('les')) return true;
+          if (sLower.includes('atop') && dLower.includes('atop')) return true;
+          return false;
+        });
       }
       if (currentDiseaseFilter && currentDiseaseFilter !== 'all') {
         list = list.filter(q => (q.disease === currentDiseaseFilter) || (q.subject && q.subject.includes(currentDiseaseFilter)));
       }
       return list;
+    }
+
+    function renderSlideSelectors() {
+      const materials = getMaterialsForSubject(currentStudySubject);
+
+      const qzCard = document.getElementById('quizSlideSelectorCard');
+      const qzSelect = document.getElementById('quizTargetSlideSelect');
+      const qzPills = document.getElementById('quizSlidePillsList');
+      const qzBanner = document.getElementById('quizActiveSlideBanner');
+      const qzBannerText = document.getElementById('quizActiveSlideBannerText');
+
+      const fcCard = document.getElementById('fcSlideSelectorCard');
+      const fcSelect = document.getElementById('fcTargetSlideSelect');
+      const fcPills = document.getElementById('fcSlidePillsList');
+      const fcBanner = document.getElementById('fcActiveSlideBanner');
+      const fcBannerText = document.getElementById('fcActiveSlideBannerText');
+
+      [
+        { card: qzCard, select: qzSelect, pills: qzPills, banner: qzBanner, bannerText: qzBannerText },
+        { card: fcCard, select: fcSelect, pills: fcPills, banner: fcBanner, bannerText: fcBannerText }
+      ].forEach(({ card, select, pills, banner, bannerText }) => {
+        if (!card || !select) return;
+        if (materials.length === 0) {
+          card.style.display = 'none';
+          return;
+        }
+        card.style.display = 'block';
+
+        select.innerHTML = '<option value="all">📚 Todos os Slides / Matéria Completa</option>' +
+          materials.map(m => {
+            const isSelected = currentQuizSlideFilter === m.name;
+            const shortName = m.name.length > 45 ? m.name.slice(0, 42) + '...' : m.name;
+            return `<option value="${m.name.replace(/"/g, '&quot;')}" ${isSelected ? 'selected' : ''}>📄 ${shortName} ${m.topic ? `(${m.topic})` : ''}</option>`;
+          }).join('');
+
+        if (pills) {
+          pills.innerHTML = `
+            <button class="btn-outline-action ${currentQuizSlideFilter === 'all' ? 'active' : ''}" 
+                    style="font-size: 11px; padding: 4px 10px; border-radius: 14px; white-space: nowrap; ${currentQuizSlideFilter === 'all' ? 'border-color: var(--neon); background: rgba(0, 229, 255, 0.12); font-weight: 700;' : ''}"
+                    onclick="handleSlideSelectChange('all')">
+              📚 Todos (${materials.length} slides)
+            </button>
+          ` + materials.map(m => {
+            const isActive = currentQuizSlideFilter === m.name;
+            const countForSlide = sharedQuestionsBank.filter(q => (q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase())) && (q.slideName === m.name || (q.disease && m.disease && q.disease.includes(m.disease)))).length;
+            const shortName = m.name.replace(/\.pdf$/i, '');
+            const truncated = shortName.length > 25 ? shortName.slice(0, 23) + '...' : shortName;
+            return `
+              <button class="btn-outline-action ${isActive ? 'active' : ''}" 
+                      style="font-size: 11px; padding: 4px 10px; border-radius: 14px; white-space: nowrap; ${isActive ? 'border-color: #00ff66; background: rgba(0, 255, 102, 0.12); color: #00ff66; font-weight: 700;' : ''}"
+                      onclick="handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')"
+                      title="${m.name}">
+                📄 ${truncated} ${countForSlide > 0 ? `<span style="opacity: 0.85; font-size: 10px;">(${countForSlide})</span>` : ''}
+              </button>
+            `;
+          }).join('');
+        }
+
+        if (banner && bannerText) {
+          if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
+            banner.style.display = 'flex';
+            const filtered = getFilteredQuestions();
+            bannerText.innerHTML = `🎯 Foco Ativo: <strong>${currentQuizSlideFilter}</strong> • ${filtered.length} ${filtered.length === 1 ? 'questão' : 'questões'} prontas (Quiz ⇄ Flashcard)`;
+          } else {
+            banner.style.display = 'none';
+          }
+        }
+      });
+    }
+
+    function handleSlideSelectChange(slideName) {
+      currentQuizSlideFilter = slideName;
+      const qzSelect = document.getElementById('quizTargetSlideSelect');
+      if (qzSelect && qzSelect.value !== slideName) qzSelect.value = slideName;
+      const fcSelect = document.getElementById('fcTargetSlideSelect');
+      if (fcSelect && fcSelect.value !== slideName) fcSelect.value = slideName;
+
+      renderSharedStudyItems();
+    }
+
+    function clearSlideFilter() {
+      handleSlideSelectChange('all');
+    }
+
+    // MODAL DE QUANTIDADE (BOTÃO ÚNICO QUIZ ⇄ FLASHCARD)
+    function openGenerateStudyModal(materialName, subjectName) {
+      const targetSubj = subjectName || currentStudySubject;
+      pendingGenerateStudyContext = {
+        materialName: materialName || '',
+        subjectName: targetSubj
+      };
+      const titleEl = document.getElementById('generateStudyModalTitle');
+      const targetEl = document.getElementById('generateStudyModalTargetName');
+      const inputEl = document.getElementById('generateStudyQuestionsCountInput');
+      if (titleEl) {
+        titleEl.textContent = materialName ? '⚡ Gerar Estudo Deste Slide' : `⚡ Gerar Estudo: ${targetSubj}`;
+      }
+      if (targetEl) {
+        targetEl.textContent = materialName ? `📄 ${materialName} (${targetSubj})` : `📚 Disciplina Integral: ${targetSubj}`;
+      }
+      if (inputEl) inputEl.value = '5';
+      const modal = document.getElementById('modalGenerateStudyCount');
+      if (modal) modal.classList.add('active');
+    }
+
+    function openGenerateStudyModalForActiveSlide() {
+      const selectEl = document.getElementById('quizTargetSlideSelect') || document.getElementById('fcTargetSlideSelect');
+      const val = selectEl ? selectEl.value : 'all';
+      const matName = val === 'all' ? '' : val;
+      openGenerateStudyModal(matName, currentStudySubject);
+    }
+
+    function setGenerateStudyCount(n) {
+      const inputEl = document.getElementById('generateStudyQuestionsCountInput');
+      if (inputEl) inputEl.value = Math.max(1, Math.min(30, parseInt(n, 10) || 5));
+    }
+
+    function validateGenerateStudyCount(input) {
+      let val = parseInt(input.value, 10);
+      if (isNaN(val)) return;
+      if (val < 1) input.value = '1';
+      if (val > 30) input.value = '30';
+    }
+
+    function confirmGenerateStudyCount() {
+      const inputEl = document.getElementById('generateStudyQuestionsCountInput');
+      let count = inputEl ? parseInt(inputEl.value, 10) : 5;
+      if (isNaN(count) || count < 1) count = 1;
+      if (count > 30) count = 30;
+
+      const { materialName, subjectName } = pendingGenerateStudyContext;
+      closeModals();
+
+      if (materialName) {
+        generateUnifiedStudyForMaterial(materialName, subjectName, count);
+      } else {
+        generateUnifiedStudyForSubject(subjectName, count);
+      }
     }
 
     function renderSharedStudyItems() {
@@ -4101,6 +4409,8 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       const qzEmpty = document.getElementById('quizzesEmptyState');
       const qzDeck = document.getElementById('quizDeck');
 
+      renderSlideSelectors();
+
       if (isPending) {
         if (fcPendingBanner) {
           fcPendingBanner.style.display = 'block';
@@ -4139,6 +4449,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         updateCardDisplay(filtered);
         renderQuizzesList(filtered);
       }
+      renderSlideSelectors();
     }
 
     function updateCardDisplay(filteredList) {
@@ -4386,47 +4697,267 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       }
     }
 
-    // GERAÇÃO SOB DEMANDA, AUDITORIA DE REDUNDÂNCIA POR MATÉRIA & EXCLUSÃO
-    function generateQuestionsForSubject(subjectName) {
-      const targetSubject = subjectName || currentStudySubject;
-      if (!targetSubject) return;
+    // GERAÇÃO SOB DEMANDA, MOTOR UNIFICADO (QUIZ ⇄ FLASHCARD) & AUDITORIA
+    function generateUnifiedStudyForMaterial(materialName, subjectName, count) {
+      const targetSubj = subjectName || currentStudySubject;
+      if (!targetSubj || !materialName) return;
 
-      let materials = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === targetSubject) : []);
-      if (materials.length === 0) {
-        materials = [{ name: `${targetSubject} - Conteúdo Curricular`, disease: targetSubject, subject: targetSubject }];
+      const qCount = Math.max(1, Math.min(30, count || 5));
+      const materials = getMaterialsForSubject(targetSubj);
+      const targetFile = materials.find(m => m.name === materialName) || { name: materialName, disease: materialName, topic: materialName };
+
+      // Remove questões prévias deste slide específico
+      sharedQuestionsBank = sharedQuestionsBank.filter(q => !(q.subject === targetSubj && q.slideName === materialName));
+
+      const generated = [];
+      const sLower = materialName.toLowerCase();
+      const dLower = (targetFile.disease || '').toLowerCase();
+      const areaInfo = categorizeMedicalSubjectArea(targetSubj, targetFile.disease || materialName);
+
+      // CASO ESPECIAL: Slide de Psoríase e Líquens
+      if ((sLower.includes('psori') || dLower.includes('psori')) && (sLower.includes('liquen') || dLower.includes('liquen'))) {
+        const q1 = createEnareQuestionObject('Psoríase Vulgar & Koebner', targetSubj, 1);
+        q1.slideName = materialName;
+        generated.push(q1);
+
+        if (qCount >= 2) {
+          const q2 = createEnareQuestionObject('Líquen Plano & Wickham', targetSubj, 2);
+          q2.slideName = materialName;
+          generated.push(q2);
+        }
+
+        if (qCount >= 3) {
+          generated.push({
+            id: `enare-${Date.now()}-psori3`,
+            subject: targetSubj,
+            slideName: materialName,
+            disease: 'Artropatia Psoriásica & Manifestações Ungueais',
+            area: areaInfo.area,
+            areaLabel: areaInfo.areaLabel,
+            vignette: 'Homem, 38 anos, com placas eritemato-descamativas em cotovelos há 4 anos. Procura atendimento por dor e edema difuso em todo o 3º pododáctilo direito ("dedo em salsicha") e dor lombar inflamatória de predomínio matinal que melhora com movimentação. Ao exame dermatológico minucioso das unhas: depressões puntiformes cupuliformes ("pitting" ungueal) e manchas em "gota de óleo". Fator Reumatoide (FR) e anti-CCP negativos.',
+            question: 'Diante do quadro clínico apresentado, qual a denominação semiológica da tumefação digitiforme difusa e a correlação fisiopatológica diagnóstica segundo os critérios CASPAR?',
+            quizOptions: [
+              'Trata-se de dactilite ("dedo em salsicha"), manifestação cardinal de Artropatia Psoriásica dentro do grupo das espondiloartrites soronegativas.',
+              'Trata-se de tofo gotoso agudo; prescrever alopurinol em dose máxima imediata na crise.',
+              'Trata-se de nódulo de Heberden característico de osteoartrite erosiva avançada.',
+              'Trata-se de artrite reumatoide clássica com acometimento axial e fator reumatoide falso-negativo.'
+            ],
+            correctIndex: 0,
+            tripartite: {
+              correctReason: 'A dactilite (inflamação simultânea das articulações e bainhas tendíneas dos flexores) é manifestação clássica e altamente específica de Artropatia Psoriásica (Espondiloartrite). O "pitting" ungueal correlaciona-se fortemente com acometimento articular periférico. Os critérios CASPAR validam o diagnóstico de Artropatia Psoriásica mesmo na ausência de fator reumatoide (soronegatividade).',
+              distractorAnalysis: {
+                1: 'A crise de gota causa monoartrite inflamatória súbita (frequentemente podagra no 1º MTF), não dactilite difusa com pitting.',
+                2: 'Heberden e Bouchard são osteófitos interfalangianos da osteoartrite mecânica, sem padrão inflamatório em salsicha.',
+                3: 'A artrite reumatoide afeta predominantemente pequenas articulações com sinovite simétrica e poupa o esqueleto axial (exceto C1-C2).'
+              },
+              pearl: 'Na Psoríase: Dactilite ("dedo em salsicha") + Alterações Ungueais (pitting/óleo) = Artropatia Psoriásica (critérios CASPAR, soronegativa)!'
+            },
+            answer: 'Dactilite ("dedo em salsicha") é marco da Artropatia Psoriásica; associa-se a alterações ungueais (pitting) e soronegatividade (FR negativo).',
+            isRedundant: false,
+            redundancyScore: 0,
+            isStarred: false
+          });
+        }
+
+        if (qCount >= 4) {
+          generated.push({
+            id: `enare-${Date.now()}-liquen4`,
+            subject: targetSubj,
+            slideName: materialName,
+            disease: 'Líquen Plano Oral Erosivo & Vigilância de CEC',
+            area: areaInfo.area,
+            areaLabel: areaInfo.areaLabel,
+            vignette: 'Mulher, 56 anos, com queixa de queimação bucal ao ingerir alimentos ácidos e condimentados há 5 meses. Ao exame estomatológico: mucosa jugal bilateral com áreas de erosão recobertas por fibrina entremeadas a finas estrias esbranquiçadas reticuladas de Wickham que não se destacam à raspagem com espátula de madeira.',
+            question: 'Considerando as formas clínicas do Líquen Plano em mucosas, qual a principal conduta diagnóstica obrigatória e a complicação neoplásica descrita na literatura?',
+            quizOptions: [
+              'Realizar biópsia incisional de margem da lesão para exame histopatológico; vigiar risco de transformação maligna para Carcinoma Espinocelular (CEC).',
+              'Prescrever antifúngico oral empírico (fluconazol) por se tratar de candidíase pseudomembranosa clássica.',
+              'Indicar ressecção cirúrgica ampla imediata com margem de segurança de 2 cm sem biópsia prévia.',
+              'Tratar como estomatite aftosa recorrente com bochechos de bicarbonato de sódio e alta ambulatorial.'
+            ],
+            correctIndex: 0,
+            tripartite: {
+              correctReason: 'O Líquen Plano Oral (LPO), especialmente na variante erosiva/atrófica, é classificado pela OMS como desordem potencialmente maligna, com taxa de transformação para carcinoma espinocelular (CEC) de 0,5% a 2%. A biópsia incisional é mandatória para confirmação (infiltrado linfocitário em faixa e degeneração vacuolar basal) e exclusão de displasia/malignidade.',
+              distractorAnalysis: {
+                1: 'A candidíase pseudomembranosa desprende-se facilmente à raspagem (deixando base eritematosa), diferindo das estrias fixas de Wickham.',
+                2: 'A cirurgia mutiladora sem biópsia viola os princípios de conduta em dermatologia e estomatologia.',
+                3: 'Estomatite aftosa recidivante não exibe o padrão reticular de Wickham nem erosões extensas em placas.'
+              },
+              pearl: 'Líquen Plano Oral Erosivo: dor com alimentos ácidos + estrias de Wickham fixas; biopsiar e vigiar transformação para CEC!'
+            },
+            answer: 'Líquen Plano Oral Erosivo é desordem potencialmente maligna; conduta é biópsia incisional para confirmação e acompanhamento periódico contra Carcinoma Espinocelular (CEC).',
+            isRedundant: false,
+            redundancyScore: 0,
+            isStarred: false
+          });
+        }
+
+        if (qCount >= 5) {
+          generated.push({
+            id: `enare-${Date.now()}-psori5`,
+            subject: targetSubj,
+            slideName: materialName,
+            disease: 'Terapêutica Sistêmica da Psoríase & Biológicos',
+            area: areaInfo.area,
+            areaLabel: areaInfo.areaLabel,
+            vignette: 'Homem, 45 anos, com Psoríase em placas moderada a grave acometendo 22% da superfície corporal (PASI 18, DLQI 16), refratária a corticoterapia tópica e fototerapia UVB-NB. Sem etilismo ativo. Exames pré-terapêuticos: Sorologias para HIV, HBV e HCV negativas; PPD / IGRA negativo; Função hepática e hemograma normais.',
+            question: 'Segundo o Protocolo Clínico e Diretrizes Terapêuticas (PCDT) do Ministério da Saúde/SUS para Psoríase, qual a droga modificadora do curso da doença (DMARD) convencional de 1ª linha sistêmica indicada?',
+            quizOptions: [
+              'Metotrexato oral ou subcutâneo com suplementação obrigatória de ácido fólico nos dias subsequentes.',
+              'Prednisona oral em altas doses (1 mg/kg/dia) como terapia de manutenção contínua.',
+              'Talidomida sistêmica associada a antibióticos de amplo espectro.',
+              'Infliximabe intravenoso de início imediato sem tentativa prévia de imunossupressor convencional.'
+            ],
+            correctIndex: 0,
+            tripartite: {
+              correctReason: 'No PCDT de Psoríase do SUS, o Metotrexato (MTX) é a droga sintética convencional de primeira linha para doença moderada a grave (>10% SC ou PASI >10). A suplementação de ácido fólico (5 mg/semana, 24-48h após MTX) é essencial para reduzir toxicidade hematológica e gastrointestinal. Corticoides orais sistêmicos são terminantemente contraindicados pelo risco de psoríase pustulosa de von Zumbusch por efeito rebote.',
+              distractorAnalysis: {
+                1: 'Corticóides sistêmicos são PROIBIDOS na psoríase crônica pelo altíssimo risco de rebote grave (psoríase eritrodérmica ou pustulosa generalizada).',
+                2: 'Talidomida não integra o algoritmo terapêutico de primeira linha da psoríase em placas.',
+                3: 'Os imunobiológicos (anti-TNF, anti-IL17, anti-IL23) são indicados após falha ou contraindicação aos agentes convencionais (MTX, acitretina, ciclosporina).'
+              },
+              pearl: 'Psoríase moderada/grave: 1ª linha sistêmica é Metotrexato + Ácido Fólico! CORTICOIDE ORAL NUNCA (risco de rebote pustuloso)!'
+            },
+            answer: 'Psoríase sistêmica: Metotrexato + Ácido Fólico é a 1ª linha do SUS; corticoides orais são contraindicados pelo risco de rebote pustuloso grave.',
+            isRedundant: false,
+            redundancyScore: 0,
+            isStarred: false
+          });
+        }
+      } else if (sLower.includes('les') || sLower.includes('elementar') || dLower.includes('les')) {
+        const q1 = createEnareQuestionObject('Semiologia das Lesões Elementares Cutâneas', targetSubj, 0);
+        q1.slideName = materialName;
+        generated.push(q1);
+
+        if (qCount >= 2) {
+          generated.push({
+            id: `enare-${Date.now()}-les2`,
+            subject: targetSubj,
+            slideName: materialName,
+            disease: 'Lesões de Conteúdo Líquido: Vesícula, Bolha e Pústula',
+            area: areaInfo.area,
+            areaLabel: areaInfo.areaLabel,
+            vignette: 'Mulher, 28 anos, com erupção cutânea dolorosa no hemitórax direito há 3 dias. Ao exame dermatológico: lesões de conteúdo líquido límpido agrupadas sobre base eritematosa com distribuição metamérica (unilateral respeitando a linha média), com diâmetro individual medindo entre 2 e 4 mm.',
+            question: 'Identifique a nomenclatura semiológica elementar da lesão descrita e o critério dimensional que a diferencia da bolha (flictena):',
+            quizOptions: [
+              'Vesícula (coleção líquida superficial < 1 cm); a bolha diferencia-se por ter diâmetro superior a 1 cm.',
+              'Pústula purulenta primária; a bolha diferencia-se por acometer exclusivamente mucosas.',
+              'Pápula dérmica sólida infiltrada; a bolha possui conteúdo sólido com descamação periférica.',
+              'Cisto subcutâneo com cápsula epitelial verdadeira e conteúdo sebáceo.'
+            ],
+            correctIndex: 0,
+            tripartite: {
+              correctReason: 'A vesícula é uma elevação circunscrita com conteúdo líquido claro/citrino de diâmetro menor que 1,0 cm (ou < 0,5 cm em algumas literaturas). Quando o diâmetro excede 1,0 cm, a lesão é classificada como bolha ou flictena. No caso descrito (Herpes Zoster), as lesões são classicamente vesículas agrupadas sobre base eritematosa.',
+              distractorAnalysis: {
+                1: 'Pústula contém exsudato purulento desde a origem, o que não ocorre na fase vesicular inicial do zoster.',
+                2: 'Pápulas são estritamente lesões sólidas sem conteúdo líquido.',
+                3: 'Cistos são cavidades fechadas dérmicas ou hipodérmicas com membrana epitelial própria e conteúdo fluido ou semissólido.'
+              },
+              pearl: 'Lesões líquidas: Vesícula < 1 cm; Bolha > 1 cm; Pústula tem pus desde o início!'
+            },
+            answer: 'Vesícula é coleção líquida clara circunscrita < 1 cm; Bolha tem diâmetro > 1 cm.',
+            isRedundant: false,
+            redundancyScore: 0,
+            isStarred: false
+          });
+        }
+      } else {
+        const diseaseName = targetFile.disease || extractDiseaseFromFilename(materialName);
+        for (let i = 0; i < Math.min(qCount, 5); i++) {
+          const q = createEnareQuestionObject(diseaseName, targetSubj, i);
+          q.slideName = materialName;
+          generated.push(q);
+        }
       }
 
-      // Remove questões prévias dessa matéria para evitar repetições
-      sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== targetSubject);
+      // Se o usuário pediu mais questões do que o banco fixo (até 30), gera variações ricas de casos clínicos
+      while (generated.length < qCount) {
+        const extraIdx = generated.length;
+        const diseaseTitle = targetFile.disease || targetFile.topic || extractDiseaseFromFilename(materialName);
+        const qExtra = createEnareQuestionObject(`${diseaseTitle} (Cenário de Fixação #${extraIdx + 1})`, targetSubj, extraIdx);
+        qExtra.slideName = materialName;
+        generated.push(qExtra);
+      }
 
-      let generatedCount = 0;
-      materials.forEach((file, idx) => {
-        const diseaseName = file.disease || extractDiseaseFromFilename(file.name);
-        const qObj = createEnareQuestionObject(diseaseName, targetSubject, idx);
-        sharedQuestionsBank.unshift(qObj);
-        generatedCount++;
-      });
+      // Insere no banco compartilhado
+      generated.reverse().forEach(q => sharedQuestionsBank.unshift(q));
 
-      subjectGenerationStatus[targetSubject] = {
-        status: 'ready',
-        materialsCount: materials.length,
-        questionsCount: generatedCount
-      };
+      // Atualiza status da matéria
+      if (!subjectGenerationStatus[targetSubj]) {
+        subjectGenerationStatus[targetSubj] = { status: 'ready', materialsCount: materials.length, questionsCount: 0 };
+      }
+      subjectGenerationStatus[targetSubj].status = 'ready';
+      subjectGenerationStatus[targetSubj].questionsCount = sharedQuestionsBank.filter(q => q.subject === targetSubj).length;
 
-      currentStudySubject = targetSubject;
-      currentCardIndex = 0;
-      currentDiseaseFilter = 'all';
+      currentStudySubject = targetSubj;
+      currentQuizSlideFilter = materialName;
 
       renderSharedStudyItems();
       renderCurriculumGrid();
+      renderSlideSelectors();
       renderSceBars();
       updateSubjectFilterMenus();
 
-      showToast(`⚡ ${generatedCount} Questões no Padrão ENARE/FGV geradas para "${targetSubject}"!`);
+      showToast(`⚡ ${generated.length} pares de estudo (Quiz & Flashcard) gerados com sucesso para "${materialName}"!`);
+    }
+
+    function generateUnifiedStudyForSubject(subjectName, count) {
+      const targetSubj = subjectName || currentStudySubject;
+      if (!targetSubj) return;
+
+      const qCount = Math.max(1, Math.min(30, count || 5));
+      const materials = getMaterialsForSubject(targetSubj);
+
+      if (materials.length > 0) {
+        // Distribui entre os materiais
+        sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== targetSubj);
+        const perMat = Math.max(1, Math.floor(qCount / materials.length));
+        let totalCreated = 0;
+
+        materials.forEach((m, mIdx) => {
+          if (totalCreated >= qCount) return;
+          const toGenerate = (mIdx === materials.length - 1) ? (qCount - totalCreated) : perMat;
+          for (let i = 0; i < toGenerate; i++) {
+            const diseaseName = m.disease || extractDiseaseFromFilename(m.name);
+            const q = createEnareQuestionObject(diseaseName, targetSubj, totalCreated);
+            q.slideName = m.name;
+            sharedQuestionsBank.unshift(q);
+            totalCreated++;
+          }
+        });
+      } else {
+        // Sem materiais anexados ainda
+        sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== targetSubj);
+        for (let i = 0; i < qCount; i++) {
+          const q = createEnareQuestionObject(`${targetSubj} - Caso #${i + 1}`, targetSubj, i);
+          sharedQuestionsBank.unshift(q);
+        }
+      }
+
+      subjectGenerationStatus[targetSubj] = {
+        status: 'ready',
+        materialsCount: materials.length,
+        questionsCount: sharedQuestionsBank.filter(q => q.subject === targetSubj).length
+      };
+
+      currentStudySubject = targetSubj;
+      currentQuizSlideFilter = 'all';
+
+      renderSharedStudyItems();
+      renderCurriculumGrid();
+      renderSlideSelectors();
+      renderSceBars();
+      updateSubjectFilterMenus();
+
+      showToast(`⚡ ${qCount} pares de estudo (Quiz & Flashcard) gerados para "${targetSubj}"!`);
+    }
+
+    function generateQuestionsForSubject(subjectName) {
+      generateUnifiedStudyForSubject(subjectName, 5);
     }
 
     function generateQuestionsForCurrentSubject() {
-      generateQuestionsForSubject(currentStudySubject);
+      generateUnifiedStudyForSubject(currentStudySubject, 5);
     }
 
     function auditSubjectRedundancy(subjectName) {
@@ -6024,7 +6555,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     } catch (e) {
       rawCurriculum = [];
     }
-    let universityCurriculum = sanitizeSavedCurriculum(rawCurriculum);
+    var universityCurriculum = sanitizeSavedCurriculum(rawCurriculum);
     if (savedCurriculum && universityCurriculum.length !== rawCurriculum.length) {
       try {
         if (universityCurriculum.length === 0) {
@@ -6034,7 +6565,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         }
       } catch (e) {}
     }
-    let currentCurriculumCycleFilter = 'all';
+    var currentCurriculumCycleFilter = 'all';
 
     function getAllCurriculumSubjects() {
       if (!universityCurriculum || universityCurriculum.length === 0) return [];
@@ -6541,6 +7072,7 @@ ${rawText.slice(0, 150000)}`;
         const pKey = subj.period || 'Disciplinas da Ementa';
         if (!periodMap.has(pKey)) {
           periodMap.set(pKey, {
+            id: 'curriculum_period_' + (periodMap.size + 1),
             period: pKey,
             periodName: pKey,
             cycle: subj.cycle,
@@ -6879,11 +7411,18 @@ ${rawText.slice(0, 150000)}`;
     // CONTROLE DE ACORDEÃO E DETALHES DE DISCIPLINAS
     var expandedCurriculumPeriods = new Set();
 
-    function toggleCurriculumPeriod(periodName) {
-      if (expandedCurriculumPeriods.has(periodName)) {
-        expandedCurriculumPeriods.delete(periodName);
+    function toggleCurriculumPeriod(periodKey) {
+      let resolvedKey = periodKey;
+      if (universityCurriculum && Array.isArray(universityCurriculum)) {
+        const found = universityCurriculum.find(p => p.id === periodKey || p.period === periodKey);
+        if (found) {
+          resolvedKey = found.id || found.period;
+        }
+      }
+      if (expandedCurriculumPeriods.has(resolvedKey)) {
+        expandedCurriculumPeriods.delete(resolvedKey);
       } else {
-        expandedCurriculumPeriods.add(periodName);
+        expandedCurriculumPeriods.add(resolvedKey);
       }
       renderCurriculumGrid();
     }
@@ -6894,11 +7433,17 @@ ${rawText.slice(0, 150000)}`;
         ? universityCurriculum
         : universityCurriculum.filter(p => p.cycleName === currentCurriculumCycleFilter || (p.period && p.period.includes(currentCurriculumCycleFilter)));
       
-      const allExpanded = filtered.length > 0 && filtered.every(p => expandedCurriculumPeriods.has(p.period));
+      const allExpanded = filtered.length > 0 && filtered.every((p, idx) => {
+        const key = p.id || p.period || ('period_' + idx);
+        return expandedCurriculumPeriods.has(key);
+      });
       if (allExpanded) {
         expandedCurriculumPeriods.clear();
       } else {
-        filtered.forEach(p => expandedCurriculumPeriods.add(p.period));
+        filtered.forEach((p, idx) => {
+          const key = p.id || p.period || ('period_' + idx);
+          expandedCurriculumPeriods.add(key);
+        });
       }
       renderCurriculumGrid();
     }
@@ -6960,6 +7505,42 @@ ${rawText.slice(0, 150000)}`;
           });
         } else {
           topicsList.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Nenhum tópico individual cadastrado.</span>';
+        }
+      }
+
+      // Renderiza as Matérias Específicas / Slides vinculados com o Botão Único de Geração
+      const materialsContainer = document.getElementById('modalSubjectMaterialsContainer');
+      const materialsList = document.getElementById('modalSubjectMaterialsList');
+      const materials = getMaterialsForSubject(subjectName);
+
+      if (materialsContainer && materialsList) {
+        if (materials.length > 0) {
+          materialsContainer.style.display = 'block';
+          materialsList.innerHTML = materials.map(m => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; gap: 10px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px; flex: 1 1 200px; min-width: 140px;">
+                <span style="font-size: 16px;">📄</span>
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); word-break: break-word;">${m.name}</div>
+                  <div style="font-size: 11px; color: var(--text-secondary);">${m.topic || m.disease || ''} ${m.sizeStr ? '• ' + m.sizeStr : ''}</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                <!-- BOTÃO ÚNICO DE GERAÇÃO (QUIZ ⇄ FLASHCARD) -->
+                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="closeModals(); openGenerateStudyModal('${m.name.replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Gerar Quiz e Flashcard direcionados deste slide">
+                  ⚡ Gerar Estudo (Quiz & Flashcard)
+                </button>
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${subjectName.replace(/'/g, "\\'")}', 'quizzes'); handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')" title="Ver Quizzes deste slide">
+                  📝 Quiz
+                </button>
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${subjectName.replace(/'/g, "\\'")}', 'flashcards'); handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')" title="Ver Flashcards deste slide">
+                  🗂️ Card
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          materialsContainer.style.display = 'none';
         }
       }
 
@@ -7026,16 +7607,29 @@ ${rawText.slice(0, 150000)}`;
 
         const toggleAllBtn = document.getElementById('btnToggleAllCurriculum');
         if (toggleAllBtn) {
-          const isAllExpanded = filtered.length > 0 && filtered.every(p => expandedCurriculumPeriods.has(p.period));
+          const isAllExpanded = filtered.length > 0 && filtered.every((p, idx) => {
+            const key = p.id || p.period || ('period_' + idx);
+            return expandedCurriculumPeriods.has(key);
+          });
           toggleAllBtn.innerHTML = isAllExpanded 
             ? '<svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="18 15 12 9 6 15"/></svg> Recolher Todas' 
             : '<svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="6 9 12 15 18 9"/></svg> Expandir Todas';
         }
 
-        filtered.forEach(cat => {
+        filtered.forEach((cat, idx) => {
+          const periodId = cat.id || cat.period || ('period_' + idx);
+          cat.id = periodId;
           const card = document.createElement('div');
-          const isExpanded = expandedCurriculumPeriods.has(cat.period);
+          const isExpanded = expandedCurriculumPeriods.has(periodId);
+          card.id = `card_${periodId}`;
           card.className = `subject-category-card ${isExpanded ? 'expanded' : 'collapsed'}`;
+          
+          if (!isExpanded) {
+            card.onclick = (e) => {
+              if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.subject-row')) return;
+              toggleCurriculumPeriod(periodId);
+            };
+          }
           
           let cycleColor = 'var(--neon)';
           let cycleBg = 'rgba(0, 229, 255, 0.12)';
@@ -7048,10 +7642,10 @@ ${rawText.slice(0, 150000)}`;
           }
 
           const subjCount = (cat.subjects || []).length;
-          const escapedPeriod = (cat.period || '').replace(/'/g, "\\'");
+          const escapedPeriodId = periodId.replace(/'/g, "\\'");
 
           let headerHtml = `
-            <div class="category-header" onclick="toggleCurriculumPeriod('${escapedPeriod}')" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; ${isExpanded ? 'border-bottom: 1px solid var(--border); padding-bottom: 10px;' : ''}" title="Clique para ${isExpanded ? 'recolher' : 'abrir'} a lista de matérias deste período">
+            <div class="category-header" onclick="toggleCurriculumPeriod('${escapedPeriodId}')" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; ${isExpanded ? 'border-bottom: 1px solid var(--border); padding-bottom: 10px;' : ''}" title="Clique para ${isExpanded ? 'recolher' : 'abrir'} a lista de matérias deste período">
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-weight: 700; color: var(--text-primary); font-size: 13.5px;">${cat.period}</span>
                 <span style="background: ${cycleBg}; color: ${cycleColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.3px;">
@@ -7099,40 +7693,29 @@ ${rawText.slice(0, 150000)}`;
                   if (hasMaterials) {
                     if (isPending) {
                       rightTag = `
-                        <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
-                          <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
-                          <button class="btn-outline-action primary" style="padding: 2px 7px; font-size: 10px; font-weight: 700;" onclick="generateQuestionsForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Flashcards e Quizzes sob demanda com IA">⚡ Gerar IA</button>
-                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
-                          <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
-                        </div>
+                        <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
+                        <button class="btn-outline-action primary" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700;" onclick="openGenerateStudyModal('', '${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Flashcards e Quizzes sob demanda com IA">⚡ Gerar Estudo</button>
                       `;
                     } else {
                       rightTag = `
-                        <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
-                          <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
-                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'flashcards')" title="Estudar Flashcards desta matéria">🗂️ Flashcards</button>
-                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Estudar Quizzes desta matéria">📝 Quizzes</button>
-                          <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px;" onclick="auditSubjectRedundancy('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Auditar redundâncias de conteúdo desta matéria">🛡️ Redundância</button>
-                          <button class="btn-outline-action danger" style="padding: 2px 6px; font-size: 10px;" onclick="deleteSubjectData('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Excluir matéria e liberar cache">🗑️</button>
-                        </div>
+                        <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
+                        <button class="btn-outline-action" style="padding: 3px 8px; font-size: 10.5px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Ver Quizzes desta disciplina">📝 Quizzes</button>
                       `;
                     }
                   } else {
                     rightTag = `
-                      <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px; border-radius: 6px;" onclick="openSubjectDetailModal('${escapedName}')" title="Ver ementa e detalhes desta disciplina">
-                        ℹ️ Ementa
-                      </button>
+                      <span style="font-size: 10.5px; color: var(--text-muted); background: var(--bg-card); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border);">ℹ️ Ementa</span>
                     `;
                   }
 
                   return `
-                    <div class="subject-row" onclick="openSubjectDetailModal('${escapedName}')" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 8px 12px; border: 1px solid rgba(0, 255, 102, 0.25);' : 'background: var(--bg-surface); border-radius: 8px; padding: 8px 12px; border: 1px solid var(--border);'} display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: all 0.15s ease;" title="Clique para ver ementa e detalhes de ${escapedName}">
-                      <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
-                        <span style="font-size: 12.5px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: normal;">
+                    <div class="subject-row" onclick="openSubjectDetailModal('${escapedName}')" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 10px 12px; border: 1px solid rgba(0, 255, 102, 0.25);' : 'background: var(--bg-surface); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border);'} cursor: pointer;" title="Clique para ver matérias específicas e detalhes de ${escapedName}">
+                      <div style="display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 140px;">
+                        <span style="font-size: 13px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; line-height: 1.4; word-break: break-word;">
                           ${hasMaterials ? '🟢 ' : '• '}${sName}
                         </span>
                       </div>
-                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;" onclick="event.stopPropagation()">
+                      <div class="subject-actions-box" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: 0 1 auto;" onclick="event.stopPropagation()">
                         ${rightTag}
                       </div>
                     </div>
