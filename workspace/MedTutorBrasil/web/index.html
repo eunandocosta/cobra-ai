@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- PDF.js da Mozilla para descompressão e extração de texto fiel de arquivos PDF da Ementa -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     /* =========================================================
        VARIÁVEIS DE TEMA: MATERIAL 3 + VERDE NEON (DARK & LIGHT)
@@ -3254,7 +3256,53 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       closeModals();
     }
 
-    // EXTRAÇÃO SEGURA DE ARQUIVOS (PDF, DOCX, TXT) SEM TRAVAMENTO
+    // DETECTOR DE ARTEFATOS BINÁRIOS, FLUXOS DE COMPRESSÃO E RUÍDOS DE PDF
+    function isGarbageOrBinaryText(str) {
+      if (!str || typeof str !== 'string') return true;
+      // 1. Marcadores e tokens internos de arquivos PDF e fluxos binários
+      if (/%PDF-|endstream|endobj|\bobj\b|\bxref\b|trailer|JFIF|xExif|\/Filter|\/FlateDecode/i.test(str)) {
+        return true;
+      }
+      // 2. Caracteres exóticos fora do alfabeto latino/português provenientes de decodificação binária bruta (ISO-8859)
+      if (/[ÞÐ×Øÿýåæøëïöü\x00-\x08\x0E-\x1F]/.test(str)) {
+        return true;
+      }
+      // 3. Sequências de abertura/fechamento estranhas no início de linhas
+      if (/^[\}\]\)\>\%\/\\]/.test(str.trim())) {
+        return true;
+      }
+      return false;
+    }
+
+    // VALIDADOR SEMÂNTICO E FONÉTICO DE NOMES DE MATÉRIAS
+    function isValidSubjectName(name) {
+      if (!name || typeof name !== 'string') return false;
+      const trimmed = name.replace(/^[\*\•\-\s0-9\.\)\(]+/, '').trim();
+      if (trimmed.length < 3 || trimmed.length > 85) return false;
+      if (isGarbageOrBinaryText(trimmed)) return false;
+
+      // Deve conter letras do alfabeto
+      const letters = trimmed.match(/[a-zA-ZÀ-ÿ]/g);
+      if (!letters || letters.length < 3) return false;
+
+      // Proporção de vogais (português e termos médicos em latim: no mínimo 20% de vogais)
+      const vowels = trimmed.match(/[aeiouáéíóúâêîôûãõAEIOUÁÉÍÓÚÂÊÎÔÛÃÕ]/g);
+      if (!vowels || (vowels.length / letters.length) < 0.20) {
+        return false;
+      }
+
+      // Palavras com pelo menos 2 letras
+      const words = trimmed.split(/[\s\-\/\:\,]+/).filter(w => w.length >= 2);
+      if (words.length === 0) return false;
+
+      // Cabeçalhos que não são nomes de disciplinas
+      const headerJunkRegex = /^(p[aá]gina \d+|universidade|faculdade|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre|cnpj|di[aá]rio oficial|ementa do curso|matriz curricular|grade hor[aá]ria|cr[eé]ditos?:|professor|docente|bibliografia|objetivos?|conte[uú]do|t[oó]picos?)/i;
+      if (headerJunkRegex.test(trimmed)) return false;
+
+      return true;
+    }
+
+    // EXTRAÇÃO SEGURA DE ARQUIVOS (PDF VIA PDF.JS, DOCX, TXT) SEM TRAVAMENTO E SEM RUÍDOS BINÁRIOS
     async function extractTextFromFile(file) {
       if (!file) return '';
 
@@ -3268,47 +3316,79 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         });
       }
 
-      // Arquivo PDF ou binário: varredura segura de streams de texto sem travar main thread
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
+      // Arquivo PDF: descompressão de streams via PDF.js oficial da Mozilla
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        return new Promise(async (resolve) => {
           try {
-            const buffer = e.target.result;
-            const bytes = new Uint8Array(buffer);
-            let extracted = '';
-            let word = '';
-            const maxLen = 180000; // Limite de segurança de caracteres para evitar estouro de memória
+            const buffer = await file.arrayBuffer();
 
-            for (let i = 0; i < bytes.length && extracted.length < maxLen; i++) {
-              const b = bytes[i];
-              // Caracteres imprimíveis ASCII, acentuações portuguesas comuns e quebras de linha
-              if ((b >= 32 && b <= 126) || (b >= 192 && b <= 255) || b === 10 || b === 13 || b === 9) {
-                word += String.fromCharCode(b);
-              } else {
-                if (word.length >= 3) {
-                  extracted += word + ' ';
+            // 1. Extração profissional com PDF.js
+            if (window.pdfjsLib) {
+              try {
+                if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                 }
-                word = '';
+                const loadingTask = window.pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+                const pdf = await loadingTask.promise;
+                let fullPdfText = '';
+                const maxPages = Math.min(pdf.numPages, 60);
+
+                for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+                  const page = await pdf.getPage(pageNum);
+                  const textContent = await page.getTextContent();
+                  const pageStr = textContent.items.map(item => item.str).join(' ');
+                  if (pageStr && pageStr.trim()) {
+                    fullPdfText += pageStr + '\n\n';
+                  }
+                }
+
+                const cleanedPdfText = fullPdfText
+                  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+                  .replace(/[ \t]+/g, ' ')
+                  .replace(/\n\s*\n\s*\n+/g, '\n\n')
+                  .trim();
+
+                if (cleanedPdfText.length > 20 && !isGarbageOrBinaryText(cleanedPdfText)) {
+                  return resolve(cleanedPdfText);
+                }
+              } catch (pdfJsErr) {
+                console.warn('PDF.js encontrou problema ou PDF é puramente escaneado:', pdfJsErr);
               }
             }
-            if (word.length >= 3) extracted += word;
 
-            // Sanitização de ruídos binários e normalização de espaços
-            extracted = extracted
-              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-              .replace(/[ \t]+/g, ' ')
-              .replace(/\n\s*\n\s*\n+/g, '\n\n')
-              .trim();
+            // 2. Fallback seguro: procurar apenas blocos BT...ET descompactados (NUNCA fluxos FlateDecode comprimidos)
+            const textRaw = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+            const btMatches = textRaw.match(/BT[\s\S]*?ET/g);
+            if (btMatches && btMatches.length > 0) {
+              let uncompressed = '';
+              btMatches.forEach(block => {
+                const strings = block.match(/\(([^)]+)\)\s*T[jJ]/g);
+                if (strings) {
+                  strings.forEach(s => {
+                    const m = s.match(/\(([^)]+)\)/);
+                    if (m && m[1]) uncompressed += m[1] + ' ';
+                  });
+                  uncompressed += '\n';
+                }
+              });
+              const cleanFallback = uncompressed.trim();
+              if (cleanFallback.length > 30 && !isGarbageOrBinaryText(cleanFallback)) {
+                return resolve(cleanFallback);
+              }
+            }
 
-            resolve(extracted);
-          } catch (err) {
-            console.warn('Fallback na leitura segura de binário:', err);
+            // Se for PDF de imagem (scaneado) ou puramente comprimido sem suporte a texto:
+            // NUNCA retornar bytes binários brutos para não gerar lixo visual!
+            resolve('');
+          } catch (e) {
+            console.error('Erro na extração segura do PDF:', e);
             resolve('');
           }
-        };
-        reader.onerror = () => resolve('');
-        reader.readAsArrayBuffer(file);
-      });
+        });
+      }
+
+      // Outros formatos: retorno seguro vazio
+      return '';
     }
 
     // =========================================================
@@ -5819,10 +5899,38 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       }
     ];
 
+    function sanitizeSavedCurriculum(curr) {
+      if (!Array.isArray(curr)) return [];
+      return curr.map(periodObj => {
+        if (!periodObj || !Array.isArray(periodObj.subjects)) return null;
+        const validSubjects = periodObj.subjects.filter(s => {
+          const name = typeof s === 'string' ? s : (s && s.name ? s.name : '');
+          return isValidSubjectName(name);
+        });
+        if (validSubjects.length === 0) return null;
+        return { ...periodObj, subjects: validSubjects };
+      }).filter(Boolean);
+    }
+
     const savedCurriculum = localStorage.getItem('medtutor_saved_curriculum');
-    let universityCurriculum = (localStorage.getItem('medtutor_reset_clean') === 'true' || !savedCurriculum)
-      ? []
-      : JSON.parse(savedCurriculum || '[]');
+    let rawCurriculum = [];
+    try {
+      rawCurriculum = (localStorage.getItem('medtutor_reset_clean') === 'true' || !savedCurriculum)
+        ? []
+        : JSON.parse(savedCurriculum || '[]');
+    } catch (e) {
+      rawCurriculum = [];
+    }
+    let universityCurriculum = sanitizeSavedCurriculum(rawCurriculum);
+    if (savedCurriculum && universityCurriculum.length !== rawCurriculum.length) {
+      try {
+        if (universityCurriculum.length === 0) {
+          localStorage.removeItem('medtutor_saved_curriculum');
+        } else {
+          localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
+        }
+      } catch (e) {}
+    }
     let currentCurriculumCycleFilter = 'all';
 
     function getAllCurriculumSubjects() {
@@ -5869,10 +5977,18 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       renderCurriculumGrid();
     }
 
-    // PARSER AVANÇADO DE EMENTA UNIVERSITÁRIA (ARMAZENA DESCRIÇÕES E TÓPICOS)
+    // PARSER AVANÇADO DE EMENTA UNIVERSITÁRIA (ARMAZENA DESCRIÇÕES E TÓPICOS COM BLINDAGEM ANTI-RUÍDO)
     function parseEmentaWithDescriptions(text) {
       const subjects = [];
-      const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      if (!text || typeof text !== 'string') return subjects;
+
+      const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+      // Blindagem imediata contra arquivos binários ou fluxos brutos de PDF
+      if (isGarbageOrBinaryText(clean)) {
+        console.warn('Texto da ementa descartado por conter artefatos ou fluxos binários.');
+        return subjects;
+      }
 
       const hasExplicitLabels = /(disciplina|mat[eé]ria|m[oó]dulo|unidade curricular)\s*:/i.test(clean);
 
@@ -5882,6 +5998,8 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
           .filter(b => b.length > 3);
 
         blocks.forEach((block, idx) => {
+          if (isGarbageOrBinaryText(block)) return;
+
           let name = '';
           let period = '';
           let description = '';
@@ -5919,22 +6037,23 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
             }
           });
 
-          if (name && name.length >= 3) {
-            subjects.push(buildSubjectObject(name, period, description, topics, idx));
+          if (isValidSubjectName(name)) {
+            const subjObj = buildSubjectObject(name, period, description, topics, idx);
+            if (subjObj) subjects.push(subjObj);
           }
         });
       } else {
         const rawSections = clean.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
-        const headerJunkRegex = /^(p[aá]gina \d+|universidade|faculdade|resolu[cç][aã]o|portaria|coordena[cç][aã]o|diretoria|curso de medicina|ano letivo|semestre|cnpj|di[aá]rio oficial|ementa do curso|matriz curricular|grade hor[aá]ria|cr[eé]ditos?:|professor|docente|bibliografia|objetivos?)/i;
 
         rawSections.forEach((sec, idx) => {
           if (subjects.length >= 60) return; // Limite de proteção contra loops de arquivos gigantes
+          if (isGarbageOrBinaryText(sec)) return;
 
           const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
           if (lines.length === 0) return;
 
           let rawName = lines[0].replace(/^[0-9]+[\.\-\)\s]+/, '').replace(/^[\*\•\-\s]+/, '').trim();
-          if (headerJunkRegex.test(rawName) || rawName.length < 3 || rawName.length > 90 || !/[a-zA-ZÀ-ÿ]/.test(rawName)) {
+          if (!isValidSubjectName(rawName)) {
             return;
           }
 
@@ -5951,6 +6070,8 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
             description = lines.slice(1).join(' ');
           }
 
+          if (!isValidSubjectName(name)) return;
+
           if (description.includes('Tópicos:') || description.includes('tópicos:')) {
             const parts = description.split(/t[oó]picos?\s*:/i);
             description = parts[0].trim();
@@ -5959,8 +6080,9 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
             }
           }
 
-          if (name && name.length >= 3 && !headerJunkRegex.test(name)) {
-            subjects.push(buildSubjectObject(name, period, description, topics, idx));
+          const subjObj = buildSubjectObject(name, period, description, topics, idx);
+          if (subjObj) {
+            subjects.push(subjObj);
           }
         });
       }
@@ -5969,11 +6091,18 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     }
 
     function buildSubjectObject(name, periodRaw, description, topics, index) {
+      if (!isValidSubjectName(name) || isGarbageOrBinaryText(name)) return null;
+
       let period = periodRaw || '';
       let cycle = 'clinico';
       let cycleName = 'Ciclo Clínico';
 
-      const lower = (name + ' ' + period + ' ' + description).toLowerCase();
+      let cleanDesc = (typeof description === 'string' && !isGarbageOrBinaryText(description)) ? description.trim() : '';
+      const cleanTopics = Array.isArray(topics)
+        ? topics.filter(t => typeof t === 'string' && t.trim().length >= 2 && !isGarbageOrBinaryText(t)).map(t => t.trim())
+        : [];
+
+      const lower = (name + ' ' + period + ' ' + cleanDesc).toLowerCase();
 
       if (lower.includes('1º') || lower.includes('1o') || lower.includes('primeiro') || lower.includes('anatomia') || lower.includes('histologia') || lower.includes('bioquimica') || lower.includes('biologia celular')) {
         period = period || '1º Período • Ciclo Básico';
@@ -6017,15 +6146,15 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         cycleName = 'Ciclo Universitário';
       }
 
-      const textKeywords = extractKeywords(`${name} ${description} ${topics.join(' ')}`);
+      const textKeywords = extractKeywords(`${name} ${cleanDesc} ${cleanTopics.join(' ')}`);
 
       return {
         name: name,
         period: period,
         cycle: cycle,
         cycleName: cycleName,
-        description: description.trim(),
-        topics: topics,
+        description: cleanDesc,
+        topics: cleanTopics,
         keywords: textKeywords,
         isUser: true
       };
@@ -6211,8 +6340,17 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       if (!input.files || !input.files[0]) return;
       const file = input.files[0];
 
-      // Sanitiza e extrai texto de forma segura (PDF / TXT / DOC) sem travar a main thread
+      // Sanitiza e extrai texto de forma segura (PDF via PDF.js / TXT / DOC) sem travar a main thread
       const sanitizedText = await extractTextFromFile(file);
+
+      if (!sanitizedText || sanitizedText.trim().length < 15 || isGarbageOrBinaryText(sanitizedText)) {
+        const inputEl = document.getElementById('syllabusTextInput');
+        if (inputEl) inputEl.value = '';
+        input.value = '';
+        showToast('⚠️ Não foi possível extrair texto selecionável deste PDF (pode ser escaneado como imagem ou protegido). Por favor, cole o texto da ementa abaixo ou clique em "Carregar Grade Nacional DCN".');
+        return;
+      }
+
       const inputEl = document.getElementById('syllabusTextInput');
       if (inputEl) inputEl.value = sanitizedText;
 
@@ -6267,6 +6405,11 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         return;
       }
 
+      if (isGarbageOrBinaryText(text)) {
+        showToast('⚠️ O texto contém caracteres binários ou corrompidos. Cole o texto legível da ementa.');
+        return;
+      }
+
       const previewSample = text.slice(0, 160).replace(/\n/g, ' ') + (text.length > 160 ? '...' : '');
 
       openUploadConfirmation({
@@ -6290,6 +6433,11 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     async function processSyllabusTextAsync(rawText) {
       if (!rawText) return;
 
+      if (isGarbageOrBinaryText(rawText)) {
+        showToast('⚠️ O texto informado contém artefatos binários ou ilegíveis.');
+        return;
+      }
+
       const clean = rawText
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
         .replace(/\r\n/g, '\n')
@@ -6301,7 +6449,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
 
       const parsedSubjects = parseEmentaWithDescriptions(clean);
       if (parsedSubjects.length === 0) {
-        showToast('⚠️ Nenhuma disciplina reconhecida no texto. Tente o formato "Disciplina: Nome..."');
+        showToast('⚠️ Nenhuma disciplina válida reconhecida no texto. Certifique-se de usar o formato "Disciplina: Nome..." ou colar os nomes das matérias.');
         return;
       }
 
