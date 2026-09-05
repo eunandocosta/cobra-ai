@@ -813,6 +813,133 @@
       padding-top: 14px;
     }
 
+    /* BARRA UNIFICADA & ELEGANTE DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (QUIZZES & FLASHCARDS) */
+    .unified-study-control-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 22px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    .study-nav-hierarchy {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .study-nav-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1 1 200px;
+      min-width: 180px;
+    }
+
+    .study-nav-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .study-nav-select {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12.5px;
+      font-weight: 500;
+      width: 100%;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .study-nav-select:focus, .study-nav-select:hover {
+      border-color: var(--neon);
+    }
+
+    .study-nav-arrow {
+      color: var(--neon);
+      font-size: 18px;
+      font-weight: 700;
+      opacity: 0.6;
+      padding-top: 14px;
+      user-select: none;
+    }
+
+    .study-actions-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 10px;
+    }
+
+    .study-active-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .study-focus-pill {
+      font-size: 11.5px;
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--neon);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .study-cycle-pill {
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .study-buttons-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 768px) {
+      .study-nav-arrow {
+        display: none;
+      }
+      .study-actions-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .study-buttons-group {
+        justify-content: flex-start;
+      }
+    }
+
     /* 2. Flashcards */
     .study-toolbar {
       display: flex;
@@ -2134,103 +2261,98 @@
         <!-- 2. ABA FLASHCARDS -->
         <section id="tab-flashcards" class="tab-section">
           
-          <div class="study-toolbar" style="flex-wrap: wrap; gap: 10px; justify-content: space-between;">
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                + Upload de Aula
-              </button>
-              <button class="btn-outline-action" onclick="openDriveModal()">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                Atualizar por Drive
-              </button>
+          <!-- BARRA UNIFICADA DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (PERÍODO > DISCIPLINA > SLIDE) -->
+          <div class="unified-study-control-card">
+            <!-- NAVEGAÇÃO HIERÁRQUICA DROPDOWNS -->
+            <div class="study-nav-hierarchy">
+              <div class="study-nav-field">
+                <label class="study-nav-label" for="fcPeriodSelect">1. Período / Ciclo</label>
+                <select id="fcPeriodSelect" class="study-nav-select" onchange="handlePeriodSelectChange(this.value)">
+                  <option value="all">📚 Todos os Períodos</option>
+                </select>
+              </div>
 
-              <!-- DROPDOWN DE AFECÇÃO / TÓPICO DENTRO DA MATÉRIA -->
-              <div class="dropdown-filter-container">
-                <button class="dropdown-trigger-btn" id="fcSubjectDropdownBtn" onclick="toggleFcSubjectDropdown()">
-                  <span>🔬 Tópico: <strong id="fcCurrentFilterLabel" style="color: var(--neon);">Todas as Doenças</strong></span> ▾
-                </button>
-                <div class="dropdown-menu-list" id="fcSubjectDropdownMenu">
-                  <!-- Gerado dinamicamente: Doenças da Matéria Ativa -->
-                </div>
+              <div class="study-nav-arrow">›</div>
+
+              <div class="study-nav-field" style="flex: 1.2;">
+                <label class="study-nav-label" for="fcDisciplineSelect">2. Disciplina</label>
+                <select id="fcDisciplineSelect" class="study-nav-select" onchange="handleDisciplineSelectChange(this.value)">
+                  <!-- Preenchido dinamicamente -->
+                </select>
+              </div>
+
+              <div class="study-nav-arrow">›</div>
+
+              <div class="study-nav-field" style="flex: 1.5;">
+                <label class="study-nav-label" for="fcTargetSlideSelect">3. Matéria Específica / Slide</label>
+                <select id="fcTargetSlideSelect" class="study-nav-select" onchange="handleSlideSelectChange(this.value)">
+                  <option value="all">📚 Todos os Slides / Disciplina Completa</option>
+                </select>
               </div>
             </div>
 
-            <div class="mode-switch">
-              <button id="btnModeTraditional" class="mode-btn active" onclick="setStudyMode('traditional')">
-                Verso do Card
-              </button>
-              <button id="btnModeAI" class="mode-btn" onclick="setStudyMode('ai')">
-                ✍️ Resposta Escrita (IA)
-              </button>
+            <!-- BARRA DE AÇÕES, STATUS E OPÇÕES -->
+            <div class="study-actions-toolbar">
+              <div class="study-active-badge-group">
+                <span class="study-focus-pill" id="fcFocusBadge">
+                  🎯 <strong>Carregando...</strong>
+                </span>
+                <span class="study-cycle-pill" id="fcCycleBadge">Ciclo Básico</span>
+              </div>
+
+              <div class="study-buttons-group">
+                <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" title="Gerar Flashcards e Quizzes sob demanda (1 a 30 questões)" style="font-weight: 700;">
+                  ⚡ Gerar Estudo (1-30)
+                </button>
+
+                <button class="btn-outline-action" id="fcChangeDisciplineBtn" onclick="openChangeMaterialDisciplineModal()" title="Mover este slide para outra disciplina da ementa">
+                  🔄 Trocar Disciplina
+                </button>
+
+                <!-- Seletor de Modo de Estudo -->
+                <div class="mode-switch">
+                  <button id="btnModeTraditional" class="mode-btn active" onclick="setStudyMode('traditional')">
+                    🗂️ Verso
+                  </button>
+                  <button id="btnModeAI" class="mode-btn" onclick="setStudyMode('ai')">
+                    ✍️ IA
+                  </button>
+                </div>
+
+                <!-- Menu Dropdown de Mais Opções -->
+                <div class="dropdown-filter-container">
+                  <button class="btn-outline-action" onclick="toggleStudyMoreOptions('fc')" title="Mais ações e ferramentas da disciplina">
+                    ⋮ Opções ▾
+                  </button>
+                  <div class="dropdown-menu-list" id="fcStudyMoreMenu" style="right: 0; left: auto; min-width: 220px;">
+                    <div class="dropdown-item" onclick="openActiveReadingDoc()">
+                      📖 Ler Apostila dos Slides
+                    </div>
+                    <div class="dropdown-item" onclick="openUploadMaterialModal()">
+                      📁 + Upload Nova Aula
+                    </div>
+                    <div class="dropdown-item" onclick="auditCurrentSubjectRedundancy()">
+                      🛡️ Auditoria de Redundância
+                    </div>
+                    <div class="dropdown-item danger" onclick="deleteCurrentSubjectData()">
+                      🗑️ Excluir Dados da Matéria
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- BARRA DE SELEÇÃO DE MATÉRIA -->
-          <div class="subject-study-pills-bar" id="fcSubjectPillsBar" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border);"></div>
-
-          <!-- CARD DA MATÉRIA ATIVA COM BOTÃO DE REDUNDÂNCIA DA MATÉRIA -->
-          <div class="active-subject-header-card" id="fcActiveSubjectCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="background: rgba(0, 229, 255, 0.15); color: var(--neon); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISCIPLINA ATIVA</span>
-                  <h3 id="fcActiveSubjectTitle" style="font-size: 15px; margin: 0; font-weight: 700;">Integração de Sistemas Humanos 2</h3>
-                </div>
-                <div id="fcActiveSubjectMeta" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
-                  8 aulas sincronizadas • 4 flashcards prontos
-                </div>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <!-- BOTÃO DE REDUNDÂNCIA DA MATÉRIA (NÃO NO CARD DO FLASHCARD!) -->
-                <button class="btn-outline-action" id="btnFcSubjectRedundancy" onclick="auditCurrentSubjectRedundancy()" title="Auditar redundâncias e sobreposição de conteúdo nesta matéria">
-                  🛡️ Auditoria de Redundância
-                </button>
-                <button class="btn-outline-action danger" onclick="deleteCurrentSubjectData()" title="Excluir materiais e flashcards desta matéria">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                  Excluir Matéria
-                </button>
-              </div>
+          <!-- BANNER DE GERAÇÃO PENDENTE -->
+          <div class="pending-generation-banner" id="fcPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 18px 22px; margin-bottom: 20px; text-align: center;">
+            <div style="font-size: 14.5px; font-weight: 700; color: #ffaa00; margin-bottom: 4px;">
+              ⚡ Aulas Disponíveis • Geração Pendente
             </div>
-          </div>
-
-          <!-- SELETOR DE MATÉRIA ESPECÍFICA / SLIDE EM FLASHCARDS -->
-          <div class="active-subject-header-card" id="fcSlideSelectorCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="background: rgba(0, 229, 255, 0.15); color: var(--neon); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">MATÉRIA ESPECÍFICA / SLIDE</span>
-                  <h4 style="font-size: 13.5px; margin: 0; font-weight: 700; color: var(--text-primary);">Selecione o Slide ou Aula</h4>
-                </div>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="font-size: 11.5px; font-weight: 700; padding: 5px 12px;" title="Gerar Flashcards e Quizzes sob demanda para o slide selecionado">
-                  ⚡ Gerar Estudo (Quiz & Flashcard)
-                </button>
-              </div>
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
-              <select id="fcTargetSlideSelect" class="form-select" onchange="handleSlideSelectChange(this.value)" style="flex: 1; min-width: 220px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;">
-                <option value="all">📚 Todos os Slides / Matéria Completa</option>
-              </select>
-            </div>
-            <div id="fcSlidePillsList" style="display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; flex-wrap: wrap;"></div>
-            <div id="fcActiveSlideBanner" style="display: none; margin-top: 10px; padding: 8px 12px; background: rgba(0, 229, 255, 0.08); border: 1px solid var(--border-accent); border-radius: 8px; font-size: 12px; justify-content: space-between; align-items: center;">
-              <span id="fcActiveSlideBannerText" style="color: var(--neon); font-weight: 600;"></span>
-              <button class="btn-outline-action" onclick="clearSlideFilter()" style="padding: 2px 8px; font-size: 10px;">✕ Ver Todos os Slides</button>
-            </div>
-          </div>
-
-          <!-- BANNER DE PENDÊNCIA DE GERAÇÃO EM FLASHCARDS -->
-          <div class="pending-generation-banner" id="fcPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 22px; margin-bottom: 20px; text-align: center;">
-            <div style="font-size: 15px; font-weight: 700; color: #ffaa00; margin-bottom: 6px;">
-              ⚡ Aulas Disponíveis • Geração de Flashcards Pendente
-            </div>
-            <p id="fcPendingDesc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; max-width: 540px; margin-left: auto; margin-right: auto;">
-              Os materiais desta disciplina estão prontos na sua sessão. Clique abaixo para gerar os Flashcards e Quizzes sob demanda com a IA.
+            <p id="fcPendingDesc" style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; max-width: 520px; margin-left: auto; margin-right: auto;">
+              Os materiais desta disciplina estão prontos. Clique abaixo para gerar seus Flashcards e Quizzes sob demanda.
             </p>
-            <button class="btn-outline-action primary" onclick="generateQuestionsForCurrentSubject()" style="padding: 10px 22px; font-size: 13px; font-weight: 700; display: inline-flex; margin: 0 auto;">
-              ⚡ Gerar Flashcards com IA desta Matéria
+            <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="padding: 8px 20px; font-size: 12.5px; font-weight: 700; display: inline-flex; margin: 0 auto;">
+              ⚡ Gerar Questões desta Disciplina (1-30)
             </button>
           </div>
 
@@ -2240,7 +2362,7 @@
               <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
             </div>
             <h3>Nenhum Flashcard Ativo</h3>
-            <p>Faça upload de resumos, sincronize apostilas com o Drive ou crie cards diretamente nas discussões do Chat.</p>
+            <p>Selecione uma disciplina e slide acima ou faça upload de novos materiais para gerar cards de estudo.</p>
             <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
               Carregar Primeiro Material
             </button>
@@ -2317,71 +2439,88 @@
             </div>
           </div>
 
-          <!-- BARRA DE SELEÇÃO DE MATÉRIA EM QUIZZES -->
-          <div class="subject-study-pills-bar" id="qzSubjectPillsBar" style="display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--border);"></div>
-
-          <!-- CARD DA MATÉRIA ATIVA EM QUIZZES COM BOTÃO DE REDUNDÂNCIA DA MATÉRIA -->
-          <div class="active-subject-header-card" id="qzActiveSubjectCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="background: rgba(0, 229, 255, 0.15); color: var(--neon); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISCIPLINA ATIVA</span>
-                  <h3 id="qzActiveSubjectTitle" style="font-size: 15px; margin: 0; font-weight: 700;">Integração de Sistemas Humanos 2</h3>
-                </div>
-                <div id="qzActiveSubjectMeta" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
-                  8 aulas sincronizadas • 4 quizzes disponíveis
-                </div>
+          <!-- BARRA UNIFICADA DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (PERÍODO > DISCIPLINA > SLIDE) -->
+          <div class="unified-study-control-card">
+            <!-- NAVEGAÇÃO HIERÁRQUICA DROPDOWNS -->
+            <div class="study-nav-hierarchy">
+              <div class="study-nav-field">
+                <label class="study-nav-label" for="qzPeriodSelect">1. Período / Ciclo</label>
+                <select id="qzPeriodSelect" class="study-nav-select" onchange="handlePeriodSelectChange(this.value)">
+                  <option value="all">📚 Todos os Períodos</option>
+                </select>
               </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <!-- BOTÃO DE REDUNDÂNCIA DA MATÉRIA (NÃO NO CARD DO QUIZ!) -->
-                <button class="btn-outline-action" id="btnQzSubjectRedundancy" onclick="auditCurrentSubjectRedundancy()" title="Auditar redundâncias e similaridades de conteúdo nesta matéria">
-                  🛡️ Auditoria de Redundância
+
+              <div class="study-nav-arrow">›</div>
+
+              <div class="study-nav-field" style="flex: 1.2;">
+                <label class="study-nav-label" for="qzDisciplineSelect">2. Disciplina</label>
+                <select id="qzDisciplineSelect" class="study-nav-select" onchange="handleDisciplineSelectChange(this.value)">
+                  <!-- Preenchido dinamicamente -->
+                </select>
+              </div>
+
+              <div class="study-nav-arrow">›</div>
+
+              <div class="study-nav-field" style="flex: 1.5;">
+                <label class="study-nav-label" for="quizTargetSlideSelect">3. Matéria Específica / Slide</label>
+                <select id="quizTargetSlideSelect" class="study-nav-select" onchange="handleSlideSelectChange(this.value)">
+                  <option value="all">📚 Todos os Slides / Disciplina Completa</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- BARRA DE AÇÕES, STATUS E OPÇÕES -->
+            <div class="study-actions-toolbar">
+              <div class="study-active-badge-group">
+                <span class="study-focus-pill" id="qzFocusBadge">
+                  🎯 <strong>Carregando...</strong>
+                </span>
+                <span class="study-cycle-pill" id="qzCycleBadge">Ciclo Básico</span>
+              </div>
+
+              <div class="study-buttons-group">
+                <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" title="Gerar Flashcards e Quizzes sob demanda (1 a 30 questões)" style="font-weight: 700;">
+                  ⚡ Gerar Estudo (1-30)
                 </button>
-                <button class="btn-outline-action danger" onclick="deleteCurrentSubjectData()" title="Excluir materiais e quizzes desta matéria">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                  Excluir Matéria
+
+                <button class="btn-outline-action" id="qzChangeDisciplineBtn" onclick="openChangeMaterialDisciplineModal()" title="Mover este slide para outra disciplina da ementa">
+                  🔄 Trocar Disciplina
                 </button>
+
+                <!-- Menu Dropdown de Mais Opções -->
+                <div class="dropdown-filter-container">
+                  <button class="btn-outline-action" onclick="toggleStudyMoreOptions('qz')" title="Mais ações e ferramentas da disciplina">
+                    ⋮ Opções ▾
+                  </button>
+                  <div class="dropdown-menu-list" id="qzStudyMoreMenu" style="right: 0; left: auto; min-width: 220px;">
+                    <div class="dropdown-item" onclick="openActiveReadingDoc()">
+                      📖 Ler Apostila dos Slides
+                    </div>
+                    <div class="dropdown-item" onclick="openUploadMaterialModal()">
+                      📁 + Upload de Material para Quizzes
+                    </div>
+                    <div class="dropdown-item" onclick="auditCurrentSubjectRedundancy()">
+                      🛡️ Auditoria de Redundância
+                    </div>
+                    <div class="dropdown-item danger" onclick="deleteCurrentSubjectData()">
+                      🗑️ Excluir Dados da Matéria
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- SELETOR DE MATÉRIA ESPECÍFICA / SLIDE EM QUIZZES -->
-          <div class="active-subject-header-card" id="quizSlideSelectorCard" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">MATÉRIA ESPECÍFICA / SLIDE</span>
-                  <h4 style="font-size: 13.5px; margin: 0; font-weight: 700; color: var(--text-primary);">Selecione o Slide ou Aula</h4>
-                </div>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="font-size: 11.5px; font-weight: 700; padding: 5px 12px;" title="Gerar Flashcards e Quizzes sob demanda para o slide selecionado">
-                  ⚡ Gerar Estudo (Quiz & Flashcard)
-                </button>
-              </div>
+          <!-- BANNER DE GERAÇÃO PENDENTE EM QUIZZES -->
+          <div class="pending-generation-banner" id="qzPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 18px 22px; margin-bottom: 20px; text-align: center;">
+            <div style="font-size: 14.5px; font-weight: 700; color: #ffaa00; margin-bottom: 4px;">
+              ⚡ Aulas Disponíveis • Geração Pendente
             </div>
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
-              <select id="quizTargetSlideSelect" class="form-select" onchange="handleSlideSelectChange(this.value)" style="flex: 1; min-width: 220px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;">
-                <option value="all">📚 Todos os Slides / Matéria Completa</option>
-              </select>
-            </div>
-            <div id="quizSlidePillsList" style="display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; flex-wrap: wrap;"></div>
-            <div id="quizActiveSlideBanner" style="display: none; margin-top: 10px; padding: 8px 12px; background: rgba(0, 229, 255, 0.08); border: 1px solid var(--border-accent); border-radius: 8px; font-size: 12px; justify-content: space-between; align-items: center;">
-              <span id="quizActiveSlideBannerText" style="color: var(--neon); font-weight: 600;"></span>
-              <button class="btn-outline-action" onclick="clearSlideFilter()" style="padding: 2px 8px; font-size: 10px;">✕ Ver Todos os Slides</button>
-            </div>
-          </div>
-
-          <!-- BANNER DE PENDÊNCIA DE GERAÇÃO EM QUIZZES -->
-          <div class="pending-generation-banner" id="qzPendingBanner" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 14px; padding: 22px; margin-bottom: 20px; text-align: center;">
-            <div style="font-size: 15px; font-weight: 700; color: #ffaa00; margin-bottom: 6px;">
-              ⚡ Aulas Disponíveis • Geração de Quizzes Pendente
-            </div>
-            <p id="qzPendingDesc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; max-width: 540px; margin-left: auto; margin-right: auto;">
-              Os materiais desta disciplina estão prontos na sua sessão. Clique abaixo para gerar os Quizzes sob demanda com a IA.
+            <p id="qzPendingDesc" style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; max-width: 520px; margin-left: auto; margin-right: auto;">
+              Os materiais desta disciplina estão prontos. Clique abaixo para gerar os Quizzes sob demanda com a IA.
             </p>
-            <button class="btn-outline-action primary" onclick="generateQuestionsForCurrentSubject()" style="padding: 10px 22px; font-size: 13px; font-weight: 700; display: inline-flex; margin: 0 auto;">
-              ⚡ Gerar Quizzes com IA desta Matéria
+            <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="padding: 8px 20px; font-size: 12.5px; font-weight: 700; display: inline-flex; margin: 0 auto;">
+              ⚡ Gerar Quizzes desta Disciplina (1-30)
             </button>
           </div>
 
@@ -2391,7 +2530,7 @@
               <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <h3>Nenhum Quiz Disponível</h3>
-            <p>Selecione uma matéria acima ou faça upload de novos materiais para gerar quizzes de fixação.</p>
+            <p>Selecione uma disciplina e slide acima ou faça upload de novos materiais para gerar simulados.</p>
             <button class="btn-outline-action primary" onclick="openUploadMaterialModal()">
               Fazer Upload de Conteúdo
             </button>
@@ -3103,6 +3242,49 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         <button class="btn-outline-action" onclick="closeModals()">Cancelar</button>
         <button class="btn-outline-action primary" id="btnConfirmGenerateStudy" onclick="confirmGenerateStudyCount()" style="font-weight: 700;">
           ⚡ Confirmar & Gerar Estudo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE TROCA DE DISCIPLINA DA MATÉRIA / SLIDE
+       ========================================================= -->
+  <div class="modal-overlay" id="modalChangeMaterialDiscipline" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 500px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">🔄</span>
+          <h3 style="font-size: 16px; margin: 0; color: var(--text-primary);">Trocar Disciplina da Matéria</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div style="margin: 14px 0;">
+        <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-bottom: 2px;">Slide / Aula:</div>
+        <div id="changeMaterialTargetFileName" style="font-size: 13.5px; font-weight: 700; color: var(--neon); word-break: break-word; margin-bottom: 12px;"></div>
+
+        <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-bottom: 2px;">Disciplina Atual:</div>
+        <div id="changeMaterialCurrentSubjectName" style="font-size: 13px; color: var(--text-primary); margin-bottom: 16px;"></div>
+
+        <label for="changeMaterialTargetSubjectSelect" style="display: block; font-size: 12.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">
+          Selecione a Nova Disciplina de Destino:
+        </label>
+        <select id="changeMaterialTargetSubjectSelect" class="form-select" style="width: 100%; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-accent); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; outline: none;">
+          <!-- Preenchido dinamicamente com todas as disciplinas da ementa -->
+        </select>
+
+        <p style="font-size: 11.5px; color: var(--text-secondary); margin: 0; line-height: 1.45;">
+          ℹ️ O slide e todas as questões de <strong>Quizzes</strong> e <strong>Flashcards</strong> associadas a este material serão movidos automaticamente para a nova disciplina selecionada.
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px;">
+        <button class="btn-outline-action" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action primary" id="btnConfirmChangeMaterialDiscipline" onclick="confirmChangeMaterialDiscipline()" style="font-weight: 700;">
+          🔄 Confirmar Troca
         </button>
       </div>
     </div>
@@ -4108,6 +4290,11 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
 
     function getAvailableStudySubjects() {
       const set = new Set();
+      if (typeof getAllCurriculumSubjects === 'function') {
+        try {
+          getAllCurriculumSubjects().forEach(s => { if (s && s.name) set.add(s.name); });
+        } catch (e) {}
+      }
       Object.keys(subjectGenerationStatus).forEach(s => { if (s) set.add(s); });
       if (Array.isArray(chatDriveMaterials)) {
         chatDriveMaterials.forEach(m => { if (m.subject) set.add(m.subject); });
@@ -4197,72 +4384,221 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       return list;
     }
 
+    var currentStudyPeriodFilter = 'all';
+    var pendingChangeMaterialContext = { materialName: '', currentSubject: '' };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function getDisciplinesForPeriod(periodVal) {
+      const all = (typeof getAllCurriculumSubjects === 'function') ? getAllCurriculumSubjects() : [];
+      if (!periodVal || periodVal === 'all') {
+        if (all.length > 0) return all;
+        return getAvailableStudySubjects().map(name => ({ name, period: 'Disciplinas da Ementa', cycleName: 'Ciclo Universitário' }));
+      }
+      const filtered = all.filter(s => s.period === periodVal || (s.period && s.period.toLowerCase() === periodVal.toLowerCase()));
+      if (filtered.length > 0) return filtered;
+      return all;
+    }
+
+    function handlePeriodSelectChange(periodVal) {
+      currentStudyPeriodFilter = periodVal || 'all';
+
+      const fcPeriodSelect = document.getElementById('fcPeriodSelect');
+      if (fcPeriodSelect && fcPeriodSelect.value !== currentStudyPeriodFilter) {
+        fcPeriodSelect.value = currentStudyPeriodFilter;
+      }
+      const qzPeriodSelect = document.getElementById('qzPeriodSelect');
+      if (qzPeriodSelect && qzPeriodSelect.value !== currentStudyPeriodFilter) {
+        qzPeriodSelect.value = currentStudyPeriodFilter;
+      }
+
+      const availableInPeriod = getDisciplinesForPeriod(currentStudyPeriodFilter);
+      if (availableInPeriod.length > 0) {
+        const stillValid = availableInPeriod.some(d => d.name === currentStudySubject || (d.name && d.name.toLowerCase() === (currentStudySubject || '').toLowerCase()));
+        if (!stillValid) {
+          currentStudySubject = availableInPeriod[0].name;
+          currentQuizSlideFilter = 'all';
+          currentCardIndex = 0;
+        }
+      }
+
+      renderSlideSelectors();
+      renderSharedStudyItems();
+    }
+
+    function handleDisciplineSelectChange(subjectVal) {
+      if (!subjectVal) return;
+      currentStudySubject = subjectVal;
+      currentQuizSlideFilter = 'all';
+      currentCardIndex = 0;
+
+      // Sincroniza o filtro de período caso a disciplina pertença a um período específico
+      const all = (typeof getAllCurriculumSubjects === 'function') ? getAllCurriculumSubjects() : [];
+      const match = all.find(s => s.name === subjectVal || (s.name && s.name.toLowerCase() === subjectVal.toLowerCase()));
+      if (match && match.period && currentStudyPeriodFilter !== 'all' && match.period !== currentStudyPeriodFilter) {
+        currentStudyPeriodFilter = match.period;
+      }
+
+      renderSlideSelectors();
+      renderSharedStudyItems();
+      updateSubjectFilterMenus();
+    }
+
     function renderSlideSelectors() {
+      ensureCurrentSubjectValid();
       const materials = getMaterialsForSubject(currentStudySubject);
 
-      const qzCard = document.getElementById('quizSlideSelectorCard');
-      const qzSelect = document.getElementById('quizTargetSlideSelect');
-      const qzPills = document.getElementById('quizSlidePillsList');
-      const qzBanner = document.getElementById('quizActiveSlideBanner');
-      const qzBannerText = document.getElementById('quizActiveSlideBannerText');
+      // 1. Dropdowns de Período: fcPeriodSelect & qzPeriodSelect
+      const periods = [];
+      if (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum)) {
+        universityCurriculum.forEach(p => {
+          if (p.period && !periods.includes(p.period)) periods.push(p.period);
+        });
+      }
+      if (periods.length === 0) {
+        const allSubs = (typeof getAllCurriculumSubjects === 'function') ? getAllCurriculumSubjects() : [];
+        allSubs.forEach(s => {
+          if (s.period && !periods.includes(s.period)) periods.push(s.period);
+        });
+      }
 
-      const fcCard = document.getElementById('fcSlideSelectorCard');
-      const fcSelect = document.getElementById('fcTargetSlideSelect');
-      const fcPills = document.getElementById('fcSlidePillsList');
-      const fcBanner = document.getElementById('fcActiveSlideBanner');
-      const fcBannerText = document.getElementById('fcActiveSlideBannerText');
-
-      [
-        { card: qzCard, select: qzSelect, pills: qzPills, banner: qzBanner, bannerText: qzBannerText },
-        { card: fcCard, select: fcSelect, pills: fcPills, banner: fcBanner, bannerText: fcBannerText }
-      ].forEach(({ card, select, pills, banner, bannerText }) => {
-        if (!card || !select) return;
-        if (materials.length === 0) {
-          card.style.display = 'none';
-          return;
-        }
-        card.style.display = 'block';
-
-        select.innerHTML = '<option value="all">📚 Todos os Slides / Matéria Completa</option>' +
-          materials.map(m => {
-            const isSelected = currentQuizSlideFilter === m.name;
-            const shortName = m.name.length > 45 ? m.name.slice(0, 42) + '...' : m.name;
-            return `<option value="${m.name.replace(/"/g, '&quot;')}" ${isSelected ? 'selected' : ''}>📄 ${shortName} ${m.topic ? `(${m.topic})` : ''}</option>`;
-          }).join('');
-
-        if (pills) {
-          pills.innerHTML = `
-            <button class="btn-outline-action ${currentQuizSlideFilter === 'all' ? 'active' : ''}" 
-                    style="font-size: 11px; padding: 4px 10px; border-radius: 14px; white-space: nowrap; ${currentQuizSlideFilter === 'all' ? 'border-color: var(--neon); background: rgba(0, 229, 255, 0.12); font-weight: 700;' : ''}"
-                    onclick="handleSlideSelectChange('all')">
-              📚 Todos (${materials.length} slides)
-            </button>
-          ` + materials.map(m => {
-            const isActive = currentQuizSlideFilter === m.name;
-            const countForSlide = sharedQuestionsBank.filter(q => (q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase())) && (q.slideName === m.name || (q.disease && m.disease && q.disease.includes(m.disease)))).length;
-            const shortName = m.name.replace(/\.pdf$/i, '');
-            const truncated = shortName.length > 25 ? shortName.slice(0, 23) + '...' : shortName;
-            return `
-              <button class="btn-outline-action ${isActive ? 'active' : ''}" 
-                      style="font-size: 11px; padding: 4px 10px; border-radius: 14px; white-space: nowrap; ${isActive ? 'border-color: #00ff66; background: rgba(0, 255, 102, 0.12); color: #00ff66; font-weight: 700;' : ''}"
-                      onclick="handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')"
-                      title="${m.name}">
-                📄 ${truncated} ${countForSlide > 0 ? `<span style="opacity: 0.85; font-size: 10px;">(${countForSlide})</span>` : ''}
-              </button>
-            `;
-          }).join('');
-        }
-
-        if (banner && bannerText) {
-          if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
-            banner.style.display = 'flex';
-            const filtered = getFilteredQuestions();
-            bannerText.innerHTML = `🎯 Foco Ativo: <strong>${currentQuizSlideFilter}</strong> • ${filtered.length} ${filtered.length === 1 ? 'questão' : 'questões'} prontas (Quiz ⇄ Flashcard)`;
-          } else {
-            banner.style.display = 'none';
-          }
-        }
+      let periodOptionsHtml = '<option value="all">📚 Todos os Períodos / Ciclos</option>';
+      periods.forEach(p => {
+        periodOptionsHtml += `<option value="${p.replace(/"/g, '&quot;')}" ${currentStudyPeriodFilter === p ? 'selected' : ''}>${p}</option>`;
       });
+
+      const fcPeriodSelect = document.getElementById('fcPeriodSelect');
+      if (fcPeriodSelect) {
+        fcPeriodSelect.innerHTML = periodOptionsHtml;
+        fcPeriodSelect.value = currentStudyPeriodFilter;
+      }
+      const qzPeriodSelect = document.getElementById('qzPeriodSelect');
+      if (qzPeriodSelect) {
+        qzPeriodSelect.innerHTML = periodOptionsHtml;
+        qzPeriodSelect.value = currentStudyPeriodFilter;
+      }
+
+      // 2. Dropdowns de Disciplina: fcDisciplineSelect & qzDisciplineSelect
+      const disciplinesInScope = getDisciplinesForPeriod(currentStudyPeriodFilter);
+      let discOptionsHtml = '';
+
+      if (currentStudyPeriodFilter === 'all' && typeof universityCurriculum !== 'undefined' && universityCurriculum.length > 0) {
+        universityCurriculum.forEach(p => {
+          if (Array.isArray(p.subjects) && p.subjects.length > 0) {
+            discOptionsHtml += `<optgroup label="${p.period}">`;
+            p.subjects.forEach(s => {
+              const sName = typeof s === 'string' ? s : s.name;
+              const isSel = sName === currentStudySubject || (sName && sName.toLowerCase() === (currentStudySubject || '').toLowerCase());
+              const mCount = getMaterialsForSubject(sName).length;
+              const qCount = sharedQuestionsBank.filter(q => q.subject === sName).length;
+              const countBadge = mCount > 0 ? ` (${mCount} ${mCount === 1 ? 'aula' : 'aulas'})` : (qCount > 0 ? ` (${qCount} cards)` : '');
+              discOptionsHtml += `<option value="${sName.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>${sName}${countBadge}</option>`;
+            });
+            discOptionsHtml += `</optgroup>`;
+          }
+        });
+
+        const currNames = getAllCurriculumSubjects().map(s => s.name.toLowerCase());
+        const extraSubs = getAvailableStudySubjects().filter(s => !currNames.includes(s.toLowerCase()));
+        if (extraSubs.length > 0) {
+          discOptionsHtml += `<optgroup label="Outras Disciplinas">`;
+          extraSubs.forEach(sName => {
+            const isSel = sName === currentStudySubject;
+            const mCount = getMaterialsForSubject(sName).length;
+            discOptionsHtml += `<option value="${sName.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>${sName} (${mCount} aulas)</option>`;
+          });
+          discOptionsHtml += `</optgroup>`;
+        }
+      } else {
+        disciplinesInScope.forEach(d => {
+          const sName = d.name;
+          const isSel = sName === currentStudySubject || (sName && sName.toLowerCase() === (currentStudySubject || '').toLowerCase());
+          const mCount = getMaterialsForSubject(sName).length;
+          const qCount = sharedQuestionsBank.filter(q => q.subject === sName).length;
+          const countBadge = mCount > 0 ? ` (${mCount} ${mCount === 1 ? 'aula' : 'aulas'})` : (qCount > 0 ? ` (${qCount} cards)` : '');
+          discOptionsHtml += `<option value="${sName.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>${sName}${countBadge}</option>`;
+        });
+      }
+
+      const fcDisciplineSelect = document.getElementById('fcDisciplineSelect');
+      if (fcDisciplineSelect) {
+        fcDisciplineSelect.innerHTML = discOptionsHtml;
+        fcDisciplineSelect.value = currentStudySubject;
+      }
+      const qzDisciplineSelect = document.getElementById('qzDisciplineSelect');
+      if (qzDisciplineSelect) {
+        qzDisciplineSelect.innerHTML = discOptionsHtml;
+        qzDisciplineSelect.value = currentStudySubject;
+      }
+
+      // 3. Dropdowns de Slides: fcTargetSlideSelect & quizTargetSlideSelect
+      let slideOptionsHtml = '';
+      if (materials.length > 0) {
+        slideOptionsHtml = `<option value="all">📚 Todos os Slides (${materials.length} aulas na disciplina)</option>` +
+          materials.map(m => {
+            const isSel = currentQuizSlideFilter === m.name;
+            const shortName = m.name.length > 42 ? m.name.slice(0, 39) + '...' : m.name;
+            const countForSlide = sharedQuestionsBank.filter(q => (q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase())) && (q.slideName === m.name || (q.disease && m.disease && q.disease.includes(m.disease)))).length;
+            const countStr = countForSlide > 0 ? ` [${countForSlide} questões]` : '';
+            return `<option value="${m.name.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>📄 ${shortName} ${m.topic ? `(${m.topic})` : ''}${countStr}</option>`;
+          }).join('');
+      } else {
+        slideOptionsHtml = '<option value="all">📁 Disciplina Completa (Sem slides vinculados)</option>';
+      }
+
+      const fcTargetSlideSelect = document.getElementById('fcTargetSlideSelect');
+      if (fcTargetSlideSelect) {
+        fcTargetSlideSelect.innerHTML = slideOptionsHtml;
+        fcTargetSlideSelect.value = currentQuizSlideFilter;
+      }
+      const quizTargetSlideSelect = document.getElementById('quizTargetSlideSelect');
+      if (quizTargetSlideSelect) {
+        quizTargetSlideSelect.innerHTML = slideOptionsHtml;
+        quizTargetSlideSelect.value = currentQuizSlideFilter;
+      }
+
+      // 4. Badges de Foco e Ciclo
+      const fcFocusBadge = document.getElementById('fcFocusBadge');
+      const qzFocusBadge = document.getElementById('qzFocusBadge');
+      const fcCycleBadge = document.getElementById('fcCycleBadge');
+      const qzCycleBadge = document.getElementById('qzCycleBadge');
+
+      const focusHtml = (currentQuizSlideFilter && currentQuizSlideFilter !== 'all')
+        ? `🎯 Slide: <strong>${escapeHtml(currentQuizSlideFilter.length > 32 ? currentQuizSlideFilter.slice(0, 30) + '...' : currentQuizSlideFilter)}</strong>`
+        : `🎯 Foco: <strong>${escapeHtml(currentStudySubject || 'Geral')}</strong>`;
+
+      if (fcFocusBadge) fcFocusBadge.innerHTML = focusHtml;
+      if (qzFocusBadge) qzFocusBadge.innerHTML = focusHtml;
+
+      const curSubObj = (typeof getAllCurriculumSubjects === 'function')
+        ? getAllCurriculumSubjects().find(s => s.name === currentStudySubject || (s.name && s.name.toLowerCase() === (currentStudySubject || '').toLowerCase()))
+        : null;
+      const cycleText = curSubObj ? (curSubObj.cycleName || curSubObj.period || 'Ciclo da Ementa') : 'Ciclo Básico';
+
+      if (fcCycleBadge) fcCycleBadge.textContent = cycleText;
+      if (qzCycleBadge) qzCycleBadge.textContent = cycleText;
+
+      // 5. Botões de Trocar Disciplina
+      const hasMaterials = materials.length > 0;
+      const fcChangeBtn = document.getElementById('fcChangeDisciplineBtn');
+      if (fcChangeBtn) {
+        fcChangeBtn.disabled = !hasMaterials;
+        fcChangeBtn.style.opacity = hasMaterials ? '1' : '0.5';
+        fcChangeBtn.title = hasMaterials ? 'Mover material para outra disciplina da ementa' : 'Nenhum material vinculado a esta disciplina para mover';
+      }
+      const qzChangeBtn = document.getElementById('qzChangeDisciplineBtn');
+      if (qzChangeBtn) {
+        qzChangeBtn.disabled = !hasMaterials;
+        qzChangeBtn.style.opacity = hasMaterials ? '1' : '0.5';
+        qzChangeBtn.title = hasMaterials ? 'Mover material para outra disciplina da ementa' : 'Nenhum material vinculado a esta disciplina para mover';
+      }
     }
 
     function handleSlideSelectChange(slideName) {
@@ -4277,6 +4613,450 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
 
     function clearSlideFilter() {
       handleSlideSelectChange('all');
+    }
+
+    // CONTROLE DE DROPDOWN DE MAIS OPÇÕES (FLASHCARDS E QUIZZES)
+    function toggleStudyMoreOptions(tab) {
+      const menuId = tab === 'fc' ? 'fcStudyMoreMenu' : 'qzStudyMoreMenu';
+      const menu = document.getElementById(menuId);
+      if (!menu) return;
+      menu.classList.toggle('visible');
+    }
+
+    // MODAL E LÓGICA DE TROCA DE DISCIPLINA DE MATÉRIA / SLIDE
+    function openChangeMaterialDisciplineModal(matName, subjName) {
+      let targetMat = matName;
+      let currentSubj = subjName || currentStudySubject;
+
+      if (!targetMat) {
+        if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
+          targetMat = currentQuizSlideFilter;
+        } else {
+          const mats = getMaterialsForSubject(currentSubj);
+          if (mats.length > 0) {
+            targetMat = mats[0].name;
+          }
+        }
+      }
+
+      if (!targetMat) {
+        showToast('⚠️ Nenhum material/slide vinculado nesta disciplina para mover.');
+        return;
+      }
+
+      if (!currentSubj) {
+        const foundMat = (chatDriveMaterials || []).find(m => m.name === targetMat);
+        if (foundMat && foundMat.subject) currentSubj = foundMat.subject;
+      }
+
+      pendingChangeMaterialContext = {
+        materialName: targetMat,
+        currentSubject: currentSubj
+      };
+
+      const fileEl = document.getElementById('changeMaterialTargetFileName');
+      const subjEl = document.getElementById('changeMaterialCurrentSubjectName');
+      const selectEl = document.getElementById('changeMaterialTargetSubjectSelect');
+
+      if (fileEl) fileEl.textContent = targetMat;
+      if (subjEl) subjEl.textContent = currentSubj || 'Não especificada';
+
+      if (selectEl) {
+        let allSubjects = (typeof getAllCurriculumSubjects === 'function') ? getAllCurriculumSubjects() : [];
+        if (allSubjects.length === 0) {
+          allSubjects = getAvailableStudySubjects().map(name => ({ name, period: 'Disciplinas da Ementa' }));
+        }
+
+        const periodsMap = new Map();
+        allSubjects.forEach(s => {
+          const pName = s.period || 'Grade Curricular';
+          if (!periodsMap.has(pName)) periodsMap.set(pName, []);
+          periodsMap.get(pName).push(s);
+        });
+
+        let optionsHtml = '';
+        periodsMap.forEach((subs, pName) => {
+          optionsHtml += `<optgroup label="${pName}">`;
+          subs.forEach(s => {
+            const isCurrent = s.name === currentSubj;
+            optionsHtml += `<option value="${s.name.replace(/"/g, '&quot;')}" ${isCurrent ? 'disabled' : ''}>
+              ${s.name} ${isCurrent ? '(Atual)' : ''}
+            </option>`;
+          });
+          optionsHtml += `</optgroup>`;
+        });
+
+        selectEl.innerHTML = optionsHtml;
+
+        for (let i = 0; i < selectEl.options.length; i++) {
+          if (!selectEl.options[i].disabled) {
+            selectEl.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      const modal = document.getElementById('modalChangeMaterialDiscipline');
+      if (modal) modal.classList.add('active');
+    }
+
+    function confirmChangeMaterialDiscipline() {
+      const selectEl = document.getElementById('changeMaterialTargetSubjectSelect');
+      const newSubject = selectEl ? selectEl.value : '';
+      const { materialName, currentSubject } = pendingChangeMaterialContext;
+
+      if (!newSubject || newSubject === currentSubject) {
+        showToast('⚠️ Selecione uma disciplina de destino diferente da atual.');
+        return;
+      }
+
+      let movedMats = 0;
+      if (Array.isArray(chatDriveMaterials)) {
+        chatDriveMaterials.forEach(m => {
+          if (m.name === materialName) {
+            m.subject = newSubject;
+            movedMats++;
+          }
+        });
+      }
+
+      let movedQuestions = 0;
+      if (Array.isArray(sharedQuestionsBank)) {
+        sharedQuestionsBank.forEach(q => {
+          if (q.slideName === materialName || q.materialName === materialName) {
+            q.subject = newSubject;
+            movedQuestions++;
+          }
+        });
+      }
+
+      [currentSubject, newSubject].forEach(subj => {
+        if (subj) {
+          const mCount = getMaterialsForSubject(subj).length;
+          const qCount = sharedQuestionsBank.filter(q => q.subject === subj).length;
+          subjectGenerationStatus[subj] = {
+            status: qCount > 0 ? 'ready' : (mCount > 0 ? 'pending' : 'ready'),
+            materialsCount: mCount,
+            questionsCount: qCount
+          };
+        }
+      });
+
+      closeModals();
+
+      currentStudySubject = newSubject;
+      currentQuizSlideFilter = materialName;
+
+      renderSharedStudyItems();
+      renderCurriculumGrid();
+      renderSlideSelectors();
+      renderSceBars();
+      updateSubjectFilterMenus();
+
+      showToast(`✅ "${materialName}" movido com sucesso para "${newSubject}"! (${movedQuestions} questões migradas)`);
+    }
+
+    function openGenerateStudyModalForMaterial(materialName, subjectName) {
+      openGenerateStudyModal(materialName, subjectName || currentStudySubject);
+    }
+
+    // GERAÇÃO ESTRUTURADA DE APOSTILA DE LEITURA (FORMATO CARD LEITURA FOCADA DO CHAT)
+    function generateReadingDocumentHtml(materials, subjectName, topicName, textContent) {
+      const matList = Array.isArray(materials) ? materials : (materials ? [materials] : []);
+      const subj = subjectName || (matList[0]?.subject) || currentStudySubject || 'Clínica Médica';
+      const mainDisease = topicName || (matList[0]?.disease) || (matList[0]?.topic) || (matList[0]?.name ? extractDiseaseFromFilename(matList[0].name) : '') || subj;
+      const matNames = matList.map(m => m.name).filter(Boolean);
+
+      const isDermato = subj.toLowerCase().includes('dermat') ||
+        mainDisease.toLowerCase().includes('dermat') ||
+        mainDisease.toLowerCase().includes('psor') ||
+        mainDisease.toLowerCase().includes('liquen') ||
+        mainDisease.toLowerCase().includes('eczema') ||
+        matNames.some(n => n.toLowerCase().includes('dermat') || n.toLowerCase().includes('psor') || n.toLowerCase().includes('tegument'));
+
+      const docTitle = isDermato
+        ? `Dermatologia Clínica: ${mainDisease} & Roteiro Integrado de Diagnóstico e Conduta`
+        : `${subj}: ${mainDisease} • Roteiro Clínico Estruturado & Diretrizes`;
+
+      const docSubtitle = `Apostila Didática Baseada nos Slides • ${matNames.join(', ') || 'Material de Aula'} • Diretrizes SUS, CFM & ENARE`;
+
+      let sectionsHtml = '';
+
+      if (isDermato) {
+        sectionsHtml = `
+          <!-- SEÇÃO 1: SEMIOLOGIA DAS LESÕES ELEMENTARES -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>1. Propedêutica Semiológica & Lesões Elementares Cutâneas</span>
+            </div>
+            <p style="margin: 0 0 8px 0;">
+              A semiologia dermatológica fundamenta-se na inspeção sob iluminação adequada e na palpação tecidual (avaliação de consistência, plano anatômico e temperatura). As lesões dividem-se conforme alteração anatomopatológica:
+            </p>
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>Categoria Semiológica</th>
+                  <th>Tipo de Lesão</th>
+                  <th>Dimensão & Plano</th>
+                  <th>Correlação Fisiopatológica & Diagnósticos</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Modificação de Cor</strong></td>
+                  <td>Mácula / Mancha</td>
+                  <td>Mácula &lt; 1 cm; Mancha &gt; 1 cm (planas)</td>
+                  <td>Vascular (eritema, telangiectasia) ou pigmentar (vitiligo, melasma). Não há relevo ou espessamento palpável.</td>
+                </tr>
+                <tr>
+                  <td><strong>Elevação Sólida</strong></td>
+                  <td>Pápula / Placa</td>
+                  <td>Pápula &lt; 1 cm; Placa &gt; 1 cm (platô)</td>
+                  <td>Infiltrado inflamatório dérmico superficial ou hiperplasia epidérmica com queratinização acelerada (ex: Psoríase).</td>
+                </tr>
+                <tr>
+                  <td><strong>Formação Profunda</strong></td>
+                  <td>Nódulo / Tumor</td>
+                  <td>Nódulo (1 a 3 cm); Derme profunda/hipoderme</td>
+                  <td>Mais palpável que visível. Infiltrado inflamatório denso, granuloma ou proliferação neoplásica (ex: Eritema nodoso).</td>
+                </tr>
+                <tr>
+                  <td><strong>Conteúdo Líquido</strong></td>
+                  <td>Vesícula / Bolha / Pústula</td>
+                  <td>Vesícula &lt; 1 cm; Bolha &gt; 1 cm; Pústula (pus)</td>
+                  <td>Clivagem intraepidérmica (acantólise em Pênfigo Vulgar) ou subepidérmica (Pênfigo Bolhoso). Vesículas no Herpes simples.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- SEÇÃO 2: HISTOLOGIA E BARREIRA TEGUMENTAR -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>2. Histologia & Barreira Cutânea do Sistema Tegumentar</span>
+            </div>
+            <p style="margin: 0 0 6px 0;">
+              A epiderme é um epitélio estratificado pavimentoso queratinizado avascular organizado em quatro estratos funcionais:
+            </p>
+            <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.6;">
+              <li><strong>Camada Basal (Germinativa):</strong> Células-tronco com alta taxa mitótica intercaladas por melanócitos dendríticos (sintetizam e transferem grânulos de melanina aos queratinócitos para fotoproteção do DNA nuclear).</li>
+              <li><strong>Camada Espinhosa:</strong> Queratinócitos unidos fortemente por desmossomos (tonofilamentos de citoqueratina) conferindo resistência mecânica contra forças de cisalhamento.</li>
+              <li><strong>Camada Granulosa:</strong> Acúmulo de grânulos basofílicos de querato-hialina e corpos lamelares (liberação de ceramidas, colesterol e ácidos graxos livres na matriz intercelular).</li>
+              <li><strong>Camada Córnea:</strong> Corneócitos anucleados imersos na matriz lipídica hidrofóbica ("modelo de tijolos e argamassa"), garantindo baixa perda transepidérmica de água (TEWL).</li>
+            </ul>
+          </div>
+
+          <!-- SEÇÃO 3: PSORÍASE VS LÍQUEN PLANO -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>3. Diagnóstico Diferencial: Psoríase Vulgar vs Líquen Plano</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+                <strong style="color: var(--neon);">Psoríase Vulgar</strong>
+                <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
+                  • <strong>Lesão Típica:</strong> Placas eritemato-descamativas bem delimitadas com escamas micáceas prateadas.<br>
+                  • <strong>Topografia:</strong> Superfícies extensoras (cotovelos, joelhos, couro cabeludo, região lombo-sacra).<br>
+                  • <strong>Curetagem de Brocq:</strong> Sinal da vela ➔ Sinal da película de Duncan-Dulck ➔ <strong>Sinal de Auspitz (Orvalho Sangrento)</strong> por papilomatose dérmica.<br>
+                  • <strong>Fenômeno de Koebner:</strong> Surgimento de novas lesões em sítios de trauma físico.
+                </p>
+              </div>
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+                <strong style="color: #60a5fa;">Líquen Plano</strong>
+                <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
+                  • <strong>Lesão Típica:</strong> Pápulas violáceas poligonais brilhantes, intensamente pruriginosas (Regra dos 4 Ps: Poligonal, Pruriginosa, Púrpura/violácea, Plana).<br>
+                  • <strong>Topografia:</strong> Superfícies flexoras dos punhos, tornozelos e mucosa oral jugal.<br>
+                  • <strong>Estrias de Wickham:</strong> Rede reticulada de linhas esbranquiçadas na superfície da pápula.<br>
+                  • <strong>Associação Sistêmica:</strong> Sorologia para Hepatite C recomendada na investigação.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 4: ECZEMAS E DERMATITES -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>4. Eczemas: Diferencial entre Dermatite Atópica, Seborreica e de Contato</span>
+            </div>
+            <p style="margin: 0 0 6px 0;">
+              O padrão inflamatório eczematoso evolui em fases aguda (eritema, vesiculação e exsudação "pele fervente") e crônica (ressecamento e liquenificação pelo prurido contínuo):
+            </p>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+              • <strong>Dermatite Atópica:</strong> No lactente predomina na face (áreas malares poupando o triângulo perioral) e superfícies extensoras; na infância/adulto migra para dobras flexurais (fossas cubitais e poplíteas) com intensa xerose cutânea e prurido.<br>
+              • <strong>Dermatite Seborreica:</strong> Lesões eritemato-descamativas untuosas amareladas em áreas seborreicas (couro cabeludo, sulco nasogeniano, sobrancelhas e pré-esternal). Associação fisiopatológica com a levedura lipofílica <em>Malassezia</em>.<br>
+              • <strong>Dermatite de Contato:</strong> Alérgica (hipersensibilidade tipo IV celular mediada por linfócitos T, ultrapassa limites do agente causador, ex: níquel) vs Irritativa primária (dano químico direto à barreira, restrita à área de contato).
+            </div>
+          </div>
+
+          <!-- SEÇÃO 5: PÉROLAS DE PROVA & PRÁTICA MÉDICA -->
+          <div class="doc-pearl-box">
+            <div style="color: var(--neon); font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>💡 Pérolas de Prova de Residência & Internato</span>
+            </div>
+            <ul style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.6;">
+              <li><strong>Auspitz / Orvalho Sangrento:</strong> Corresponde a capilares dilatados nas papilas dérmicas expostos após raspagem da película de Duncan; altamente característico de psoríase.</li>
+              <li><strong>Psoríase Pustulosa Aguda:</strong> Pode ser precipitada pelo desmame ou interrupção abrupta de corticoterapia sistêmica oral! Nunca usar prednisona oral como primeira linha na psoríase em placas.</li>
+              <li><strong>Poupação Perioral no Lactente:</strong> Eczema exsudativo malar poupando o triângulo centro-facial em bebê é o achado clássico de dermatite atópica infantil.</li>
+              <li><strong>Tratamento Tópico Facial:</strong> Na face, evitar corticoides tópicos fluorados de alta potência devido ao risco de atrofia cutânea e telangiectasias; preferir imunomoduladores tópicos (tacrolimo / pimecrolimo).</li>
+            </ul>
+          </div>
+        `;
+      } else {
+        sectionsHtml = `
+          <!-- SEÇÃO 1: SÍNTESE SEMIOLÓGICA E MATERIAIS SELECIONADOS -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>1. Propedêutica & Síntese Semiológica das Aulas Selecionadas</span>
+            </div>
+            <p style="margin: 0 0 8px 0;">
+              O compilado didático reúne as evidências essenciais e pontos de maior impacto clínico das aulas para <strong>${subj}</strong>:
+            </p>
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>Material / Slide</th>
+                  <th>Afecção / Foco</th>
+                  <th>Abordagem Propedêutica</th>
+                  <th>Ponto-Chave de Conduta</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(matList.length > 0 ? matList : [{ name: mainDisease, topic: subj, sizeStr: 'Slide' }]).map(m => `
+                  <tr>
+                    <td><strong>${m.name}</strong></td>
+                    <td>${m.disease || m.topic || mainDisease}</td>
+                    <td>Anamnese dirigida, cronologia sintomática e exame físico segmentar focado.</td>
+                    <td>Estratificação de risco precoce, exames dirigidos e prescrição conforme diretrizes oficiais.</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- SEÇÃO 2: FISIOPATOLOGIA E RACIOCÍNIO DIAGNÓSTICO -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>2. Fisiopatologia & Raciocínio Diagnóstico Integrado</span>
+            </div>
+            <p style="margin: 0 0 6px 0;">
+              A compreensão dos mecanismos etiopatogênicos permite antecipar desfechos clínicos e indicar terapêutica direcionada:
+            </p>
+            <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.6;">
+              <li><strong>Fisiopatologia Celular & Humoral:</strong> Alterações teciduais, mediadores inflamatórios e resposta adaptativa associada a ${mainDisease}.</li>
+              <li><strong>Apresentação Clínica Típica vs Atípica:</strong> Sinais cardinais de apresentação, formas subclínicas e apresentações oligossintomáticas frequentes em idosos e imunossuprimidos.</li>
+              <li><strong>Propedêutica Armada Estratificada:</strong> Exames laboratoriais de triagem, marcadores de lesão orgânica e métodos de imagem guiados pela probabilidade pré-teste.</li>
+            </ul>
+          </div>
+
+          <!-- SEÇÃO 3: DIAGNÓSTICO DIFERENCIAL E CONDUTA TERAPÊUTICA -->
+          <div class="doc-section">
+            <div class="doc-section-title">
+              <span>3. Diagnóstico Diferencial & Abordagem Terapêutica Baseada em Evidências</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+                <strong style="color: var(--neon);">Diagnóstico Diferencial Crítico</strong>
+                <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
+                  • Descartar causas secundárias e síndromes mimetizadoras com potencial de rápida deterioração hemodinâmica ou neurológica.<br>
+                  • Monitorar sinais de alarme ("Red Flags") que determinam necessidade de internação ou intervenção urgente.
+                </p>
+              </div>
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+                <strong style="color: #60a5fa;">Manejo Clínico SUS / Diretrizes Oficiais</strong>
+                <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
+                  • <strong>1ª Linha:</strong> Intervenções não-farmacológicas imediatas associadas à terapia farmacológica padrão-ouro.<br>
+                  • <strong>Segurança do Paciente:</strong> Ajuste posológico para função renal/hepática e prevenção de interações medicamentosas.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 4: PÉROLAS DE PROVA & PRÁTICA MÉDICA -->
+          <div class="doc-pearl-box">
+            <div style="color: var(--neon); font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>💡 Pérolas de Prova de Residência & Internato (${subj})</span>
+            </div>
+            <ul style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.6;">
+              <li><strong>Critério de Decisão Imediata:</strong> Em ${mainDisease}, identificar precocemente os critérios de gravidade e estratificação de risco orienta a conduta correta na prova e no plantão.</li>
+              <li><strong>Racionalidade Diagnóstica:</strong> Evite solicitar exames invasivos ou dispendiosos antes de esgotar a avaliação clínica e os exames de triagem fundamentais.</li>
+              <li><strong>Diretriz Oficial:</strong> As bancas examinadoras (ENARE, USP, AMRIGS) cobram rigorosamente os fluxogramas dos Protocolos Clínicos e Diretrizes Terapêuticas (PCDT) do Ministério da Saúde.</li>
+            </ul>
+          </div>
+        `;
+      }
+
+      const fullHtml = `
+        <div class="reading-doc-card">
+          <div class="reading-doc-header">
+            <span class="reading-doc-badge">📚 APOSTILA DE LEITURA & REVISÃO MÉDICA</span>
+            <h3 style="font-size: 16px; margin: 6px 0 2px 0; color: var(--text-primary); font-weight: 700;">
+              ${docTitle}
+            </h3>
+            <div style="font-size: 11px; color: var(--text-secondary);">
+              ${docSubtitle}
+            </div>
+          </div>
+
+          ${sectionsHtml}
+
+          <!-- LINHA DE AÇÕES -->
+          <div class="doc-actions-row">
+            <button class="btn-outline-action primary" onclick="openReaderModalFromCard(this)" title="Visualizar a apostila completa em tela limpa sem distrações">
+              📖 Abrir no Modo Leitura Focada
+            </button>
+            <button class="btn-outline-action" onclick="openGenerateStudyModal('${(matList[0]?.name || '').replace(/'/g, "\\'")}', '${subj.replace(/'/g, "\\'")}')" title="Gerar novos Flashcards e Quizzes a partir desta aula">
+              ⚡ + Gerar Estudo (1-30)
+            </button>
+            <button class="btn-outline-action" onclick="copyReadingDocText(this)" title="Copiar texto formatado da apostila">
+              📋 Copiar Apostila
+            </button>
+          </div>
+        </div>
+      `;
+
+      return {
+        docTitle,
+        docSubtitle,
+        fullHtml,
+        plainText: `${docTitle}\n${docSubtitle}\n\n${mainDisease} - Roteiro de Estudo e Revisão Médica`
+      };
+    }
+
+    function openReaderModalForMaterial(materialName) {
+      const modal = document.getElementById('readerModal');
+      const content = document.getElementById('readerModalContent');
+      if (!modal || !content) return;
+
+      let mat = (chatDriveMaterials || []).find(m => m.name === materialName || m.name.replace(/\.[^/.]+$/, '') === (materialName || '').replace(/\.[^/.]+$/, ''));
+      if (!mat) {
+        mat = { name: materialName || currentStudySubject, subject: currentStudySubject, topic: materialName ? materialName.replace(/\.[^/.]+$/, '') : currentStudySubject };
+      }
+
+      if (!mat.readingDocHtml) {
+        const gen = generateReadingDocumentHtml([mat], mat.subject || currentStudySubject, mat.topic || mat.disease, '');
+        mat.readingDocHtml = gen.fullHtml;
+      }
+
+      const temp = document.createElement('div');
+      temp.innerHTML = mat.readingDocHtml;
+      const actions = temp.querySelector ? temp.querySelector('.doc-actions-row') : null;
+      if (actions && actions.remove) actions.remove();
+
+      content.innerHTML = temp.innerHTML;
+      modal.classList.add('active');
+    }
+
+    function openActiveReadingDoc() {
+      if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
+        openReaderModalForMaterial(currentQuizSlideFilter);
+        return;
+      }
+      const mats = getMaterialsForSubject(currentStudySubject);
+      if (mats.length > 0) {
+        openReaderModalForMaterial(mats[0].name);
+      } else {
+        openReaderModalForMaterial(currentStudySubject);
+      }
     }
 
     // MODAL DE QUANTIDADE (BOTÃO ÚNICO QUIZ ⇄ FLASHCARD)
@@ -4338,68 +5118,15 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     function renderSharedStudyItems() {
       ensureCurrentSubjectValid();
 
-      const availableSubjects = getAvailableStudySubjects();
       const currentStatus = subjectGenerationStatus[currentStudySubject] || { status: 'ready', materialsCount: 0, questionsCount: 0 };
-      const isPending = currentStatus.status === 'pending';
-
-      // 1. Renderiza os pills de matérias nas abas Flashcards e Quizzes
-      ['fcSubjectPillsBar', 'qzSubjectPillsBar'].forEach(barId => {
-        const bar = document.getElementById(barId);
-        if (!bar) return;
-        if (availableSubjects.length <= 1 && availableSubjects[0] === '') {
-          bar.innerHTML = '';
-          bar.style.display = 'none';
-          return;
-        }
-        bar.style.display = 'flex';
-        bar.innerHTML = availableSubjects.map(subj => {
-          const isActive = subj === currentStudySubject;
-          const statusObj = subjectGenerationStatus[subj] || {};
-          const isSubjPending = statusObj.status === 'pending';
-          const qCount = sharedQuestionsBank.filter(q => q.subject === subj).length;
-          const matCount = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === subj).length : 0) || statusObj.materialsCount || 0;
-
-          return `
-            <button class="btn-outline-action ${isActive ? 'active' : ''}" 
-                    style="border-radius: 20px; font-size: 11px; padding: 6px 14px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; ${isActive ? 'border-color: var(--neon); background: rgba(0, 229, 255, 0.12);' : ''}" 
-                    onclick="selectStudySubject('${subj.replace(/'/g, "\\'")}')">
-              <span>${isSubjPending ? '⚡' : '📚'} ${subj}</span>
-              <span style="font-size: 10px; opacity: 0.75; font-weight: 600;">
-                ${isSubjPending ? `(${matCount} aulas • Pendente)` : `(${qCount} cards)`}
-              </span>
-            </button>
-          `;
-        }).join('');
-      });
-
-      // 2. Renderiza Card de Cabeçalho da Matéria Ativa (com botão de Redundância e Exclusão)
-      const qCount = sharedQuestionsBank.filter(q => q.subject === currentStudySubject).length;
       const matCount = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === currentStudySubject).length : 0) || currentStatus.materialsCount || 0;
+      const qCount = sharedQuestionsBank.filter(q => q.subject === currentStudySubject).length;
+      const isPending = currentStatus.status === 'pending' || (matCount > 0 && qCount === 0);
 
-      const fcActiveCard = document.getElementById('fcActiveSubjectCard');
-      const qzActiveCard = document.getElementById('qzActiveSubjectCard');
-      const fcActiveTitle = document.getElementById('fcActiveSubjectTitle');
-      const qzActiveTitle = document.getElementById('qzActiveSubjectTitle');
-      const fcActiveMeta = document.getElementById('fcActiveSubjectMeta');
-      const qzActiveMeta = document.getElementById('qzActiveSubjectMeta');
+      // 1. Atualiza os seletores hierárquicos e badges
+      renderSlideSelectors();
 
-      if (currentStudySubject) {
-        if (fcActiveCard) fcActiveCard.style.display = 'block';
-        if (qzActiveCard) qzActiveCard.style.display = 'block';
-        if (fcActiveTitle) fcActiveTitle.textContent = currentStudySubject;
-        if (qzActiveTitle) qzActiveTitle.textContent = currentStudySubject;
-        
-        const metaText = isPending
-          ? `📁 ${matCount} ${matCount === 1 ? 'aula disponível' : 'aulas disponíveis'} • ⚡ Geração de questões pendente sob demanda`
-          : `📁 ${matCount} ${matCount === 1 ? 'aula sincronizada' : 'aulas sincronizadas'} • 🎯 ${qCount} ${qCount === 1 ? 'questão pronta' : 'questões prontas'}`;
-        if (fcActiveMeta) fcActiveMeta.textContent = metaText;
-        if (qzActiveMeta) qzActiveMeta.textContent = metaText;
-      } else {
-        if (fcActiveCard) fcActiveCard.style.display = 'none';
-        if (qzActiveCard) qzActiveCard.style.display = 'none';
-      }
-
-      // 3. Controle de Banner Pendente vs Decks
+      // 2. Controle de Banner Pendente vs Decks
       const fcPendingBanner = document.getElementById('fcPendingBanner');
       const qzPendingBanner = document.getElementById('qzPendingBanner');
       const fcPendingDesc = document.getElementById('fcPendingDesc');
@@ -4409,19 +5136,17 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       const qzEmpty = document.getElementById('quizzesEmptyState');
       const qzDeck = document.getElementById('quizDeck');
 
-      renderSlideSelectors();
-
       if (isPending) {
         if (fcPendingBanner) {
           fcPendingBanner.style.display = 'block';
           if (fcPendingDesc) {
-            fcPendingDesc.textContent = `A matéria "${currentStudySubject}" possui ${matCount} aulas no Drive salvas na sua sessão. Clique abaixo para gerar Flashcards sob demanda com IA.`;
+            fcPendingDesc.textContent = `A disciplina "${currentStudySubject}" possui ${matCount} ${matCount === 1 ? 'aula disponível' : 'aulas disponíveis'} salvas no Drive. Clique abaixo para gerar Flashcards e Quizzes sob demanda com IA.`;
           }
         }
         if (qzPendingBanner) {
           qzPendingBanner.style.display = 'block';
           if (qzPendingDesc) {
-            qzPendingDesc.textContent = `A matéria "${currentStudySubject}" possui ${matCount} aulas no Drive salvas na sua sessão. Clique abaixo para gerar Quizzes sob demanda com IA.`;
+            qzPendingDesc.textContent = `A disciplina "${currentStudySubject}" possui ${matCount} ${matCount === 1 ? 'aula disponível' : 'aulas disponíveis'} salvas no Drive. Clique abaixo para gerar Flashcards e Quizzes sob demanda com IA.`;
           }
         }
         if (fcDeck) fcDeck.style.display = 'none';
@@ -4434,7 +5159,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
       if (fcPendingBanner) fcPendingBanner.style.display = 'none';
       if (qzPendingBanner) qzPendingBanner.style.display = 'none';
 
-      // 4. Questões filtradas da matéria ativa
+      // 3. Questões filtradas da matéria ativa
       const filtered = getFilteredQuestions();
       const hasItems = filtered.length > 0;
 
@@ -4449,7 +5174,6 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         updateCardDisplay(filtered);
         renderQuizzesList(filtered);
       }
-      renderSlideSelectors();
     }
 
     function updateCardDisplay(filteredList) {
@@ -4580,7 +5304,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
           </div>
 
           <div class="quiz-options-list" id="quizOptions_${item.id}">
-            ${item.quizOptions.map((opt, optIdx) => `
+            ${(item.quizOptions || []).map((opt, optIdx) => `
               <div class="quiz-opt" id="opt_${item.id}_${optIdx}" onclick="answerQuizOption(this, ${optIdx === item.correctIndex}, '${item.id}', ${optIdx})">
                 <span style="font-weight: 700; width: 22px; flex-shrink: 0;">${String.fromCharCode(65 + optIdx)})</span>
                 <span style="flex: 1;">${opt}</span>
@@ -5161,7 +5885,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     });
 
     // 6. PROCESSAMENTO DE UPLOAD COM DIRECIONAMENTO E TESTE DE REDUNDÂNCIA
-    let pendingUploadMaterial = null;
+    var pendingUploadMaterial = null;
 
     function promptMaterialDirection() {
       const text = document.getElementById('materialTextInput').value.trim();
@@ -5222,10 +5946,8 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         }
       }
 
-      closeModals();
-
-      // Adiciona o material enviado aos materiais do Chat associado à disciplina correta
-      chatDriveMaterials.unshift({
+      // Cria o objeto de material com metadados
+      const newMaterial = {
         id: 'upload-mat-' + Date.now(),
         name: pendingUploadMaterial.fileName,
         sizeStr: `${(pendingUploadMaterial.text.length / 1024).toFixed(1)} KB`,
@@ -5235,7 +5957,47 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
         disease: diseaseName,
         topic: diseaseName,
         subject: subjectName
-      });
+      };
+
+      // GERAÇÃO AUTOMÁTICA DA APOSTILA DE LEITURA (FORMATO CARD LEITURA FOCADA DO CHAT)
+      const readingDoc = generateReadingDocumentHtml(
+        [newMaterial],
+        subjectName,
+        diseaseName,
+        pendingUploadMaterial.text
+      );
+      newMaterial.readingDocHtml = readingDoc.fullHtml;
+      newMaterial.readingDocText = readingDoc.plainText;
+
+      chatDriveMaterials.unshift(newMaterial);
+
+      // Posta automaticamente no Chat do Tutor a apostila gerada
+      const flow = document.getElementById('chatFlow');
+      const empty = document.getElementById('chatEmptyState');
+      if (empty) empty.style.display = 'none';
+
+      const tutorBubble = document.createElement('div');
+      tutorBubble.className = 'chat-bubble tutor';
+      tutorBubble.style.maxWidth = '94%';
+      tutorBubble.innerHTML = `
+        <div class="tutor-header">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Apostila Estruturada de Leitura Gerada a Partir dos Slides (${pendingUploadMaterial.fileName})
+        </div>
+        ${readingDoc.fullHtml}
+      `;
+      if (flow) {
+        flow.appendChild(tutorBubble);
+        flow.scrollTop = flow.scrollHeight;
+      }
+      if (typeof chatSessions !== 'undefined' && chatSessions[0] && Array.isArray(chatSessions[0].messages)) {
+        chatSessions[0].messages.push({
+          sender: 'tutor',
+          time: 'Agora',
+          text: `📖 Apostila estruturada gerada a partir dos slides de ${pendingUploadMaterial.fileName}`,
+          htmlContent: tutorBubble.innerHTML
+        });
+      }
 
       currentStudySubject = subjectName;
       const countInSubj = chatDriveMaterials.filter(m => m.subject === subjectName).length;
@@ -7536,6 +8298,12 @@ ${rawText.slice(0, 150000)}`;
                 <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${subjectName.replace(/'/g, "\\'")}', 'flashcards'); handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')" title="Ver Flashcards deste slide">
                   🗂️ Card
                 </button>
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openReaderModalForMaterial('${m.name.replace(/'/g, "\\'")}')" title="Ler apostila gerada deste slide">
+                  📖 Apostila
+                </button>
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openChangeMaterialDisciplineModal('${m.name.replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Mover este slide para outra disciplina da grade">
+                  🔄 Mover
+                </button>
               </div>
             </div>
           `).join('');
@@ -8407,8 +9175,8 @@ ${rawText.slice(0, 150000)}`;
       }
     ];
 
-    let chatDriveMaterials = [];
-    let currentReaderFontSize = 14;
+    var chatDriveMaterials = [];
+    var currentReaderFontSize = 14;
 
     function initChatDriveMaterials() {
       renderChatDriveVerticalList();
@@ -8813,6 +9581,14 @@ ${rawText.slice(0, 150000)}`;
         const fcMenu = document.getElementById('fcSubjectDropdownMenu');
         if (fcMenu) fcMenu.classList.remove('visible');
       }
+      if (!e.target.closest('#fcStudyMoreMenu') && !e.target.closest('[onclick*="toggleStudyMoreOptions(\'fc\')"]')) {
+        const m = document.getElementById('fcStudyMoreMenu');
+        if (m) m.classList.remove('visible');
+      }
+      if (!e.target.closest('#qzStudyMoreMenu') && !e.target.closest('[onclick*="toggleStudyMoreOptions(\'qz\')"]')) {
+        const m = document.getElementById('qzStudyMoreMenu');
+        if (m) m.classList.remove('visible');
+      }
     });
 
     // GERAÇÃO DO MATERIAL COMPLETO DE ESTUDO PARA LEITURA
@@ -8848,227 +9624,15 @@ ${rawText.slice(0, 150000)}`;
         tutorBubble.className = 'chat-bubble tutor';
         tutorBubble.style.maxWidth = '94%';
 
-        const disciplineName = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : 'Clínica Médica';
-        const isDermato = disciplineName.toLowerCase().includes('dermatologia') || selected.some(s => (s.disease && s.disease.toLowerCase().includes('dermat')) || (s.name && s.name.toLowerCase().includes('dermat')));
-
-        const docTitle = isDermato 
-          ? 'Dermatologia Clínica: Propedêutica das Lesões Elementares, Fisiopatologia Cutânea e Eczemas'
-          : `${disciplineName}: Roteiro Didático, Propedêutica e Raciocínio Clínico`;
-        const docSubtitle = `Compilado Didático Estruturado • ${selected.length} Apresentações de Aula Sincronizadas do Google Drive`;
-
-        let sectionsHtml = '';
-        if (isDermato) {
-          sectionsHtml = `
-            <!-- SEÇÃO 1: SEMIOLOGIA DAS LESÕES ELEMENTARES -->
-            <div class="doc-section">
-              <div class="doc-section-title">
-                <span>1. Propedêutica & Semiologia das Lesões Elementares Cutâneas</span>
-              </div>
-              <p style="margin: 0 0 8px 0;">
-                A semiologia dermatológica fundamenta-se na inspeção dinâmica e palpação tecidual minuciosa. As lesões dividem-se conforme alteração anatômica primária:
-              </p>
-              <table class="doc-table">
-                <thead>
-                  <tr>
-                    <th>Categoria Semiológica</th>
-                    <th>Tipo de Lesão</th>
-                    <th>Tamanho & Profundidade</th>
-                    <th>Correlação Fisiopatológica & Exemplo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>Modificação de Cor</strong></td>
-                    <td>Mácula / Mancha</td>
-                    <td>Mácula &lt; 1 cm; Mancha &gt; 1 cm (planas)</td>
-                    <td>Vascular (eritema, telangiectasia) ou pigmentar (vitiligo, melasma). Não há relevo ou espessamento palpável.</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Elevação Sólida</strong></td>
-                    <td>Pápula / Placa</td>
-                    <td>Pápula &lt; 1 cm; Placa &gt; 1 cm (platô)</td>
-                    <td>Infiltrado celular inflamatório na derme superficial ou hiperplasia epidérmica com queratinização acelerada (ex: Psoríase).</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Formação Profunda</strong></td>
-                    <td>Nódulo / Tumor</td>
-                    <td>Nódulo (1 a 3 cm); Derme profunda/hipoderme</td>
-                    <td>Mais palpável que visível. Infiltrado inflamatório denso, granuloma ou proliferação neoplásica (ex: Eritema nodoso).</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Conteúdo Líquido</strong></td>
-                    <td>Vesícula / Bolha / Pústula</td>
-                    <td>Vesícula &lt; 1 cm; Bolha &gt; 1 cm; Pústula (pus)</td>
-                    <td>Clivagem intraepidérmica (acantólise em Pênfigo Vulgar) ou subepidérmica (Pênfigo Bolhoso). Vesículas no Herpes simples.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- SEÇÃO 2: HISTOLOGIA E BARREIRA TEGUMENTAR -->
-            <div class="doc-section">
-              <div class="doc-section-title">
-                <span>2. Histologia & Barreira Cutânea do Sistema Tegumentar</span>
-              </div>
-              <p style="margin: 0 0 6px 0;">
-                A epiderme é um epitélio estratificado pavimentoso queratinizado avascular com 4 estratos principais funcionais:
-              </p>
-              <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.6;">
-                <li><strong>Camada Basal (Germinativa):</strong> Células-tronco com alta taxa mitótica intercaladas por melanócitos dendríticos (sintetizam e transferem grânulos de melanina aos queratinócitos para fotoproteção do DNA nuclear).</li>
-                <li><strong>Camada Espinhosa:</strong> Queratinócitos unidos fortemente por desmossomos (tonofilamentos de citoqueratina) conferindo resistência mecânica contra forças de cisalhamento.</li>
-                <li><strong>Camada Granulosa:</strong> Acúmulo de grânulos basofílicos de querato-hialina e corpos lamelares (liberação de ceramidas, colesterol e ácidos graxos livres na matriz intercelular).</li>
-                <li><strong>Camada Córnea:</strong> Corneócitos anucleados imersos na matriz lipídica hidrofóbica ("modelo de tijolos e argamassa"), garantindo baixa perda transepidérmica de água (TEWL).</li>
-              </ul>
-            </div>
-
-            <!-- SEÇÃO 3: PSORÍASE VS LÍQUEN PLANO -->
-            <div class="doc-section">
-              <div class="doc-section-title">
-                <span>3. Diagnóstico Diferencial: Psoríase Vulgar vs Líquen Plano</span>
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
-                  <strong style="color: var(--neon);">Psoríase Vulgar</strong>
-                  <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
-                    • <strong>Lesão Típica:</strong> Placas eritemato-descamativas bem delimitadas com escamas micáceas prateadas.<br>
-                    • <strong>Topografia:</strong> Superfícies extensoras (cotovelos, joelhos, couro cabeludo, região lombo-sacra).<br>
-                    • <strong>Curetagem de Brocq:</strong> Sinal da vela ➔ Sinal da película de Duncan-Dulck ➔ <strong>Sinal de Auspitz (Orvalho Sangrento)</strong> por papilomatose dérmica.<br>
-                    • <strong>Fenômeno de Koebner:</strong> Surgimento de novas lesões em sítios de trauma físico.
-                  </p>
-                </div>
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
-                  <strong style="color: #60a5fa;">Líquen Plano</strong>
-                  <p style="font-size: 12px; margin: 4px 0 0 0; color: var(--text-secondary); line-height: 1.5;">
-                    • <strong>Lesão Típica:</strong> Pápulas violáceas poligonais brilhantes, intensamente pruriginosas (Regra dos 4 Ps: Poligonal, Pruriginosa, Púrpura/violácea, Plana).<br>
-                    • <strong>Topografia:</strong> Superfícies flexoras dos punhos, tornozelos e mucosa oral jugal.<br>
-                    • <strong>Estrias de Wickham:</strong> Rede reticulada de linhas esbranquiçadas na superfície da pápula.<br>
-                    • <strong>Associação Sistêmica:</strong> Sorologia para Hepatite C recomendada na investigação.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- SEÇÃO 4: ECZEMAS E DERMATITES -->
-            <div class="doc-section">
-              <div class="doc-section-title">
-                <span>4. Eczemas: Diferencial entre Dermatite Atópica, Seborreica e de Contato</span>
-              </div>
-              <p style="margin: 0 0 6px 0;">
-                O padrão inflamatório eczematoso evolui em fases aguda (eritema, vesiculação e exsudação "pele fervente") e crônica (ressecamento e liquenificação pelo prurido contínuo):
-              </p>
-              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
-                • <strong>Dermatite Atópica:</strong> No lactente predomina na face (áreas malares poupando o triângulo perioral) e superfícies extensoras; na infância/adulto migra para dobras flexurais (fossas cubitais e poplíteas) com intensa xerose cutânea e prurido.<br>
-                • <strong>Dermatite Seborreica:</strong> Lesões eritemato-descamativas untuosas amareladas em áreas seborreicas (couro cabeludo, sulco nasogeniano, sobrancelhas e pré-esternal). Associação fisiopatológica com a levedura lipofílica <em>Malassezia</em>.<br>
-                • <strong>Dermatite de Contato:</strong> Alérgica (hipersensibilidade tipo IV celular mediada por linfócitos T, ultrapassa limites do agente causador, ex: níquel) vs Irritativa primária (dano químico direto à barreira, restrita à área de contato).
-              </div>
-            </div>
-
-            <!-- SEÇÃO 5: PÉROLAS DE PROVA & PRÁTICA MÉDICA -->
-            <div class="doc-pearl-box">
-              <div style="color: var(--neon); font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                <span>💡 Pérolas de Prova de Residência & Internato</span>
-              </div>
-              <ul style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.6;">
-                <li><strong>Auspitz / Orvalho Sangrento:</strong> Corresponde a capilares dilatados nas papilas dérmicas expostos após raspagem da película de Duncan; altamente característico de psoríase.</li>
-                <li><strong>Psoríase Pustulosa Aguda:</strong> Pode ser precipitada pelo desmame ou interrupção abrupta de corticoterapia sistêmica oral! Nunca usar prednisona oral como primeira linha na psoríase em placas.</li>
-                <li><strong>Poupação Perioral no Lactente:</strong> Eczema exsudativo malar poupando o triângulo centro-facial em bebê é o achado clássico de dermatite atópica infantil.</li>
-                <li><strong>Tratamento Tópico Facial:</strong> Na face, evitar corticoides tópicos fluorados de alta potência devido ao risco de atrofia cutânea e telangiectasias; preferir imunomoduladores tópicos (tacrolimo / pimecrolimo).</li>
-              </ul>
-            </div>
-          `;
-        } else {
-          sectionsHtml = `
-            <!-- SEÇÃO 1: SÍNTESE SEMIOLÓGICA DAS AULAS SELECIONADAS -->
-            <div class="doc-section">
-              <div class="doc-section-title">
-                <span>1. Propedêutica & Síntese Didática das Aulas Selecionadas</span>
-              </div>
-              <p style="margin: 0 0 8px 0;">
-                O compilado didático reúne as evidências essenciais e pontos de maior impacto clínico das aulas sincronizadas no Google Drive para <strong>${disciplineName}</strong>:
-              </p>
-              <table class="doc-table">
-                <thead>
-                  <tr>
-                    <th>Arquivo / Aula</th>
-                    <th>Afecção / Tópico</th>
-                    <th>Tamanho</th>
-                    <th>Ponto-Chave de Propedêutica & Conduta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${selected.map(s => `
-                    <tr>
-                      <td><strong>${s.name}</strong></td>
-                      <td>${s.disease || s.topic}</td>
-                      <td>${s.sizeStr}</td>
-                      <td>Investigação semiológica direcionada, exames complementares e abordagem terapêutica baseada em diretrizes.</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-
-            <!-- SEÇÃO 2: FISIOPATOLOGIA E RACIOCÍNIO DIAGNÓSTICO -->
-            <div class="doc-section">
-              <div class="doc-section-title">
-                <span>2. Fisiopatologia & Raciocínio Diagnóstico Integrado</span>
-              </div>
-              <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.6;">
-                ${selected.map(s => `
-                  <li><strong>${s.disease || s.topic}:</strong> Integração dos mecanismos anatomopatológicos e fisiológicos, sinais de alarme ao exame físico e biomarcadores laboratoriais para estratificação rápida.</li>
-                `).join('')}
-              </ul>
-            </div>
-
-            <!-- SEÇÃO 3: CONDUTA TERAPÊUTICA & PÉROLAS DE PROVA -->
-            <div class="doc-pearl-box">
-              <div style="color: var(--neon); font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                <span>💡 Pérolas de Prova de Residência & Internato (${disciplineName})</span>
-              </div>
-              <ul style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.6;">
-                <li><strong>Anamnese e Linha do Tempo:</strong> Correlacione rigorosamente o tempo de início, evolução dos sintomas e fatores agravantes e atenuantes na história clínica.</li>
-                <li><strong>Propedêutica Armada Estratificada:</strong> Exames complementares devem ser guiados pela probabilidade pré-teste, evitando exames desnecessários.</li>
-                <li><strong>Prescrição Baseada em Evidências:</strong> Priorize sempre medidas não-farmacológicas associadas à terapia farmacológica padrão de 1ª linha.</li>
-              </ul>
-            </div>
-          `;
-        }
+        const disciplineName = currentScannedFolder ? (currentScannedFolder.disciplineKey || 'Clínica Médica') : (selected[0]?.subject || 'Clínica Médica');
+        const readingDoc = generateReadingDocumentHtml(selected, disciplineName, '', '');
 
         tutorBubble.innerHTML = `
           <div class="tutor-header">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             Material de Leitura Gerado a Partir do Google Drive
           </div>
-
-          <div class="reading-doc-card">
-            <div class="reading-doc-header">
-              <span class="reading-doc-badge">📚 APOSTILA DE LEITURA & REVISÃO MÉDICA</span>
-              <h3 style="font-size: 16px; margin: 6px 0 2px 0; color: var(--text-primary); font-weight: 700;">
-                ${docTitle}
-              </h3>
-              <div style="font-size: 11px; color: var(--text-secondary);">
-                ${docSubtitle}
-              </div>
-            </div>
-
-            ${sectionsHtml}
-
-            <!-- LINHA DE AÇÕES -->
-            <div class="doc-actions-row">
-              <button class="btn-outline-action primary" onclick="openReaderModalFromCard()" title="Visualizar a apostila completa em tela limpa sem distrações">
-                📖 Abrir no Modo Leitura Focada
-              </button>
-              <button class="btn-outline-action" onclick="extractFlashcardsFromReadingDoc()" title="Gerar novos Flashcards a partir deste texto">
-                🗂️ + Extrair Flashcards
-              </button>
-              <button class="btn-outline-action" onclick="extractQuizzesFromReadingDoc()" title="Gerar novo Quiz de Múltipla Escolha">
-                📝 + Gerar Simulado
-              </button>
-              <button class="btn-outline-action" onclick="copyReadingDocText()" title="Copiar texto formatado da apostila">
-                📋 Copiar Apostila
-              </button>
-            </div>
-          </div>
+          ${readingDoc.fullHtml}
         `;
 
         flow.appendChild(tutorBubble);
@@ -9078,12 +9642,14 @@ ${rawText.slice(0, 150000)}`;
     }
 
     // MODAL DE LEITURA FOCADA
-    function openReaderModalFromCard() {
+    function openReaderModalFromCard(btn) {
       const modal = document.getElementById('readerModal');
       const content = document.getElementById('readerModalContent');
       if (!modal || !content) return;
 
-      const card = document.querySelector('.reading-doc-card');
+      let card = null;
+      if (btn && btn.closest) card = btn.closest('.reading-doc-card');
+      if (!card) card = document.querySelector('.reading-doc-card');
       if (card) {
         const clone = card.cloneNode(true);
         const actions = clone.querySelector('.doc-actions-row');
@@ -9111,8 +9677,10 @@ ${rawText.slice(0, 150000)}`;
       });
     }
 
-    function copyReadingDocText() {
-      const card = document.querySelector('.reading-doc-card');
+    function copyReadingDocText(btn) {
+      let card = null;
+      if (btn && btn.closest) card = btn.closest('.reading-doc-card');
+      if (!card) card = document.querySelector('.reading-doc-card');
       if (!card) return;
       navigator.clipboard.writeText(card.innerText).then(() => {
         showToast('📋 Material de leitura copiado com sucesso!');
