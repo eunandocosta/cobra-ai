@@ -97,7 +97,7 @@ Digite sua mensagem ou dúvida abaixo (ou digite 'sair' para encerrar):
         console.warn('\x1b[31m[Aviso]:\x1b[0m Tentando resposta rápida via modelo alternativo...');
         try {
           const fallbackRes = await ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
+            model: 'gemini-3.5-flash',
             contents: conversationHistory,
             config: {
               systemInstruction: { parts: [{ text: systemInstruction }] },

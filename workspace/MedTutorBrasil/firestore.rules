@@ -1,0 +1,200 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model (MedTutor Brasil)
+    // ===============================================================
+    //
+    // Collection: users/{userId}
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID do estudante
+    //   - nome: string (required, 2-100 chars) - Nome do estudante de medicina
+    //   - email: string (optional, valid email format)
+    //   - faculdade: string (required, 2-150 chars) - Faculdade/Universidade
+    //   - periodo_atual: string (required, 2-50 chars) - Ex: '5º Período'
+    //   - ciclo: string (required, 2-50 chars) - 'Ciclo Básico', 'Ciclo Clínico' ou 'Internato'
+    //   - tema_preferido: string (optional) - 'dark' ou 'light'
+    //   - maestria_xp: number (optional, >= 0) - Pontos de XP
+    //   - data_criacao: string / timestamp (required)
+    //   - ultimo_acesso: string / timestamp (optional)
+    //
+    // Subcollection: users/{userId}/grade_curricular/{disciplineId}
+    // Fields:
+    //   - id: string (required) - ID da disciplina
+    //   - periodo: string (required) - Ex: '5º Período'
+    //   - ciclo: string (optional)
+    //   - disciplina: string (required, 2-200 chars)
+    //   - materias: list (required, <= 100 itens) - Lista de tópicos oficiais
+    //   - maestria_xp: number (optional, >= 0)
+    //   - itensEstudados: number (optional, >= 0)
+    //   - atualizadoEm: string / timestamp (required)
+    //
+    // Subcollection: users/{userId}/materiais_estudo/{materialId}
+    // Fields:
+    //   - id: string (required)
+    //   - nome: string (required, 2-250 chars)
+    //   - originalFileName: string (optional, <= 250 chars)
+    //   - disciplina: string (required, <= 200 chars)
+    //   - materia: string (optional, <= 200 chars)
+    //   - doenca: string (optional, <= 200 chars)
+    //   - conteudo_md: string (required, <= 1000000 chars) - Markdown estruturado leve
+    //   - tamanho_original_kb: number (optional)
+    //   - tamanho_otimizado_kb: number (optional)
+    //   - percentual_reducao: number (optional)
+    //   - figuras_clinicas: list (optional, <= 100 itens)
+    //   - descriptiveIndex: list / map (optional)
+    //   - criadoEm: string / timestamp (required)
+    //   - atualizadoEm: string / timestamp (optional)
+    //
+    // Subcollection: users/{userId}/banco_questoes/{questionId}
+    // Fields:
+    //   - id: string (required)
+    //   - pergunta: string (required, 5-2000 chars)
+    //   - resposta_correta: string (required, 1-2000 chars)
+    //   - distratores: list (optional, <= 10 itens)
+    //   - disciplina: string (required, <= 200 chars)
+    //   - materia: string (optional, <= 200 chars)
+    //   - doenca: string (optional, <= 200 chars)
+    //   - srs: map (optional) - Dados do algoritmo SM-2
+    //   - quizStats: map (optional)
+    //   - isRedundant: bool (optional)
+    //   - redundancyScore: number (optional)
+    //   - atualizadoEm: string / timestamp (required)
+    //
+    // Subcollection: users/{userId}/historico_chats/{chatId}
+    // Fields:
+    //   - id: string (required)
+    //   - titulo: string (required, 1-250 chars)
+    //   - disciplina: string (optional, <= 200 chars)
+    //   - mensagens: list (required, <= 500 mensagens)
+    //   - memoria_compacta: string (optional, <= 5000 chars)
+    //   - tokensConsumidos: number (optional, >= 0)
+    //   - atualizadoEm: string / timestamp (required)
+    // ===============================================================
+
+    // ===============================================================
+    // Funções Auxiliares de Segurança e Validação
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // ===============================================================
+    // Validadores de Domínio (Utilizados no Create E no Update)
+    // ===============================================================
+
+    function isValidUserProfile(data) {
+      return hasRequiredFields(['uid', 'nome', 'faculdade', 'periodo_atual', 'ciclo']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+             data.nome is string && data.nome.size() >= 2 && data.nome.size() <= 100 &&
+             data.faculdade is string && data.faculdade.size() >= 2 && data.faculdade.size() <= 150 &&
+             data.periodo_atual is string && data.periodo_atual.size() >= 2 && data.periodo_atual.size() <= 50 &&
+             data.ciclo is string && data.ciclo in ['Ciclo Básico', 'Ciclo Clínico', 'Internato'] &&
+             (!('email' in data) || isValidEmail(data.email)) &&
+             (!('maestria_xp' in data) || (data.maestria_xp is number && data.maestria_xp >= 0));
+    }
+
+    function isValidCurriculumItem(data) {
+      return hasRequiredFields(['id', 'periodo', 'disciplina', 'materias']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.periodo is string && data.periodo.size() <= 100 &&
+             data.disciplina is string && data.disciplina.size() >= 2 && data.disciplina.size() <= 200 &&
+             data.materias is list && data.materias.size() <= 100;
+    }
+
+    function isValidStudyMaterial(data) {
+      return hasRequiredFields(['id', 'nome', 'disciplina', 'conteudo_md']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.nome is string && data.nome.size() >= 2 && data.nome.size() <= 250 &&
+             data.disciplina is string && data.disciplina.size() <= 200 &&
+             data.conteudo_md is string && data.conteudo_md.size() <= 1000000;
+    }
+
+    function isValidStudyQuestion(data) {
+      return hasRequiredFields(['id', 'pergunta', 'resposta_correta', 'disciplina']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.pergunta is string && data.pergunta.size() >= 5 && data.pergunta.size() <= 2000 &&
+             data.resposta_correta is string && data.resposta_correta.size() >= 1 && data.resposta_correta.size() <= 2000 &&
+             data.disciplina is string && data.disciplina.size() <= 200 &&
+             (!('distratores' in data) || (data.distratores is list && data.distratores.size() <= 10));
+    }
+
+    function isValidChatSession(data) {
+      return hasRequiredFields(['id', 'titulo', 'mensagens']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.titulo is string && data.titulo.size() >= 1 && data.titulo.size() <= 250 &&
+             data.mensagens is list && data.mensagens.size() <= 500 &&
+             (!('memoria_compacta' in data) || (data.memoria_compacta is string && data.memoria_compacta.size() <= 5000));
+    }
+
+    // ===============================================================
+    // Regras de Acesso às Coleções
+    // ===============================================================
+
+    // 1. Perfil do Usuário
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && uidUnchanged() && isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) && uidNotModified() && isValidUserProfile(request.resource.data);
+      allow delete: if isOwner(userId);
+
+      // 2. Grade Curricular do Estudante
+      match /grade_curricular/{disciplineId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidCurriculumItem(request.resource.data);
+        allow update: if isOwner(userId) && isValidCurriculumItem(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // 3. Materiais de Estudo (Apostilas e Slides em Markdown)
+      match /materiais_estudo/{materialId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidStudyMaterial(request.resource.data);
+        allow update: if isOwner(userId) && isValidStudyMaterial(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // 4. Banco Unificado de Questões (Flashcards SM-2 e Quizzes)
+      match /banco_questoes/{questionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidStudyQuestion(request.resource.data);
+        allow update: if isOwner(userId) && isValidStudyQuestion(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // 5. Histórico de Chats com a Dra. Sofia
+      match /historico_chats/{chatId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidChatSession(request.resource.data);
+        allow update: if isOwner(userId) && isValidChatSession(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Bloqueio Global por Padrão (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

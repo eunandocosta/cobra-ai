@@ -1,0 +1,26 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": [
+    {
+      "bucket": "cobra-ai-6549d.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ],
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "MedTutor Brasil",
+        "supportEmail": "suporte@medtutorbrasil.com.br",
+        "authorizedRedirectUris": [
+          "http://localhost",
+          "http://127.0.0.1"
+        ]
+      }
+    }
+  }
+}

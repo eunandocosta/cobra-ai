@@ -1,0 +1,27 @@
+{
+  "name": "medtutor-brasil",
+  "version": "2.0.0",
+  "description": "MedTutor Brasil - Plataforma de Educação Médica com Inteligência Artificial e Evidências Científicas",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node scratch/test_modular_monolith.js"
+  },
+  "keywords": [
+    "medicina",
+    "educacao-medica",
+    "gemini-ai",
+    "pubmed",
+    "scielo",
+    "modular-monolith"
+  ],
+  "author": "MedTutor Brasil Team",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "firebase-admin": "^14.3.0"
+  }
+}

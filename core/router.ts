@@ -57,11 +57,11 @@ export class ModelRouter {
   }
 
   /**
-   * Mapeia o tier para o modelo concreto (usando os modelos atuais: gemini-3.7-flash, gemini-3.5-flash-lite)
+   * Mapeia o tier para o modelo concreto (usando os modelos atuais: gemini-3.7-flash, gemini-3.5-flash)
    */
   public resolveModel(tier: ModelTier = 'BALANCED'): string {
     const tierMap: Record<ModelTier, string> = {
-      FAST: process.env.MODEL_FAST || 'gemini-3.5-flash-lite',
+      FAST: process.env.MODEL_FAST || 'gemini-3.5-flash',
       BALANCED: process.env.MODEL_BALANCED || 'gemini-3.7-flash',
       REASONING: process.env.MODEL_REASONING || 'gemini-3.7-flash',
       CODE: process.env.MODEL_CODE || 'gemini-3.7-flash',

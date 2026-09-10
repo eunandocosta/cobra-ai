@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024; // Máximo 5MB
+    }
+
+    // Pasta de imagens clínicas de aulas do estudante
+    match /usuarios/{userId}/imagens_aulas/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidImage();
+      allow delete: if isOwner(userId);
+    }
+
+    // Bloqueio Padrão
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

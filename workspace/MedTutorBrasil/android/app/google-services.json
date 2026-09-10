@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "275562725419",
+    "project_id": "cobra-ai-6549d",
+    "storage_bucket": "cobra-ai-6549d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:275562725419:android:9741fe61b4c663624bea6e",
+        "android_client_info": {
+          "package_name": "com.cobraai.project"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "275562725419-ukfsqnbkr5624niea1fhv7q07esaeth6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjk64vwcXtQ192fMwUnu0ewDsLUQw61Hw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "275562725419-ukfsqnbkr5624niea1fhv7q07esaeth6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
