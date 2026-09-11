@@ -9758,6 +9758,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       const fcBox = document.getElementById('flashcardBox');
       if (fcBox) fcBox.classList.remove('flipped');
+      document.querySelectorAll('.flashcard-side').forEach(side => { side.scrollTop = 0; });
       const ansInput = document.getElementById('studentAnswerInput');
       if (ansInput) ansInput.value = item.lastStudentAnswer || '';
       const aiFeedback = document.getElementById('aiEvaluationFeedback');
@@ -9767,7 +9768,33 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         aiFeedback.style.display = 'none';
         aiFeedback.innerHTML = '';
       }
+      requestAnimationFrame(updateFlashcardScrollbars);
     }
+
+    function updateFlashcardScrollbars() {
+      document.querySelectorAll('.flashcard-side').forEach(side => {
+        const rail = side.querySelector('.flashcard-scrollbar');
+        const thumb = rail && rail.querySelector('.flashcard-scrollbar-thumb');
+        if (!rail || !thumb) return;
+
+        const visibleHeight = side.clientHeight;
+        const contentHeight = side.scrollHeight;
+        const railHeight = rail.clientHeight;
+        if (!visibleHeight || !railHeight) return;
+
+        const thumbHeight = Math.max(32, Math.min(railHeight, railHeight * (visibleHeight / contentHeight)));
+        const maxScroll = Math.max(1, contentHeight - visibleHeight);
+        const maxOffset = Math.max(0, railHeight - thumbHeight);
+        const offset = maxOffset * (side.scrollTop / maxScroll);
+        thumb.style.height = `${thumbHeight}px`;
+        thumb.style.transform = `translateY(${offset}px)`;
+        rail.classList.toggle('is-scrollable', contentHeight > visibleHeight + 1);
+      });
+    }
+
+    document.querySelectorAll('.flashcard-side').forEach(side => {
+      side.addEventListener('scroll', updateFlashcardScrollbars, { passive: true });
+    });
 
     function deleteCurrentCard() {
       const baseList = getFilteredQuestions();
@@ -9798,6 +9825,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function flipCardManual() {
       const fcBox = document.getElementById('flashcardBox');
       if (fcBox) fcBox.classList.toggle('flipped');
+      requestAnimationFrame(updateFlashcardScrollbars);
     }
 
     // Classificação Anki / SM-2 (1: Repetir, 2: Difícil, 3: Bom, 4: Fácil)
