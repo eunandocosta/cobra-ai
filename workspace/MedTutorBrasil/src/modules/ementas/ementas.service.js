@@ -1,5 +1,6 @@
 // Serviço Universal de Ementas & Sequenciamento Cognitivo (MedTutor Brasil)
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
+const { runWithAiLimit } = require('../../shared/ai-limiter');
 
 const universalCurriculumSchema = {
   type: SchemaType.OBJECT,
@@ -129,7 +130,7 @@ class EmentasService {
     });
 
     const prompt = `Analise o documento e estruture a matriz curricular exata desta faculdade de Medicina:\n\n"""\n${rawText.slice(0, 150000)}\n"""`;
-    const result = await model.generateContent(prompt);
+    const result = await runWithAiLimit(() => model.generateContent(prompt));
     const parsed = JSON.parse(result.response.text());
 
     if (!parsed || !Array.isArray(parsed.periods) || parsed.periods.length === 0) {
@@ -197,7 +198,7 @@ ${(materialContent || materialName).slice(0, 4000)}
 """
 `;
 
-    const res = await model.generateContent(prompt);
+    const res = await runWithAiLimit(() => model.generateContent(prompt));
     return JSON.parse(res.response.text());
   }
 

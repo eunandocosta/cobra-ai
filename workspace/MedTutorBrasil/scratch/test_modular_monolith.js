@@ -49,7 +49,13 @@ for (const mod of requiredModules) {
   console.log(`[PASS] Módulo '${mod}' validado com isolamento de rotas, controlador e serviço`);
 }
 
-// 3. Teste de Inicialização e Roteamento HTTP
+// 3. Teste de Inicialização e Roteamento HTTP (sem chamadas externas de IA)
+const reportService = require('../src/modules/relatorios/relatorios.service');
+const quizService = require('../src/modules/quizzes/quizzes.service');
+const chatService = require('../src/modules/chat/chat.service');
+reportService.generateReport = async (payload) => ({ title: payload.title, subject: payload.subject, html: '<p>Relatório de teste</p>' });
+quizService.generateQuestions = async () => ({ questions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }] });
+chatService.processMessage = async () => ({ reply: 'Resposta de teste baseada em diretrizes médicas.' });
 const app = require('../index.js');
 const server = http.createServer((req, res) => app.handle(req, res));
 
@@ -117,17 +123,23 @@ server.listen(TEST_PORT, async () => {
     // Test 4: Relatórios Module
     const relatorio = await makeRequest('POST', '/api/relatorios/gerar', {
       subject: 'Neurologia',
-      title: 'Vias Sensitivas e Motoras'
+      title: 'Vias Sensitivas e Motoras',
+      content: 'As vias sensitivas e motoras integram neurônios, tratos medulares, tronco encefálico e córtex cerebral para organizar a percepção e o movimento voluntário.'
     });
     assert.strictEqual(relatorio.statusCode, 200);
     assert(relatorio.body.title.includes('Vias Sensitivas e Motoras'));
     console.log(`[PASS] POST /api/relatorios/gerar -> 200 OK ('${relatorio.body.title}')`);
 
+    const invalidReport = await makeRequest('POST', '/api/relatorios/gerar', { title: 'Sem conteúdo' });
+    assert.strictEqual(invalidReport.statusCode, 400);
+    console.log('[PASS] POST /api/relatorios/gerar sem conteúdo -> 400 Bad Request');
+
     // Test 5: Quizzes Module
     const quiz = await makeRequest('POST', '/api/quizzes/gerar', {
       subject: 'Neurologia',
       topic: 'Tronco Encefálico',
-      count: 3
+      count: 3,
+      materialText: 'O tronco encefálico é formado por mesencéfalo, ponte e bulbo, contendo vias ascendentes, descendentes e núcleos de nervos cranianos.'
     });
     assert.strictEqual(quiz.statusCode, 200);
     assert.strictEqual(quiz.body.questions.length, 3);

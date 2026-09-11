@@ -4,7 +4,12 @@ const quizzesService = require('./quizzes.service');
 class QuizzesController {
   async generate(req, res) {
     try {
-      const data = await quizzesService.generateQuestions(req.body || {});
+      const payload = req.body || {};
+      const materialText = payload.materialText || payload.text || payload.conteudo || payload.content || '';
+      if (typeof materialText !== 'string' || materialText.trim().length < 20) {
+        return res.status(400).json({ error: 'Texto de estudo insuficiente para gerar questões.', details: 'Envie materialText, text, conteudo ou content com ao menos 20 caracteres.' });
+      }
+      const data = await quizzesService.generateQuestions(payload);
       return res.json(data);
     } catch (err) {
       console.error("❌ Erro capturado no QuizzesController:", err);

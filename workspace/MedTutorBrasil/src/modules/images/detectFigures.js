@@ -1,6 +1,10 @@
 // detectFigures.js
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import fs from 'fs';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { runWithAiLimit } = require('../../shared/ai-limiter.js');
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -42,10 +46,10 @@ IGNORE: títulos de slides, textos explicativos, cabeçalhos, rodapés e logotip
 Retorne as coordenadas normalizadas de 0 a 1000 da região onde está a figura.
 `;
 
-  const result = await model.generateContent([
+  const result = await runWithAiLimit(() => model.generateContent([
     prompt,
     { inlineData: { data: pageImageBuffer.toString("base64"), mimeType: "image/webp" } }
-  ]);
+  ]));
 
   return JSON.parse(result.response.text());
 }

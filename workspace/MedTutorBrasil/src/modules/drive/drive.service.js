@@ -2,6 +2,8 @@
 // Serviço de Integração com Google Drive (MedTutor Brasil)
 
 class DriveService {
+  static MAX_DOWNLOAD_BYTES = Number(process.env.DRIVE_MAX_DOWNLOAD_BYTES || 200 * 1024 * 1024);
+  static DOWNLOAD_TIMEOUT_MS = Number(process.env.DRIVE_DOWNLOAD_TIMEOUT_MS || 20_000);
   /**
    * Extrai o ID da pasta ou arquivo a partir de URL ou ID cru
    */
@@ -119,11 +121,14 @@ class DriveService {
     if (!fileId) throw new Error('ID do arquivo ausente.');
     const downloadUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DriveService.DOWNLOAD_TIMEOUT_MS);
     const res = await fetch(downloadUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: controller.signal
     });
 
     if (!res.ok) {
@@ -131,8 +136,28 @@ class DriveService {
     }
 
     const contentType = res.headers.get('content-type') || 'application/octet-stream';
-    const buffer = Buffer.from(await res.arrayBuffer());
+    const declaredSize = Number(res.headers.get('content-length') || 0);
+    if (declaredSize > DriveService.MAX_DOWNLOAD_BYTES) {
+      throw new Error(`Arquivo excede o limite de ${Math.floor(DriveService.MAX_DOWNLOAD_BYTES / 1024 / 1024)} MB.`);
+    }
 
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('Não foi possível ler o arquivo do Google Drive.');
+    const chunks = [];
+    let receivedBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > DriveService.MAX_DOWNLOAD_BYTES) {
+        await reader.cancel();
+        throw new Error(`Arquivo excede o limite de ${Math.floor(DriveService.MAX_DOWNLOAD_BYTES / 1024 / 1024)} MB.`);
+      }
+      chunks.push(Buffer.from(value));
+    }
+    const buffer = Buffer.concat(chunks, receivedBytes);
+
+    clearTimeout(timeout);
     return { buffer, contentType };
   }
 

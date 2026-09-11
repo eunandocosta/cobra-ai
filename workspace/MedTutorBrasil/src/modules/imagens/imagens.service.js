@@ -4,6 +4,10 @@
 
 const https = require('https');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { runWithAiLimit } = require('../../shared/ai-limiter');
+
+const CACHE_TTL_MS = Number(process.env.IMAGE_CACHE_TTL_MS || 30 * 60 * 1000);
+const MAX_CACHE_ENTRIES = Number(process.env.IMAGE_CACHE_MAX_ENTRIES || 250);
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -14,6 +18,26 @@ function getGenAI() {
 class ImagensService {
   constructor() {
     this.cache = new Map();
+  }
+
+  getCached(cacheKey) {
+    const entry = this.cache.get(cacheKey);
+    if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+      this.cache.delete(cacheKey);
+      return null;
+    }
+    // Move para o fim: o Map funciona como LRU simples.
+    this.cache.delete(cacheKey);
+    this.cache.set(cacheKey, entry);
+    return entry.value;
+  }
+
+  cacheResult(cacheKey, value) {
+    this.cache.delete(cacheKey);
+    this.cache.set(cacheKey, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+    while (this.cache.size > MAX_CACHE_ENTRIES) this.cache.delete(this.cache.keys().next().value);
+    return value;
   }
 
   /**
@@ -544,7 +568,7 @@ Retorne JSON no formato:
   ]
 }`;
 
-      const res = await model.generateContent(prompt);
+      const res = await runWithAiLimit(() => model.generateContent(prompt));
       const resText = res.response.text();
       const parsed = JSON.parse(resText);
 
@@ -673,7 +697,7 @@ Retorne JSON no formato:
   ]
 }`;
 
-      const res = await model.generateContent(prompt);
+      const res = await runWithAiLimit(() => model.generateContent(prompt));
       const parsed = JSON.parse(res.response.text());
       const approvedItems = Array.isArray(parsed.curatedEntities) ? parsed.curatedEntities : [];
 
@@ -733,8 +757,9 @@ Retorne JSON no formato:
     }
 
     const cacheKey = `${userQuery.toLowerCase().trim()}_${subject.toLowerCase().trim()}_${isReport ? 'rep' : 'std'}`;
-    if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey);
+    const cached = this.getCached(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     // 1. Extração profunda de todas as entidades anatômicas e clínicas
@@ -781,8 +806,7 @@ Retorne JSON no formato:
             return acc;
           }, {})
         };
-        this.cache.set(cacheKey, result);
-        return result;
+        return this.cacheResult(cacheKey, result);
       }
     }
 
@@ -830,8 +854,7 @@ Retorne JSON no formato:
 
     if (candidates.length === 0) {
       const result = { success: false, image: null, images: [], reason: 'Nenhuma imagem encontrada nas bases médicas abertas.' };
-      this.cache.set(cacheKey, result);
-      return result;
+      return this.cacheResult(cacheKey, result);
     }
 
     // Curadoria de precisão com IA
@@ -850,8 +873,7 @@ Retorne JSON no formato:
           reason: 'Candidatos descartados pelo curador por falta de aderência clínica 100% precisa.'
         };
 
-    this.cache.set(cacheKey, result);
-    return result;
+    return this.cacheResult(cacheKey, result);
   }
 }
 

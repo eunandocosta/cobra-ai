@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { runWithAiLimit } = require('../../shared/ai-limiter');
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -84,12 +85,13 @@ Você é um preceptor médico sênior da MedTutor Brasil e editor-chefe de trata
 Sua missão é sintetizar materiais médicos em um Tratado Acadêmico formal, aprofundado e diagramado em Markdown.
 
 DIRETRIZES FUNDAMENTAIS DE CONTEÚDO:
-1. RIGOR E PROFUNDIDADE: Detalhe os mecanismos etiopatogênicos, moleculares, correlações semiológicas e farmacológicas presentes no conteúdo. Jamais use resumos superficiais ou clichês vazios.
-2. FIDELIDADE CONCEITUAL: Todo o embasamento teórico deve vir do material fornecido. Não invente afirmações incompatíveis com a fonte.
-3. DIRETRIZES NACIONAIS: Correlacione condutas com os consensos vigentes do SUS e protocolos clínicos (PCDT).
-4. FECHAMENTO DIDÁTICO:
-   - Finalize com 1 Caso Clínico autossuficiente contendo Enunciado, Pergunta e Gabarito comentado com diagnósticos diferenciais.
-   - Apresente de 3 a 5 "💡 Pérolas de Plantão e Prova" focadas em temas quentes para ENARE e Revalida.
+1. FUNDAMENTOS EM CAMADAS: para cada estrutura, conceito, via ou fenômeno, ensine nesta ordem: o que é e onde está; partes e relações; função; mecanismo; alteração/lesão; consequência. A aplicação clínica vem depois, como confirmação da compreensão.
+2. DISTRIBUIÇÃO DE ÊNFASE: priorize estrutura, localização, componentes, função, relações e mecanismos (cerca de 65%); depois consequências e correlações clínico-fisiopatológicas (25%); por último conduta, farmacologia e prova (10%), exceto quando o material for explicitamente clínico.
+3. TABELA DE ANCORAGEM: em cada bloco, use uma tabela com Estrutura ou conceito | Onde está / relações | Função | Mecanismo | Se alterada, o que acontece.
+4. RECUPERAÇÃO ATIVA: encerre cada bloco com duas perguntas curtas, uma de recordação e uma de comparação/consequência; apresente as respostas sob o subtítulo "Resposta comentada".
+5. FIDELIDADE CONCEITUAL: Todo o embasamento teórico deve vir do material fornecido. Não invente afirmações incompatíveis com a fonte.
+6. DIRETRIZES NACIONAIS: Correlacione condutas com os consensos vigentes do SUS e protocolos clínicos (PCDT), apenas após consolidar os fundamentos.
+7. FECHAMENTO DIDÁTICO: finalize com um caso clínico autossuficiente que exija explicar estrutura, mecanismo e consequência, seguido de 3 a 5 pérolas de prova.
 
 DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
 1. PROIBIÇÃO ABSOLUTA DE DIAGRAMAS EM TEXTO OU ASCII:
@@ -131,21 +133,23 @@ ${content}
 --- FIM DO MATERIAL ---
 
 INSTRUÇÕES DE ESCRITA:
-Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o título H1 e metadados, desenvolvendo as seguintes seções de forma detalhada e técnica:
+Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o título H1 e metadados, desenvolvendo as seguintes seções de forma detalhada e técnica. Não avance para clínica ou tratamento antes de consolidar as três primeiras seções:
 
 # ${cleanTitle}
 **Disciplina:** ${cleanSubject} | **Autor:** ${author} | **Instituição:** ${institution}
 
-## 1. Introdução e Objetivos de Aprendizagem
-## 2. Fisiopatologia, Bases Moleculares e Anatomoclínica (ilustrada com as figuras pertinentes do catálogo)
-## 3. Apresentação Clínica, Semiologia e Diagnóstico Diferencial (com tabela comparativa obrigatória)
-## 4. Abordagem Terapêutica e Farmacologia Aplicada (PCDT / SUS)
-## 5. Avaliação Ativa: Caso Clínico Comentado
-## 6. Pérolas de Prova (ENARE / Revalida)
+## 1. Fundamentos: definição, localização e organização
+## 2. Componentes, relações e função de cada estrutura/conceito
+## 3. Mecanismos: como estrutura e função produzem o fenômeno
+## 4. Causa → alteração → consequência, com correlação clínico-fisiopatológica
+## 5. Recuperação ativa por blocos, com respostas comentadas
+## 6. Aplicação clínica, semiologia e diagnóstico diferencial
+## 7. Conduta e farmacologia aplicada (PCDT / SUS), apenas quando pertinentes
+## 8. Caso clínico comentado e pérolas de prova
 `;
 
     try {
-      const result = await model.generateContent(prompt);
+      const result = await runWithAiLimit(() => model.generateContent(prompt));
       const generatedMarkdown = result.response.text();
 
       // Monta os nomes de arquivo sanitizados para download

@@ -5,6 +5,9 @@ class RelatoriosController {
   async generate(req, res) {
     try {
       const payload = req.body || {};
+      if (typeof payload.content !== 'string' || payload.content.trim().length < 80) {
+        return res.status(400).json({ error: 'Conteúdo textual insuficiente para gerar o relatório.', details: 'Envie content com ao menos 80 caracteres.' });
+      }
       const report = await relatoriosService.generateReport(payload);
       return res.json(report);
     } catch (err) {

@@ -1,4 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { runWithAiLimit } = require('../../shared/ai-limiter');
+
+const MAX_USER_PROMPTS_PER_SESSION = 100;
+const MAX_MESSAGE_CHARS = 6_000;
+const MAX_MATERIAL_CHARS = 120_000;
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -13,6 +18,15 @@ class ChatService {
     this.repository = sessionRepository;
     // Fallback local caso não haja repositório injetado
     this.sessions = new Map();
+  }
+
+  limitHistory(history, maximumUserPrompts = MAX_USER_PROMPTS_PER_SESSION) {
+    const userIndexes = history.reduce((indexes, item, index) => {
+      if (item?.role === 'user') indexes.push(index);
+      return indexes;
+    }, []);
+    if (userIndexes.length <= maximumUserPrompts) return history;
+    return history.slice(userIndexes[userIndexes.length - maximumUserPrompts]);
   }
 
   // Sanitização simplificada focada em extrair palavras-chave médicas limpas
@@ -57,9 +71,16 @@ class ChatService {
     if (!message || !message.trim()) {
       throw new Error('A mensagem do usuário não pode estar vazia.');
     }
+    if (message.length > MAX_MESSAGE_CHARS) {
+      throw new Error(`A mensagem excede o limite de ${MAX_MESSAGE_CHARS} caracteres.`);
+    }
+    if (materialContent && materialContent.length > MAX_MATERIAL_CHARS) {
+      throw new Error(`O material excede o limite de ${MAX_MATERIAL_CHARS} caracteres.`);
+    }
 
     const sId = sessionId || `session_${Date.now()}`;
     const session = this.sessions.get(sId) || { id: sId, history: [] };
+    session.history = this.limitHistory(session.history, MAX_USER_PROMPTS_PER_SESSION - 1);
 
     const isReport = /\b(relat[oó]rio|laudo|parecer|tratado|artigo formal)\b/i.test(message);
     const isBooklet = /\b(apostila\s+de\s+quest[oõ]es|caderno\s+de\s+quest[oõ]es|lista\s+de\s+quest[oõ]es|lista\s+de\s+exerc[ií]cios|exerc[ií]cios|perguntas|quizzes?|flashcards?|simulado|teste|caderno|apostila)\b/i.test(message) &&
@@ -67,14 +88,14 @@ class ChatService {
 
     let systemInstruction = `
 Você é o MedCopilot, tutor médico inteligente da plataforma MedTutor Brasil.
-Seu objetivo é guiar estudantes de medicina com rigor fisiopatológico, raciocínio clínico e foco em condutas práticas (PCDT/SUS e ENARE/Revalida).
+Seu objetivo principal é fazer o estudante COMPREENDER e recuperar o conteúdo: primeiro estrutura, localização, componentes e função; depois mecanismos, causa, alteração e consequência; por último, aplicação clínica. Conduta prática (PCDT/SUS e ENARE/Revalida) é uma aplicação importante, mas não deve substituir os fundamentos.
 
 REGRAS DE CONDUTA:
 1. SE HOUVER MATERIAL FORNECIDO: Suas respostas devem ser 100% ancoradas no conteúdo do material. Se a informação não constar no material, avise educadamente e explique o conceito com base nas diretrizes médicas canônicas.
-2. DIDÁTICA: Explique os mecanismos de causa e efeito (fisiopatologia) antes da conduta.
+2. DIDÁTICA: Quando a pergunta permitir uma explicação completa, use a progressão: (a) o que é/onde está/partes e função, (b) mecanismo e relação causa → alteração → consequência, (c) aplicação clínica. Direcione aproximadamente 65% da explicação aos fundamentos, 25% aos mecanismos e consequências e no máximo 10% a conduta/prova, salvo quando o estudante pedir explicitamente uma decisão clínica urgente.
 3. DIRETO AO PONTO: Responda diretamente ao que o estudante perguntou, sem rodeios ou saudações excessivas.
 4. PROIBIÇÃO ABSOLUTA DE DIAGRAMAS ASCII: É ESTRITAMENTE PROIBIDO desenhar esquemas usando texto, caixas ASCII ("+---+", "|", "--+--"), traços ou setas ("--->", "↓") para representar artérias, vias, lesões ou fluxogramas. Para sínteses anatômicas, relações e síndromes clínicas, utilize EXCLUSIVAMENTE Tabelas Markdown bem estruturadas (| Estrutura / Nível | Relação / Vias Acometidas | Prejuízo / Síndrome Clínica |). A documentação visual oficial será fornecida através de figuras médicas e esquemas anatômicos curados.
-5. PÉROLA PRÁTICA: Finalize sempre com uma "💡 Pérola de Plantão/Prova" com alto valor para provas de residência.
+5. RETENÇÃO ATIVA: Quando fizer sentido, finalize com uma pergunta curta de evocação e uma "💡 Pérola de compreensão" que conecte estrutura, função e consequência. Use pérola de plantão/prova apenas como complemento clínico.
 `;
 
     if (isBooklet) {
@@ -130,13 +151,8 @@ Apresente de 4 a 6 flashcards essenciais no formato estrito:
 O usuário solicitou explicitamente um RELATÓRIO MÉDICO / ACADÊMICO que será emitido em PDF.
 Estruture o documento de forma formal, completa e pronta para impressão/exportação em formato A4:
 - Inicie com Título H1 (#) representativo do caso/tema.
-- Apresente seções completas e detalhadas (H2: ##):
-  ## 1. Introdução, Apresentação Clínica & Objetivos
-  ## 2. Fisiopatologia, Mecanismos Celulares & Microvasculares
-  ## 3. Propedêutica Armada, Tabela Comparativa de Diagnóstico Diferencial & Estratificação de Risco
-  ## 4. Abordagem Terapêutica & Protocolos Clínicos (SUS / PCDT)
-  ## 5. Caso Clínico Comentado & Pérolas de Prova (ENARE / Revalida)
-  ## 6. Referências Bibliográficas Biomédicas Indexadas
+- Apresente seções completas e detalhadas (H2: ##) nesta ordem: 1. Fundamentos: definição, localização e organização; 2. Componentes, relações e função; 3. Mecanismos; 4. Causa → alteração → consequência; 5. Recuperação ativa; 6. Aplicação clínica/semiologia; 7. Manejo apenas quando sustentado pela fonte; 8. Referências.
+- Reserve aproximadamente 65% do texto aos fundamentos, 25% a mecanismos/consequências e no máximo 10% a manejo/prova, exceto quando o próprio material for predominantemente clínico.
 - REGRA VISUAL E EDITORIAL RIGOROSA: É ESTRITAMENTE PROIBIDO desenhar esquemas usando texto, caixas ASCII, traços ou setas (como '|', '--+--', '↓' para representar artérias ou vias). Para sínteses conceituais, utilize EXCLUSIVAMENTE Tabelas Markdown com cabeçalhos bem delineados (| Estrutura | Função / Anastomose | Relevância Clínica |). A documentação visual oficial será integrada diretamente através de figuras médicas de alta definição.
 `;
     }
@@ -173,12 +189,13 @@ Dúvida do aluno: ${message}
     }
 
     try {
-      const result = await chat.sendMessage(promptPayload);
+      const result = await runWithAiLimit(() => chat.sendMessage(promptPayload));
       const replyText = result.response.text();
 
       // Atualiza o histórico no formato esperado pelo SDK do Gemini
       session.history.push({ role: 'user', parts: [{ text: message }] });
       session.history.push({ role: 'model', parts: [{ text: replyText }] });
+      session.history = this.limitHistory(session.history);
       this.sessions.set(sId, session);
 
       const evidence = this.getEvidenceUrls(message, subject);
