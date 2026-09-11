@@ -18,6 +18,21 @@ function areQuestionsTooSimilar(first, second) {
   return intersection / new Set([...a, ...b]).size >= 0.45;
 }
 
+function buildSafeFlashcardTitle(title, correctAnswer, learningFocus) {
+  const candidate = String(title || '').replace(/\s+/g, ' ').trim();
+  const normalize = value => String(value || '').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const normalizedTitle = normalize(candidate);
+  const normalizedAnswer = normalize(correctAnswer);
+  const titleRevealsAnswer = normalizedTitle && normalizedAnswer && (
+    normalizedAnswer.includes(normalizedTitle) || normalizedTitle.includes(normalizedAnswer)
+  );
+  if (candidate.length >= 3 && candidate.length <= 72 && !titleRevealsAnswer) return candidate;
+  if (learningFocus === 'fundamentos') return 'Fundamentos em revisão';
+  if (learningFocus === 'mecanismo_consequencia') return 'Mecanismo em revisão';
+  return 'Aplicação em revisão';
+}
+
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -65,6 +80,10 @@ const questionsSchema = {
         format: "enum",
         enum: ["fundamentos", "mecanismo_consequencia", "aplicacao_clinica"],
         description: "Categoria pedagógica obrigatória da questão"
+      },
+      titulo_flashcard: {
+        type: SchemaType.STRING,
+        description: "Título de contexto do flashcard, com 3 a 7 palavras. Nunca revele resposta, diagnóstico, alternativa correta ou conduta."
       }
     },
     required: [
@@ -74,7 +93,8 @@ const questionsSchema = {
       "texto_resposta_correta",
       "justificativa",
       "perola_clinica",
-      "foco_aprendizagem"
+      "foco_aprendizagem",
+      "titulo_flashcard"
     ]
   }
 };
@@ -131,7 +151,7 @@ Com base nas estruturas anatômicas, vias neurais, síndromes e vascularização
 ${materialText}
 --- FIM DO CONTEÚDO ---
 
-Regras: respeite a distribuição 40% fundamentos, 35% mecanismo_consequencia e 25% aplicacao_clinica, identificando cada item em foco_aprendizagem. Só a última categoria exige vinheta clínica. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença.
+Regras: respeite a distribuição 40% fundamentos, 35% mecanismo_consequencia e 25% aplicacao_clinica, identificando cada item em foco_aprendizagem. Só a última categoria exige vinheta clínica. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use o diagnóstico, a alternativa correta, a conduta ou um dado que resolva a questão.
 ${learningFocus ? `Nesta chamada unitária, gere exclusivamente uma questão de foco_aprendizagem: ${learningFocus}.` : ''}
 ${previousQuestions.length ? `Não repita nem reformule estas questões já aceitas:\n${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 500)}`).join('\n')}` : ''}
 `;
@@ -160,6 +180,8 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
         const cognitiveDomain = resolvedFocus === 'fundamentos'
           ? 'conceitual'
           : (resolvedFocus === 'mecanismo_consequencia' ? 'mecanismo' : 'aplicacao');
+        const correctAnswer = q.texto_resposta_correta || cleanAlternatives[correctIdx] || '';
+        const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer, resolvedFocus);
 
         return {
           id: `q_${Date.now()}_${index + 1}`,
@@ -171,8 +193,8 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
           alternativas: cleanAlternatives,
           gabarito: q.gabarito,
           correctIndex: correctIdx,
-          correctAnswerText: q.texto_resposta_correta || cleanAlternatives[correctIdx] || '',
-          resposta_correta: q.texto_resposta_correta || cleanAlternatives[correctIdx] || '',
+          correctAnswerText: correctAnswer,
+          resposta_correta: correctAnswer,
           justificativa: q.justificativa,
           explanation: q.justificativa,
           perola_clinica: q.perola_clinica,
@@ -181,9 +203,11 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
           difficultyLevel,
           cognitiveLevel: difficultyLevel,
           cognitiveDomain,
+          flashcardTitle,
           flashcard: {
+            title: flashcardTitle,
             front: q.pergunta,
-            back: `${q.texto_resposta_correta || cleanAlternatives[correctIdx]}\n\n💡 Pérola Clínica: ${q.perola_clinica}`
+            back: `${correctAnswer}\n\n💡 Pérola Clínica: ${q.perola_clinica}`
           },
           quizStats: {
             attempts: 0,

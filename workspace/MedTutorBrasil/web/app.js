@@ -856,6 +856,7 @@
                 doenca: q.disease || '',
                 foco_aprendizagem: q.learningFocus || '',
                 nivel_dificuldade: q.difficultyLevel || '',
+                titulo_flashcard: q.flashcardTitle || q.flashcard?.title || '',
                 dominio_cognitivo: q.cognitiveDomain || '',
                 modelo_gerador: q.generatorModel || q.generatorEngine || '',
                 requer_imagem: !!q.requer_imagem,
@@ -1041,6 +1042,7 @@
                   answer: q.answer || q.resposta_correta || '',
                   learningFocus,
                   difficultyLevel,
+                  flashcardTitle: q.flashcardTitle || q.titulo_flashcard || q.flashcard?.title || '',
                   cognitiveDomain: q.cognitiveDomain || q.dominio_cognitivo || (difficultyLevel === 'iniciante' ? 'conceitual' : (difficultyLevel === 'intermediario' ? 'mecanismo' : 'aplicacao')),
                   generatorModel: q.generatorModel || q.modelo_gerador || '',
                   requer_imagem: q.requer_imagem || false
@@ -4935,6 +4937,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           slideName: metadata.materialName || item.slideName || '',
           topic: item.topic || item.learningFocus || 'Conceito do material',
           disease: item.disease || item.learningFocus || 'Conceito do material',
+          flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
           learningFocus,
           difficultyLevel,
           cognitiveLevel: difficultyLevel,
@@ -9650,6 +9653,38 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       return list;
     }
 
+    function resolveFlashcardTitle(item) {
+      const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
+      const genericTitles = new Set([
+        'fundamentos', 'mecanismo consequencia', 'mecanismo_consequencia',
+        'aplicacao clinica', 'aplicacao_clinica', 'conceito do material', 'disciplina'
+      ]);
+      const supplied = clean(item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || item.topic);
+      const normalized = supplied.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      if (supplied && !genericTitles.has(normalized) && supplied.length <= 72) return supplied;
+
+      // Títulos de reserva para cards já existentes: contextualizam sem revelar a resposta.
+      const question = clean(item.flashcard?.front || item.question || item.pergunta).toLowerCase();
+      if (/l[ií]quor|liquido cefalorraquidiano|lcr\b/.test(question)) return 'Interpretação do líquor';
+      if (/mening/.test(question)) return 'Quadro meníngeo';
+      if (/nervo|nervosa|neur/.test(question)) return 'Estruturas e vias nervosas';
+      if (/art[eé]ria|vascular|vaso|circula/.test(question)) return 'Relações vasculares';
+      if (/m[úu]sculo|muscular/.test(question)) return 'Função musculoesquelética';
+
+      const subject = clean(item.subject || '').replace(/^[A-Z]+\d+\s*[-:]?\s*/i, '');
+      const focus = item.learningFocus === 'fundamentos' ? 'Fundamentos em revisão'
+        : (item.learningFocus === 'mecanismo_consequencia' ? 'Mecanismo em revisão' : 'Aplicação em revisão');
+      return subject ? `${focus}: ${subject.slice(0, 42)}` : focus;
+    }
+
+    function getFlashcardDifficultyLabel(item) {
+      const level = item.difficultyLevel || (item.learningFocus === 'fundamentos' ? 'iniciante'
+        : (item.learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
+      if (level === 'iniciante') return 'Iniciante';
+      if (level === 'intermediario') return 'Intermediário';
+      return 'Avançado';
+    }
+
     function updateCardDisplay(filteredList) {
       const baseList = filteredList || getFilteredQuestions();
       const list = getSrsFilteredList(baseList);
@@ -9683,7 +9718,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const frontEl = document.getElementById('fcFrontQuestion');
         const backEl = document.getElementById('fcBackAnswer');
         const countEl = document.getElementById('fcCounter');
+        const difficultyBadge = document.getElementById('fcDifficultyBadge');
         if (countEl) countEl.textContent = 'Fila Vazia';
+        if (difficultyBadge) difficultyBadge.style.display = 'none';
         if (frontEl) frontEl.textContent = '🎉 Todos os flashcards desta fila foram revisados!';
         if (backEl) backEl.innerHTML = 'Parabéns! Seu cérebro consolidou os conceitos desta sessão. Retorne amanhã para a próxima rodada de repetição espaçada.';
         return;
@@ -9697,8 +9734,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const frontEl = document.getElementById('fcFrontQuestion');
       const backEl = document.getElementById('fcBackAnswer');
       const visualBadge = document.getElementById('fcVisualBadge');
+      const difficultyBadge = document.getElementById('fcDifficultyBadge');
 
-      if (tagEl) tagEl.textContent = (item.disease || item.subject).toUpperCase();
+      if (tagEl) tagEl.textContent = resolveFlashcardTitle(item).toUpperCase();
+      if (difficultyBadge) {
+        difficultyBadge.style.display = 'inline-block';
+        difficultyBadge.textContent = getFlashcardDifficultyLabel(item);
+      }
       if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length}${srsQueueFilter !== 'all' ? ' • Fila: ' + srsQueueFilter : ''}`;
       if (frontEl) frontEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.front || item.question || '') : (item.flashcard?.front || item.question || '');
       if (backEl) backEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.back || item.reference_answer || item.answer || '') : (item.flashcard?.back || item.reference_answer || item.answer || '');
@@ -9768,33 +9810,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         aiFeedback.style.display = 'none';
         aiFeedback.innerHTML = '';
       }
-      requestAnimationFrame(updateFlashcardScrollbars);
     }
-
-    function updateFlashcardScrollbars() {
-      document.querySelectorAll('.flashcard-side').forEach(side => {
-        const rail = side.querySelector('.flashcard-scrollbar');
-        const thumb = rail && rail.querySelector('.flashcard-scrollbar-thumb');
-        if (!rail || !thumb) return;
-
-        const visibleHeight = side.clientHeight;
-        const contentHeight = side.scrollHeight;
-        const railHeight = rail.clientHeight;
-        if (!visibleHeight || !railHeight) return;
-
-        const thumbHeight = Math.max(32, Math.min(railHeight, railHeight * (visibleHeight / contentHeight)));
-        const maxScroll = Math.max(1, contentHeight - visibleHeight);
-        const maxOffset = Math.max(0, railHeight - thumbHeight);
-        const offset = maxOffset * (side.scrollTop / maxScroll);
-        thumb.style.height = `${thumbHeight}px`;
-        thumb.style.transform = `translateY(${offset}px)`;
-        rail.classList.toggle('is-scrollable', contentHeight > visibleHeight + 1);
-      });
-    }
-
-    document.querySelectorAll('.flashcard-side').forEach(side => {
-      side.addEventListener('scroll', updateFlashcardScrollbars, { passive: true });
-    });
 
     function deleteCurrentCard() {
       const baseList = getFilteredQuestions();
@@ -9825,7 +9841,6 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function flipCardManual() {
       const fcBox = document.getElementById('flashcardBox');
       if (fcBox) fcBox.classList.toggle('flipped');
-      requestAnimationFrame(updateFlashcardScrollbars);
     }
 
     // Classificação Anki / SM-2 (1: Repetir, 2: Difícil, 3: Bom, 4: Fácil)
@@ -18144,7 +18159,39 @@ Para cada material, retorne um objeto no JSON com:
           ? GEMINI_CONFIG_2026.models
           : ['gemini-3.5-flash'];
 
-        if (apiKey) {
+        // A chave fica exclusivamente no servidor. O chat usa o Gemini do .env
+        // e envia o material selecionado pelo estudante somente com sua autorização.
+        try {
+          const serverMaterial = mainMaterial
+            ? String(mainMaterial.markdownText || mainMaterial.conteudo_md || mainMaterial.text || '').slice(0, 100000)
+            : '';
+          const backendResponse = await fetch('/api/chat/mensagem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: `web_${session.id}`,
+              message: text,
+              materialContent: serverMaterial,
+              subject: evidenceSubject
+            })
+          });
+          const backendPayload = await backendResponse.json();
+          if (!backendResponse.ok || !backendPayload.reply) {
+            throw new Error(backendPayload.details || backendPayload.error || `HTTP ${backendResponse.status}`);
+          }
+          aiGeneratedText = backendPayload.reply;
+          successfulModel = 'Gemini 3.5 Flash (servidor)';
+          console.info('[MedTutor Chat]', {
+            engine: backendPayload.generatorEngine || 'backend-gemini',
+            model: backendPayload.generatorModel || successfulModel,
+            sessionId: backendPayload.sessionId,
+            hasMaterial: Boolean(serverMaterial)
+          });
+        } catch (backendError) {
+          console.warn('[MedTutor Chat] Gemini no servidor indisponível; tentando a configuração local do navegador.', backendError);
+        }
+
+        if (!aiGeneratedText && apiKey) {
           for (const usedModel of candidateModels) {
             try {
               const preferencesDirective = (typeof UserStudyPreferences !== 'undefined') ? UserStudyPreferences.buildSystemPromptContext() : '';

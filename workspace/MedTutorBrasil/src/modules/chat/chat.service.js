@@ -219,6 +219,8 @@ Dúvida do aluno: ${message}
       return {
         sessionId: sId,
         reply: replyText,
+        generatorEngine: 'backend-gemini',
+        generatorModel: process.env.MODEL_CHAT || 'gemini-3.5-flash',
         evidence: evidence.urls,
         isReport,
         reportTitle: isReport ? this.extractReportTitle(message, subject) : null,

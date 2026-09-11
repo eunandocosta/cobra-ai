@@ -15,7 +15,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=20260911-flashcard-scroll-v5">
 </head>
 <body>
 
@@ -409,8 +409,9 @@
                  <!-- Frente -->
                  <div class="flashcard-side front">
                    <div class="card-meta">
-                     <div style="display: flex; align-items: center; gap: 6px;">
+                     <div class="flashcard-meta-items">
                        <span id="fcTag">DISCIPLINA</span>
+                       <span id="fcDifficultyBadge" style="display: none; font-size: 10px; background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-weight: 700;"></span>
                        <span id="fcModelBadge" style="display: none; font-size: 10px; background: rgba(140, 158, 255, 0.15); color: #8c9eff; border: 1px solid rgba(140, 158, 255, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700;">✨ Gemini 3.5 Flash-Lite</span>
                        <span id="fcVisualBadge" style="display: none; font-size: 10px; background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700;">📷 Inspeção Visual</span>
                        <span id="fcRedundancyAlertBadge" style="display: none; font-size: 10px; background: rgba(255, 68, 68, 0.15); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.4); padding: 2px 6px; border-radius: 4px; font-weight: 800; cursor: pointer;" onclick="showCardRedundancyDetails()" title="Clique para auditar card similar (>50%)">⚠️ ! Redundante</span>
@@ -443,7 +444,6 @@
                    <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 10px;" id="flipHint">
                      👆 Toque no botão abaixo ou no card para ver o verso
                    </div>
-                   <div class="flashcard-scrollbar" aria-hidden="true"><div class="flashcard-scrollbar-thumb"></div></div>
                  </div>
 
                 <!-- Verso -->
@@ -475,7 +475,6 @@
                       <div id="srsEasyPreview" style="font-size: 10px; opacity: 0.85;">7 dias</div>
                     </button>
                   </div>
-                  <div class="flashcard-scrollbar" aria-hidden="true"><div class="flashcard-scrollbar-thumb"></div></div>
                 </div>
               </div>
             </div>
@@ -2506,6 +2505,6 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260911-sequential-backend-v2"></script>
+  <script defer src="/app.js?v=20260911-flashcard-title-difficulty-v1"></script>
 </body>
 </html>
