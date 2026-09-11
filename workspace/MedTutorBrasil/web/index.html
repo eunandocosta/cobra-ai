@@ -994,6 +994,9 @@
           <button id="btnProduceReadingFromModal" class="btn-outline-action" style="flex: 1.4; justify-content: center; border-color: var(--neon); color: var(--neon);" onclick="produceReadingFromDriveModal()">
             📖 Produzir Leitura no Chat
           </button>
+          <button class="btn-outline-action" style="flex: 1.25; justify-content: center;" onclick="importDriveAndGenerateReports()">
+            📄 Gerar Relatórios
+          </button>
           <button id="btnImportDriveFiles" class="btn-outline-action primary" style="flex: 1.6; justify-content: center;" onclick="importDriveEligibleFiles()">
             📥 Sincronizar Flashcards & Quizzes (<span id="btnImportCount">7</span>)
           </button>
@@ -1679,6 +1682,13 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
               </span>
             </div>
           </label>
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; user-select: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+            <input type="checkbox" id="importStudyGenerateReportCheckbox" style="margin-top: 3px; width: 16px; height: 16px; accent-color: var(--neon); cursor: pointer;">
+            <div>
+              <span style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); display: block;">Gerar relatório acadêmico exclusivo deste arquivo</span>
+              <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px; line-height: 1.4;">O material será salvo para que o relatório seja baseado somente neste PDF, slide ou texto.</span>
+            </div>
+          </label>
         </div>
 
         <!-- Box Informativo do Reconhecimento por IA -->
@@ -1825,6 +1835,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
 
       <div style="display: flex; gap: 10px; margin-top: 18px;">
         <button class="btn-outline-action" style="flex: 1; justify-content: center;" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action" style="flex: 1.35; justify-content: center;" onclick="promptMaterialDirection(true)">📄 Importar e gerar relatórios</button>
         <button class="btn-outline-action primary" id="btnStartUniversalUpload" style="flex: 1.4; justify-content: center; font-weight: 700;" onclick="promptMaterialDirection()">✨ Processar com IA</button>
       </div>
     </div>

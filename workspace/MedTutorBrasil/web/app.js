@@ -6427,30 +6427,42 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
           chatDriveMaterials = chatDriveMaterials.map(normalizeMaterial);
         }
 
+        // Um relatório é sempre ancorado em UM material. Não permita que um ID
+        // informado caia em um arquivo homônimo: isso misturava aulas distintas.
         const mat = (typeof chatDriveMaterials !== 'undefined')
-          ? chatDriveMaterials.find(m => m.id === materialId || m.name === materialName || m.nome === materialName || m.originalFileName === materialName)
+          ? (materialId
+            ? chatDriveMaterials.find(m => m.id === materialId)
+            : chatDriveMaterials.find(m => m.name === materialName || m.nome === materialName || m.originalFileName === materialName))
           : null;
 
         const effectiveSubject = subjectName || mat?.subject || mat?.disciplina || currentStudySubject || 'Clínica Médica';
         const effectiveTitle = mat?.name || mat?.nome || materialName || effectiveSubject;
         const diseaseTopic = mat?.disease || mat?.doenca || mat?.topic || mat?.materia || effectiveTitle.replace(/\.[^/.]+$/, '');
 
-        // Reúne materiais relevantes da matéria caso material selecionado não possua texto direto ou seja relatório da disciplina
-        let relevantMaterials = [];
-        if (mat && (mat.markdownText || mat.conteudo_md)) {
-          relevantMaterials = [mat];
-        } else {
-          relevantMaterials = (typeof getMaterialsForSubject === 'function') ? getMaterialsForSubject(effectiveSubject) : [];
-        }
-
-        let materialContent = mat?.markdownText || mat?.conteudo_md || mat?.text || '';
-        if (!materialContent && relevantMaterials.length > 0) {
+        // Só relatórios explicitamente solicitados para uma disciplina podem reunir
+        // fontes. Um PDF/slide escolhido nunca pode herdar o texto de outro arquivo.
+        const isIndividualMaterialRequest = Boolean(materialId || mat);
+        const relevantMaterials = !isIndividualMaterialRequest && typeof getMaterialsForSubject === 'function'
+          ? getMaterialsForSubject(effectiveSubject)
+          : [];
+        let materialContent = mat?.markdownText || mat?.conteudo_md || mat?.text || mat?.readingDocText || '';
+        if (!materialContent && !isIndividualMaterialRequest && relevantMaterials.length > 0) {
           materialContent = relevantMaterials.map(m => {
             const mTitle = m.name || m.nome || 'Conteúdo de Aula';
             const mText = m.markdownText || m.conteudo_md || m.text || '';
             return `### ${mTitle}\n\n${mText}`;
           }).join('\n\n---\n\n');
         }
+
+        const sourceIdentity = [
+          `ARQUIVO-FONTE EXCLUSIVO: ${effectiveTitle}`,
+          mat?.originalFileName ? `NOME ORIGINAL: ${mat.originalFileName}` : '',
+          mat?.topic || mat?.disease ? `TEMA DECLARADO: ${mat.topic || mat.disease}` : '',
+          mat?.folderPath ? `LOCAL NO DRIVE: ${mat.folderPath}` : ''
+        ].filter(Boolean).join('\n');
+        // Metadados só orientam a geração quando a extração falhou; jamais são
+        // substituídos pelo conteúdo de outra aula da disciplina.
+        if (!materialContent && sourceIdentity) materialContent = sourceIdentity;
 
         // 1. Busca rigorosa na ementa oficial para garantir ancoragem estrita
         let officialDisciplineInfo = null;
@@ -6487,7 +6499,39 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
 
         // Se online e com API Key disponível, aciona os modelos Gemini com o Motor Pedagógico de Avaliação e Síntese Médica
         // SEM RESTRIÇÃO DE TETO DE GASTOS PARA TEXTOS: priorização total de conclusão e completude 100%
-        if (!forceLocal && apiKey) {
+        // A chave fica somente no servidor local (.env). Prioriza o endpoint local
+        // para que o relatório use Gemini sem expor credenciais no navegador.
+        if (!forceLocal && materialContent.trim().length >= 80) {
+          try {
+            const serverResponse = await fetch('/api/relatorios/gerar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                materialId: mat?.id || materialId,
+                title: effectiveTitle,
+                subject: effectiveSubject,
+                content: `${sourceIdentity}\n\n--- CONTEÚDO EXTRAÍDO DESTE ARQUIVO ---\n${materialContent}`,
+                studentName,
+                medicalSchool
+              })
+            });
+            if (serverResponse.ok) {
+              const serverReport = await serverResponse.json();
+              if (serverReport?.markdown && serverReport.markdown.length > 200) {
+                aiGeneratedArticle = serverReport.markdown;
+                if (typeof AppExpenseTracker !== 'undefined') {
+                  AppExpenseTracker.recordAction({ actionName: `Tratado Acadêmico: ${effectiveTitle}`, model: 'Gemini via servidor local', isLocal: false });
+                }
+              }
+            } else {
+              console.warn('[AcademicReportAgent] Backend de relatórios respondeu', serverResponse.status);
+            }
+          } catch (serverError) {
+            console.warn('[AcademicReportAgent] Backend de relatórios indisponível:', serverError);
+          }
+        }
+
+        if (!forceLocal && !aiGeneratedArticle && apiKey) {
           let evidenceData = null;
           let literatureContextPrompt = '';
           if (typeof ScientificLiteratureService !== 'undefined') {
@@ -6540,7 +6584,10 @@ OUTRAS DIRETRIZES:
    Apresentando as referências em padrão biomédico com links diretos clicáveis e indicando alternativas de leitura para aprofundamento nas bases indexadas.
 ${UserStudyPreferences.buildSystemPromptContext()}`;
 
-              const userPromptText = `CONTEÚDO DO MATERIAL PARA REVISÃO/RELATÓRIO (${effectiveTitle} - ${effectiveSubject}):
+              const userPromptText = `FONTE EXCLUSIVA DESTE RELATÓRIO (não misture com outros arquivos):
+${sourceIdentity}
+
+CONTEÚDO DO MATERIAL PARA REVISÃO/RELATÓRIO (${effectiveTitle} - ${effectiveSubject}):
 """
 ${materialContent.slice(0, 300000)}
 """
@@ -8822,7 +8869,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (typeof showToast === 'function') showToast('✏️ Nome do relatório atualizado.');
     }
 
-    async function openAcademicReportForMaterial(materialName, subjectName) {
+    async function openAcademicReportForMaterial(materialIdOrName, subjectName, displayName = '') {
       const modal = document.getElementById('readerModal');
       const content = document.getElementById('readerModalContent');
       const titleEl = document.getElementById('readerModalTitle');
@@ -8848,8 +8895,12 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       `;
       modal.classList.add('active');
 
+      const selectedMaterial = (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials))
+        ? (chatDriveMaterials.find(m => m.id === materialIdOrName) || chatDriveMaterials.find(m => m.name === materialIdOrName || m.originalFileName === materialIdOrName))
+        : null;
       const rep = await AcademicReportAgent.generateReport({
-        materialName: materialName,
+        materialId: selectedMaterial?.id,
+        materialName: displayName || selectedMaterial?.name || materialIdOrName,
         subjectName: subjectName || currentStudySubject
       });
 
@@ -8866,8 +8917,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     async function openAcademicReportForSubject(subjectName) {
       const mats = (typeof getMaterialsForSubject === 'function') ? getMaterialsForSubject(subjectName) : [];
-      const matName = mats.length > 0 ? mats[0].name : subjectName;
-      await openAcademicReportForMaterial(matName, subjectName);
+      const mat = mats.length > 0 ? mats[0] : null;
+      await openAcademicReportForMaterial(mat?.id || subjectName, subjectName, mat?.name || subjectName);
     }
 
     function printAcademicReport() {
@@ -12697,6 +12748,7 @@ DIRETRIZES CIRÚRGICAS:
       pendingUploadMaterial = null;
       currentConfirmCandidate = null;
       window.activeBatchTargetSemester = null;
+
       closeModals();
       if (processed > 0) {
         showToast(`Processamento finalizado com ${processed} material(is) alocado(s).`);
@@ -12714,6 +12766,15 @@ DIRETRIZES CIRÚRGICAS:
       pendingUploadMaterial = null;
       currentConfirmCandidate = null;
       window.activeBatchTargetSemester = null;
+
+      const reportIds = Array.isArray(window.importedMaterialReportIds) ? window.importedMaterialReportIds.slice() : [];
+      window.importedMaterialReportIds = [];
+      window.generateReportsAfterUpload = false;
+      if (reportIds.length > 0) {
+        // Não bloqueia o término da importação; os relatórios são gerados na fila,
+        // um por arquivo e sempre com seu ID e conteúdo próprios.
+        setTimeout(() => generateImportedMaterialReports(reportIds), 0);
+      }
     }
 
     function toggleConfirmSubjectAccordion() {
@@ -12880,6 +12941,10 @@ DIRETRIZES CIRÚRGICAS:
       }
 
       chatDriveMaterials.unshift(newMaterial);
+      if (window.generateReportsAfterUpload) {
+        window.importedMaterialReportIds = Array.isArray(window.importedMaterialReportIds) ? window.importedMaterialReportIds : [];
+        window.importedMaterialReportIds.push(newMaterial.id);
+      }
       if (typeof sortChatDriveMaterialsInLearningOrder === 'function') {
         sortChatDriveMaterialsInLearningOrder();
       }
@@ -12948,6 +13013,26 @@ DIRETRIZES CIRÚRGICAS:
         const modeStr = (mode === 'auto' || mode === 'suggested') ? '🎯 Sugestão Inteligente' : '📂 Seleção Manual';
         showToast(`${modeStr}: "${finalTitle}" alocado com sucesso em "${finalSubject}"!`);
       }
+    }
+
+    async function generateImportedMaterialReports(materialIds) {
+      const uniqueIds = [...new Set((materialIds || []).filter(Boolean))];
+      if (!uniqueIds.length) return;
+      showToast(`📄 Gerando ${uniqueIds.length} relatório${uniqueIds.length > 1 ? 's' : ''}, um por material...`, 3000);
+      let completed = 0;
+      for (const materialId of uniqueIds) {
+        const material = chatDriveMaterials.find(m => m.id === materialId);
+        if (!material) continue;
+        try {
+          await AcademicReportAgent.generateReport({ materialId: material.id, materialName: material.name, subjectName: material.subject });
+          completed++;
+        } catch (error) {
+          console.warn('[Relatórios após importação] Falha para', material.name, error);
+        }
+      }
+      showToast(completed === uniqueIds.length
+        ? `✅ ${completed} relatório${completed > 1 ? 's' : ''} exclusivo${completed > 1 ? 's' : ''} gerado${completed > 1 ? 's' : ''}. Abra cada material e clique em “Relatório”.`
+        : `⚠️ ${completed} de ${uniqueIds.length} relatórios foram gerados. Confira o servidor Gemini e tente novamente os restantes.`, 5000);
     }
 
     /**
@@ -13076,7 +13161,10 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
     }
     window.translateMaterialToMarkdownWithAI = translateMaterialToMarkdownWithAI;
 
-    async function promptMaterialDirection() {
+    async function promptMaterialDirection(generateReports = false) {
+      // Mantém a intenção para cada item da fila, inclusive uploads múltiplos.
+      window.generateReportsAfterUpload = Boolean(generateReports);
+      if (generateReports) window.importedMaterialReportIds = [];
       const drivePanel = document.getElementById('universalUploadPanelDrive');
       const driveInput = document.getElementById('universalDriveUrlInput');
       const driveUrl = driveInput ? driveInput.value.trim() : '';
@@ -14618,6 +14706,12 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
     }
 
     let pendingDriveImportFiles = [];
+
+    function importDriveAndGenerateReports() {
+      window.generateReportsAfterUpload = true;
+      window.importedMaterialReportIds = [];
+      importDriveEligibleFiles();
+    }
 
     function importDriveEligibleFiles() {
       const filesPool = (typeof window !== 'undefined' && window.scannedDriveFiles && window.scannedDriveFiles.length > 0) ? window.scannedDriveFiles : scannedDriveFiles;
@@ -16813,7 +16907,7 @@ Para cada material, retorne um objeto no JSON com:
               </div>
               <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                 <!-- BOTÃO DE RELATÓRIO ACADÊMICO FORMAL (ARTIGO & PROVA) -->
-                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="closeModals(); openAcademicReportForMaterial('${m.name.replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Gerar e Ler Relatório em Formato de Artigo Acadêmico & Fixação TDAH">
+                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="closeModals(); openAcademicReportForMaterial('${(m.id || m.name).replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}', '${m.name.replace(/'/g, "\\'")}')" title="Gerar e Ler Relatório exclusivo deste arquivo">
                   📄 Relatório Acadêmico
                 </button>
                 <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openGenerateStudyModal('${m.name.replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Gerar Quiz e Flashcard direcionados deste slide">
@@ -20187,6 +20281,7 @@ Linha 04: __________________________________________________
       }
 
       const saveAsMaterial = document.getElementById('importStudySaveAsMaterialCheckbox')?.checked || false;
+      const generateIndividualReport = document.getElementById('importStudyGenerateReportCheckbox')?.checked || false;
 
       // Inicia exibição de progresso
       const progressBox = document.getElementById('importStudyProgressBox');
@@ -20246,7 +20341,8 @@ Linha 04: __________________________________________________
       if (progDetail) progDetail.textContent = 'Indexando no banco de estudos...';
 
       // 4. Trata o salvamento ou não na seção de Materiais do Aluno
-      if (saveAsMaterial) {
+      let importedStudyMaterial = null;
+      if (saveAsMaterial || generateIndividualReport) {
         // Aluno optou por salvar na biblioteca de materiais
         const newMaterial = {
           id: 'mat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
@@ -20272,6 +20368,7 @@ Linha 04: __________________________________________________
           }
           saveChatDriveMaterials();
         }
+        importedStudyMaterial = newMaterial;
       } else {
         // Aluno optou por NÃO salvar na biblioteca de materiais:
         // Mantém chatDriveMaterials intocado!
@@ -20373,11 +20470,15 @@ Linha 04: __________________________________________________
         typeDesc = '⚡ Material Misto (Teoria + Questões)';
       }
 
-      const matStatusMsg = saveAsMaterial 
+      const matStatusMsg = (saveAsMaterial || generateIndividualReport)
         ? 'Arquivo salvo na biblioteca de materiais.' 
         : 'Arquivo NÃO adicionado à biblioteca de materiais (estudo direto).';
 
       showToast(`🎉 ${typeDesc}: ${reusedCount} reaproveitadas + ${genCount} formuladas por IA! ${matStatusMsg}`);
+
+      if (generateIndividualReport && importedStudyMaterial) {
+        await openAcademicReportForMaterial(importedStudyMaterial.id, targetSubject, importedStudyMaterial.name);
+      }
     }
 
     /**
@@ -20931,7 +21032,10 @@ ${textSample}
               <span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• ${file.topic}</span>
             </div>
           </div>
-          <button class="btn-outline-action danger" style="padding: 2px 7px; font-size: 11px; margin-left: 6px; flex-shrink: 0; border-radius: 6px;" onclick="event.stopPropagation(); deleteMaterialFromSubject('${(file.id || file.name).replace(/'/g, "\\'")}', '${(file.subject || '').replace(/'/g, "\\'")}')" title="Excluir este conteúdo da matéria">🗑️</button>
+          <div style="display: flex; gap: 5px; margin-left: 6px; flex-shrink: 0;">
+            <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px; border-radius: 6px;" onclick="event.stopPropagation(); openAcademicReportForMaterial('${(file.id || file.name).replace(/'/g, "\\'")}', '${(file.subject || '').replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}')" title="Gerar relatório exclusivo deste PDF ou slide">📄 Relatório</button>
+            <button class="btn-outline-action danger" style="padding: 2px 7px; font-size: 11px; border-radius: 6px;" onclick="event.stopPropagation(); deleteMaterialFromSubject('${(file.id || file.name).replace(/'/g, "\\'")}', '${(file.subject || '').replace(/'/g, "\\'")}')" title="Excluir este conteúdo da matéria">🗑️</button>
+          </div>
         `;
         container.appendChild(item);
       });
