@@ -3208,6 +3208,40 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return union === 0 ? 0.0 : (intersection / union);
     }
 
+    function getStudyAnswerForComparison(item) {
+      if (!item) return '';
+      const options = Array.isArray(item.quizOptions || item.alternativas) ? (item.quizOptions || item.alternativas) : [];
+      const indexedAnswer = Number.isInteger(item.correctIndex) ? options[item.correctIndex] : '';
+      return item.correctAnswerText || item.resposta_correta || item.reference_answer || item.answer || indexedAnswer || item.flashcard?.back || item.explanation || '';
+    }
+
+    function calculateAnswerSimilarity(first, second) {
+      const normalizedFirst = normalizeString(first);
+      const normalizedSecond = normalizeString(second);
+      if (normalizedFirst.length < 3 || normalizedSecond.length < 3) return 0;
+      if (normalizedFirst === normalizedSecond) return 1;
+      const firstTokens = new Set(extractKeywords(normalizedFirst));
+      const secondTokens = new Set(extractKeywords(normalizedSecond));
+      if (!firstTokens.size || !secondTokens.size) return 0;
+      const shared = [...firstTokens].filter(token => secondTokens.has(token)).length;
+      // A cobertura da menor resposta detecta "Tálamo" versus uma explicação
+      // longa sobre o tálamo, sem depender de enunciados parecidos.
+      return Math.max(calculateLocalSimilarity(normalizedFirst, normalizedSecond), shared / Math.min(firstTokens.size, secondTokens.size));
+    }
+
+    function evaluateStudyItemDuplicate(first, second) {
+      const questionScore = calculateLocalSimilarity(first?.question || first?.pergunta || first?.flashcard?.front || '', second?.question || second?.pergunta || second?.flashcard?.front || '');
+      const answerScore = calculateAnswerSimilarity(getStudyAnswerForComparison(first), getStudyAnswerForComparison(second));
+      const sameAnswer = answerScore >= 0.85;
+      return {
+        isRedundant: sameAnswer || questionScore >= 0.82,
+        score: Math.max(questionScore, answerScore),
+        questionScore,
+        answerScore,
+        basis: sameAnswer ? 'mesma resposta' : 'enunciado muito semelhante'
+      };
+    }
+
     function evaluateRedundancy(candidateText) {
       let maxScore = 0.0;
       let matched = null;
@@ -3234,26 +3268,27 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         return { isRedundant: false, score: 0, percentage: 0, matchedCard: null };
       }
 
-      const cardQuestion = card.flashcard?.front || card.front || card.question || '';
       const cardSubject = normalizeString(card.subject || '');
       let maxScore = 0.0;
       let matched = null;
+      let matchedComparison = null;
 
       for (const other of allCards) {
         if (other.id === card.id) continue;
         if (cardSubject && normalizeString(other.subject || '') !== cardSubject) continue;
-        const otherQuestion = other.flashcard?.front || other.front || other.question || '';
-        const score = calculateLocalSimilarity(cardQuestion, otherQuestion);
-        if (score > maxScore) {
-          maxScore = score;
+        const comparison = evaluateStudyItemDuplicate(card, other);
+        if ((comparison.isRedundant && !matchedComparison?.isRedundant) || comparison.score > maxScore) {
+          maxScore = comparison.score;
           matched = other;
+          matchedComparison = comparison;
         }
       }
 
       return {
-        isRedundant: maxScore >= 0.82, // Só sinaliza cópias quase idênticas, não temas relacionados.
+        isRedundant: !!matchedComparison?.isRedundant,
         score: maxScore,
         percentage: Math.round(maxScore * 100),
+        basis: matchedComparison?.basis || '',
         matchedCard: matched
       };
     }
@@ -10178,8 +10213,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         item.redundancyInfo = redCheck;
         if (redCheck.isRedundant) {
           redBadge.style.display = 'inline-flex';
-          redBadge.textContent = `⚠️ ! Redundante (${redCheck.percentage}%)`;
-          redBadge.title = `Card com ${redCheck.percentage}% de similaridade com outro card existente. Clique para auditar.`;
+          redBadge.textContent = `⚠️ Redundante (${redCheck.percentage}% • ${redCheck.basis || 'semelhança alta'})`;
+          redBadge.title = `Card com ${redCheck.percentage}% de similaridade por ${redCheck.basis || 'conteúdo'} com outro card existente. Clique para auditar.`;
         } else {
           redBadge.style.display = 'none';
         }
@@ -11359,9 +11394,9 @@ Retorne EXCLUSIVAMENTE um JSON:
         for (let j = i + 1; j < questions.length; j++) {
           const qA = questions[i];
           const qB = questions[j];
-          const sim = calculateLocalSimilarity(qA.question, qB.question);
-          if (sim >= 0.82) {
-            pairs.push({ qA, qB, score: Math.round(sim * 100) });
+          const comparison = evaluateStudyItemDuplicate(qA, qB);
+          if (comparison.isRedundant) {
+            pairs.push({ qA, qB, score: Math.round(comparison.score * 100), basis: comparison.basis });
             redundantIds.add(qB.id);
           }
         }
@@ -11413,13 +11448,13 @@ Retorne EXCLUSIVAMENTE um JSON:
       } else {
         html += `
           <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">
-            Pares com Sobreposição Detectada:
+            Pares com Gabarito ou Enunciado Repetido:
           </div>
           <div style="display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
             ${pairs.map((p, idx) => `
               <div style="background: var(--bg-surface); border: 1px solid rgba(255, 68, 68, 0.3); border-radius: 10px; padding: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                  <span style="font-size: 11px; font-weight: 700; color: var(--danger);">Par #${idx + 1} • ${p.score}% de Sobreposição</span>
+                  <span style="font-size: 11px; font-weight: 700; color: var(--danger);">Par #${idx + 1} • ${p.score}% de semelhança • ${p.basis}</span>
                   <button class="btn-outline-action danger" style="padding: 3px 8px; font-size: 11px;" onclick="deleteDuplicateQuestion('${p.qB.id}', '${targetSubject.replace(/'/g, "\\'")}')">
                     🗑️ Excluir Cópia
                   </button>
@@ -11429,6 +11464,9 @@ Retorne EXCLUSIVAMENTE um JSON:
                 </div>
                 <div style="font-size: 12px; color: var(--text-secondary);">
                   <span style="color: var(--warning); font-weight: 700;">Questão B (Sobreposta):</span> ${p.qB.question}
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 7px;">
+                  <strong>Resposta compartilhada:</strong> ${escapeHtml(String(getStudyAnswerForComparison(p.qA)).slice(0, 180))}
                 </div>
               </div>
             `).join('')}
