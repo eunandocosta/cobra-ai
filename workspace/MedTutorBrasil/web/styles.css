@@ -5724,6 +5724,34 @@
       word-break: normal;
     }
 
+    /* Tabelas geradas pela IA: o cabeçalho funciona como índice; todo conteúdo
+       do corpo usa uma superfície uniforme, escura e legível em qualquer tela. */
+    .doc-table td,
+    .academic-article-container .doc-table td,
+    .study-rich-text .doc-table td,
+    .chat-bubble .doc-table td,
+    .flashcard-side .doc-table td,
+    .quiz-box .doc-table td,
+    .question-discussion-answer .doc-table td,
+    .question-discussion-context .doc-table td {
+      background: #071b35;
+      color: #ffffff;
+      border-color: #244a70;
+    }
+
+    .doc-table tr:nth-child(even) td,
+    .academic-article-container .doc-table tr:nth-child(even) td,
+    .doc-table tr:hover td,
+    .academic-article-container .doc-table tr:hover td {
+      background: #071b35;
+      color: #ffffff;
+    }
+
+    .doc-table td *,
+    .academic-article-container .doc-table td * {
+      color: inherit;
+    }
+
     @media (display-mode: standalone) {
       .pwa-boot-splash {
         position: fixed;
