@@ -1401,7 +1401,11 @@
       // Upload de Imagem Clínica WebP para o Firebase Storage
       async uploadClinicalImage(imageSource, materialId, imgIndex) {
         const uid = this.getUserId();
-        const fileName = `${materialId || 'aula'}_fig_${imgIndex || 0}.webp`;
+        const imageMime = typeof imageSource === 'string' && imageSource.startsWith('data:')
+          ? (imageSource.match(/^data:([^;,]+)/i)?.[1] || 'image/webp')
+          : (imageSource?.type || 'image/webp');
+        const extension = imageMime.includes('png') ? 'png' : (imageMime.includes('jpeg') ? 'jpg' : 'webp');
+        const fileName = `${materialId || 'aula'}_fig_${imgIndex || 0}.${extension}`;
         const storagePath = `usuarios/${uid}/imagens_aulas/${fileName}`;
 
         if (firebaseStorage && isFirebaseCloudActive) {
@@ -1419,7 +1423,7 @@
               }
               uploadBlob = new Blob([ab], { type: mimeString });
             }
-            const snapshot = await storageRef.put(uploadBlob, { contentType: 'image/webp' });
+            const snapshot = await storageRef.put(uploadBlob, { contentType: imageMime });
             const downloadUrl = await snapshot.ref.getDownloadURL();
             console.log(`[Firebase Storage] Imagem clínica salva em ${storagePath} -> ${downloadUrl}`);
             return downloadUrl;
@@ -3573,6 +3577,137 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         compressedSizeKB,
         reductionPercent
       };
+    }
+
+    async function getImageDimensions(src) {
+      return new Promise(resolve => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.naturalWidth || image.width || 0, height: image.naturalHeight || image.height || 0 });
+        image.onerror = () => resolve({ width: 0, height: 0 });
+        image.src = src;
+      });
+    }
+
+    // PDF.js renderiza páginas como WebP. Para PDFs, uma página é a unidade visual
+    // mais fiel: preserva figuras, esquemas, lâminas e suas respectivas legendas.
+    async function extractPdfVisualPages(file, limit = 10) {
+      if (!window.pdfjsLib || typeof file?.arrayBuffer !== 'function') return [];
+      const buffer = await file.arrayBuffer();
+      if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const total = Math.min(pdf.numPages || 0, limit);
+      const images = [];
+      for (let pageNumber = 1; pageNumber <= total; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 1.2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) continue;
+        await page.render({ canvasContext: context, viewport }).promise;
+        images.push({
+          id: `pdf-page-${pageNumber}`,
+          title: `Página ${pageNumber} do material`,
+          clinicalLabel: `Página ilustrada ${pageNumber}`,
+          page: pageNumber,
+          width: canvas.width,
+          height: canvas.height,
+          originalSizeKB: Math.round((canvas.width * canvas.height * 3) / 1024),
+          src: canvas.toDataURL('image/webp', 0.82)
+        });
+      }
+      return images;
+    }
+
+    // Slides PPTX são ZIPs: lê somente ppt/media/* no navegador, sem enviar o
+    // arquivo bruto a terceiros. Suporta as entradas compactadas mais comuns.
+    async function extractPptxEmbeddedImages(file, limit = 12) {
+      if (typeof file?.arrayBuffer !== 'function') return [];
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      let eocd = -1;
+      for (let index = bytes.length - 22; index >= Math.max(0, bytes.length - 65557); index--) {
+        if (view.getUint32(index, true) === 0x06054b50) { eocd = index; break; }
+      }
+      if (eocd < 0) return [];
+      const entries = view.getUint16(eocd + 10, true);
+      let cursor = view.getUint32(eocd + 16, true);
+      const decoder = new TextDecoder();
+      const images = [];
+      for (let entry = 0; entry < entries && cursor + 46 <= bytes.length && images.length < limit; entry++) {
+        if (view.getUint32(cursor, true) !== 0x02014b50) break;
+        const compression = view.getUint16(cursor + 10, true);
+        const compressedSize = view.getUint32(cursor + 20, true);
+        const nameLength = view.getUint16(cursor + 28, true);
+        const extraLength = view.getUint16(cursor + 30, true);
+        const commentLength = view.getUint16(cursor + 32, true);
+        const localOffset = view.getUint32(cursor + 42, true);
+        const name = decoder.decode(bytes.slice(cursor + 46, cursor + 46 + nameLength));
+        cursor += 46 + nameLength + extraLength + commentLength;
+        if (!/^ppt\/media\/[^/]+\.(?:png|jpe?g|webp|gif)$/i.test(name) || localOffset + 30 > bytes.length) continue;
+        if (view.getUint32(localOffset, true) !== 0x04034b50) continue;
+        const localNameLength = view.getUint16(localOffset + 26, true);
+        const localExtraLength = view.getUint16(localOffset + 28, true);
+        const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+        const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+        let raw = compressed;
+        if (compression === 8 && typeof DecompressionStream !== 'undefined') {
+          const stream = new DecompressionStream('deflate-raw');
+          const writer = stream.writable.getWriter();
+          await writer.write(compressed);
+          await writer.close();
+          raw = new Uint8Array(await new Response(stream.readable).arrayBuffer());
+        } else if (compression !== 0) {
+          continue;
+        }
+        const extension = name.split('.').pop().toLowerCase();
+        const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : (extension === 'gif' ? 'image/gif' : (extension === 'webp' ? 'image/webp' : 'image/png'));
+        const dataUrl = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(new Blob([raw], { type: mime }));
+        });
+        if (!dataUrl) continue;
+        const dimensions = await getImageDimensions(dataUrl);
+        images.push({ id: `pptx-${entry}`, title: name.split('/').pop(), clinicalLabel: 'Imagem extraída do slide', width: dimensions.width, height: dimensions.height, originalSizeKB: Math.round(raw.length / 1024), src: dataUrl });
+      }
+      return images;
+    }
+
+    async function extractOriginalDocumentImages(file) {
+      const filename = String(file?.name || '').toLowerCase();
+      try {
+        if (file?.type === 'application/pdf' || filename.endsWith('.pdf')) return await extractPdfVisualPages(file);
+        if (/\.pptx?$/.test(filename)) return await extractPptxEmbeddedImages(file);
+      } catch (error) {
+        console.warn('[Imagens do material] Não foi possível extrair as figuras originais:', error);
+      }
+      return [];
+    }
+
+    async function attachOriginalDocumentImages(material, sourceFile) {
+      if (!material || !sourceFile) return;
+      const rawImages = await extractOriginalDocumentImages(sourceFile);
+      const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages.slice(0, 10);
+      if (!selectedImages.length) return;
+      const uploadedImages = [];
+      for (let index = 0; index < selectedImages.length; index++) {
+        const image = selectedImages[index];
+        const url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
+        if (!/^https?:\/\//i.test(url || '')) continue; // Nunca grava Base64 no Markdown/Firestore
+        uploadedImages.push({ ...image, imageUrl: url, thumbnailUrl: url, source: 'PDF/slide enviado pelo estudante' });
+      }
+      if (!uploadedImages.length) return;
+      material.clinicalImages = uploadedImages;
+      material.markdownText = `${material.markdownText || material.text || ''}\n\n## Figuras do Material Original\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Figura ${index + 1}`}](${image.imageUrl})\n*Figura ${index + 1}: extraída do PDF/slide enviado pelo estudante.*`).join('\n\n')}`;
+      material.text = material.markdownText;
+      await saveChatDriveMaterials();
+      if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
+      console.info(`[Imagens do material] ${uploadedImages.length} figura(s) original(is) vinculada(s) a ${material.name}.`);
     }
 
       /**
@@ -14581,6 +14716,13 @@ DIRETRIZES CIRÚRGICAS:
         sortChatDriveMaterialsInLearningOrder();
       }
       saveChatDriveMaterials();
+      // O salvamento textual não espera a extração visual: a interface permanece
+      // responsiva e as figuras originais são anexadas assim que terminarem.
+      if (currentMat.file) {
+        attachOriginalDocumentImages(newMaterial, currentMat.file).catch(error => {
+          console.warn('[Imagens do material] Falha ao anexar imagens originais:', error);
+        });
+      }
 
       // Posta automaticamente no Chat do Tutor a apostila gerada
       const flow = document.getElementById('chatFlow');
@@ -19513,6 +19655,18 @@ Para cada material, retorne um objeto no JSON com:
           continue;
         }
 
+        // Imagens Markdown vindas do próprio PDF/slide. Aceita somente URLs
+        // HTTP(S) já persistidas no Storage; dados Base64 nunca são renderizados.
+        const markdownImage = line.trim().match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/i);
+        if (markdownImage) {
+          if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+          const alt = escapeHtml(markdownImage[1] || 'Figura do material');
+          const url = escapeHtml(markdownImage[2]);
+          html += `<figure class="material-original-figure"><img src="${url}" alt="${alt}" loading="lazy"><figcaption>${alt}</figcaption></figure>`;
+          i++;
+          continue;
+        }
+
         // 1. Títulos Markdown (H1 até H5)
         if (line.startsWith('##### ')) {
           if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
@@ -22228,6 +22382,11 @@ Linha 04: __________________________________________________
             sortChatDriveMaterialsInLearningOrder();
           }
           saveChatDriveMaterials();
+          if (pendingImportStudyFile) {
+            attachOriginalDocumentImages(newMaterial, pendingImportStudyFile).catch(error => {
+              console.warn('[Imagens do material] Falha ao anexar imagens da importação:', error);
+            });
+          }
         }
         importedStudyMaterial = newMaterial;
       } else {
