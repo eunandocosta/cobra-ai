@@ -3797,6 +3797,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     async function attachOriginalDocumentImages(material, sourceFile, visualAssociations = [], sourceImages = null) {
       if (!material || !sourceFile) return;
       const rawImages = Array.isArray(sourceImages) ? sourceImages : await extractOriginalDocumentImages(sourceFile);
+      material.sourceImageCount = rawImages.length;
       const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages.slice(0, 10);
       if (!selectedImages.length) return;
       const uploadedImages = [];
@@ -3820,7 +3821,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           source: 'PDF/slide enviado pelo estudante'
         });
       }
-      if (!uploadedImages.length) return;
+      if (!uploadedImages.length) {
+        material.imagePersistenceError = `${selectedImages.length} imagem(ns) extraída(s), mas nenhuma recebeu URL persistida no Firebase Storage.`;
+        console.warn('[Imagens do material]', material.imagePersistenceError);
+        return;
+      }
       material.clinicalImages = uploadedImages;
       material.visualAssociations = visualAssociations;
       material.markdownText = `${material.markdownText || material.text || ''}\n\n## Figuras do Material Original\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Figura ${index + 1}`}](${image.imageUrl})\n*Figura ${index + 1}: extraída do PDF/slide enviado pelo estudante.*${image.visualAssociation ? `\n\n**Associação didática:** ${image.visualAssociation}` : ''}${image.studyQuestion ? `\n\n**Pergunta de recuperação:** ${image.studyQuestion}` : ''}`).join('\n\n')}`;
@@ -3914,8 +3919,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         if (typeof AppExpenseTracker !== 'undefined' && associations.length) {
           AppExpenseTracker.recordAction({ actionName: `Associação visual: ${material.name}`, model: 'Gemini via servidor local', isLocal: false });
         }
-        reportUploadDiagnostic(material, 'sucesso');
-        showToast(associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.');
+        const uploadStatus = material.imagePersistenceError ? 'parcial' : 'sucesso';
+        reportUploadDiagnostic(material, uploadStatus);
+        showToast(material.imagePersistenceError
+          ? `⚠️ Gemini analisou ${associations.length} figura(s), mas o Firebase Storage não persistiu as imagens. Veja o terminal.`
+          : (associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.'));
       } catch (error) {
         console.error('[Associação visual] Falha no upload universal:', error);
         try {
@@ -3932,10 +3940,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       if (typeof fetch !== 'function' || !material) return;
       const inputChars = Number(material.uploadInputChars) || String(material.readingDocText || material.text || '').length;
       const outputChars = String(material.markdownText || material.text || '').length;
+      const imagesPersisted = Array.isArray(material.clinicalImages) ? material.clinicalImages.length : 0;
+      const imagesCollected = Number(material.sourceImageCount) || imagesPersisted;
       const aiEngine = material.visualAssociationAuthorized
         ? 'Gemini via servidor local (associação visual)'
         : (material.aiEngine || 'Motor local (sem chamada Gemini confirmada)');
-      const payload = { status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected: Array.isArray(material.clinicalImages) ? material.clinicalImages.length : 0 };
+      const payload = { status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected, imagesPersisted, storageStatus: material.imagePersistenceError || (imagesPersisted ? 'persistido no Firebase Storage' : 'coleta pendente') };
       console.info('[Upload MedTutor] Enviando diagnóstico operacional:', payload);
       fetch('/api/diagnostics/upload', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,

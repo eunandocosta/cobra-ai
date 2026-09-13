@@ -65,6 +65,8 @@ app.post('/api/diagnostics/upload', (req, res) => {
     caracteresLidos: Math.max(0, Math.min(Number(body.inputChars) || 0, 100_000_000)),
     caracteresGerados: Math.max(0, Math.min(Number(body.outputChars) || 0, 100_000_000)),
     imagensColetadas: Math.max(0, Math.min(Number(body.imagesCollected) || 0, 1000)),
+    imagensPersistidas: Math.max(0, Math.min(Number(body.imagesPersisted) || 0, 1000)),
+    armazenamento: String(body.storageStatus || 'não informado').replace(/[\r\n]+/g, ' ').slice(0, 180),
     at: new Date().toISOString()
   };
   const icon = safe.status === 'sucesso' ? '✅' : (safe.status === 'iniciando' ? '📥' : (safe.status === 'processando' ? '⏳' : (safe.status === 'texto_extraido' ? '📄' : '⚠️')));
