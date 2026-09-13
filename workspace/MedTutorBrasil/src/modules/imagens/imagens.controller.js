@@ -40,7 +40,15 @@ class ImagensController {
       if (!image || typeof image.data !== 'string' || typeof image.mimeType !== 'string') {
         return res.status(400).json({ error: 'Imagem visual válida é obrigatória.' });
       }
+      const diagnostic = {
+        arquivo: String(fileName || 'Material visual').slice(0, 180),
+        pagina: Number(page) || 1,
+        modelo: process.env.MODEL_REASONING || 'gemini-3.7-flash',
+        bytesImagem: Math.round((image.data.length * 3) / 4)
+      };
+      console.log('🧠 [Gemini Visual] Iniciando análise autorizada:', diagnostic);
       const association = await imagensService.analyzeVisualAssociation({ image, fileName, subject, page });
+      console.log('✅ [Gemini Visual] Análise concluída:', { ...diagnostic, materialVisual: association.isVisualStudyMaterial, estruturas: association.visibleStructures.length });
       return res.json({ success: true, association });
     } catch (err) {
       console.error('❌ [ImagensController] Erro na associação visual:', err);

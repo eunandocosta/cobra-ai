@@ -3845,6 +3845,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     async function analyzeVisualMaterialAssociations(sourceFile, metadata = {}) {
       const rawImages = (await extractOriginalDocumentImages(sourceFile)).slice(0, 6);
       const associations = [];
+      console.info(`[Gemini Visual] Análise autorizada para ${rawImages.length} imagem(ns) de "${metadata.fileName || sourceFile?.name || 'material'}".`);
       for (let index = 0; index < rawImages.length; index++) {
         try {
           const image = await makeVisionSafeImage(rawImages[index].src);
@@ -3853,7 +3854,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image, fileName: metadata.fileName, subject: metadata.targetSubject, page: rawImages[index].page || index + 1 })
           });
-          if (!response.ok) continue;
+          if (!response.ok) {
+            console.warn(`[Gemini Visual] O servidor recusou a imagem ${index + 1}: HTTP ${response.status}.`);
+            continue;
+          }
           const payload = await response.json();
           if (payload?.association?.isVisualStudyMaterial) {
             associations.push({
@@ -3866,6 +3870,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           console.warn('[Associação visual] Não foi possível interpretar a imagem', index + 1, error);
         }
       }
+      console.info(`[Gemini Visual] ${associations.length} associação(ões) aproveitada(s) pelo material.`);
       return associations;
     }
 
@@ -3883,6 +3888,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       }
       try {
         showToast('🧠 Gemini está interpretando as páginas visuais do material...');
+        reportUploadDiagnostic({
+          ...material,
+          aiEngine: 'Gemini via servidor local (análise visual autorizada)'
+        }, 'processando');
         const associations = await analyzeVisualMaterialAssociations(sourceFile, { fileName: material.originalFileName || material.name, targetSubject: material.subject });
         material.visualAssociations = associations;
         const visualMarkdown = buildVisualAssociationsMarkdown(associations);
