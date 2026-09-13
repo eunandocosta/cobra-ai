@@ -177,6 +177,7 @@ DIRETRIZES FUNDAMENTAIS:
 4. PROIBIDO usar palavras como: "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
 5. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido.
 6. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
+7. COBERTURA ESTRUTURAL DO MARKDOWN: Quando o material for extenso ou estruturado em títulos (#, ##), listas, tabelas comparativas ou critérios diagnósticos, distribua as questões de forma equilibrada por toda a extensão do documento (início, meio e fim). Não concentre as perguntas apenas nas seções iniciais. Explore ativamente relações, classificações e diferenciações descritas nas tabelas e seções conceituais distintas.
 `;
 
 class QuizzesService {
@@ -246,7 +247,7 @@ Antes de redigir, analise essas questões autorais. Priorize reaproveitar seu ob
 ${materialText}
 --- FIM DO CONTEÚDO ---
 
-Regras: selecione um trecho diferente e verificável do conteúdo para cada questão. Em nível iniciante, cobre reconhecimento, definição, partes, localização, relação ou função que estejam escritos na fonte, em linguagem direta. Em nível intermediário, peça comparação ou relação que a própria fonte permita concluir. Em nível avançado, aumente a integração sem inserir dados externos; uma situação clínica só é permitida se estiver presente na fonte. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use a resposta correta ou um dado que resolva a questão. A justificativa e o ponto-chave devem permanecer estritamente dentro da fonte.
+Regras: selecione trechos diferentes e verificáveis do conteúdo para cada questão, distribuindo a seleção proporcionalmente por toda a extensão do material (início, meio e fim), contemplando diferentes tópicos de títulos (#, ##), critérios diagnósticos e tabelas comparativas presentes no Markdown. Em nível iniciante, cobre reconhecimento, definição, partes, localização, relação ou função que estejam escritos na fonte, em linguagem direta. Em nível intermediário, peça comparação ou relação que a própria fonte permita concluir (incluindo diferenciações entre colunas de tabelas ou critérios). Em nível avançado, aumente a integração sem inserir dados externos; uma situação clínica só é permitida se estiver presente na fonte. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use a resposta correta ou um dado que resolva a questão. A justificativa e o ponto-chave devem permanecer estritamente dentro da fonte.
 ${previousQuestions.length ? `Não repita nem reformule estas questões já aceitas:\n${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 500)}`).join('\n')}` : ''}
 ${previousQuestionAnswers.length ? `Também não reutilize o mesmo gabarito, ainda que o enunciado pareça diferente. Questões e respostas já aceitas:\n${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.question.slice(0, 260)} | Resposta: ${item.answer.slice(0, 260)}`).join('\n')}` : ''}
 `;
@@ -481,7 +482,10 @@ DIRETRIZES OBRIGATÓRIAS:
 
 5. ENUNCIADO COMPARTILHADO:
    - O campo question será usado igual no Quiz e na frente do Flashcard. Ele deve ser uma pergunta aberta, autocontida e respondível sem alternativas.
-   - É proibido escrever “assinale a alternativa”, “marque a opção”, “de acordo com as opções” ou incluir opções no próprio enunciado.`,
+   - É proibido escrever “assinale a alternativa”, “marque a opção”, “de acordo com as opções” ou incluir opções no próprio enunciado.
+
+6. COBERTURA ESTRUTURAL E TABELAS:
+   - Distribua as questões de forma equilibrada ao longo de todo o documento (início, meio e fim), contemplando os diferentes tópicos (#, ##), critérios diagnósticos e tabelas comparativas presentes no material, evitando concentrar perguntas apenas no trecho inicial.`,
       generationConfig: {
         temperature: 0.15,
         responseMimeType: "application/json"
