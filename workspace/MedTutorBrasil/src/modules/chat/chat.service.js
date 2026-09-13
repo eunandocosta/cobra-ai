@@ -157,10 +157,11 @@ Estruture o documento de forma formal, completa e pronta para impressão/exporta
 `;
     }
 
-    // Configura Gemini 3.5 Flash para agilidade na conversação
+    // Usa exclusivamente o modelo configurado e validado no servidor.
+    const chatModel = process.env.MODEL_CHAT || process.env.MODEL_BALANCED || process.env.MODEL_FAST || 'gemini-3.5-flash';
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.5-flash",
+      model: chatModel,
       systemInstruction,
       generationConfig: {
         temperature: 0.3,
@@ -191,6 +192,7 @@ Dúvida do aluno: ${message}
     try {
       const result = await runWithAiLimit(() => chat.sendMessage(promptPayload));
       const replyText = result.response.text();
+      const usage = result.response.usageMetadata || {};
 
       // Atualiza o histórico no formato esperado pelo SDK do Gemini
       session.history.push({ role: 'user', parts: [{ text: message }] });
@@ -220,7 +222,13 @@ Dúvida do aluno: ${message}
         sessionId: sId,
         reply: replyText,
         generatorEngine: 'backend-gemini',
-        generatorModel: process.env.MODEL_CHAT || 'gemini-3.5-flash',
+        generatorModel: chatModel,
+        usage: {
+          promptTokens: usage.promptTokenCount || 0,
+          outputTokens: usage.candidatesTokenCount || 0,
+          cachedTokens: usage.cachedContentTokenCount || 0,
+          totalTokens: usage.totalTokenCount || 0
+        },
         evidence: evidence.urls,
         isReport,
         reportTitle: isReport ? this.extractReportTitle(message, subject) : null,

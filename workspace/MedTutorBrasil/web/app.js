@@ -4347,6 +4347,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           inputPerMillion: 0.10,
           outputPerMillion: 0.30,
         },
+        'gemini-3.7-flash': {
+          label: 'Gemini 3.7 Flash (Servidor)',
+          inputPerMillion: 0.75,
+          outputPerMillion: 3.75,
+          cachedInputPerMillion: 0.075,
+        },
         'local-heuristic': {
           label: 'Motor Local MedCopilot (Free Tier / Custo Zero)',
           inputPerMillion: 0.00,
@@ -4991,7 +4997,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       }
     }
 
+    // Quiz e Flashcard usam sempre o Gemini do servidor: mesma chave, mesmo modelo,
+    // validação única e telemetria consistente em qualquer navegador.
     async function generateQuestionsWithGemini(materialText, metadata, config = {}, count = 5) {
+      return generateQuestionsViaBackend(materialText, metadata, config, count);
+    }
+
+    // Mantido temporariamente apenas como referência de migração; não é chamado pelo fluxo de estudo.
+    async function generateQuestionsWithBrowserGeminiLegacy(materialText, metadata, config = {}, count = 5) {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
     logQuizGenerationDebug('gemini_unavailable', {
@@ -5289,7 +5302,7 @@ ${cleanText}
           });
           const generated = await generateQuestionsWithGemini(buildQuestionContext(materialText, plan.evidencia_fonte), metadata, {
             ...config,
-            acceptedStudyItems: accepted,
+            acceptedStudyItems: [...existingItems, ...accepted],
             forcedLearningFocus
           }, 1);
           const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
@@ -18626,8 +18639,16 @@ Para cada material, retorne um objeto no JSON com:
       const contextPayload = (typeof CompactMemoryAgent !== 'undefined') ? CompactMemoryAgent.generateContextPayload(session.messages, selectedMaterials) : { compactSummary: '', cachedMaterialContexts: [] };
       const apiKey = typeof getGeminiApiKey === 'function' ? getGeminiApiKey() : '';
 
+      // Retorno imediato para que o aluno saiba que a solicitação foi recebida.
+      const loadingBubble = document.createElement('div');
+      loadingBubble.className = 'chat-bubble tutor chat-response-loading';
+      loadingBubble.setAttribute('aria-live', 'polite');
+      loadingBubble.innerHTML = `<div class="tutor-header"><span class="sparkle-icon">✦</span><span>MedTutor AI</span></div><div style="display:flex;align-items:center;gap:9px;padding:8px 2px;color:var(--text-secondary);font-size:13px;"><span class="loader-spinner" style="width:18px;height:18px;border-width:2px;flex:0 0 auto;"></span><span>Elaborando uma resposta fundamentada…</span></div>`;
+      flow.appendChild(loadingBubble);
+      flow.scrollTop = flow.scrollHeight;
+
       setTimeout(async () => {
-        const tutorBubble = document.createElement('div');
+        const tutorBubble = loadingBubble;
         tutorBubble.className = 'chat-bubble tutor';
 
         const lowerText = text.toLowerCase();
@@ -18703,6 +18724,7 @@ Para cada material, retorne um objeto no JSON com:
         let usedInputTokens = 1250 + usedCachedTokens;
         let usedOutputTokens = 380;
         let successfulModel = 'Motor Clínico Local';
+        let trackedModel = 'local-heuristic';
         const candidateModels = (typeof GEMINI_CONFIG_2026 !== 'undefined' && Array.isArray(GEMINI_CONFIG_2026.models) && GEMINI_CONFIG_2026.models.length > 0)
           ? GEMINI_CONFIG_2026.models
           : ['gemini-3.5-flash'];
@@ -18728,12 +18750,17 @@ Para cada material, retorne um objeto no JSON com:
             throw new Error(backendPayload.details || backendPayload.error || `HTTP ${backendResponse.status}`);
           }
           aiGeneratedText = backendPayload.reply;
-          successfulModel = 'Gemini 3.5 Flash (servidor)';
+          successfulModel = backendPayload.generatorModel || 'Gemini (servidor)';
+          trackedModel = backendPayload.generatorModel || 'gemini-3.5-flash';
+          usedInputTokens = Number(backendPayload.usage?.promptTokens) || usedInputTokens;
+          usedOutputTokens = Number(backendPayload.usage?.outputTokens) || usedOutputTokens;
+          usedCachedTokens = Number(backendPayload.usage?.cachedTokens) || usedCachedTokens;
           console.info('[MedTutor Chat]', {
             engine: backendPayload.generatorEngine || 'backend-gemini',
             model: backendPayload.generatorModel || successfulModel,
             sessionId: backendPayload.sessionId,
-            hasMaterial: Boolean(serverMaterial)
+            hasMaterial: Boolean(serverMaterial),
+            usage: backendPayload.usage || null
           });
         } catch (backendError) {
           console.warn('[MedTutor Chat] Gemini no servidor indisponível; tentando a configuração local do navegador.', backendError);
@@ -18967,6 +18994,7 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
 
                   aiGeneratedText = fullChatText;
                   successfulModel = (GEMINI_CONFIG_2026.pricing[usedModel] || {}).label || usedModel;
+                  trackedModel = usedModel;
                   break;
                 }
               }
@@ -19151,6 +19179,13 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
           ? ScientificLiteratureService.renderChatReadingAlternativesBar(evidenceTitle, evidenceSubject, evidenceData.baseUrls, evidenceData.articles)
           : '';
 
+        const responseCost = aiGeneratedText && typeof AppExpenseTracker !== 'undefined'
+          ? AppExpenseTracker.calculateCost(trackedModel, usedInputTokens, usedOutputTokens, usedCachedTokens)
+          : null;
+        const responseCostHtml = responseCost
+          ? `<span title="${usedInputTokens.toLocaleString('pt-BR')} tokens de entrada e ${usedOutputTokens.toLocaleString('pt-BR')} de saída. Em Free Tier, o custo efetivo pode ser R$ 0,00." style="font-size:10px;color:var(--text-muted);white-space:nowrap;">Estimativa IA: R$ ${responseCost.costUSD * GEMINI_CONFIG_2026.usdToBrlRate < 0.0001 ? '0,0000' : (responseCost.costUSD * GEMINI_CONFIG_2026.usdToBrlRate).toFixed(4).replace('.', ',')}</span>`
+          : '<span style="font-size:10px;color:var(--text-muted);">IA indisponível</span>';
+
         const tutorHtml = `
           <div class="tutor-header">
             <span class="sparkle-icon">✦</span>
@@ -19168,6 +19203,7 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
           <div class="chat-clean-footer">
             <span class="chat-ref-subtle">📖 Fundamentação: Diretrizes Clínicas (<span class="citation-badge" onmouseenter="showCitationPopover(event, '${citationKey}')" onmouseleave="hideCitationPopover()">${citationLabel}</span>); PubMed; SciELO; Cochrane; Elsevier; SUS / PCDT.</span>
             <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              ${responseCostHtml}
               ${isQuestionBookletQuery ? `
                 <button class="chat-clean-copy-btn" onclick="emitChatBookletPdf('${bookletData.id}')" title="Emitir esta apostila diretamente como PDF A4 para impressão">
                   🖨️ Imprimir Apostila (A4)
@@ -19219,8 +19255,8 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
         if (typeof AppExpenseTracker !== 'undefined') {
           if (aiGeneratedText) {
             AppExpenseTracker.recordAction({
-              actionName: 'Atendimento MedTutor AI (Gemini Flash-Lite)',
-              model: usedModel,
+              actionName: 'Atendimento MedTutor AI (Gemini servidor)',
+              model: trackedModel,
               inputTokens: usedInputTokens,
               outputTokens: usedOutputTokens,
               cachedTokens: usedCachedTokens,

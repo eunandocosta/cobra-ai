@@ -149,8 +149,11 @@ class QuizzesService {
     const totalQuestoes = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
 
     const genAI = getGenAI();
+    // Um único caminho de configuração: se não houver modelo exclusivo de quiz,
+    // usa os modelos já validados no .env, sem cair em nome fixo desatualizado.
+    const quizModel = process.env.MODEL_QUIZ || process.env.MODEL_BALANCED || process.env.MODEL_FAST || 'gemini-3.5-flash';
     const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_QUIZ || "gemini-3.5-flash",
+      model: quizModel,
       systemInstruction: SYSTEM_INSTRUCTION,
       generationConfig: {
         temperature: 0.2,
@@ -193,6 +196,9 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
       const formatadas = questoesUnicas.map((q, index) => {
         const correctIdx = letterToIndex[q.gabarito] ?? 0;
         const cleanAlternatives = Array.isArray(q.alternativas) ? q.alternativas : [];
+        if (cleanAlternatives.length !== 4 || cleanAlternatives.some(option => !String(option || '').trim()) || correctIdx > 3) {
+          return null;
+        }
         const resolvedFocus = learningFocus || q.foco_aprendizagem || 'fundamentos';
         const difficultyLevel = resolvedFocus === 'fundamentos'
           ? 'iniciante'
@@ -205,7 +211,7 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
 
         return {
           id: `q_${Date.now()}_${index + 1}`,
-          generatorModel: process.env.MODEL_QUIZ || "gemini-3.5-flash",
+          generatorModel: quizModel,
           generatorEngine: 'backend-gemini',
           question: q.pergunta,
           pergunta: q.pergunta,
@@ -235,7 +241,11 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
             lastAnswered: null
           }
         };
-      });
+      }).filter(Boolean);
+
+      if (formatadas.length === 0) {
+        throw new Error('A IA não retornou questões com quatro alternativas válidas.');
+      }
 
       console.log(`✅ [Quiz Engine] ${formatadas.length} questões geradas com sucesso.`);
       return formatadas;
