@@ -4867,6 +4867,19 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     function filterUniqueStudyItems(items, existingItems = []) {
       const accepted = [];
       const comparisonPool = Array.isArray(existingItems) ? [...existingItems] : [];
+      const answerIsTooSimilar = (first, second) => {
+        const normalizedFirst = normalizeStudyComparisonText(first);
+        const normalizedSecond = normalizeStudyComparisonText(second);
+        if (normalizedFirst.length < 3 || normalizedSecond.length < 3) return false;
+        if (normalizedFirst === normalizedSecond) return true;
+        const ignored = new Set(['para', 'como', 'sobre', 'entre', 'esta', 'esse', 'essa', 'resposta', 'correta', 'funcao', 'estrutura', 'processo', 'sistema']);
+        const tokensFor = value => new Set(value.split(' ').filter(token => token.length >= 4 && !ignored.has(token)));
+        const firstTokens = tokensFor(normalizedFirst);
+        const secondTokens = tokensFor(normalizedSecond);
+        if (!firstTokens.size || !secondTokens.size) return false;
+        const shared = [...firstTokens].filter(token => secondTokens.has(token)).length;
+        return shared / Math.min(firstTokens.size, secondTokens.size) >= 0.85;
+      };
       for (const item of (items || [])) {
         const questionText = item?.question || item?.pergunta || item?.flashcard?.front || '';
         const answerText = item?.reference_answer || item?.answer || item?.flashcard?.back || item?.explanation || '';
@@ -4874,7 +4887,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const candidateText = `${questionText} ${answerText}`;
         const duplicate = comparisonPool.some(other => {
           const otherText = `${other?.question || other?.pergunta || other?.flashcard?.front || ''} ${other?.reference_answer || other?.answer || other?.flashcard?.back || other?.explanation || ''}`;
-          return calculateLocalSimilarity(candidateText, otherText) >= 0.45;
+          const otherAnswer = other?.reference_answer || other?.answer || other?.flashcard?.back || other?.explanation || '';
+          return calculateLocalSimilarity(candidateText, otherText) >= 0.45 || answerIsTooSimilar(answerText, otherAnswer);
         });
         if (!duplicate) {
           accepted.push(item);
@@ -5024,7 +5038,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
-      const previousQuestions = (config.acceptedStudyItems || []).map(item => item.question || item.pergunta || '').filter(Boolean);
+      const acceptedStudyItems = config.acceptedStudyItems || [];
+      const previousQuestions = acceptedStudyItems.map(item => item.question || item.pergunta || '').filter(Boolean).slice(-30);
+      const previousQuestionAnswers = acceptedStudyItems.map(item => ({
+        question: item.question || item.pergunta || item.flashcard?.front || '',
+        answer: item.reference_answer || item.answer || item.correctAnswerText || item.resposta_correta || item.flashcard?.back || item.explanation || ''
+      })).filter(item => item.question || item.answer).slice(-30);
       const authoredSourceQuestions = Array.isArray(config.sourceQuestions)
         ? config.sourceQuestions
         : extractAuthoredQuestionsFromMaterial(materialText);
@@ -5033,7 +5052,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         : 'iniciante';
       const cognitiveDomain = 'compreensao';
       try {
-        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, difficultyLevel, previousCount: previousQuestions.length, authoredQuestionsFound: authoredSourceQuestions.length });
+        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, difficultyLevel, previousCount: previousQuestions.length, previousAnswersCount: previousQuestionAnswers.length, authoredQuestionsFound: authoredSourceQuestions.length });
         const response = await fetch('/api/quizzes/gerar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -5042,6 +5061,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             quantidade: count,
             difficulty: difficultyLevel,
             previousQuestions,
+            previousQuestionAnswers,
             sourceQuestions: authoredSourceQuestions
           })
         });

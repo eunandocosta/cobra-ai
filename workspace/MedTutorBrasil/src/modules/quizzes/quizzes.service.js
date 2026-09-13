@@ -18,6 +18,23 @@ function areQuestionsTooSimilar(first, second) {
   return intersection / new Set([...a, ...b]).size >= 0.45;
 }
 
+function areAnswersTooSimilar(first, second) {
+  const normalizedFirst = String(first || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const normalizedSecond = String(second || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (normalizedFirst.length < 3 || normalizedSecond.length < 3) return false;
+  if (normalizedFirst === normalizedSecond) return true;
+  const a = questionTokenSet(normalizedFirst);
+  const b = questionTokenSet(normalizedSecond);
+  if (!a.size || !b.size) return false;
+  const intersection = [...a].filter(token => b.has(token)).length;
+  // A resposta pode ser breve (por exemplo, apenas o nome de uma estrutura) em
+  // um card e explicada por extenso em outro. Cobrir quase todos os termos da
+  // menor resposta indica o mesmo gabarito, mesmo com enunciados diferentes.
+  return intersection / Math.min(a.size, b.size) >= 0.85;
+}
+
 // Muitos slides trazem exercícios elaborados pelo próprio professor. Eles são uma
 // referência didática mais fiel que um tema solto: preservamos o foco e a redação
 // quando a resposta puder ser comprovada no conteúdo, sem transformar alternativas
@@ -174,6 +191,12 @@ class QuizzesService {
       ? payload.difficulty
       : 'iniciante';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 30) : [];
+    const previousQuestionAnswers = Array.isArray(payload.previousQuestionAnswers)
+      ? payload.previousQuestionAnswers.map(item => ({
+        question: String(item?.question || '').replace(/\s+/g, ' ').trim(),
+        answer: String(item?.answer || '').replace(/\s+/g, ' ').trim()
+      })).filter(item => item.question || item.answer).slice(0, 30)
+      : [];
     const providedSourceQuestions = Array.isArray(payload.sourceQuestions)
       ? payload.sourceQuestions.map(question => String(question || '').replace(/\s+/g, ' ').trim()).filter(question => question.length >= 20).slice(0, 12)
       : [];
@@ -225,6 +248,7 @@ ${materialText}
 
 Regras: selecione um trecho diferente e verificável do conteúdo para cada questão. Em nível iniciante, cobre reconhecimento, definição, partes, localização, relação ou função que estejam escritos na fonte, em linguagem direta. Em nível intermediário, peça comparação ou relação que a própria fonte permita concluir. Em nível avançado, aumente a integração sem inserir dados externos; uma situação clínica só é permitida se estiver presente na fonte. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use a resposta correta ou um dado que resolva a questão. A justificativa e o ponto-chave devem permanecer estritamente dentro da fonte.
 ${previousQuestions.length ? `Não repita nem reformule estas questões já aceitas:\n${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 500)}`).join('\n')}` : ''}
+${previousQuestionAnswers.length ? `Também não reutilize o mesmo gabarito, ainda que o enunciado pareça diferente. Questões e respostas já aceitas:\n${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.question.slice(0, 260)} | Resposta: ${item.answer.slice(0, 260)}`).join('\n')}` : ''}
 `;
 
     try {
@@ -235,15 +259,25 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
         ...question,
         pergunta: sanitizeSharedQuestionStem(question?.pergunta)
       })).filter(question => isSharedQuestionStemValid(question.pergunta));
+      const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
+      const getCorrectAnswer = question => {
+        const correctIdx = letterToIndex[question?.gabarito] ?? 0;
+        return question?.texto_resposta_correta || question?.alternativas?.[correctIdx] || '';
+      };
       const questoesUnicas = questoesNormalizadas.filter((question, index, all) => {
         const current = question?.pergunta || '';
-        return all.slice(0, index).every(previous => !areQuestionsTooSimilar(current, previous?.pergunta || ''));
+        const currentAnswer = getCorrectAnswer(question);
+        const repeatsInBatch = all.slice(0, index).some(previous =>
+          areQuestionsTooSimilar(current, previous?.pergunta || '') || areAnswersTooSimilar(currentAnswer, getCorrectAnswer(previous))
+        );
+        const repeatsPreviousAnswer = previousQuestionAnswers.some(previous =>
+          areQuestionsTooSimilar(current, previous.question) || areAnswersTooSimilar(currentAnswer, previous.answer)
+        );
+        return !repeatsInBatch && !repeatsPreviousAnswer;
       });
       if (questoesUnicas.length === 0) {
         throw new Error('A IA retornou questões redundantes ou sem enunciados válidos.');
       }
-
-      const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
 
       const formatadas = questoesUnicas.map((q, index) => {
         const correctIdx = letterToIndex[q.gabarito] ?? 0;
