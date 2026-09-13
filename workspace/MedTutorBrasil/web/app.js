@@ -541,14 +541,20 @@
       const effectiveTopic = m.topic || m.materia || effectiveName;
       const effectiveDisease = m.disease || m.doenca || '';
 
-      const textCandidates = [
+      const isBoilerplate = text => typeof text === 'string' && (
+        /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
+        /• Diretrizes SUS, CFM & ENARE/i.test(text.trim()) ||
+        /ÍNDICE DESCRITIVO DO MATERIAL ANALISADO/i.test(text.trim())
+      );
+
+      // Prioridade 1: textos clínicos reais e autênticos (sem boilerplate sintético)
+      const primaryCandidates = [
         m.material_md,
         m.materialMd,
         m.conteudo_md,
         m.conteudoMd,
         m.markdownText,
         m.markdown,
-        m.readingDocText,
         m.extractedText,
         m.rawText,
         m.fullText,
@@ -557,16 +563,26 @@
         m.content,
         m.conteudo,
         m.corpo,
-        m.body,
-        m.descricao,
-        m.relatorio_academico?.conteudo_md,
-        m.relatorio_academico?.markdown,
-        m.academicReport?.conteudo_md,
-        m.academicReport?.markdown
-      ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+        m.body
+      ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
 
-      textCandidates.sort((a, b) => b.length - a.length);
-      const effectiveMd = textCandidates[0] || '';
+      let effectiveMd = '';
+      if (primaryCandidates.length > 0) {
+        primaryCandidates.sort((a, b) => b.length - a.length);
+        effectiveMd = primaryCandidates[0];
+      } else {
+        // Fallback secundário apenas se não houver NENHUM texto real
+        const secondaryCandidates = [
+          m.descricao,
+          m.relatorio_academico?.conteudo_md,
+          m.relatorio_academico?.markdown,
+          m.academicReport?.conteudo_md,
+          m.academicReport?.markdown,
+          m.readingDocText
+        ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+        secondaryCandidates.sort((a, b) => b.length - a.length);
+        effectiveMd = secondaryCandidates[0] || '';
+      }
 
       return {
         ...m,
@@ -1133,6 +1149,12 @@
                   }
                 }
 
+                const isBoilerplate = text => typeof text === 'string' && (
+                  /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
+                  /• Diretrizes SUS, CFM & ENARE/i.test(text.trim()) ||
+                  /ÍNDICE DESCRITIVO DO MATERIAL ANALISADO/i.test(text.trim())
+                );
+
                 // Considera o maior texto entre o documento raiz do Firestore e a subcoleção de chunks
                 const firestoreCandidates = [
                   completeChunksText,
@@ -1148,7 +1170,7 @@
                   material.content,
                   material.corpo,
                   material.body
-                ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+                ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
                 firestoreCandidates.sort((a, b) => b.length - a.length);
                 const bestFirestoreText = firestoreCandidates[0] || '';
 
@@ -1163,6 +1185,7 @@
                 // Proteção contra regressão de dados: se a versão do IndexedDB tiver mais conteúdo
                 // do que a versão retornada pelo Firestore, preserva o conteúdo local completo.
                 // Mas se a versão do Firestore for igual ou mais completa, ela prevalece!
+                // Importante: conteúdos locais com boilerplate gerado NUNCA sobrescrevem dados reais!
                 const localMat = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m =>
                   m.id === normalized.id ||
                   m.name === normalized.name ||
@@ -1181,7 +1204,7 @@
                     localMat.conteudo,
                     localMat.corpo,
                     localMat.body
-                  ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+                  ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
                   localCandidates.sort((a, b) => b.length - a.length);
                   const localBest = localCandidates[0] || '';
 
@@ -1197,11 +1220,11 @@
                     normalized.conteudo,
                     normalized.corpo,
                     normalized.body
-                  ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+                  ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
                   normCandidates.sort((a, b) => b.length - a.length);
                   const normBest = normCandidates[0] || '';
 
-                  if (localBest.length > normBest.length) {
+                  if (localBest.length > 0 && localBest.length > normBest.length) {
                     normalized.material_md = localBest;
                     normalized.markdownText = localBest;
                     normalized.conteudo_md = localBest;
