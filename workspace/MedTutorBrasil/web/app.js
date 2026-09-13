@@ -3642,24 +3642,28 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const total = Math.min(pdf.numPages || 0, limit);
       const images = [];
       for (let pageNumber = 1; pageNumber <= total; pageNumber++) {
-        const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 1.2 });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(viewport.width);
-        canvas.height = Math.round(viewport.height);
-        const context = canvas.getContext('2d', { alpha: false });
-        if (!context) continue;
-        await page.render({ canvasContext: context, viewport }).promise;
-        images.push({
-          id: `pdf-page-${pageNumber}`,
-          title: `Página ${pageNumber} do material`,
-          clinicalLabel: `Página ilustrada ${pageNumber}`,
-          page: pageNumber,
-          width: canvas.width,
-          height: canvas.height,
-          originalSizeKB: Math.round((canvas.width * canvas.height * 3) / 1024),
-          src: canvas.toDataURL('image/webp', 0.82)
-        });
+        try {
+          const page = await pdf.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: 1.2 });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(viewport.width);
+          canvas.height = Math.round(viewport.height);
+          const context = canvas.getContext('2d', { alpha: false });
+          if (!context) continue;
+          await page.render({ canvasContext: context, viewport }).promise;
+          images.push({
+            id: `pdf-page-${pageNumber}`,
+            title: `Página ${pageNumber} do material`,
+            clinicalLabel: `Página ilustrada ${pageNumber}`,
+            page: pageNumber,
+            width: canvas.width,
+            height: canvas.height,
+            originalSizeKB: Math.round((canvas.width * canvas.height * 3) / 1024),
+            src: canvas.toDataURL('image/jpeg', 0.82)
+          });
+        } catch (pageError) {
+          console.warn(`[Imagens do material] Não foi possível renderizar a página ${pageNumber} do PDF:`, pageError);
+        }
       }
       return images;
     }
@@ -3790,9 +3794,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return [];
     }
 
-    async function attachOriginalDocumentImages(material, sourceFile, visualAssociations = []) {
+    async function attachOriginalDocumentImages(material, sourceFile, visualAssociations = [], sourceImages = null) {
       if (!material || !sourceFile) return;
-      const rawImages = await extractOriginalDocumentImages(sourceFile);
+      const rawImages = Array.isArray(sourceImages) ? sourceImages : await extractOriginalDocumentImages(sourceFile);
       const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages.slice(0, 10);
       if (!selectedImages.length) return;
       const uploadedImages = [];
@@ -3842,8 +3846,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     // Executada somente com consentimento no checkbox de importação. Cada imagem
     // é enviada separadamente para limitar o conteúdo transmitido e a memória.
-    async function analyzeVisualMaterialAssociations(sourceFile, metadata = {}) {
-      const rawImages = (await extractOriginalDocumentImages(sourceFile)).slice(0, 6);
+    async function analyzeVisualMaterialAssociations(sourceFile, metadata = {}, sourceImages = null) {
+      const rawImages = (Array.isArray(sourceImages) ? sourceImages : await extractOriginalDocumentImages(sourceFile)).slice(0, 6);
       const associations = [];
       console.info(`[Gemini Visual] Análise autorizada para ${rawImages.length} imagem(ns) de "${metadata.fileName || sourceFile?.name || 'material'}".`);
       for (let index = 0; index < rawImages.length; index++) {
@@ -3888,11 +3892,16 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       }
       try {
         showToast('🧠 Gemini está interpretando as páginas visuais do material...');
+        const sourceImages = await extractOriginalDocumentImages(sourceFile);
+        reportUploadDiagnostic({ ...material, clinicalImages: sourceImages }, 'processando');
+        if (!sourceImages.length) {
+          throw new Error('Nenhuma página ou imagem do arquivo pôde ser renderizada para a análise visual.');
+        }
         reportUploadDiagnostic({
           ...material,
           aiEngine: 'Gemini via servidor local (análise visual autorizada)'
         }, 'processando');
-        const associations = await analyzeVisualMaterialAssociations(sourceFile, { fileName: material.originalFileName || material.name, targetSubject: material.subject });
+        const associations = await analyzeVisualMaterialAssociations(sourceFile, { fileName: material.originalFileName || material.name, targetSubject: material.subject }, sourceImages);
         material.visualAssociations = associations;
         const visualMarkdown = buildVisualAssociationsMarkdown(associations);
         if (visualMarkdown && !(material.markdownText || '').includes('## Associação Visual do Material')) {
@@ -3900,7 +3909,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           material.text = material.markdownText;
           material.readingDocText = `${material.readingDocText || ''}${visualMarkdown}`;
         }
-        await attachOriginalDocumentImages(material, sourceFile, associations);
+        await attachOriginalDocumentImages(material, sourceFile, associations, sourceImages);
         await saveChatDriveMaterials();
         if (typeof AppExpenseTracker !== 'undefined' && associations.length) {
           AppExpenseTracker.recordAction({ actionName: `Associação visual: ${material.name}`, model: 'Gemini via servidor local', isLocal: false });
