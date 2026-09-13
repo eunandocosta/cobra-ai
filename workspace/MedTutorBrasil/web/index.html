@@ -2450,20 +2450,20 @@
         <button class="auth-tab-btn" id="tabAuthRegister" onclick="switchAuthTab('register')">Cadastrar</button>
       </div>
 
-      <!-- Cartão de Acesso Rápido com a Conta Oficial Fernando Costa -->
-      <div id="quickAccountFernando" style="background: linear-gradient(135deg, rgba(0, 229, 255, 0.1), rgba(0, 255, 102, 0.08)); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: all 0.2s;" onclick="MedTutorAuthService.signInAsFernandoCosta()" title="Acessar instantaneamente sua conta oficial com todos os dados restaurados do Firestore">
+      <!-- Atalho de autenticação real da conta com dados no Firebase -->
+      <div id="quickAccountFernando" style="background: linear-gradient(135deg, rgba(0, 229, 255, 0.1), rgba(0, 255, 102, 0.08)); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: all 0.2s;" onclick="MedTutorAuthService.signInWithFirebaseAccount()" title="Entrar com sua conta Google para acessar os dados protegidos no Firestore">
         <div style="display: flex; align-items: center; gap: 10px;">
           <img src="https://lh3.googleusercontent.com/a/ACg8ocIcQF7WhgkgtZkPVI3VwqnulukYB7oW-OdlvAgcd3z1p2T9N7Si=s96-c" alt="Fernando Costa" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--neon-cyan); object-fit: cover;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2300e5ff\'><path d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>'">
           <div style="text-align: left;">
             <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-              <span>Fernando Costa</span>
-              <span style="font-size: 9px; background: rgba(0, 255, 102, 0.2); color: #00ff66; padding: 2px 5px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">CONTA OFICIAL</span>
+              <span>Entrar na conta do estudante</span>
+              <span style="font-size: 9px; background: rgba(0, 255, 102, 0.2); color: #00ff66; padding: 2px 5px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">FIREBASE</span>
             </div>
-            <div style="font-size: 11px; color: var(--text-secondary);">fmscosta99@gmail.com • 61 disciplinas salvas</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Use a conta Google que possui seus materiais salvos</div>
           </div>
         </div>
         <button type="button" class="btn-outline-action primary" style="font-size: 11px; padding: 6px 12px; pointer-events: none; white-space: nowrap;">
-          Entrar Direto ➔
+          Entrar com Google ➔
         </button>
       </div>
 
@@ -2473,15 +2473,15 @@
           <span style="font-size: 14px;">⚠️</span>
           <div>
             <strong style="color: #ffaa00;">Acesso via Arquivo Local (file://):</strong> O Google OAuth bloqueia chamadas em <code>file://</code> por segurança.
-            <div style="margin-top: 4px; color: var(--text-primary);">Acesse via <strong>http://localhost:3000</strong> ou clique em <strong>Entrar Direto</strong> acima para carregar sua conta oficial agora mesmo.</div>
+            <div style="margin-top: 4px; color: var(--text-primary);">Acesse pelo servidor local para entrar com sua conta Google e carregar seus dados do Firebase.</div>
           </div>
         </div>
         <div style="display: flex; gap: 6px; margin-top: 8px;">
           <a href="http://localhost:3000" class="btn-outline-action primary" style="flex: 1; text-align: center; justify-content: center; font-size: 11px; padding: 5px 8px; text-decoration: none;">
             🌐 Abrir via localhost:3000
           </a>
-          <button type="button" class="btn-outline-action" style="flex: 1; justify-content: center; font-size: 11px; padding: 5px 8px;" onclick="MedTutorAuthService.signInAsFernandoCosta()">
-            👤 Entrar como Fernando Costa
+          <button type="button" class="btn-outline-action" style="flex: 1; justify-content: center; font-size: 11px; padding: 5px 8px;" onclick="MedTutorAuthService.signInWithFirebaseAccount()">
+            🔐 Entrar com Google
           </button>
         </div>
       </div>

@@ -108,11 +108,9 @@
           if (savedProfile) {
             this.userProfile = JSON.parse(savedProfile);
           }
-          const savedAuth = localStorage.getItem('medtutor_auth_user');
-          if (savedAuth) {
-            this.currentUser = JSON.parse(savedAuth);
-            this.authMode = 'firebase';
-          }
+          // Um perfil salvo localmente não é uma credencial Firebase. A sessão
+          // oficial será restaurada exclusivamente por onAuthStateChanged.
+          localStorage.removeItem('medtutor_auth_user');
         } catch (e) {}
 
         // Se estiver rodando via file://, exibe aviso explicativo na tela de login
@@ -209,6 +207,16 @@
                 if (typeof renderCurriculumView === 'function') renderCurriculumView();
                 if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
                 if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+              } else {
+                // Não mantenha um UID antigo apenas no localStorage: ele fazia a
+                // interface parecer conectada, mas as regras do Firestore o negavam.
+                this.currentUser = null;
+                this.authMode = 'guest';
+                localStorage.removeItem('medtutor_auth_user');
+                this.updateUserTopbarUI();
+                this.updateFirebaseConfigModalUI();
+                const authScreen = document.getElementById('authScreenContainer');
+                if (authScreen) authScreen.classList.add('active');
               }
             });
           }
@@ -249,32 +257,10 @@
         }
       },
 
-      // Acesso Direto com a Conta Oficial Fernando Costa (fmscosta99@gmail.com)
-      async signInAsFernandoCosta() {
-        const uid = '1wcOOuiFs7cW1WBQy1UegaJKmgH2';
-        this.currentUser = {
-          uid: uid,
-          email: 'fmscosta99@gmail.com',
-          displayName: 'Fernando Costa',
-          photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocIcQF7WhgkgtZkPVI3VwqnulukYB7oW-OdlvAgcd3z1p2T9N7Si=s96-c'
-        };
-        this.authMode = 'firebase';
-        localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-        
-        const authScreen = document.getElementById('authScreenContainer');
-        if (authScreen) authScreen.classList.remove('active');
-
-        showToast('✓ Conectado como Fernando Costa (fmscosta99@gmail.com)!');
-
-        // Carrega perfil e sincroniza todos os 61 itens da grade, banco de questões e materiais do Firestore
-        await this.fetchUserProfileFromFirestore(uid);
-        await MedTutorFirebaseService.loadAllDataFromPersistence();
-        this.updateUserTopbarUI();
-
-        if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
-        if (typeof renderDashboardView === 'function') renderDashboardView();
-        if (typeof renderCurriculumView === 'function') renderCurriculumView();
-        if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
+      // O atalho inicia OAuth real; nunca deve simular o UID de outro usuário.
+      async signInWithFirebaseAccount() {
+        showToast('🔐 Entre com a conta Google que possui seus materiais no Firebase.');
+        await this.signInWithGoogle();
       },
 
       async signInWithGoogle() {
@@ -282,7 +268,7 @@
         if (window.location.protocol === 'file:') {
           const hint = document.getElementById('authLocalServerHint');
           if (hint) hint.style.display = 'block';
-          showAuthError('O Google OAuth bloqueia chamadas em páginas abertas diretamente do disco ("file://"). Clique no botão "Entrar Direto" do Fernando Costa ou acesse pelo servidor web em http://localhost:3000');
+          showAuthError('O Google OAuth bloqueia páginas abertas diretamente do disco ("file://"). Acesse pelo servidor local para entrar na sua conta Firebase.');
           return;
         }
 
@@ -336,7 +322,7 @@
           } catch (err) {
             console.error('[Google Auth Error]:', err);
             const friendlyMsg = this.mapAuthErrorMessage(err.code || err.message);
-            showAuthError(`Falha na autenticação Google (${err.code || 'erro'}): ${friendlyMsg}. Se preferir, use o botão "Entrar Direto" do seu perfil.`);
+            showAuthError(`Falha na autenticação Google (${err.code || 'erro'}): ${friendlyMsg}.`);
           } finally {
             if (btnGoogle) {
               btnGoogle.disabled = false;
@@ -344,7 +330,7 @@
             }
           }
         } else {
-          showAuthError('Serviço de autenticação Firebase indisponível. Clique em "Entrar Direto" acima.');
+          showAuthError('Serviço de autenticação Firebase indisponível.');
         }
       },
 
@@ -521,7 +507,7 @@
       updateFirebaseConfigModalUI() {
         const badge = document.getElementById('firebaseStatusBadge');
         if (badge) {
-          if (isFirebaseCloudActive && this.authMode === 'firebase') {
+          if (isFirebaseCloudActive && firebaseAuth?.currentUser?.uid && this.authMode === 'firebase') {
             badge.textContent = '🟢 Nuvem Conectada & Sincronizada';
             badge.style.background = 'rgba(0, 255, 102, 0.15)';
             badge.style.color = 'var(--neon)';
@@ -1078,30 +1064,9 @@
           }
         }
 
-        // Fallback para os materiais autoritativos já carregados da sessão (espelho estrito do Firestore)
-        const normalizedTarget = normalizeStudyComparisonText(materialIdOrName || '');
-        const found = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m =>
-          m.id === materialIdOrName ||
-          m.name === materialIdOrName ||
-          m.originalFileName === materialIdOrName ||
-          (materialIdOrName && normalizeStudyComparisonText(m.name) === normalizedTarget)
-        );
-
-        if (found) {
-          const text = getMaterialStudyText(found);
-          return {
-            text,
-            source: 'session_memory',
-            docId: found.id || '',
-            materialName: found.name || materialIdOrName,
-            subject: found.subject || subjectName,
-            data: found
-          };
-        }
-
         return {
           text: '',
-          source: 'none',
+          source: this.hasAuthenticatedCloudSession(uid) ? 'none' : 'auth_required',
           docId: '',
           materialName: materialIdOrName || '',
           subject: subjectName || '',
@@ -1160,18 +1125,8 @@
           }
         }
 
-        if (materialsFound.length === 0 && Array.isArray(chatDriveMaterials)) {
-          const localMats = chatDriveMaterials.filter(m => m.subject === subjectName);
-          localMats.forEach(m => {
-            const t = getMaterialStudyText(m);
-            if (t && !isBoilerplate(t)) {
-              materialsFound.push({ name: m.name, text: t, id: m.id });
-            }
-          });
-        }
-
         if (materialsFound.length === 0) {
-          return { text: '', source: 'none', count: 0, materials: [] };
+          return { text: '', source: this.hasAuthenticatedCloudSession(uid) ? 'none' : 'auth_required', count: 0, materials: [] };
         }
 
         const combinedText = materialsFound.map(m => `--- INÍCIO DA AULA: ${m.name} ---\n\n${m.text}\n\n--- FIM DA AULA: ${m.name} ---`).join('\n\n');
@@ -1385,7 +1340,7 @@
         }
 
         // 2. Se o Firestore estiver online, sincroniza dados atualizados da nuvem
-        if (firestoreDb && isFirebaseCloudActive && MedTutorAuthService.authMode === 'firebase') {
+        if (this.hasAuthenticatedCloudSession(uid)) {
           try {
             const userDoc = await firestoreDb.collection('users').doc(uid).get();
             if (userDoc.exists) {
@@ -10476,15 +10431,22 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           updateValidationModalStats(this.value);
         };
       }
+      const requiresFirebaseAuth = result?.source === 'auth_required';
       if (btnExec) {
-        btnExec.disabled = false;
-        btnExec.innerHTML = `<span>🚀</span> Validar & Gerar ${qCount} Questões`;
+        btnExec.disabled = requiresFirebaseAuth;
+        btnExec.innerHTML = requiresFirebaseAuth
+          ? '<span>🔐</span> Entre no Firebase para continuar'
+          : `<span>🚀</span> Validar & Gerar ${qCount} Questões`;
       }
 
       updateValidationModalStats(text);
 
       if (alertEl) {
-        if (text.length >= 300) {
+        if (requiresFirebaseAuth) {
+          alertEl.style.background = 'rgba(255, 59, 48, 0.1)';
+          alertEl.style.borderColor = 'rgba(255, 59, 48, 0.4)';
+          alertEl.innerHTML = '🔐 <strong>Sessão Firebase necessária:</strong> entre com a conta Google que possui seus materiais. O app não usará uma síntese local como substituta do texto do Firestore.';
+        } else if (text.length >= 300) {
           alertEl.style.background = 'rgba(0, 255, 102, 0.08)';
           alertEl.style.borderColor = 'rgba(0, 255, 102, 0.3)';
           alertEl.innerHTML = `✅ <strong>Texto autêntico validado do Cloud Firestore (${result?.source === 'firestore_direct' ? 'Documento Direto + Chunks' : 'Coleção Nuvem'}):</strong> Revise abaixo o conteúdo exato antes de autorizar a formulação das perguntas pela IA.`;
