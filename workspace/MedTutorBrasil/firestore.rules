@@ -62,6 +62,14 @@ service cloud.firestore {
     //   - redundancyScore: number (optional)
     //   - atualizadoEm: string / timestamp (required)
     //
+    // Subcollection: users/{userId}/perfis_didaticos/{disciplineId}
+    // Fields:
+    //   - schema: string (required) - 'medtutor_question_bank_v1'
+    //   - disciplina: string (required, <= 200 chars)
+    //   - questoes: list (required, <= 60 itens) - Amostras autorais para estilo
+    //   - materiais: list (optional, <= 80 itens)
+    //   - atualizadoEm: string / timestamp (required)
+    //
     // Subcollection: users/{userId}/historico_chats/{chatId}
     // Fields:
     //   - id: string (required)
@@ -140,6 +148,14 @@ service cloud.firestore {
              (!('distratores' in data) || (data.distratores is list && data.distratores.size() <= 10));
     }
 
+    function isValidDidacticProfile(data) {
+      return hasRequiredFields(['schema', 'disciplina', 'questoes']) &&
+             data.schema == 'medtutor_question_bank_v1' &&
+             data.disciplina is string && data.disciplina.size() >= 2 && data.disciplina.size() <= 200 &&
+             data.questoes is list && data.questoes.size() <= 60 &&
+             (!('materiais' in data) || (data.materiais is list && data.materiais.size() <= 80));
+    }
+
     function isValidChatSession(data) {
       return hasRequiredFields(['id', 'titulo', 'mensagens']) &&
              data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
@@ -193,7 +209,16 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
-      // 5. Histórico de Chats com a Dra. Sofia
+      // 5. Perfil didático por disciplina: JSON de questões autorais que
+      // orienta o estilo do Gemini sem compartilhar dados entre estudantes.
+      match /perfis_didaticos/{disciplineId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidDidacticProfile(request.resource.data);
+        allow update: if isOwner(userId) && isValidDidacticProfile(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // 6. Histórico de Chats com a Dra. Sofia
       match /historico_chats/{chatId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidChatSession(request.resource.data);

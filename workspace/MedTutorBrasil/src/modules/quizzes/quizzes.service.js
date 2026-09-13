@@ -314,6 +314,12 @@ class QuizzesService {
     const providedSourceQuestions = Array.isArray(payload.sourceQuestions)
       ? payload.sourceQuestions.map(question => String(question || '').replace(/\s+/g, ' ').trim()).filter(question => question.length >= 20).slice(0, 12)
       : [];
+    // Banco persistente da disciplina: questões autorais encontradas em todos
+    // os materiais enviados, usado como referência de estilo e não como fonte
+    // de fatos para o conteúdo novo.
+    const disciplineQuestionBank = Array.isArray(payload.disciplineQuestionBank)
+      ? payload.disciplineQuestionBank.map(question => String(question || '').replace(/\s+/g, ' ').trim()).filter(question => question.length >= 20).slice(0, 40)
+      : [];
     const authoredSourceQuestions = providedSourceQuestions.length
       ? providedSourceQuestions
       : extractAuthoredQuestionsFromMaterial(materialText);
@@ -324,6 +330,7 @@ class QuizzesService {
       console.log("🔍 [Quiz Engine] Início do texto recebido:", materialText.slice(0, 150).replace(/\s+/g, ' '));
     }
     console.log("📝 [Quiz Engine] Questões autorais identificadas:", authoredSourceQuestions.length);
+    console.log("🏛️ [Quiz Engine] Amostras do banco da disciplina:", disciplineQuestionBank.length);
     console.log("📚 [Quiz Engine] Questões já existentes no deck:", previousQuestions.length);
 
     if (!materialText || materialText.trim().length < 20) {
@@ -373,6 +380,13 @@ ${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATER
 ${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}
 (Priorize o objetivo didático dessas questões, sem usar comandos de múltipla escolha no enunciado)
 --- FIM DAS QUESTÕES AUTORAIS ---
+` : ''}
+
+${disciplineQuestionBank.length ? `--- BANCO DE ESTILO DA DISCIPLINA ---
+Estas são questões autorais extraídas de outros materiais da MESMA disciplina. Use-as somente para absorver o padrão didático do professor: tipo de enunciado, granularidade, verbos e relações cobradas.
+NÃO copie frases, respostas, alternativas ou fatos dessas amostras. O conteúdo factual de cada nova questão deve vir exclusivamente do conteúdo médico integral abaixo.
+${disciplineQuestionBank.map((question, index) => `${index + 1}. ${question}`).join('\n')}
+--- FIM DO BANCO DE ESTILO ---
 ` : ''}
 
 --- CONTEÚDO MÉDICO INTEGRAL ---

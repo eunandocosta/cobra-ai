@@ -18,6 +18,14 @@
     let firebaseStorage = null;
     let firebaseAuth = null;
     let isFirebaseCloudActive = false;
+    let disciplineQuestionBankCache = {};
+
+    function getDisciplineQuestionBankId(subjectName) {
+      const normalized = String(subjectName || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      return `disciplina_${(normalized || 'sem_nome').slice(0, 100)}`;
+    }
 
     // Repositório IndexedDB Local (Garantia de 100% Anti-F5 mesmo sem rede ou credenciais)
     const MedTutorLocalDB = {
@@ -824,6 +832,7 @@
             await this.writeMaterialTextChunks(docRef, markdown);
           }
           console.info(`[Firestore] ${materialsArray.length} material(is) sincronizado(s) com conteúdo integral em blocos.`, { uid });
+          await this.rebuildDisciplineQuestionBanks(materialsArray);
         } catch (e) {
           reportFirestoreSyncIssue('falha_ao_gravar_materiais', {
             code: e.code || 'firestore/write-failed',
@@ -835,6 +844,80 @@
           });
           if (typeof showToast === 'function') showToast(`⚠️ Materiais salvos localmente, mas a nuvem recusou a sincronização: ${e.code || e.message}`);
         }
+      },
+
+      // Banco JSON por disciplina: conserva questões que já vieram em PDFs e
+      // slides para que o Gemini reconheça o estilo do professor em gerações futuras.
+      async rebuildDisciplineQuestionBanks(materialsArray) {
+        const profiles = {};
+        (materialsArray || []).forEach(material => {
+          const subject = String(material?.subject || material?.disciplina || '').trim();
+          const text = typeof getMaterialStudyText === 'function' ? getMaterialStudyText(material) : String(material?.markdownText || material?.conteudo_md || material?.text || '');
+          if (!subject || !text || typeof extractAuthoredQuestionsFromMaterial !== 'function') return;
+          const samples = extractAuthoredQuestionsFromMaterial(text, 30);
+          if (!samples.length) return;
+          const id = getDisciplineQuestionBankId(subject);
+          const profile = profiles[id] || {
+            schema: 'medtutor_question_bank_v1',
+            disciplina: subject,
+            questoes: [],
+            materiais: []
+          };
+          profile.materiais.push({ id: material.id || '', nome: material.name || material.nome || 'Material enviado' });
+          samples.forEach(question => {
+            const normalized = String(question).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (normalized && !profile.questoes.some(item => item.chave === normalized)) {
+              profile.questoes.push({ pergunta: String(question).slice(0, 700), materialId: material.id || '', materialNome: material.name || material.nome || '' , chave: normalized });
+            }
+          });
+          profiles[id] = profile;
+        });
+
+        Object.values(profiles).forEach(profile => {
+          profile.questoes = profile.questoes.slice(0, 60);
+          profile.materiais = profile.materiais.slice(0, 80);
+          profile.atualizadoEm = new Date().toISOString();
+        });
+        disciplineQuestionBankCache = { ...disciplineQuestionBankCache, ...profiles };
+        try { localStorage.setItem('medtutor_discipline_question_banks_v1', JSON.stringify(disciplineQuestionBankCache)); } catch (e) {}
+
+        const uid = this.getUserId();
+        if (!Object.keys(profiles).length || !this.hasAuthenticatedCloudSession(uid)) return;
+        try {
+          const batch = firestoreDb.batch();
+          const colRef = firestoreDb.collection('users').doc(uid).collection('perfis_didaticos');
+          Object.entries(profiles).forEach(([id, profile]) => batch.set(colRef.doc(id), profile, { merge: true }));
+          await batch.commit();
+          console.info(`[Banco didático] ${Object.keys(profiles).length} perfil(is) de disciplina salvo(s) no Firestore.`);
+        } catch (error) {
+          console.warn('[Banco didático] Não foi possível salvar os perfis de questões:', error);
+        }
+      },
+
+      async getDisciplineQuestionBank(subjectName) {
+        const id = getDisciplineQuestionBankId(subjectName);
+        if (!Object.keys(disciplineQuestionBankCache).length) {
+          try { disciplineQuestionBankCache = JSON.parse(localStorage.getItem('medtutor_discipline_question_banks_v1') || '{}') || {}; } catch (e) {}
+        }
+        const uid = this.getUserId();
+        if (this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const snapshot = await firestoreDb.collection('users').doc(uid).collection('perfis_didaticos').doc(id).get();
+            if (snapshot.exists) disciplineQuestionBankCache[id] = snapshot.data();
+          } catch (error) {
+            console.warn('[Banco didático] Perfil remoto indisponível; usando cache local:', error);
+          }
+        }
+        // Migração sob demanda: disciplinas já importadas antes deste recurso
+        // também ganham seu banco ao gerar o próximo lote de questões.
+        if (!disciplineQuestionBankCache[id] && Array.isArray(chatDriveMaterials) && chatDriveMaterials.length) {
+          await this.rebuildDisciplineQuestionBanks(chatDriveMaterials);
+        }
+        const profile = disciplineQuestionBankCache[id] || null;
+        return {
+          profile,
+          questions: Array.isArray(profile?.questoes) ? profile.questoes.map(item => item.pergunta).filter(Boolean).slice(0, 40) : []
+        };
       },
 
       // Salva o Relatório Acadêmico individual em users/{userId}/materiais_estudo/{materialId}
@@ -5575,6 +5658,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const authoredSourceQuestions = Array.isArray(config.sourceQuestions)
         ? config.sourceQuestions
         : extractAuthoredQuestionsFromMaterial(materialText);
+      const disciplineQuestionBank = Array.isArray(config.disciplineQuestionBank)
+        ? config.disciplineQuestionBank.filter(question => typeof question === 'string' && question.trim().length >= 20).slice(0, 40)
+        : [];
       const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(config.difficulty)
         ? config.difficulty
         : 'balanced';
@@ -5590,6 +5676,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             previousQuestions,
             previousQuestionAnswers,
             sourceQuestions: authoredSourceQuestions,
+            disciplineQuestionBank,
             targetConcept: config.targetConcept || '',
             focusExcerpt: config.focusExcerpt || ''
           })
@@ -5935,6 +6022,18 @@ ${cleanText}
       const accepted = [];
       const total = Math.max(1, Math.min(30, count || 5));
       const authoredSourceQuestions = extractAuthoredQuestionsFromMaterial(materialText);
+      let disciplineQuestionBank = [];
+      try {
+        const bank = await MedTutorFirebaseService.getDisciplineQuestionBank(metadata.subjectName || '');
+        disciplineQuestionBank = bank.questions || [];
+        logQuizGenerationDebug('discipline_question_bank_loaded', {
+          subject: metadata.subjectName || '',
+          samples: disciplineQuestionBank.length,
+          source: bank.profile ? 'firestore_or_cache' : 'empty'
+        });
+      } catch (error) {
+        console.warn('[Banco didático] Não foi possível carregar o perfil da disciplina:', error);
+      }
       logQuizGenerationDebug('authored_questions_scanned', { found: authoredSourceQuestions.length, requestedItems: total });
 
       setStudyGenerationProgress({
@@ -5948,6 +6047,7 @@ ${cleanText}
         const generated = await generateQuestionsWithGemini(materialText, metadata, {
           ...config,
           sourceQuestions: authoredSourceQuestions,
+          disciplineQuestionBank,
           acceptedStudyItems: existingItems
         }, total);
 
@@ -5977,6 +6077,7 @@ ${cleanText}
           const supplement = await generateQuestionsWithGemini(materialText, metadata, {
             ...config,
             sourceQuestions: authoredSourceQuestions,
+            disciplineQuestionBank,
             acceptedStudyItems: [...existingItems, ...accepted]
           }, needed);
 
