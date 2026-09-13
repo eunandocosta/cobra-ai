@@ -5584,6 +5584,176 @@
         padding: 24px 16px;
       }
 
+      /* Fluxos de estudo: cada controle mantém tamanho confortável para toque. */
+      .study-nav-hierarchy {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .study-nav-arrow {
+        display: none;
+      }
+
+      .study-nav-field,
+      .study-nav-field[style] {
+        width: 100%;
+        flex: 0 0 auto !important;
+      }
+
+      .study-nav-select {
+        min-height: 46px;
+        font-size: 16px;
+      }
+
+      .study-actions-toolbar,
+      .study-buttons-group {
+        display: grid;
+        grid-template-columns: 1fr;
+        width: 100%;
+      }
+
+      .study-active-badge-group {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .study-buttons-group > .btn-outline-action,
+      .study-buttons-group > .dropdown-filter-container,
+      .study-buttons-group > .dropdown-filter-container > .btn-outline-action {
+        width: 100%;
+      }
+
+      .study-buttons-group > .dropdown-filter-container > .dropdown-menu-list {
+        left: 0 !important;
+        right: auto !important;
+        width: 100%;
+        max-width: none;
+      }
+
+      /* As filas continuam acessíveis sem espremê-las em duas linhas curtas. */
+      [role="group"][aria-label="Filas de flashcards"] {
+        width: 100%;
+        flex-wrap: nowrap !important;
+        justify-content: flex-start !important;
+        overflow-x: auto;
+        padding: 2px 0 7px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+
+      [role="group"][aria-label="Filas de flashcards"]::-webkit-scrollbar {
+        display: none;
+      }
+
+      [role="group"][aria-label="Filas de flashcards"] .btn-outline-action {
+        flex: 0 0 auto;
+        min-height: 42px;
+        white-space: nowrap;
+      }
+
+      .flashcard-meta-items {
+        max-width: 100%;
+      }
+
+      #fcCounter {
+        align-self: flex-start;
+      }
+
+      .srs-rating-buttons-group {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px !important;
+      }
+
+      .srs-rating-buttons-group > .btn-outline-action {
+        min-width: 0 !important;
+        min-height: 54px;
+      }
+
+      /* Quiz: alternar modo e responder sem botões comprimidos. */
+      .quiz-mode-bar,
+      .quiz-mode-bar > div,
+      .mode-toggle-group,
+      #quizExamControls {
+        width: 100%;
+      }
+
+      .mode-toggle-group {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .mode-toggle-group .btn-mode,
+      #quizExamControls .btn-outline-action {
+        min-height: 44px;
+      }
+
+      #quizExamControls {
+        justify-content: space-between;
+      }
+
+      .quiz-vignette-box,
+      #quizExamResultBanner,
+      .pending-generation-banner {
+        padding: 14px !important;
+      }
+
+      /* Chat: leitura, composição e ações acessíveis por uma mão. */
+      .chat-flow {
+        padding: 14px 11px;
+      }
+
+      .chat-bubble {
+        max-width: 100%;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .gemini-prompt-cards-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .gemini-prompt-card {
+        min-height: 78px;
+      }
+
+      /* Upload e leitura de relatório: painéis legíveis sem zoom horizontal. */
+      #uploadConfirmationModal .upload-stepper-container,
+      #uploadMaterialModal .modal-window,
+      #importStudyMaterialModal .modal-window {
+        width: 100%;
+      }
+
+      #readerModalContent .academic-report-container {
+        padding: 22px 16px !important;
+        max-width: none !important;
+        overflow-wrap: anywhere;
+      }
+
+      #readerModalContent .academic-report-container h1 {
+        font-size: 18px !important;
+      }
+
+      #readerModalContent .abnt-header-table,
+      #readerModalContent .abnt-header-table tbody,
+      #readerModalContent .abnt-header-table tr,
+      #readerModalContent .abnt-header-table td {
+        display: block;
+        width: 100% !important;
+      }
+
+      #readerModalContent .abnt-header-table td {
+        border-right: 0 !important;
+        border-bottom: 1px solid #cbd5e1;
+      }
+
+      #readerModalContent .report-body-content {
+        font-size: 16px !important;
+        line-height: 1.65 !important;
+        text-align: left !important;
+      }
+
       .drive-file-row {
         align-items: flex-start;
       }
