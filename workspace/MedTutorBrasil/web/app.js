@@ -10401,9 +10401,19 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const targetSubj = subjectName || currentStudySubject || 'Clínica Médica';
       const qCount = Math.max(1, Math.min(30, count || 5));
       const targetMat = materialName || '';
+      const selectedMaterial = targetMat && Array.isArray(chatDriveMaterials)
+        ? chatDriveMaterials.find(m =>
+          m.id === targetMat || m.name === targetMat || m.originalFileName === targetMat ||
+          normalizeStudyComparisonText(m.name || '') === normalizeStudyComparisonText(targetMat)
+        )
+        : null;
+      // Relatórios já chegavam pelo ID do documento. Flashcards e quizzes antes
+      // usavam apenas o nome exibido, que pode divergir do ID do Firestore.
+      const firestoreMaterialId = selectedMaterial?.id || targetMat;
 
       pendingValidatedStudyContext = {
         materialName: targetMat,
+        firestoreMaterialId,
         subjectName: targetSubj,
         count: qCount,
         config: config || {},
@@ -10471,7 +10481,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       // 2. Busca o texto autoritativo estritamente no Firestore
       let result = null;
       if (targetMat) {
-        result = await MedTutorFirebaseService.getAuthoritativeMaterialText(targetMat, targetSubj);
+        result = await MedTutorFirebaseService.getAuthoritativeMaterialText(firestoreMaterialId, targetSubj);
       } else {
         result = await MedTutorFirebaseService.getAuthoritativeSubjectText(targetSubj);
       }
