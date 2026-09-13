@@ -17812,6 +17812,19 @@ Para cada material, retorne um objeto no JSON com:
       if (sidebar) sidebar.classList.toggle('collapsed');
     }
 
+    // Em telas compactas o histórico é uma gaveta: inicia fechado para não cobrir
+    // a conversa e continua disponível pelo botão de menu já existente.
+    function setupMobileChatDrawer() {
+      if (typeof window === 'undefined' || !window.matchMedia) return;
+      const media = window.matchMedia('(max-width: 768px)');
+      const closeWhenMobile = event => {
+        if (event.matches) document.getElementById('chatSidebar')?.classList.add('collapsed');
+      };
+      closeWhenMobile(media);
+      if (media.addEventListener) media.addEventListener('change', closeWhenMobile);
+      else if (media.addListener) media.addListener(closeWhenMobile);
+    }
+
     function createNewChatSession() {
       const newSession = {
         id: 'session-' + Date.now(),
@@ -22206,6 +22219,7 @@ ${textSample}
     updateSubjectFilterMenus();
     renderCurriculumGrid();
     updateGeminiKeyBadge();
+    setupMobileChatDrawer();
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)
     if (typeof MedTutorAuthService !== 'undefined') {
