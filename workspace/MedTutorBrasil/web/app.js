@@ -550,7 +550,7 @@
         m.conteudo,
         m.corpo,
         m.body
-      ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
+        ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t) && !isSyntheticDriveSummary(t)).map(t => t.trim());
 
       let effectiveMd = '';
       if (primaryCandidates.length > 0) {
@@ -1045,7 +1045,7 @@
                 data.content,
                 data.corpo,
                 data.body
-              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
+              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t) && !isSyntheticDriveSummary(t)).map(t => t.trim());
               candidates.sort((a, b) => b.length - a.length);
 
               if (candidates.length > 0) {
@@ -1110,7 +1110,7 @@
                 data.content,
                 data.corpo,
                 data.body
-              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
+              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t) && !isSyntheticDriveSummary(t)).map(t => t.trim());
               candidates.sort((a, b) => b.length - a.length);
               if (candidates.length > 0) {
                 materialsFound.push({
@@ -1383,7 +1383,7 @@
                   material.content,
                   material.corpo,
                   material.body
-                ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
+                ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t) && !isSyntheticDriveSummary(t)).map(t => t.trim());
                 firestoreCandidates.sort((a, b) => b.length - a.length);
                 const bestFirestoreText = firestoreCandidates[0] || '';
 
@@ -11872,7 +11872,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         material.readingDocText,
         material.pedagogicalSynthesis ? (typeof material.pedagogicalSynthesis === 'string' ? material.pedagogicalSynthesis : JSON.stringify(material.pedagogicalSynthesis)) : ''
       ]
-        .filter(c => typeof c === 'string' && c.trim().length > 0)
+        .filter(c => typeof c === 'string' && c.trim().length > 0 && !isSyntheticDriveSummary(c))
         .map(c => c.trim());
 
       if (secondaryCandidates.length === 0) return '';
@@ -15479,6 +15479,51 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       };
     }
 
+    function isSyntheticDriveSummary(text) {
+      const normalized = String(text || '').trim();
+      return !normalized || normalized.length < 500 || (
+        /Tema Clínico Principal:/i.test(normalized) &&
+        /Conteúdo Didático da Aula:/i.test(normalized) &&
+        /Título da Aula:/i.test(normalized)
+      );
+    }
+
+    async function downloadAndExtractDriveFileText(fileEntry) {
+      const fileId = String(fileEntry?.id || '').trim();
+      if (!fileId || /^(parsed|file_|proxy-file-)/i.test(fileId)) {
+        throw new Error('O Google Drive não forneceu um identificador válido para baixar este arquivo.');
+      }
+
+      const endpoints = [
+        `/api/drive/file/${encodeURIComponent(fileId)}`,
+        `http://localhost:3001/api/drive/file/${encodeURIComponent(fileId)}`
+      ];
+      let lastError = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint);
+          if (!response.ok) throw new Error(`Download recusado (HTTP ${response.status}).`);
+          const blob = await response.blob();
+          if (blob.size < 20) throw new Error('O arquivo baixado está vazio.');
+          if (/text\/html/i.test(blob.type || '')) {
+            throw new Error('O Google Drive devolveu uma página de acesso, não o arquivo. Verifique se ele está compartilhado para a conta/servidor.');
+          }
+          const virtualFile = new File([blob], fileEntry.name || 'material', {
+            type: blob.type || 'application/octet-stream'
+          });
+          const extractedText = (await extractTextFromFile(virtualFile)).trim();
+          if (!isSyntheticDriveSummary(extractedText) && !isGarbageOrBinaryText(extractedText)) {
+            return extractedText;
+          }
+          throw new Error('Não foi possível extrair texto clínico suficiente deste arquivo. Se for PDF escaneado, envie uma versão com texto selecionável.');
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error('Falha ao baixar o arquivo do Google Drive.');
+    }
+
     // 1. Tenta obter arquivos reais via proxy local MedTutor (Node.js serve.cjs)
     async function fetchDriveViaLocalProxy(folderId) {
       if (!folderId) return null;
@@ -16170,7 +16215,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
         }
       }
 
-      setTimeout(() => {
+      setTimeout(async () => {
         closeModals();
         if (compressBox) compressBox.style.display = 'none';
         if (btn) {
@@ -16178,18 +16223,22 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
           btn.innerHTML = `📥 Sincronizar Flashcards & Quizzes (${filesToImport.length})`;
         }
 
-        const queue = filesToImport.map(f => {
+        const queue = [];
+        const failedFiles = [];
+        for (const f of filesToImport) {
           const sizeMB = f.sizeMB || (f.size ? f.size / (1024 * 1024) : 1);
-          let richText = f.text || f.readingDocText || '';
-          if (!richText || richText.startsWith('Material importado')) {
-            richText = [
-              f.disease ? `Tema Clínico Principal: ${f.disease}` : '',
-              f.desc ? `Conteúdo Didático da Aula: ${f.desc.replace(/^[✓📖✕⚡]\s*(?:Elegível direto|Livro-texto|Material didático)?\s*\(?[^)]*\)?\s*:?\s*/i, '')}` : '',
-              f.folderPath ? `Módulo Curricular: ${f.folderPath}` : '',
-              `Título da Aula: ${f.name.replace(/\.[^/.]+$/, '')}`
-            ].filter(Boolean).join('\n');
+          let richText = String(f.text || f.markdownText || f.readingDocText || '').trim();
+          if (isSyntheticDriveSummary(richText) || richText.startsWith('Material importado')) {
+            try {
+              showToast(`📥 Baixando e extraindo o texto real: ${f.name}`);
+              richText = await downloadAndExtractDriveFileText(f);
+            } catch (error) {
+              console.error('[Drive] Material ignorado por falta de texto real:', f.name, error);
+              failedFiles.push({ name: f.name, reason: error.message });
+              continue;
+            }
           }
-          return {
+          queue.push({
             fileName: f.name,
             text: richText,
             disease: f.disease,
@@ -16197,8 +16246,14 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
             sizeStr: f.sizeStr || `${sizeMB >= 1 ? sizeMB.toFixed(1) + ' MB' : Math.round(sizeMB * 1024) + ' KB'}`,
             file: f,
             targetSemester: targetSemester || null
-          };
-        });
+          });
+        }
+
+        if (failedFiles.length > 0) {
+          console.warn('[Drive] Arquivos não importados por ausência de texto extraível:', failedFiles);
+          showToast(`⚠️ ${failedFiles.length} arquivo(s) não foram importados porque não foi possível obter o texto real. Nenhuma ficha resumida foi salva.`);
+        }
+        if (queue.length === 0) return;
 
         if (mode === 'all-at-once') {
           startItemByItemAllocationQueue(queue, true);
