@@ -100,6 +100,7 @@
       currentUser: null,
       userProfile: null,
       authMode: 'guest', // 'firebase' | 'guest'
+      googleSignInInProgress: false,
 
       init() {
         // Carrega dados locais persistidos do usuário
@@ -264,6 +265,10 @@
       },
 
       async signInWithGoogle() {
+        if (this.googleSignInInProgress) {
+          showToast('⏳ A janela de login Google já está aberta. Conclua ou feche-a antes de tentar novamente.');
+          return;
+        }
         // 1. Verificação se está rodando via file://
         if (window.location.protocol === 'file:') {
           const hint = document.getElementById('authLocalServerHint');
@@ -272,6 +277,7 @@
           return;
         }
 
+        this.googleSignInInProgress = true;
         const btnGoogle = document.getElementById('btnGoogleAuth');
         if (btnGoogle) {
           btnGoogle.disabled = true;
@@ -324,6 +330,7 @@
             const friendlyMsg = this.mapAuthErrorMessage(err.code || err.message);
             showAuthError(`Falha na autenticação Google (${err.code || 'erro'}): ${friendlyMsg}.`);
           } finally {
+            this.googleSignInInProgress = false;
             if (btnGoogle) {
               btnGoogle.disabled = false;
               btnGoogle.style.opacity = '1';
@@ -331,6 +338,11 @@
           }
         } else {
           showAuthError('Serviço de autenticação Firebase indisponível.');
+          this.googleSignInInProgress = false;
+          if (btnGoogle) {
+            btnGoogle.disabled = false;
+            btnGoogle.style.opacity = '1';
+          }
         }
       },
 
@@ -9612,7 +9624,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (typeof showToast === 'function') showToast('✏️ Nome do relatório atualizado.');
     }
 
-    async function openAcademicReportForMaterial(materialIdOrName, subjectName, displayName = '') {
+    async function emitAcademicReportForMaterial(materialIdOrName, subjectName, displayName = '', validatedTextOverride = '') {
       const modal = document.getElementById('readerModal');
       const content = document.getElementById('readerModalContent');
       const titleEl = document.getElementById('readerModalTitle');
@@ -9645,7 +9657,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const targetSubject = subjectName || currentStudySubject;
       let validatedText = '';
       try {
-        const validated = await MedTutorFirebaseService.getAuthoritativeMaterialText(targetMaterialId, targetSubject);
+        const validated = validatedTextOverride
+          ? { text: validatedTextOverride }
+          : await MedTutorFirebaseService.getAuthoritativeMaterialText(targetMaterialId, targetSubject);
         validatedText = String(validated?.text || '').trim();
         if (validatedText.length < 500 || isSyntheticDriveSummary(validatedText)) {
           throw new Error('O Firestore não contém texto clínico válido para este arquivo. O relatório não será emitido a partir de nome, tema ou tamanho do arquivo.');
@@ -9675,6 +9689,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (subtitleEl) subtitleEl.textContent = `Documento Formal de Estudo com Fixação TDAH • Diretrizes SUS / CFM / ENARE`;
 
       content.innerHTML = rep.html;
+    }
+
+    async function openAcademicReportForMaterial(materialIdOrName, subjectName, displayName = '') {
+      return openMaterialTextValidationModal(materialIdOrName, subjectName, 0, {
+        actionType: 'report',
+        displayName: displayName || materialIdOrName
+      });
     }
 
     async function openAcademicReportForSubject(subjectName) {
@@ -10386,6 +10407,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         subjectName: targetSubj,
         count: qCount,
         config: config || {},
+        actionType: config?.actionType || 'study',
+        displayName: config?.displayName || targetMat,
         docId: '',
         originalFirestoreText: '',
         currentText: ''
@@ -10406,16 +10429,25 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const subjEl = document.getElementById('validateModalSubjectBadge');
       const statsEl = document.getElementById('validateModalStatsBadge');
       const configEl = document.getElementById('validateModalConfigBadge');
+      const modalTitleEl = document.getElementById('validateModalTitle');
+      const sourceLabelEl = document.getElementById('validateModalSourceLabel');
       const alertEl = document.getElementById('validateModalQualityAlert');
       const textareaEl = document.getElementById('validateModalTextarea');
       const btnExec = document.getElementById('btnExecuteValidatedGeneration');
 
       if (titleEl) titleEl.textContent = targetMat ? `📄 Material: ${targetMat}` : `📚 Coletânea: ${targetSubj}`;
       if (subjEl) subjEl.textContent = `🏛️ Disciplina: ${targetSubj}`;
+      const isReportValidation = config?.actionType === 'report';
+      if (modalTitleEl) modalTitleEl.textContent = isReportValidation ? 'Validação do Texto para Relatório' : 'Validação do Texto Original da Aula';
+      if (sourceLabelEl) sourceLabelEl.innerHTML = isReportValidation
+        ? '<span>☁️ Fonte obrigatória do relatório: Cloud Firestore (<code>materiais_estudo</code>)</span>'
+        : '<span>☁️ Fonte Obrigatória e Exclusiva: Cloud Firestore (<code>materiais_estudo</code>)</span>';
       if (configEl) {
         const styleMap = { bloom: 'Acadêmico (Bloom)', enare: 'FGV / ENARE', enamed: 'ENAMED / DCNs' };
         const diffMap = { balanced: 'Balanceado', iniciante: 'Iniciante', intermediario: 'Intermediário', avancado: 'Avançado' };
-        configEl.textContent = `🎯 ${qCount} itens • ${styleMap[config.examStyle] || 'Bloom'} • Nível: ${diffMap[config.difficulty] || 'Balanceado'}`;
+        configEl.textContent = isReportValidation
+          ? '📄 Relatório acadêmico • conteúdo auditável'
+          : `🎯 ${qCount} itens • ${styleMap[config.examStyle] || 'Bloom'} • Nível: ${diffMap[config.difficulty] || 'Balanceado'}`;
       }
 
       if (statsEl) statsEl.textContent = '⏳ Carregando...';
@@ -10453,6 +10485,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (textareaEl) {
         textareaEl.value = text;
         textareaEl.disabled = false;
+        textareaEl.placeholder = text
+          ? 'Texto original recuperado do Firestore.'
+          : 'Nenhum texto clínico válido foi encontrado. Cole aqui o conteúdo original da aula para corrigir este material antes de continuar.';
         textareaEl.oninput = function() {
           updateValidationModalStats(this.value);
         };
@@ -10462,7 +10497,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         btnExec.disabled = requiresFirebaseAuth;
         btnExec.innerHTML = requiresFirebaseAuth
           ? '<span>🔐</span> Entre no Firebase para continuar'
-          : `<span>🚀</span> Validar & Gerar ${qCount} Questões`;
+          : (isReportValidation ? '<span>📄</span> Validar & Emitir Relatório' : `<span>🚀</span> Validar & Gerar ${qCount} Questões`);
       }
 
       updateValidationModalStats(text);
@@ -10517,8 +10552,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const textareaEl = document.getElementById('validateModalTextarea');
       const validatedText = (textareaEl ? textareaEl.value : '').trim();
 
-      if (validatedText.length < 30) {
-        showToast('⚠️ O texto precisa de pelo menos 30 caracteres para que a IA possa formular perguntas clínicas.');
+      const actionType = pendingValidatedStudyContext.actionType || 'study';
+      if (validatedText.length < (actionType === 'report' ? 500 : 30)) {
+        showToast(actionType === 'report'
+          ? '⚠️ O relatório exige ao menos 500 caracteres do conteúdo clínico original.'
+          : '⚠️ O texto precisa de pelo menos 30 caracteres para que a IA possa formular perguntas clínicas.');
         return;
       }
 
@@ -10533,6 +10571,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       // Fecha o modal de validação
       const modal = document.getElementById('modalValidateMaterialText');
       if (modal) modal.classList.remove('active');
+
+      if (actionType === 'report') {
+        await emitAcademicReportForMaterial(materialName, subjectName, config.displayName || materialName, validatedText);
+        return;
+      }
 
       // Executa a geração com o texto estritamente validado
       if (materialName) {
