@@ -258,9 +258,11 @@
 
           if (firebase.firestore) {
             firestoreDb = firebase.firestore();
-            try {
-              firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-            } catch (pe) {}
+            // O cache persistente multiaba do Firestore exige uma "primary lease".
+            // No Safari, uma aba restaurada ou uma extensão pode manter a lease e
+            // deixar leituras pendentes indefinidamente. Como o material é
+            // autoritativo na nuvem, usamos o cache de memória padrão do SDK:
+            // todas as janelas continuam funcionando, sem disputar a lease.
             isFirebaseCloudActive = true;
           }
 
@@ -10744,10 +10746,28 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       // 2. Busca o texto autoritativo estritamente no Firestore
       let result = null;
-      if (targetMat) {
-        result = await MedTutorFirebaseService.getAuthoritativeMaterialText(firestoreMaterialId, targetSubj);
-      } else {
-        result = await MedTutorFirebaseService.getAuthoritativeSubjectText(targetSubj);
+      try {
+        // Nunca deixe a tela em "Carregando" quando uma conexão WebChannel do
+        // Firestore estiver degradada. O conteúdo continua exclusivamente da
+        // nuvem, mas a pessoa recebe uma resposta clara e pode tentar de novo.
+        const firestoreTimeoutMs = 15000;
+        const timeout = new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error('A consulta ao Cloud Firestore demorou mais de 15 segundos. Verifique a conexão e tente recarregar o texto.')), firestoreTimeoutMs);
+        });
+        const loadAuthoritativeText = targetMat
+          ? MedTutorFirebaseService.getAuthoritativeMaterialText(firestoreMaterialId, targetSubj)
+          : MedTutorFirebaseService.getAuthoritativeSubjectText(targetSubj);
+        result = await Promise.race([loadAuthoritativeText, timeout]);
+      } catch (firestoreError) {
+        console.error('[Validação] Falha ou tempo excedido ao consultar texto autoritativo:', firestoreError);
+        result = {
+          text: '',
+          source: 'unavailable',
+          docId: '',
+          materialName: firestoreMaterialId || targetSubj,
+          subject: targetSubj,
+          error: firestoreError?.message || 'Não foi possível consultar o Cloud Firestore.'
+        };
       }
 
       const text = (result && typeof result.text === 'string') ? result.text.trim() : '';
