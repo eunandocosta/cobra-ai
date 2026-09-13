@@ -5670,6 +5670,60 @@
     .question-discussion-loading .loader-spinner { width: 16px; height: 16px; border-width: 2px; }
     .question-discussion-error { color: #ff8686; }
 
+    /* Preserva colunas no Chat, Quiz e Flashcard. Em telas estreitas, a rolagem
+       fica restrita à própria tabela para não deformar o card inteiro. */
+    .study-rich-text .doc-table-wrapper,
+    .chat-bubble .doc-table-wrapper,
+    .flashcard-side .doc-table-wrapper,
+    .quiz-box .doc-table-wrapper,
+    .question-discussion-answer .doc-table-wrapper,
+    .question-discussion-context .doc-table-wrapper {
+      max-width: 100%;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      margin: 10px 0;
+      border-color: var(--border);
+      background: var(--bg-surface);
+    }
+
+    .study-rich-text .doc-table,
+    .chat-bubble .doc-table,
+    .flashcard-side .doc-table,
+    .quiz-box .doc-table,
+    .question-discussion-answer .doc-table,
+    .question-discussion-context .doc-table {
+      width: max-content;
+      min-width: 520px;
+      max-width: none;
+      table-layout: auto;
+      background: var(--bg-surface);
+    }
+
+    .study-rich-text .doc-table th,
+    .chat-bubble .doc-table th,
+    .flashcard-side .doc-table th,
+    .quiz-box .doc-table th,
+    .question-discussion-answer .doc-table th,
+    .question-discussion-context .doc-table th {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border-color: var(--border);
+      white-space: nowrap;
+    }
+
+    .study-rich-text .doc-table td,
+    .chat-bubble .doc-table td,
+    .flashcard-side .doc-table td,
+    .quiz-box .doc-table td,
+    .question-discussion-answer .doc-table td,
+    .question-discussion-context .doc-table td {
+      color: var(--text-primary);
+      border-color: var(--border);
+      background: var(--bg-surface);
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+
     @media (display-mode: standalone) {
       .pwa-boot-splash {
         position: fixed;

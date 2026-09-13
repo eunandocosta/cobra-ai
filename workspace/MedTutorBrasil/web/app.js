@@ -10094,8 +10094,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const nextButton = document.getElementById('fcNextButton');
       if (previousButton) previousButton.disabled = list.length <= 1;
       if (nextButton) nextButton.disabled = list.length <= 1;
-      if (frontEl) frontEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(visibleQuestion) : visibleQuestion;
-      if (backEl) backEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.back || item.reference_answer || item.answer || '') : (item.flashcard?.back || item.reference_answer || item.answer || '');
+      if (frontEl) frontEl.innerHTML = formatStudyRichText(visibleQuestion);
+      if (backEl) backEl.innerHTML = formatStudyRichText(item.flashcard?.back || item.reference_answer || item.answer || '');
       if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item));
 
       if (visualBadge) {
@@ -10233,7 +10233,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       activeQuestionDiscussion = item;
       const questionText = sanitizeSharedQuestionStem(item.question || item.pergunta || item.flashcard?.front || '');
       const options = Array.isArray(item.quizOptions || item.alternativas) ? (item.quizOptions || item.alternativas) : [];
-      context.innerHTML = `<strong>${escapeHtml(item.flashcardTitle || item.topic || 'Questão em estudo')}</strong><p>${escapeHtml(questionText)}</p>${options.length ? `<span>${options.length} alternativas disponíveis no quiz</span>` : ''}`;
+      context.innerHTML = `<strong>${escapeHtml(item.flashcardTitle || item.topic || 'Questão em estudo')}</strong><div class="study-rich-text">${formatStudyRichText(questionText)}</div>${options.length ? `<span>${options.length} alternativas disponíveis no quiz</span>` : ''}`;
       answer.innerHTML = '';
       input.value = '';
       modal.classList.add('active');
@@ -10268,7 +10268,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         });
         const payload = await response.json();
         if (!response.ok || !payload.reply) throw new Error(payload.details || payload.error || 'Não foi possível gerar a explicação.');
-        answer.innerHTML = `<div class="question-discussion-answer-title">Resposta do tutor</div><div>${escapeHtml(payload.reply).replace(/\n/g, '<br>')}</div>`;
+        answer.innerHTML = `<div class="question-discussion-answer-title">Resposta do tutor</div><div class="study-rich-text">${formatAITextToHTML(payload.reply)}</div>`;
         if (typeof AppExpenseTracker !== 'undefined') {
           AppExpenseTracker.recordAction({ actionName: `Dúvida sobre questão: ${item.topic || item.subject || 'Estudo'}`, model: payload.generatorModel || 'gemini-3.5-flash', inputTokens: Number(payload.usage?.promptTokens) || 0, outputTokens: Number(payload.usage?.outputTokens) || 0 });
         }
@@ -10842,12 +10842,12 @@ Retorne EXCLUSIVAMENTE um JSON:
               <strong style="color: var(--neon); font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 4px;">
                 📋 Caso Clínico & Determinantes de Saúde:
               </strong>
-              ${(typeof formatInlineMd === 'function') ? formatInlineMd(item.vignette) : item.vignette}
+              ${formatStudyRichText(item.vignette)}
             </div>
           ` : ''}
 
           <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin: 8px 0 10px 0; color: var(--text-primary);">
-            ${(typeof formatInlineMd === 'function') ? formatInlineMd(item.question) : item.question}
+            ${formatStudyRichText(item.question)}
           </div>
 
           ${renderStudySupportImage(item)}
@@ -10867,7 +10867,7 @@ Retorne EXCLUSIVAMENTE um JSON:
               return `
                 <div class="${optClass}" id="opt_${item.id}_${optIdx}" onclick="answerQuizOption(this, ${optIdx === item.correctIndex}, '${item.id}', ${optIdx})">
                   <span style="font-weight: 700; width: 22px; flex-shrink: 0;">${String.fromCharCode(65 + optIdx)})</span>
-                  <span style="flex: 1;">${(typeof formatInlineMd === 'function') ? formatInlineMd(opt) : opt}</span>
+                  <span style="flex: 1;">${formatStudyRichText(opt)}</span>
                 </div>
               `;
             }).join('')}
@@ -18670,16 +18670,40 @@ Para cada material, retorne um objeto no JSON com:
         if (line.trim().startsWith('|') && line.trim().endsWith('|') && lines[i + 1] && /^\s*\|?\s*:?-+:?\s*(\|?\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1].trim())) {
           if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
           
-          const headerCells = line.trim().split('|').slice(1, -1).map(c => c.trim());
+          const splitTableCells = (tableLine) => {
+            const cells = [];
+            let cell = '';
+            let escaped = false;
+            let inCode = false;
+            const content = tableLine.trim().replace(/^\||\|$/g, '');
+            for (const char of content) {
+              if (char === '`' && !escaped) inCode = !inCode;
+              if (char === '|' && !escaped && !inCode) {
+                cells.push(cell.trim().replace(/\\\|/g, '|'));
+                cell = '';
+              } else {
+                cell += char;
+              }
+              escaped = char === '\\' && !escaped;
+              if (char !== '\\') escaped = false;
+            }
+            cells.push(cell.trim().replace(/\\\|/g, '|'));
+            return cells;
+          };
+          const headerCells = splitTableCells(line);
           i += 2; // Pula cabeçalho e separador
           let rowsHtml = '';
           while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-            const rowCells = lines[i].trim().split('|').slice(1, -1).map(c => c.trim());
+            let rowCells = splitTableCells(lines[i]);
+            if (rowCells.length > headerCells.length) {
+              rowCells = [...rowCells.slice(0, headerCells.length - 1), rowCells.slice(headerCells.length - 1).join(' | ')];
+            }
+            while (rowCells.length < headerCells.length) rowCells.push('');
             rowsHtml += '<tr>' + rowCells.map(c => '<td>' + formatInlineMd(c) + '</td>').join('') + '</tr>';
             i++;
           }
           html += `
-            <div class="doc-table-wrapper">
+            <div class="doc-table-wrapper" role="region" aria-label="Tabela do conteúdo" tabindex="0">
               <table class="doc-table">
                 <thead>
                   <tr>${headerCells.map(c => '<th>' + formatInlineMd(c) + '</th>').join('')}</tr>
@@ -18974,9 +18998,20 @@ Para cada material, retorne um objeto no JSON com:
 
       return s;
     }
+
+    function formatStudyRichText(value) {
+      const text = String(value || '');
+      const hasMarkdownTable = /(^|\n)\s*\|.+\|\s*\n\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/m.test(text);
+      const hasAsciiTable = /^\s*\+[-=+]+\+\s*$/m.test(text);
+      if ((hasMarkdownTable || hasAsciiTable) && typeof formatAITextToHTML === 'function') {
+        return `<div class="study-rich-text">${formatAITextToHTML(text)}</div>`;
+      }
+      return typeof formatInlineMd === 'function' ? formatInlineMd(text) : escapeHtml(text);
+    }
     if (typeof window !== 'undefined') {
       window.formatInlineMd = formatInlineMd;
       window.formatAITextToHTML = formatAITextToHTML;
+      window.formatStudyRichText = formatStudyRichText;
     }
 
     function regenerateLastResponse() {
