@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260913-doubts-chat-v2">
+  <link rel="stylesheet" href="/styles.css?v=20260913-doubts-structure-v3">
 </head>
 <body>
 
@@ -2532,18 +2532,20 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
   </button>
   <aside class="doubts-drawer" id="doubtsDrawer" aria-hidden="true" aria-label="Caderno de dúvidas">
     <div class="doubts-drawer-header">
-      <button class="doubts-icon-button" id="doubtsBackButton" type="button" onclick="goBackInDoubtsDrawer()" aria-label="Voltar" style="display:none;">←</button>
+      <button class="doubts-icon-button" id="doubtsBackButton" type="button" onclick="goBackInDoubtsDrawer()" aria-label="Voltar" style="display:none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/><path d="M8 12h10"/></svg></button>
       <div>
-        <p class="doubts-eyebrow">Caderno pessoal</p>
+        <p class="doubts-eyebrow" id="doubtsDrawerSubtitle">Caderno pessoal</p>
         <h2 id="doubtsDrawerTitle">Minhas dúvidas</h2>
       </div>
-      <button class="doubts-icon-button" type="button" onclick="closeDoubtsDrawer()" aria-label="Fechar">×</button>
+      <button class="doubts-icon-button" type="button" onclick="closeDoubtsDrawer()" aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="doubts-drawer-content" id="doubtsDrawerContent"></div>
     <div class="doubts-compose" id="doubtsCompose" style="display:none;">
-      <label class="sr-only" for="doubtsInput">Escreva uma dúvida ou anotação</label>
-      <textarea id="doubtsInput" rows="2" maxlength="4000" placeholder="Escreva uma dúvida para retomar depois..." onkeydown="handleDoubtInputKeydown(event)"></textarea>
-      <button type="button" onclick="saveDoubtEntry()" aria-label="Salvar anotação">Enviar ↑</button>
+      <label for="doubtsInput">Escreva uma dúvida ou anotação</label>
+      <div class="doubts-compose-row">
+        <textarea id="doubtsInput" rows="2" maxlength="4000" placeholder="Registre algo para retomar depois..." onkeydown="handleDoubtInputKeydown(event)"></textarea>
+        <button type="button" onclick="saveDoubtEntry()" aria-label="Salvar anotação" title="Salvar anotação"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4Z"/></svg><span>Enviar</span></button>
+      </div>
     </div>
   </aside>
   <div class="doubts-backdrop" id="doubtsBackdrop" onclick="closeDoubtsDrawer()" aria-hidden="true"></div>
@@ -2551,7 +2553,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260913-doubts-v1"></script>
+  <script defer src="/app.js?v=20260913-doubts-structure-v3"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

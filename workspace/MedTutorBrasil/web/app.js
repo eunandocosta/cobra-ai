@@ -15582,15 +15582,17 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
     function renderDoubtsDrawer() {
       const content = document.getElementById('doubtsDrawerContent');
       const title = document.getElementById('doubtsDrawerTitle');
+      const subtitle = document.getElementById('doubtsDrawerSubtitle');
       const backButton = document.getElementById('doubtsBackButton');
       const compose = document.getElementById('doubtsCompose');
-      if (!content || !title || !backButton || !compose) return;
+      if (!content || !title || !subtitle || !backButton || !compose) return;
 
       backButton.style.display = doubtsDrawerState.view === 'periods' ? 'none' : 'grid';
       compose.style.display = doubtsDrawerState.view === 'conversation' ? 'grid' : 'none';
 
       if (doubtsDrawerState.view === 'periods') {
         title.textContent = 'Escolha o período';
+        subtitle.textContent = 'Caderno pessoal';
         content.innerHTML = `<div class="doubts-period-list">${getDoubtPeriods().map(period => `
           <button class="doubts-choice" type="button" onclick="selectDoubtPeriod(${period.number})">
             <span>${escapeHtml(period.label)}</span><small>${period.subjects.length} matéria(s) ›</small>
@@ -15600,6 +15602,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
 
       if (doubtsDrawerState.view === 'subjects') {
         title.textContent = doubtsDrawerState.periodLabel;
+        subtitle.textContent = 'Escolha a matéria';
         const period = getDoubtPeriods().find(item => item.number === doubtsDrawerState.periodNumber);
         const subjects = period?.subjects || [];
         content.innerHTML = subjects.length
@@ -15612,6 +15615,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       }
 
       title.textContent = doubtsDrawerState.subjectName;
+      subtitle.textContent = `${doubtsDrawerState.periodLabel} • anotações pessoais`;
       const key = getDoubtNotebookKey(doubtsDrawerState.periodNumber, doubtsDrawerState.subjectName);
       const entries = Array.isArray(doubtsNotebook[key]?.entries) ? doubtsNotebook[key].entries : [];
       if (!entries.length) {
