@@ -16062,6 +16062,8 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       if (statusEl) {
         if (key) {
           statusEl.innerHTML = '<strong style="color: var(--neon);">⚡ IA Gemini 2.5 Flash-Lite Conectada</strong> (Menor Custo)';
+        } else if (window.__MEDTUTOR_BACKEND_GEMINI_CONFIGURED) {
+          statusEl.innerHTML = '<strong style="color: var(--neon);">⚡ Gemini conectado pelo servidor</strong> <span style="color: var(--text-muted); font-size: 10.5px;">(chave protegida)</span>';
         } else {
           statusEl.innerHTML = '<span>⚡ Motor Universal Local Ativo</span> <span style="color: var(--text-muted); font-size: 10.5px;">(100% Offline e Gratuito)</span>';
         }
@@ -17699,22 +17701,51 @@ Para cada material, retorne um objeto no JSON com:
       await new Promise(resolve => setTimeout(resolve, 50));
 
       let parsedSubjects = [];
-      const apiKey = getGeminiApiKey();
 
-      // 1. Tentar análise inteligente com Gemini se a chave estiver configurada
-      if (apiKey && clean.length > 20) {
+      // O upload usa o mesmo endpoint seguro do botão "Integrar à Grade": a chave
+      // fica exclusivamente no servidor e o conteúdo é analisado pelo Gemini.
+      try {
+        showToast('⚡ Analisando ementa com Gemini no servidor...');
+        let response;
         try {
-          showToast('⚡ Analisando ementa com IA Gemini em lotes curriculares...');
-          const geminiResult = await analyzeSyllabusWithGeminiInBatches(clean, apiKey);
-          if (geminiResult && geminiResult.length > 0) {
-            parsedSubjects = geminiResult;
-          }
-        } catch (e) {
-          console.warn('Falha na IA Gemini, recorrendo ao motor heurístico local:', e);
+          response = await fetch('/api/ementas/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rawText: clean })
+          });
+        } catch (_) {
+          response = await fetch('http://localhost:3001/api/ementas/processar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rawText: clean })
+          });
         }
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success || !Array.isArray(result.curriculum) || result.curriculum.length === 0) {
+          throw new Error(result.details || result.error || `Resposta inválida do servidor (${response.status})`);
+        }
+
+        universityCurriculum = result.curriculum;
+        expandedCurriculumPeriods.clear();
+        universityCurriculum.forEach((period, index) => expandedCurriculumPeriods.add(period.id || period.period || `period_${index}`));
+        try {
+          localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
+          localStorage.removeItem('medtutor_reset_clean');
+        } catch (storageError) {
+          console.warn('Erro ao salvar ementa no armazenamento local:', storageError);
+        }
+        if (typeof MedTutorFirebaseService !== 'undefined') MedTutorFirebaseService.saveCurriculum(universityCurriculum);
+        renderCurriculumGrid();
+        updateSubjectFilterMenus();
+        console.info('[Ementa] Análise concluída pelo Gemini do servidor.', { periods: result.curriculum.length, model: result.model || 'gemini-backend' });
+        showToast(`🎓 Ementa analisada pelo Gemini: ${result.curriculum.length} períodos integrados.`);
+        return;
+      } catch (backendError) {
+        console.warn('[Ementa] Gemini do servidor indisponível; usando parser local como contingência:', backendError.message);
+        showToast('⚠️ Gemini do servidor indisponível; aplicando leitura local de contingência.');
       }
 
-      // 2. Motor Heurístico Universal Local (Tiers 1 a 4)
+      // 2. Motor Heurístico Universal Local (somente contingência)
       if (!parsedSubjects || parsedSubjects.length === 0) {
         parsedSubjects = parseEmentaWithDescriptions(clean);
         if (parsedSubjects && parsedSubjects.length > 0 && typeof AppExpenseTracker !== 'undefined') {
