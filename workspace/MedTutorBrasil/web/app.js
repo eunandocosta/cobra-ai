@@ -15231,10 +15231,23 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
           }
 
           let extracted = '';
+          let extractedImageCount = 0;
           try {
             extracted = await extractTextFromFile(f);
           } catch (e) {
             console.warn('Erro na extração de texto do arquivo:', f.name, e);
+          }
+
+          // Em apresentações visualmente orientadas, a ausência de texto não é
+          // suficiente para concluir que o arquivo está vazio. Conta as mídias
+          // embutidas para orientar o estudante a usar a associação visual.
+          if ((!extracted || extracted.trim().length < 20) && /\.pptx?$/i.test(f.name || '')) {
+            try {
+              extractedImageCount = (await extractPptxEmbeddedImages(f, 12)).length;
+              console.info(`[MedTutor PPTX] "${f.name}": ${extractedImageCount} imagem(ns) e ${String(extracted || '').length} caractere(s) de texto extraído(s).`);
+            } catch (imageExtractionError) {
+              console.warn('[MedTutor PPTX] Não foi possível inspecionar as imagens do PowerPoint:', imageExtractionError);
+            }
           }
 
           const isPlaceholder = userText.startsWith('Material extraído do arquivo:') || userText.includes('arquivos selecionados para alocação');
@@ -15253,7 +15266,8 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
             text: combinedText,
             sizeStr: f.sizeStr || `${sizeMB >= 1 ? sizeMB.toFixed(1) + ' MB' : Math.round(sizeMB * 1024) + ' KB'}`,
             file: f,
-            visualAssociationAuthorized
+            visualAssociationAuthorized,
+            extractedImageCount
           });
 
           // Registra a leitura imediatamente, sem depender da confirmação de
@@ -15263,14 +15277,16 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
             originalFileName: f.name,
             uploadInputChars: String(combinedText || '').length,
             markdownText: '',
-            aiEngine: 'Extração local (PDF.js / leitor de arquivo)',
-            clinicalImages: []
+            aiEngine: /\.pptx?$/i.test(f.name || '') ? 'Extração local de slides PowerPoint (PPTX)' : 'Extração local (PDF.js / leitor de arquivo)',
+            clinicalImages: Array.from({ length: extractedImageCount })
           };
           reportUploadDiagnostic(extractionDiagnostic, 'texto_extraido');
           if (!combinedText || combinedText.trim().length < 20) {
-            console.warn(`[Upload MedTutor] Nenhum texto selecionável foi extraído de "${f.name}".`);
+            console.warn(`[Upload MedTutor] Nenhum texto selecionável foi extraído de "${f.name}". Imagens encontradas: ${extractedImageCount}.`);
             if (!visualAssociationAuthorized) {
-              showToast('⚠️ Este arquivo não possui texto selecionável. Para PDF/slide visual, marque “Interpretar páginas visuais com Gemini”.', 5500);
+              showToast(extractedImageCount
+                ? `⚠️ Este PowerPoint contém ${extractedImageCount} imagem(ns), mas não tem texto selecionável. Marque “Interpretar páginas visuais com Gemini”.`
+                : '⚠️ Não foi possível localizar texto ou imagens legíveis neste arquivo. Verifique se o PPTX abre normalmente no PowerPoint.', 6000);
             }
           }
         }
