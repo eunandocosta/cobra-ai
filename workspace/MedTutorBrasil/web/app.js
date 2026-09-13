@@ -1905,6 +1905,34 @@
     }
     window.updateUploadProgress = updateUploadProgress;
 
+    // Cada leitura local precisa ser observável: mantém a interface e o
+    // terminal atualizados e encerra a espera caso uma biblioteca/arquivo
+    // bloqueie a extração indefinidamente.
+    async function runUploadStepWithFeedback(task, { fileName, label, progress = 20, timeoutMs = 35_000 }) {
+      const startedAt = Date.now();
+      let heartbeat = null;
+      const emitHeartbeat = () => {
+        const elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+        updateUploadProgress('1. Lendo arquivo...', `${label} (${elapsed}s). O processamento continua ativo...`, progress);
+        reportUploadDiagnostic({
+          originalFileName: fileName,
+          aiEngine: `Leitura local em andamento: ${label}`,
+          uploadInputChars: 0,
+          markdownText: '',
+          clinicalImages: []
+        }, 'processando');
+      };
+      heartbeat = setInterval(emitHeartbeat, 5_000);
+      try {
+        return await Promise.race([
+          Promise.resolve().then(task),
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`Tempo limite de ${Math.round(timeoutMs / 1000)}s durante ${label}.`)), timeoutMs))
+        ]);
+      } finally {
+        clearInterval(heartbeat);
+      }
+    }
+
     function openUploadMaterialModal() { openGeneralUploadModal(); }
     function closeModals() { 
       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); 
@@ -15232,10 +15260,28 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
 
           let extracted = '';
           let extractedImageCount = 0;
+          reportUploadDiagnostic({
+            originalFileName: f.name,
+            aiEngine: 'Leitura local iniciada',
+            uploadInputChars: 0,
+            markdownText: '',
+            clinicalImages: []
+          }, 'iniciando');
           try {
-            extracted = await extractTextFromFile(f);
+            extracted = await runUploadStepWithFeedback(
+              () => extractTextFromFile(f),
+              { fileName: f.name, label: 'extraindo texto do arquivo', progress: 22, timeoutMs: 35_000 }
+            );
           } catch (e) {
             console.warn('Erro na extração de texto do arquivo:', f.name, e);
+            reportUploadDiagnostic({
+              originalFileName: f.name,
+              aiEngine: `Leitura local interrompida: ${e.message || 'erro desconhecido'}`,
+              uploadInputChars: 0,
+              markdownText: '',
+              clinicalImages: []
+            }, 'timeout');
+            showToast(`⚠️ A leitura de "${f.name}" foi interrompida: ${e.message || 'erro desconhecido'}`, 6500);
           }
 
           // Em apresentações visualmente orientadas, a ausência de texto não é
@@ -15243,7 +15289,10 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
           // embutidas para orientar o estudante a usar a associação visual.
           if ((!extracted || extracted.trim().length < 20) && /\.pptx?$/i.test(f.name || '')) {
             try {
-              extractedImageCount = (await extractPptxEmbeddedImages(f, 12)).length;
+              extractedImageCount = (await runUploadStepWithFeedback(
+                () => extractPptxEmbeddedImages(f, 12),
+                { fileName: f.name, label: 'inspecionando imagens do PowerPoint', progress: 32, timeoutMs: 25_000 }
+              )).length;
               console.info(`[MedTutor PPTX] "${f.name}": ${extractedImageCount} imagem(ns) e ${String(extracted || '').length} caractere(s) de texto extraído(s).`);
             } catch (imageExtractionError) {
               console.warn('[MedTutor PPTX] Não foi possível inspecionar as imagens do PowerPoint:', imageExtractionError);
