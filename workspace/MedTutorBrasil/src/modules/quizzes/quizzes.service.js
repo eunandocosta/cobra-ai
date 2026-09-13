@@ -369,6 +369,8 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           correctIndex: correctIdx,
           correctAnswerText: correctAnswer,
           resposta_correta: correctAnswer,
+          answer: correctAnswer,
+          reference_answer: correctAnswer,
           justificativa: q.justificativa,
           explanation: q.justificativa,
           perola_clinica: q.perola_clinica,
