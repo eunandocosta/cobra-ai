@@ -1410,6 +1410,18 @@
         const fileName = `${materialId || 'aula'}_fig_${imgIndex || 0}.${extension}`;
         const storagePath = `usuarios/${uid}/imagens_aulas/${fileName}`;
 
+        // O perfil mostrado na interface não substitui Firebase Auth. As regras
+        // de Storage usam request.auth.uid e recusam qualquer UID apenas local.
+        if (!firebaseAuth?.currentUser || firebaseAuth.currentUser.uid !== uid) {
+          reportFirestoreSyncIssue('storage_auth_required', {
+            code: 'storage/auth-session-mismatch',
+            message: 'A imagem não foi enviada porque não há sessão Firebase Auth real para o UID do material.',
+            uid,
+            authenticatedUid: firebaseAuth?.currentUser?.uid || null
+          });
+          return imageSource;
+        }
+
         if (firebaseStorage && isFirebaseCloudActive) {
           try {
             const storageRef = firebaseStorage.ref(storagePath);
@@ -1431,6 +1443,12 @@
             return downloadUrl;
           } catch (e) {
             console.warn('[Firebase Storage] Falha ao enviar para nuvem, mantendo URL local:', e);
+            reportFirestoreSyncIssue('storage_upload_failed', {
+              code: e?.code || 'storage/upload-failed',
+              message: e?.message || 'Falha desconhecida ao enviar imagem para o Firebase Storage.',
+              uid,
+              authenticatedUid: firebaseAuth?.currentUser?.uid || null
+            });
           }
         }
 
