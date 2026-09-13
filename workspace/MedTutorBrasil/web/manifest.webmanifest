@@ -1,0 +1,21 @@
+{
+  "name": "MedTutor Brasil",
+  "short_name": "MedTutor",
+  "description": "Assistente inteligente para estudo médico, flashcards e quizzes.",
+  "id": "/",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#08120f",
+  "theme_color": "#00d66b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/medtutor-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

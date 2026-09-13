@@ -3,7 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#00d66b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MedTutor">
   <title>MedTutor Brasil - Assistente Inteligente para Medicina</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/medtutor-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/medtutor-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -18,6 +26,12 @@
   <link rel="stylesheet" href="/styles.css?v=20260913-mobile-flows-v1">
 </head>
 <body>
+
+  <div class="pwa-boot-splash" id="pwaBootSplash" aria-hidden="true">
+    <div class="pwa-boot-mark">+</div>
+    <strong>MedTutor Brasil</strong>
+    <span>Preparando seu espaço de estudo</span>
+  </div>
 
   <div class="app-root">
 
@@ -2515,5 +2529,15 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
   <script defer src="/app.js?v=20260911-flashcard-title-difficulty-v1"></script>
+  <script>
+    window.addEventListener('load', () => {
+      document.getElementById('pwaBootSplash')?.classList.add('is-ready');
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js').catch(error => {
+          console.warn('[PWA] Não foi possível preparar o modo offline:', error);
+        });
+      }
+    });
+  </script>
 </body>
 </html>
