@@ -10917,6 +10917,23 @@ Retorne EXCLUSIVAMENTE um JSON:
       }));
     }
 
+    // O mesmo material pode chegar do upload, Drive ou relatório pedagógico, cada
+    // origem preservando o texto em uma propriedade diferente. Centralizar essa
+    // leitura impede que uma disciplina pareça "sem conteúdo" apenas por ter sido
+    // importada por outro caminho.
+    function getMaterialStudyText(material = {}) {
+      const source = material.markdownText ||
+        material.conteudo_md ||
+        material.readingDocText ||
+        material.extractedText ||
+        material.text ||
+        material.content ||
+        material.conteudo ||
+        (material.pedagogicalSynthesis ? JSON.stringify(material.pedagogicalSynthesis) : '') ||
+        '';
+      return String(source).trim();
+    }
+
     // 4.4 Geração Sob Demanda: IA Gemini + Motor Local MedCopilot
     async function generateUnifiedStudyForMaterial(materialName, subjectName, count, config = {}) {
       const targetSubj = subjectName || currentStudySubject;
@@ -10931,12 +10948,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       };
 
       // 1. Resgata o texto completo do arquivo em qualquer propriedade onde ele possa ter sido salvo
-      let slideText = targetFile.markdownText || 
-                      targetFile.conteudo_md || 
-                      targetFile.text || 
-                      targetFile.readingDocText || 
-                      (targetFile.pedagogicalSynthesis ? JSON.stringify(targetFile.pedagogicalSynthesis) : '') || 
-                      '';
+      let slideText = getMaterialStudyText(targetFile);
 
       // 2. Limpeza profunda: remove índices, sumários e cabeçalhos de módulos acadêmicos
       if (slideText) {
@@ -11032,10 +11044,10 @@ Retorne EXCLUSIVAMENTE um JSON:
           if (totalCreated >= qCount) break;
           const m = materials[mIdx];
           const toGen = (mIdx === materials.length - 1) ? (qCount - totalCreated) : perMat;
-          const slideText = m.readingDocText || m.text || '';
+          const slideText = getMaterialStudyText(m);
           let createdForMat = null;
 
-          if (slideText) {
+          if (slideText.length >= 30) {
             createdForMat = await generateStudyItemsSequentially(
               slideText,
               { materialName: m.name, subjectName: targetSubj, disease: m.disease || m.name },
