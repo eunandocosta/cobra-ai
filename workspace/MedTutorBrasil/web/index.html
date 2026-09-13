@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260913-mobile-flows-v1">
+  <link rel="stylesheet" href="/styles.css?v=20260913-doubts-v1">
 </head>
 <body>
 
@@ -2525,10 +2525,33 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     </div>
   </div>
 
+  <!-- CADERNO PESSOAL DE DÚVIDAS -->
+  <button class="doubts-fab" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir caderno de dúvidas">
+    <span class="doubts-fab-icon">?</span>
+    <span>Dúvidas</span>
+  </button>
+  <aside class="doubts-drawer" id="doubtsDrawer" aria-hidden="true" aria-label="Caderno de dúvidas">
+    <div class="doubts-drawer-header">
+      <button class="doubts-icon-button" id="doubtsBackButton" type="button" onclick="goBackInDoubtsDrawer()" aria-label="Voltar" style="display:none;">←</button>
+      <div>
+        <p class="doubts-eyebrow">Caderno pessoal</p>
+        <h2 id="doubtsDrawerTitle">Minhas dúvidas</h2>
+      </div>
+      <button class="doubts-icon-button" type="button" onclick="closeDoubtsDrawer()" aria-label="Fechar">×</button>
+    </div>
+    <div class="doubts-drawer-content" id="doubtsDrawerContent"></div>
+    <div class="doubts-compose" id="doubtsCompose" style="display:none;">
+      <label class="sr-only" for="doubtsInput">Escreva uma dúvida ou anotação</label>
+      <textarea id="doubtsInput" rows="2" maxlength="4000" placeholder="Escreva uma dúvida para retomar depois..." onkeydown="handleDoubtInputKeydown(event)"></textarea>
+      <button type="button" onclick="saveDoubtEntry()" aria-label="Salvar anotação">Enviar ↑</button>
+    </div>
+  </aside>
+  <div class="doubts-backdrop" id="doubtsBackdrop" onclick="closeDoubtsDrawer()" aria-hidden="true"></div>
+
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260911-flashcard-title-difficulty-v1"></script>
+  <script defer src="/app.js?v=20260913-doubts-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

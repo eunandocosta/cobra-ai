@@ -15456,6 +15456,204 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       return list;
     }
 
+    // Caderno de dúvidas: é uma conversa privada do estudante com suas próprias
+    // anotações, organizada por período e disciplina, sem qualquer envio à IA.
+    var doubtsNotebook = {};
+    var doubtsDrawerState = { view: 'periods', periodNumber: null, periodLabel: '', subjectName: '' };
+
+    function getDoubtsStorageOwner() {
+      if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.getUserId === 'function') {
+        return MedTutorFirebaseService.getUserId();
+      }
+      return (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser?.uid) || 'guest';
+    }
+
+    function getDoubtNotebookKey(periodNumber, subjectName) {
+      return `${periodNumber || 'sem-periodo'}::${String(subjectName || '').trim().toLowerCase()}`;
+    }
+
+    function getDoubtPeriods() {
+      const periods = Array.from({ length: 12 }, (_, index) => ({
+        number: index + 1,
+        label: `${index + 1}º Período`,
+        subjects: []
+      }));
+      (universityCurriculum || []).forEach(period => {
+        const match = String(period?.period || '').match(/(\d{1,2})/);
+        const number = Number(match?.[1]);
+        if (!number || number < 1 || number > 12) return;
+        const target = periods[number - 1];
+        target.label = period.period || target.label;
+        (period.subjects || []).forEach(subject => {
+          const name = typeof subject === 'string' ? subject : subject?.name;
+          if (name && !target.subjects.some(existing => existing.name === name)) {
+            target.subjects.push({ name, period: target.label });
+          }
+        });
+      });
+
+      // Matérias já utilizadas no app continuam acessíveis mesmo antes da ementa.
+      if (typeof currentStudySubject !== 'undefined' && currentStudySubject) {
+        const fallback = periods.find(period => period.subjects.some(subject => subject.name === currentStudySubject));
+        if (!fallback) periods[0].subjects.push({ name: currentStudySubject, period: periods[0].label });
+      }
+      return periods;
+    }
+
+    function loadDoubtsNotebook() {
+      try {
+        const saved = localStorage.getItem('medtutor_doubts_notebook_v1');
+        doubtsNotebook = saved ? JSON.parse(saved) || {} : {};
+      } catch (error) {
+        doubtsNotebook = {};
+      }
+      if (typeof MedTutorLocalDB !== 'undefined') {
+        MedTutorLocalDB.get('doubts_notebook', getDoubtsStorageOwner()).then(saved => {
+          if (saved && typeof saved === 'object') {
+            doubtsNotebook = saved;
+            if (document.getElementById('doubtsDrawer')?.classList.contains('open')) renderDoubtsDrawer();
+          }
+        }).catch(() => {});
+      }
+    }
+
+    function persistDoubtsNotebook() {
+      try {
+        localStorage.setItem('medtutor_doubts_notebook_v1', JSON.stringify(doubtsNotebook));
+      } catch (error) {
+        console.warn('[Dúvidas] Não foi possível salvar localmente:', error);
+      }
+      if (typeof MedTutorLocalDB !== 'undefined') {
+        MedTutorLocalDB.set('doubts_notebook', getDoubtsStorageOwner(), doubtsNotebook).catch(() => {});
+      }
+    }
+
+    function openDoubtsDrawer() {
+      const drawer = document.getElementById('doubtsDrawer');
+      const backdrop = document.getElementById('doubtsBackdrop');
+      if (!drawer) return;
+      drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
+      backdrop?.classList.add('open');
+      doubtsDrawerState = { view: 'periods', periodNumber: null, periodLabel: '', subjectName: '' };
+      renderDoubtsDrawer();
+    }
+
+    function closeDoubtsDrawer() {
+      const drawer = document.getElementById('doubtsDrawer');
+      drawer?.classList.remove('open');
+      drawer?.setAttribute('aria-hidden', 'true');
+      document.getElementById('doubtsBackdrop')?.classList.remove('open');
+    }
+
+    function goBackInDoubtsDrawer() {
+      if (doubtsDrawerState.view === 'conversation') {
+        doubtsDrawerState.view = 'subjects';
+      } else if (doubtsDrawerState.view === 'subjects') {
+        doubtsDrawerState = { view: 'periods', periodNumber: null, periodLabel: '', subjectName: '' };
+      } else {
+        closeDoubtsDrawer();
+        return;
+      }
+      renderDoubtsDrawer();
+    }
+
+    function selectDoubtPeriod(number) {
+      const period = getDoubtPeriods().find(item => item.number === number);
+      if (!period) return;
+      doubtsDrawerState = { view: 'subjects', periodNumber: number, periodLabel: period.label, subjectName: '' };
+      renderDoubtsDrawer();
+    }
+
+    function selectDoubtSubject(subjectName) {
+      doubtsDrawerState.subjectName = subjectName;
+      doubtsDrawerState.view = 'conversation';
+      renderDoubtsDrawer();
+    }
+
+    function formatDoubtDate(timestamp) {
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(timestamp));
+    }
+
+    function formatDoubtTime(timestamp) {
+      return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
+    }
+
+    function renderDoubtsDrawer() {
+      const content = document.getElementById('doubtsDrawerContent');
+      const title = document.getElementById('doubtsDrawerTitle');
+      const backButton = document.getElementById('doubtsBackButton');
+      const compose = document.getElementById('doubtsCompose');
+      if (!content || !title || !backButton || !compose) return;
+
+      backButton.style.display = doubtsDrawerState.view === 'periods' ? 'none' : 'grid';
+      compose.style.display = doubtsDrawerState.view === 'conversation' ? 'grid' : 'none';
+
+      if (doubtsDrawerState.view === 'periods') {
+        title.textContent = 'Escolha o período';
+        content.innerHTML = `<div class="doubts-period-list">${getDoubtPeriods().map(period => `
+          <button class="doubts-choice" type="button" onclick="selectDoubtPeriod(${period.number})">
+            <span>${escapeHtml(period.label)}</span><small>${period.subjects.length} matéria(s) ›</small>
+          </button>`).join('')}</div>`;
+        return;
+      }
+
+      if (doubtsDrawerState.view === 'subjects') {
+        title.textContent = doubtsDrawerState.periodLabel;
+        const period = getDoubtPeriods().find(item => item.number === doubtsDrawerState.periodNumber);
+        const subjects = period?.subjects || [];
+        content.innerHTML = subjects.length
+          ? `<div class="doubts-subject-list">${subjects.map(subject => `
+              <button class="doubts-choice" type="button" data-subject="${encodeURIComponent(subject.name)}" onclick="selectDoubtSubject(decodeURIComponent(this.dataset.subject))">
+                <span>${escapeHtml(subject.name)}</span><small>anotar ›</small>
+              </button>`).join('')}</div>`
+          : '<p class="doubts-empty">Ainda não há matérias salvas neste período. Importe a ementa ou escolha outro período.</p>';
+        return;
+      }
+
+      title.textContent = doubtsDrawerState.subjectName;
+      const key = getDoubtNotebookKey(doubtsDrawerState.periodNumber, doubtsDrawerState.subjectName);
+      const entries = Array.isArray(doubtsNotebook[key]?.entries) ? doubtsNotebook[key].entries : [];
+      if (!entries.length) {
+        content.innerHTML = '<p class="doubts-empty">Este é seu espaço para registrar dúvidas. Escreva abaixo para criar a primeira anotação.</p>';
+      } else {
+        let lastDate = '';
+        content.innerHTML = entries.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(entry => {
+          const date = formatDoubtDate(entry.createdAt);
+          const divider = date !== lastDate ? `<div class="doubts-date-divider">${escapeHtml(date)}</div>` : '';
+          lastDate = date;
+          return `${divider}<article class="doubt-message"><div>${escapeHtml(entry.text).replace(/\n/g, '<br>')}</div><time datetime="${escapeHtml(entry.createdAt)}">${escapeHtml(formatDoubtTime(entry.createdAt))}</time></article>`;
+        }).join('');
+      }
+      requestAnimationFrame(() => { content.scrollTop = content.scrollHeight; });
+    }
+
+    function saveDoubtEntry() {
+      if (doubtsDrawerState.view !== 'conversation') return;
+      const input = document.getElementById('doubtsInput');
+      const text = String(input?.value || '').trim();
+      if (!text) return;
+      const key = getDoubtNotebookKey(doubtsDrawerState.periodNumber, doubtsDrawerState.subjectName);
+      const notebook = doubtsNotebook[key] || {
+        periodNumber: doubtsDrawerState.periodNumber,
+        periodLabel: doubtsDrawerState.periodLabel,
+        subjectName: doubtsDrawerState.subjectName,
+        entries: []
+      };
+      notebook.entries.push({ id: `doubt-${Date.now()}`, text, createdAt: new Date().toISOString() });
+      doubtsNotebook[key] = notebook;
+      if (input) input.value = '';
+      persistDoubtsNotebook();
+      renderDoubtsDrawer();
+    }
+
+    function handleDoubtInputKeydown(event) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        saveDoubtEntry();
+      }
+    }
+
     function getDisciplineMaterialsCount(subjectName) {
       if (!chatDriveMaterials || chatDriveMaterials.length === 0) return 0;
       const sLower = subjectName.toLowerCase();
@@ -22311,6 +22509,7 @@ ${textSample}
     renderCurriculumGrid();
     updateGeminiKeyBadge();
     setupMobileChatDrawer();
+    loadDoubtsNotebook();
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)
     if (typeof MedTutorAuthService !== 'undefined') {
