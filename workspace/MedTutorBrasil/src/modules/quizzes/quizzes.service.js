@@ -226,8 +226,11 @@ class QuizzesService {
       payload.conteudoMd,
       payload.markdownText,
       payload.text,
+      payload.texto,
       payload.conteudo,
-      payload.content
+      payload.content,
+      payload.corpo,
+      payload.body
     ].filter(c => typeof c === 'string' && c.trim().length > 0);
     candidates.sort((a, b) => b.length - a.length);
     const materialText = candidates[0] || '';
@@ -647,7 +650,17 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     try {
       const result = await runWithAiLimit(() => model.generateContent(prompt));
       const responseText = result.response.text();
-      let parsed = JSON.parse(responseText);
+      let parsed;
+      try {
+        parsed = JSON.parse(responseText);
+      } catch (parseErr) {
+        const cleaned = responseText
+          .replace(/```json\s*/gi, '')
+          .replace(/```\s*$/gi, '')
+          .replace(/,\s*([}\]])/g, '$1')
+          .trim();
+        parsed = JSON.parse(cleaned);
+      }
 
       let reusedCount = 0;
       let genCount = 0;

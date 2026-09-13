@@ -111,6 +111,7 @@
           const savedAuth = localStorage.getItem('medtutor_auth_user');
           if (savedAuth) {
             this.currentUser = JSON.parse(savedAuth);
+            this.authMode = 'firebase';
           }
         } catch (e) {}
 
@@ -188,7 +189,7 @@
               });
             }
 
-            firebaseAuth.onAuthStateChanged((user) => {
+            firebaseAuth.onAuthStateChanged(async (user) => {
               if (user) {
                 this.currentUser = {
                   uid: user.uid,
@@ -198,10 +199,16 @@
                 };
                 this.authMode = 'firebase';
                 localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-                this.fetchUserProfileFromFirestore(user.uid);
+                await this.fetchUserProfileFromFirestore(user.uid);
+                await MedTutorFirebaseService.loadAllDataFromPersistence();
                 this.updateUserTopbarUI();
                 const authScreen = document.getElementById('authScreenContainer');
                 if (authScreen) authScreen.classList.remove('active');
+                if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
+                if (typeof renderDashboardView === 'function') renderDashboardView();
+                if (typeof renderCurriculumView === 'function') renderCurriculumView();
+                if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
+                if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
               }
             });
           }
@@ -355,7 +362,13 @@
             showToast('✓ Login realizado com sucesso!');
             document.getElementById('authScreenContainer').classList.remove('active');
             await this.fetchUserProfileFromFirestore(cred.user.uid);
+            await MedTutorFirebaseService.loadAllDataFromPersistence();
             this.updateUserTopbarUI();
+            if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
+            if (typeof renderDashboardView === 'function') renderDashboardView();
+            if (typeof renderCurriculumView === 'function') renderCurriculumView();
+            if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
+            if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
             return true;
           } catch (err) {
             showAuthError(this.mapAuthErrorMessage(err.code || err.message));
@@ -540,8 +553,12 @@
         m.rawText,
         m.fullText,
         m.text,
+        m.texto,
         m.content,
         m.conteudo,
+        m.corpo,
+        m.body,
+        m.descricao,
         m.relatorio_academico?.conteudo_md,
         m.relatorio_academico?.markdown,
         m.academicReport?.conteudo_md,
@@ -1106,25 +1123,51 @@
             if (!matsSnap.empty) {
               const cloudMats = [];
               for (const doc of matsSnap.docs) {
-                const material = doc.data();
+                const material = { ...doc.data(), id: doc.id };
+                let completeChunksText = '';
                 if (material.conteudo_armazenamento === 'chunks_v1') {
                   try {
-                    const completeText = await this.readMaterialTextChunks(doc.ref, Number(material.conteudo_chunks) || 0);
-                    const currentLen = String(material.material_md || material.markdownText || material.conteudo_md || material.text || '').length;
-                    if (completeText && (completeText.length > currentLen || completeText.length >= Number(material.conteudo_caracteres || 0) * 0.85)) {
-                      material.material_md = completeText;
-                      material.markdownText = completeText;
-                      material.conteudo_md = completeText;
-                      material.text = completeText;
-                    }
+                    completeChunksText = await this.readMaterialTextChunks(doc.ref, Number(material.conteudo_chunks) || 0);
                   } catch (chunkError) {
                     console.warn('[Firestore] Não foi possível reconstruir o Markdown do material:', doc.id, chunkError);
                   }
                 }
+
+                // Considera o maior texto entre o documento raiz do Firestore e a subcoleção de chunks
+                const firestoreCandidates = [
+                  completeChunksText,
+                  material.material_md,
+                  material.materialMd,
+                  material.conteudo_md,
+                  material.conteudoMd,
+                  material.markdownText,
+                  material.markdown,
+                  material.texto,
+                  material.text,
+                  material.conteudo,
+                  material.content,
+                  material.corpo,
+                  material.body
+                ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+                firestoreCandidates.sort((a, b) => b.length - a.length);
+                const bestFirestoreText = firestoreCandidates[0] || '';
+
+                if (bestFirestoreText) {
+                  material.material_md = bestFirestoreText;
+                  material.markdownText = bestFirestoreText;
+                  material.conteudo_md = bestFirestoreText;
+                  material.text = bestFirestoreText;
+                }
+
                 const normalized = normalizeMaterial(material);
                 // Proteção contra regressão de dados: se a versão do IndexedDB tiver mais conteúdo
                 // do que a versão retornada pelo Firestore, preserva o conteúdo local completo.
-                const localMat = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m => m.id === normalized.id || m.name === normalized.name);
+                // Mas se a versão do Firestore for igual ou mais completa, ela prevalece!
+                const localMat = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m =>
+                  m.id === normalized.id ||
+                  m.name === normalized.name ||
+                  normalizeStudyComparisonText(m.name) === normalizeStudyComparisonText(normalized.name)
+                );
                 if (localMat) {
                   const localCandidates = [
                     localMat.material_md,
@@ -1133,7 +1176,11 @@
                     localMat.conteudoMd,
                     localMat.markdownText,
                     localMat.markdown,
-                    localMat.text
+                    localMat.texto,
+                    localMat.text,
+                    localMat.conteudo,
+                    localMat.corpo,
+                    localMat.body
                   ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
                   localCandidates.sort((a, b) => b.length - a.length);
                   const localBest = localCandidates[0] || '';
@@ -1145,7 +1192,11 @@
                     normalized.conteudoMd,
                     normalized.markdownText,
                     normalized.markdown,
-                    normalized.text
+                    normalized.texto,
+                    normalized.text,
+                    normalized.conteudo,
+                    normalized.corpo,
+                    normalized.body
                   ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
                   normCandidates.sort((a, b) => b.length - a.length);
                   const normBest = normCandidates[0] || '';
@@ -11384,8 +11435,12 @@ Retorne EXCLUSIVAMENTE um JSON:
         material.rawText,
         material.fullText,
         material.text,
+        material.texto,
         material.content,
         material.conteudo,
+        material.corpo,
+        material.body,
+        material.descricao,
         material.readingDocText,
         material.relatorio_academico?.conteudo_md,
         material.relatorio_academico?.markdown,
@@ -11409,18 +11464,30 @@ Retorne EXCLUSIVAMENTE um JSON:
       const qCount = Math.max(1, Math.min(30, count || 5));
       const materials = getMaterialsForSubject(targetSubj);
       const normalizedMaterialName = normalizeStudyComparisonText(materialName);
-      const targetFile = materials.find(m => m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
-        [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)) || {
-        name: materialName, 
-        disease: materialName, 
-        topic: materialName 
-      };
+      let targetFile = materials.find(m => m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
+        [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName));
+
+      // Se não encontrou na disciplina selecionada, busca em TODAS as disciplinas de chatDriveMaterials
+      if (!targetFile && Array.isArray(chatDriveMaterials)) {
+        targetFile = chatDriveMaterials.find(m =>
+          m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
+          [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)
+        );
+      }
+
+      if (!targetFile) {
+        targetFile = {
+          name: materialName,
+          disease: materialName,
+          topic: materialName
+        };
+      }
 
       // 1. Resgata o texto completo do arquivo em qualquer propriedade onde ele possa ter sido salvo
       let slideText = getMaterialStudyText(targetFile);
 
-      // Se o targetFile tiver texto curto (< 500 chars), busca no banco geral de materiais da sessão
-      if ((!slideText || slideText.length < 500) && Array.isArray(chatDriveMaterials)) {
+      // Sempre busca no banco geral de materiais da sessão para garantir a versão mais completa e longa disponível
+      if (Array.isArray(chatDriveMaterials)) {
         const found = chatDriveMaterials.find(m =>
           m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
           [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)

@@ -13,8 +13,11 @@ class QuizzesController {
         payload.conteudoMd,
         payload.markdownText,
         payload.text,
+        payload.texto,
         payload.conteudo,
-        payload.content
+        payload.content,
+        payload.corpo,
+        payload.body
       ].filter(c => typeof c === 'string' && c.trim().length > 0);
       candidates.sort((a, b) => b.length - a.length);
       const materialText = candidates[0] || '';
