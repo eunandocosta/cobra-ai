@@ -3691,7 +3691,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return [];
     }
 
-    async function attachOriginalDocumentImages(material, sourceFile) {
+    async function attachOriginalDocumentImages(material, sourceFile, visualAssociations = []) {
       if (!material || !sourceFile) return;
       const rawImages = await extractOriginalDocumentImages(sourceFile);
       const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages.slice(0, 10);
@@ -3701,15 +3701,73 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const image = selectedImages[index];
         const url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
         if (!/^https?:\/\//i.test(url || '')) continue; // Nunca grava Base64 no Markdown/Firestore
-        uploadedImages.push({ ...image, imageUrl: url, thumbnailUrl: url, source: 'PDF/slide enviado pelo estudante' });
+        const association = visualAssociations.find(item =>
+          item?.sourceImageId === image.id ||
+          (Number.isFinite(Number(item?.sourcePage)) && Number(item.sourcePage) === Number(image.page))
+        ) || visualAssociations[index] || null;
+        uploadedImages.push({
+          ...image,
+          imageUrl: url,
+          thumbnailUrl: url,
+          title: association?.title || image.title,
+          clinicalLabel: association?.title || image.clinicalLabel,
+          visualAssociation: association?.association || '',
+          visibleStructures: association?.visibleStructures || [],
+          studyQuestion: association?.studyQuestion || '',
+          source: 'PDF/slide enviado pelo estudante'
+        });
       }
       if (!uploadedImages.length) return;
       material.clinicalImages = uploadedImages;
-      material.markdownText = `${material.markdownText || material.text || ''}\n\n## Figuras do Material Original\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Figura ${index + 1}`}](${image.imageUrl})\n*Figura ${index + 1}: extraída do PDF/slide enviado pelo estudante.*`).join('\n\n')}`;
+      material.visualAssociations = visualAssociations;
+      material.markdownText = `${material.markdownText || material.text || ''}\n\n## Figuras do Material Original\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Figura ${index + 1}`}](${image.imageUrl})\n*Figura ${index + 1}: extraída do PDF/slide enviado pelo estudante.*${image.visualAssociation ? `\n\n**Associação didática:** ${image.visualAssociation}` : ''}${image.studyQuestion ? `\n\n**Pergunta de recuperação:** ${image.studyQuestion}` : ''}`).join('\n\n')}`;
       material.text = material.markdownText;
       await saveChatDriveMaterials();
       if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
       console.info(`[Imagens do material] ${uploadedImages.length} figura(s) original(is) vinculada(s) a ${material.name}.`);
+    }
+
+    async function makeVisionSafeImage(dataUrl) {
+      const image = new Image();
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = dataUrl; });
+      const longestSide = Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height, 1);
+      const scale = Math.min(1, 1100 / longestSide);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+      canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+      const context = canvas.getContext('2d', { alpha: false });
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const encoded = canvas.toDataURL('image/jpeg', 0.72);
+      return { mimeType: 'image/jpeg', data: encoded.split(',')[1] || '' };
+    }
+
+    // Executada somente com consentimento no checkbox de importação. Cada imagem
+    // é enviada separadamente para limitar o conteúdo transmitido e a memória.
+    async function analyzeVisualMaterialAssociations(sourceFile, metadata = {}) {
+      const rawImages = (await extractOriginalDocumentImages(sourceFile)).slice(0, 6);
+      const associations = [];
+      for (let index = 0; index < rawImages.length; index++) {
+        try {
+          const image = await makeVisionSafeImage(rawImages[index].src);
+          if (!image.data) continue;
+          const response = await fetch('/api/imagens/analisar-associacao-visual', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image, fileName: metadata.fileName, subject: metadata.targetSubject, page: rawImages[index].page || index + 1 })
+          });
+          if (!response.ok) continue;
+          const payload = await response.json();
+          if (payload?.association?.isVisualStudyMaterial) {
+            associations.push({
+              ...payload.association,
+              sourceImageId: rawImages[index].id,
+              sourcePage: rawImages[index].page || index + 1
+            });
+          }
+        } catch (error) {
+          console.warn('[Associação visual] Não foi possível interpretar a imagem', index + 1, error);
+        }
+      }
+      return associations;
     }
 
       /**
@@ -22221,6 +22279,8 @@ Linha 04: __________________________________________________
       // Reseta checkbox de salvar em materiais (PADRÃO: DESMARCADO, conforme solicitado pelo usuário)
       const saveAsMatCheckbox = document.getElementById('importStudySaveAsMaterialCheckbox');
       if (saveAsMatCheckbox) saveAsMatCheckbox.checked = false;
+      const visualAssociationCheckbox = document.getElementById('importStudyVisualAssociationCheckbox');
+      if (visualAssociationCheckbox) visualAssociationCheckbox.checked = false;
 
       // Reseta progresso e botão
       const progressBox = document.getElementById('importStudyProgressBox');
@@ -22317,6 +22377,7 @@ Linha 04: __________________________________________________
 
       const saveAsMaterial = document.getElementById('importStudySaveAsMaterialCheckbox')?.checked || false;
       const generateIndividualReport = document.getElementById('importStudyGenerateReportCheckbox')?.checked || false;
+      const visualAssociationEnabled = document.getElementById('importStudyVisualAssociationCheckbox')?.checked || false;
 
       // Inicia exibição de progresso
       const progressBox = document.getElementById('importStudyProgressBox');
@@ -22350,7 +22411,16 @@ Linha 04: __________________________________________________
         console.error('Erro na extração de texto:', err);
       }
 
-      if (!extractedText || extractedText.trim().length < 20) {
+      let visualAssociations = [];
+      const isVisualFile = !isTextTab && /(?:\.pdf|\.pptx?)$/i.test(fileName);
+      if (visualAssociationEnabled && isVisualFile && pendingImportStudyFile) {
+        if (progStatus) progStatus.textContent = '2. Interpretando páginas e marcos visuais com Gemini...';
+        if (progBar) progBar.style.width = '55%';
+        if (progDetail) progDetail.textContent = 'Enviando somente as imagens do PDF/slide autorizadas nesta importação...';
+        visualAssociations = await analyzeVisualMaterialAssociations(pendingImportStudyFile, { fileName, targetSubject });
+      }
+
+      if ((!extractedText || extractedText.trim().length < 20) && !visualAssociations.length) {
         showToast('⚠️ Não foi possível extrair texto suficiente deste arquivo. Tente colar o texto diretamente.');
         if (progressBox) progressBox.style.display = 'none';
         if (btnConfirm) {
@@ -22365,11 +22435,20 @@ Linha 04: __________________________________________________
       if (progDetail) progDetail.textContent = 'Identificando se são questões existentes, teoria ou misto...';
 
       // Executa análise e transformação por IA (Gemini ou Heurística Local)
-      const analysisResult = await analyzeAndTransformStudyMaterial(extractedText, {
-        fileName: fileName,
-        targetSubject: targetSubject,
-        saveAsMaterial: saveAsMaterial
-      });
+      const visualMarkdown = visualAssociations.length
+        ? `# Associação Visual do Material\n\n${visualAssociations.map((item, index) => `## Figura ${index + 1}: ${item.title}\n\n**Estruturas/marcos visíveis:** ${(item.visibleStructures || []).join(', ') || 'Não identificados com segurança.'}\n\n${item.association}\n\n${item.caution ? `> Atenção: ${item.caution}\n\n` : ''}**Recuperação ativa:** ${item.studyQuestion || 'Quais estruturas e relações podem ser reconhecidas nesta figura?'}\n`).join('\n')}`
+        : '';
+      let analysisResult;
+      if (extractedText && extractedText.trim().length >= 20) {
+        analysisResult = await analyzeAndTransformStudyMaterial(extractedText, {
+          fileName: fileName,
+          targetSubject: targetSubject,
+          saveAsMaterial: saveAsMaterial
+        });
+      } else {
+        extractedText = visualMarkdown;
+        analysisResult = { detectedType: 'visual_only', clinicalSubject: targetSubject, items: [], reusedQuestionsCount: 0, generatedFromTextCount: 0 };
+      }
 
       if (progStatus) progStatus.textContent = '3. Integrando questões e flashcards...';
       if (progBar) progBar.style.width = '90%';
@@ -22377,7 +22456,7 @@ Linha 04: __________________________________________________
 
       // 4. Trata o salvamento ou não na seção de Materiais do Aluno
       let importedStudyMaterial = null;
-      if (saveAsMaterial || generateIndividualReport) {
+      if (saveAsMaterial || generateIndividualReport || visualAssociationEnabled) {
         // Aluno optou por salvar na biblioteca de materiais
         const newMaterial = {
           id: 'mat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
@@ -22390,9 +22469,12 @@ Linha 04: __________________________________________________
           tag: 'Apostila / Material Importado',
           sizeStr: pendingImportStudyFile ? `${(pendingImportStudyFile.size / (1024 * 1024)).toFixed(1)} MB` : `${(extractedText.length / 1024).toFixed(1)} KB`,
           selected: true,
-          readingDocText: extractedText,
+          readingDocText: `${extractedText}${visualMarkdown && !extractedText.includes('Associação Visual do Material') ? `\n\n${visualMarkdown}` : ''}`,
           readingDocHtml: (typeof formatAITextToHTML === 'function') ? formatAITextToHTML(extractedText) : `<pre>${escapeHtml(extractedText)}</pre>`,
-          text: extractedText,
+          text: `${extractedText}${visualMarkdown && !extractedText.includes('Associação Visual do Material') ? `\n\n${visualMarkdown}` : ''}`,
+          markdownText: `${extractedText}${visualMarkdown && !extractedText.includes('Associação Visual do Material') ? `\n\n${visualMarkdown}` : ''}`,
+          visualAssociations,
+          visualAssociationAuthorized: visualAssociationEnabled,
           createdAt: new Date().toISOString()
         };
 
@@ -22403,7 +22485,7 @@ Linha 04: __________________________________________________
           }
           saveChatDriveMaterials();
           if (pendingImportStudyFile) {
-            attachOriginalDocumentImages(newMaterial, pendingImportStudyFile).catch(error => {
+            attachOriginalDocumentImages(newMaterial, pendingImportStudyFile, visualAssociations).catch(error => {
               console.warn('[Imagens do material] Falha ao anexar imagens da importação:', error);
             });
           }
@@ -22513,7 +22595,7 @@ Linha 04: __________________________________________________
         typeDesc = '⚡ Material Misto (Teoria + Questões)';
       }
 
-      const matStatusMsg = (saveAsMaterial || generateIndividualReport)
+      const matStatusMsg = (saveAsMaterial || generateIndividualReport || visualAssociationEnabled)
         ? 'Arquivo salvo na biblioteca de materiais.' 
         : 'Arquivo NÃO adicionado à biblioteca de materiais (estudo direto).';
 

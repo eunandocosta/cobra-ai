@@ -41,6 +41,45 @@ class ImagensService {
   }
 
   /**
+   * Interpreta uma página/figura enviada explicitamente pelo aluno para criar
+   * uma associação anatômica didática. Não busca nem reutiliza imagens externas.
+   */
+  async analyzeVisualAssociation({ image, fileName = 'Material visual', subject = 'Medicina', page = 1 }) {
+    const genAI = getGenAI();
+    if (!genAI) throw new Error('GEMINI_API_KEY não configurada no servidor.');
+    const mimeType = String(image.mimeType || 'image/jpeg').toLowerCase();
+    const data = String(image.data || '').replace(/^data:[^;]+;base64,/, '');
+    if (!/^image\/(?:jpeg|jpg|png|webp)$/i.test(mimeType) || !data || data.length > 1_700_000) {
+      throw new Error('Imagem visual inválida ou acima do limite seguro de análise.');
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: process.env.MODEL_REASONING || 'gemini-3.7-flash',
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 2048 }
+    });
+    const prompt = `Você é um docente de anatomia e educação médica. Analise SOMENTE a imagem de uma página/slide que o estudante autorizou enviar.
+Arquivo: ${String(fileName).slice(0, 180)} | Disciplina: ${String(subject).slice(0, 180)} | Página/imagem: ${Number(page) || 1}.
+
+Determine se é predominantemente visual (marcos anatômicos, lâmina, esquema, radiografia, figura ou slide com pouco texto) e, se for, descreva apenas o que está claramente visível. Não invente rótulos ilegíveis nem faça diagnóstico clínico a partir de imagem isolada.
+Retorne JSON puro com: isVisualStudyMaterial (boolean), title (string curto), visibleStructures (array até 8 strings), association (string didática de 2-4 frases ligando estrutura, localização e função), caution (string curta sobre incerteza, se houver), studyQuestion (pergunta aberta que pode ser respondida pela imagem).`;
+    const result = await runWithAiLimit(() => model.generateContent([
+      { text: prompt },
+      { inlineData: { mimeType, data } }
+    ]));
+    const raw = result.response.text().replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { throw new Error('O Gemini retornou uma associação visual inválida.'); }
+    return {
+      isVisualStudyMaterial: Boolean(parsed.isVisualStudyMaterial),
+      title: String(parsed.title || `Figura ${page}`).slice(0, 180),
+      visibleStructures: Array.isArray(parsed.visibleStructures) ? parsed.visibleStructures.map(item => String(item).slice(0, 180)).slice(0, 8) : [],
+      association: String(parsed.association || '').slice(0, 2400),
+      caution: String(parsed.caution || '').slice(0, 600),
+      studyQuestion: String(parsed.studyQuestion || '').slice(0, 800)
+    };
+  }
+
+  /**
    * Utilitário para requisições HTTPS com timeout resiliente
    */
   httpGetJson(url, timeoutMs = 7000) {

@@ -33,6 +33,20 @@ class ImagensController {
       return res.status(500).json({ error: 'Erro na curadoria pericial', details: err.message });
     }
   }
+
+  async analyzeVisualAssociation(req, res) {
+    try {
+      const { image, fileName, subject, page } = req.body || {};
+      if (!image || typeof image.data !== 'string' || typeof image.mimeType !== 'string') {
+        return res.status(400).json({ error: 'Imagem visual válida é obrigatória.' });
+      }
+      const association = await imagensService.analyzeVisualAssociation({ image, fileName, subject, page });
+      return res.json({ success: true, association });
+    } catch (err) {
+      console.error('❌ [ImagensController] Erro na associação visual:', err);
+      return res.status(500).json({ error: 'Erro ao interpretar o material visual', details: err.message });
+    }
+  }
 }
 
 module.exports = new ImagensController();
