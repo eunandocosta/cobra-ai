@@ -10005,6 +10005,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (backEl) backEl.innerHTML = srsQueueFilter === 'new'
           ? 'Gere novos cartões ou troque a disciplina/material para começar uma nova sessão.'
           : 'Parabéns! Seu cérebro consolidou os conceitos desta sessão. Selecione outra fila ou retorne na data de revisão.';
+        const previousButton = document.getElementById('fcPreviousButton');
+        const nextButton = document.getElementById('fcNextButton');
+        if (previousButton) previousButton.disabled = true;
+        if (nextButton) nextButton.disabled = true;
         return;
       }
 
@@ -10033,6 +10037,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       }
       const queueNames = { new: 'Não feitos', due: 'Revisão de Hoje', tomorrow: 'Revisão de amanhã', upcoming: 'Revisão dos próximos dias' };
       if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length} • ${queueNames[srsQueueFilter] || 'Todos os cards'}`;
+      const previousButton = document.getElementById('fcPreviousButton');
+      const nextButton = document.getElementById('fcNextButton');
+      if (previousButton) previousButton.disabled = list.length <= 1;
+      if (nextButton) nextButton.disabled = list.length <= 1;
       if (frontEl) frontEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(visibleQuestion) : visibleQuestion;
       if (backEl) backEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.back || item.reference_answer || item.answer || '') : (item.flashcard?.back || item.reference_answer || item.answer || '');
       if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item));
@@ -10132,6 +10140,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function flipCardManual() {
       const fcBox = document.getElementById('flashcardBox');
       if (fcBox) fcBox.classList.toggle('flipped');
+    }
+
+    // Navegação deliberadamente não altera SRS, pontuação ou histórico de resposta.
+    // Assim o aluno pode pular e voltar para qualquer cartão da fila sem "responder".
+    function navigateFlashcardWithoutAnswer(direction) {
+      const list = getSrsFilteredList(getFilteredQuestions());
+      if (list.length <= 1) return;
+      const step = Number(direction) < 0 ? -1 : 1;
+      currentCardIndex = (currentCardIndex + step + list.length) % list.length;
+      updateCardDisplay();
     }
 
     var activeQuestionDiscussion = null;

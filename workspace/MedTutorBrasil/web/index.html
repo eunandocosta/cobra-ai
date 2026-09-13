@@ -491,9 +491,15 @@
               </div>
             </div>
 
-            <div style="display: flex; justify-content: center; gap: 12px;">
+            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+              <button id="fcPreviousButton" class="btn-outline-action" onclick="navigateFlashcardWithoutAnswer(-1)" title="Volta sem alterar o agendamento do cartão">
+                ◀ Voltar
+              </button>
               <button class="btn-outline-action" onclick="flipCardManual()">
                 🔄 Virar Cartão
+              </button>
+              <button id="fcNextButton" class="btn-outline-action primary" onclick="navigateFlashcardWithoutAnswer(1)" title="Avança sem registrar resposta nem alterar o agendamento">
+                Próximo ▶
               </button>
               <button class="btn-outline-action" onclick="openQuestionDiscussionForCurrentFlashcard()">
                 💬 Perguntar sobre esta questão
