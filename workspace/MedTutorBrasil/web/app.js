@@ -10210,6 +10210,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       showToast('🗑️ Flashcard excluído.');
     }
 
+    function confirmDeleteCurrentCard() {
+      const list = getSrsFilteredList(getFilteredQuestions());
+      const item = list[currentCardIndex];
+      if (!item) return;
+      const title = String(item.question || item.pergunta || item.flashcard?.front || 'esta pergunta').replace(/\s+/g, ' ').trim();
+      if (confirm(`Eliminar esta pergunta do Quiz, dos Flashcards e das filas de revisão?\n\n"${title.slice(0, 180)}${title.length > 180 ? '…' : ''}"`)) {
+        deleteCurrentCard();
+      }
+    }
+
     function toggleStarCurrentCard() {
       const baseList = getFilteredQuestions();
       const list = getSrsFilteredList(baseList);
@@ -10815,8 +10825,8 @@ Retorne EXCLUSIVAMENTE um JSON:
               <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleStarQuizItem('${item.id}')">
                 ${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}
               </button>
-              <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')">
-                🗑️
+              <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')" title="Remove a pergunta também dos Flashcards e das filas de revisão">
+                🗑️ Eliminar pergunta
               </button>
             </div>
           </div>
@@ -11038,13 +11048,17 @@ Retorne EXCLUSIVAMENTE um JSON:
     }
 
     function deleteQuizItem(id) {
+      const item = sharedQuestionsBank.find(q => q.id === id);
+      if (!item) return;
+      const title = String(item.question || item.pergunta || item.flashcard?.front || 'esta pergunta').replace(/\s+/g, ' ').trim();
+      if (!confirm(`Eliminar esta pergunta do Quiz, dos Flashcards e das filas de revisão?\n\n"${title.slice(0, 180)}${title.length > 180 ? '…' : ''}"`)) return;
       const idx = sharedQuestionsBank.findIndex(q => q.id === id);
       if (idx !== -1) sharedQuestionsBank.splice(idx, 1);
       saveSharedQuestionsBank();
       renderSharedStudyItems();
       renderSceBars();
       updateSubjectFilterMenus();
-      showToast('🗑️ Quiz removido.');
+      showToast('🗑️ Pergunta eliminada do Quiz e dos Flashcards.');
     }
 
     function toggleStarQuizItem(id) {
