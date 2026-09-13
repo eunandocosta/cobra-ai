@@ -3720,7 +3720,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     // PDF.js renderiza páginas como WebP. Para PDFs, uma página é a unidade visual
     // mais fiel: preserva figuras, esquemas, lâminas e suas respectivas legendas.
-    async function extractPdfVisualPages(file, limit = 10) {
+    async function extractPdfVisualPages(file, limit = Number.POSITIVE_INFINITY) {
       if (!window.pdfjsLib || typeof file?.arrayBuffer !== 'function') return [];
       const buffer = await file.arrayBuffer();
       if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -3728,6 +3728,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       }
       const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
       const total = Math.min(pdf.numPages || 0, limit);
+      console.info(`[Imagens do material] PDF com ${pdf.numPages || 0} página(s): preparando ${total} página(s) para triagem visual.`);
       const images = [];
       for (let pageNumber = 1; pageNumber <= total; pageNumber++) {
         try {
@@ -3758,7 +3759,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     // Slides PPTX são ZIPs: lê somente ppt/media/* no navegador, sem enviar o
     // arquivo bruto a terceiros. Suporta as entradas compactadas mais comuns.
-    async function extractPptxEmbeddedImages(file, limit = 12) {
+    async function extractPptxEmbeddedImages(file, limit = Number.POSITIVE_INFINITY) {
       if (typeof file?.arrayBuffer !== 'function') return [];
       const bytes = new Uint8Array(await file.arrayBuffer());
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -3886,7 +3887,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       if (!material || !sourceFile) return;
       const rawImages = Array.isArray(sourceImages) ? sourceImages : await extractOriginalDocumentImages(sourceFile);
       material.sourceImageCount = rawImages.length;
-      const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages.slice(0, 10);
+      // Não imponha teto arbitrário: um material de 46 páginas pode conter
+      // muitas lâminas, esquemas ou marcos anatômicos relevantes.
+      const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages;
       if (!selectedImages.length) return;
       const uploadedImages = [];
       for (let index = 0; index < selectedImages.length; index++) {
@@ -3940,7 +3943,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     // Executada somente com consentimento no checkbox de importação. Cada imagem
     // é enviada separadamente para limitar o conteúdo transmitido e a memória.
     async function analyzeVisualMaterialAssociations(sourceFile, metadata = {}, sourceImages = null) {
-      const rawImages = (Array.isArray(sourceImages) ? sourceImages : await extractOriginalDocumentImages(sourceFile)).slice(0, 6);
+      // O estudante autorizou a associação visual: examine todas as páginas
+      // extraídas, sem limitar a análise às primeiras seis.
+      const rawImages = Array.isArray(sourceImages) ? sourceImages : await extractOriginalDocumentImages(sourceFile);
       const associations = [];
       console.info(`[Gemini Visual] Análise autorizada para ${rawImages.length} imagem(ns) de "${metadata.fileName || sourceFile?.name || 'material'}".`);
       for (let index = 0; index < rawImages.length; index++) {

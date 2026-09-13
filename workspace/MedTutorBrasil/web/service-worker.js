@@ -1,9 +1,9 @@
-const CACHE_NAME = 'medtutor-static-v11';
+const CACHE_NAME = 'medtutor-static-v12';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/styles.css?v=20260913-supabase-storage-v1',
-  '/app.js?v=20260913-supabase-storage-v1',
+  '/app.js?v=20260913-visual-full-document-v2',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
 ];
