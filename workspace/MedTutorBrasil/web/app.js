@@ -3776,6 +3776,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     async function enrichUploadedMaterialWithVisualAssociations(material, sourceFile) {
+      reportUploadDiagnostic(material, 'iniciando');
       if (!material?.visualAssociationAuthorized || !sourceFile) {
         if (sourceFile) await attachOriginalDocumentImages(material, sourceFile);
         reportUploadDiagnostic(material, 'sucesso');
@@ -3800,7 +3801,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         showToast(associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.');
       } catch (error) {
         console.error('[Associação visual] Falha no upload universal:', error);
-        await attachOriginalDocumentImages(material, sourceFile);
+        try {
+          await attachOriginalDocumentImages(material, sourceFile);
+        } catch (imageError) {
+          console.warn('[Imagens do material] Também não foi possível preservar as imagens originais:', imageError);
+        }
         reportUploadDiagnostic(material, 'parcial');
         showToast('⚠️ Não foi possível interpretar visualmente este arquivo; as imagens originais foram preservadas.');
       }
@@ -3813,10 +3818,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const aiEngine = material.visualAssociationAuthorized
         ? 'Gemini via servidor local (associação visual)'
         : (material.aiEngine || 'Motor local (sem chamada Gemini confirmada)');
+      const payload = { status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected: Array.isArray(material.clinicalImages) ? material.clinicalImages.length : 0 };
+      console.info('[Upload MedTutor] Enviando diagnóstico operacional:', payload);
       fetch('/api/diagnostics/upload', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
-        body: JSON.stringify({ status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected: Array.isArray(material.clinicalImages) ? material.clinicalImages.length : 0 })
-      }).catch(() => {});
+        body: JSON.stringify(payload)
+      }).then(response => {
+        if (!response.ok) console.warn('[Upload MedTutor] O terminal não aceitou o diagnóstico:', response.status);
+      }).catch(error => console.warn('[Upload MedTutor] Não foi possível enviar o diagnóstico ao terminal:', error));
     }
 
     async function classifyMaterialWithServerGemini(text, fileName, subjectName) {
@@ -22576,6 +22585,7 @@ Linha 04: __________________________________________________
           }
           saveChatDriveMaterials();
           if (pendingImportStudyFile) {
+            reportUploadDiagnostic(newMaterial, 'iniciando');
             attachOriginalDocumentImages(newMaterial, pendingImportStudyFile, visualAssociations)
               .then(() => reportUploadDiagnostic(newMaterial, 'sucesso'))
               .catch(error => {
