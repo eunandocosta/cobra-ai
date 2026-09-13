@@ -47,6 +47,20 @@ class ImagensController {
       return res.status(500).json({ error: 'Erro ao interpretar o material visual', details: err.message });
     }
   }
+
+  async analyzeMaterialMapping(req, res) {
+    try {
+      const { text, fileName, subject } = req.body || {};
+      if (typeof text !== 'string' || text.trim().length < 40) {
+        return res.status(400).json({ error: 'Texto do material insuficiente para mapeamento.' });
+      }
+      const mapping = await imagensService.analyzeMaterialMapping({ text, fileName, subject });
+      return res.json({ success: true, mapping });
+    } catch (err) {
+      console.error('❌ [ImagensController] Erro no mapeamento Gemini:', err);
+      return res.status(500).json({ error: 'Erro ao mapear material com Gemini', details: err.message });
+    }
+  }
 }
 
 module.exports = new ImagensController();

@@ -79,6 +79,26 @@ Retorne JSON puro com: isVisualStudyMaterial (boolean), title (string curto), vi
     };
   }
 
+  async analyzeMaterialMapping({ text, fileName = 'Material', subject = '' }) {
+    const genAI = getGenAI();
+    if (!genAI) throw new Error('GEMINI_API_KEY não configurada no servidor.');
+    const model = genAI.getGenerativeModel({
+      model: process.env.MODEL_REASONING || 'gemini-3.7-flash',
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 1024 }
+    });
+    const prompt = `Você organiza materiais de graduação médica. Leia o trecho fornecido e retorne JSON puro com suggestedTitle, diseaseTopic, subjectHint e justification. Não trate o nome do arquivo como estrutura anatômica e não invente conteúdo ausente.\nArquivo: ${String(fileName).slice(0, 180)}\nDisciplina sugerida: ${String(subject).slice(0, 180)}\nTexto:\n${String(text).slice(0, 100000)}`;
+    const result = await runWithAiLimit(() => model.generateContent(prompt));
+    const raw = result.response.text().replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { throw new Error('O Gemini retornou um mapeamento inválido.'); }
+    return {
+      suggestedTitle: String(parsed.suggestedTitle || '').slice(0, 220),
+      diseaseTopic: String(parsed.diseaseTopic || '').slice(0, 220),
+      subjectHint: String(parsed.subjectHint || '').slice(0, 220),
+      justification: String(parsed.justification || '').slice(0, 1000)
+    };
+  }
+
   /**
    * Utilitário para requisições HTTPS com timeout resiliente
    */

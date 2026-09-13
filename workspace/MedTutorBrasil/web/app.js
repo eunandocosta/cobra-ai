@@ -3770,6 +3770,49 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return associations;
     }
 
+    function buildVisualAssociationsMarkdown(associations) {
+      if (!Array.isArray(associations) || !associations.length) return '';
+      return `\n\n## Associação Visual do Material\n\n${associations.map((item, index) => `### Figura ${item.sourcePage || index + 1}: ${item.title || 'Marco visual'}\n\n**Estruturas/marcos visíveis:** ${(item.visibleStructures || []).join(', ') || 'Não identificados com segurança.'}\n\n${item.association || ''}\n\n${item.caution ? `> Atenção: ${item.caution}\n\n` : ''}**Pergunta de recuperação:** ${item.studyQuestion || 'Quais estruturas e relações podem ser reconhecidas nesta figura?'}`).join('\n\n')}`;
+    }
+
+    async function enrichUploadedMaterialWithVisualAssociations(material, sourceFile) {
+      if (!material?.visualAssociationAuthorized || !sourceFile) {
+        if (sourceFile) await attachOriginalDocumentImages(material, sourceFile);
+        return;
+      }
+      try {
+        showToast('🧠 Gemini está interpretando as páginas visuais do material...');
+        const associations = await analyzeVisualMaterialAssociations(sourceFile, { fileName: material.originalFileName || material.name, targetSubject: material.subject });
+        material.visualAssociations = associations;
+        const visualMarkdown = buildVisualAssociationsMarkdown(associations);
+        if (visualMarkdown && !(material.markdownText || '').includes('## Associação Visual do Material')) {
+          material.markdownText = `${material.markdownText || material.text || ''}${visualMarkdown}`;
+          material.text = material.markdownText;
+          material.readingDocText = `${material.readingDocText || ''}${visualMarkdown}`;
+        }
+        await attachOriginalDocumentImages(material, sourceFile, associations);
+        await saveChatDriveMaterials();
+        if (typeof AppExpenseTracker !== 'undefined' && associations.length) {
+          AppExpenseTracker.recordAction({ actionName: `Associação visual: ${material.name}`, model: 'Gemini via servidor local', isLocal: false });
+        }
+        showToast(associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.');
+      } catch (error) {
+        console.error('[Associação visual] Falha no upload universal:', error);
+        await attachOriginalDocumentImages(material, sourceFile);
+        showToast('⚠️ Não foi possível interpretar visualmente este arquivo; as imagens originais foram preservadas.');
+      }
+    }
+
+    async function classifyMaterialWithServerGemini(text, fileName, subjectName) {
+      const response = await fetch('/api/imagens/analisar-mapeamento-material', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: String(text || '').slice(0, 100000), fileName, subject: subjectName || '' })
+      });
+      if (!response.ok) throw new Error(`Servidor Gemini respondeu ${response.status}`);
+      const payload = await response.json();
+      return payload?.mapping || null;
+    }
+
       /**
        * Pipeline Integrado de Otimização:
        * PDF/Slides ➔ Markdown Estruturado + Figuras Clínicas WebP Comprimidas + Métricas de Redução (>98%)
@@ -14061,6 +14104,11 @@ DIRETRIZES CIRÚRGICAS:
 
       const total = items.length;
       const apiKey = getGeminiApiKey();
+      let serverGeminiAvailable = false;
+      try {
+        const configResponse = await fetch('/api/config');
+        serverGeminiAvailable = Boolean((await configResponse.json())?.geminiConfigured);
+      } catch (_) {}
 
       // Exibe modal de progresso do pré-carregamento
       closeModals();
@@ -14078,7 +14126,7 @@ DIRETRIZES CIRÚRGICAS:
         if (percentLabel) percentLabel.textContent = '0%';
         if (fileLabel) fileLabel.textContent = `📄 ${items[0]?.fileName || 'Material 1'}`;
         if (statusText) {
-          statusText.textContent = apiKey 
+          statusText.textContent = (apiKey || serverGeminiAvailable)
             ? 'Mapeando ementa médica oficial e gerando títulos adequados com IA Gemini...' 
             : 'Mapeando matérias e gerando títulos adequados com motor médico local...';
         }
@@ -14133,6 +14181,19 @@ DIRETRIZES CIRÚRGICAS:
             } catch (err) {
               console.warn('Falha na IA no pré-carregamento do item ' + item.fileName + ':', err);
               analysis = null;
+            }
+          } else if (serverGeminiAvailable && String(item.text || '').trim().length >= 40) {
+            try {
+              const mapping = await classifyMaterialWithServerGemini(item.text, item.fileName, item.defaultSubject || '');
+              analysis = classifyMedicalDocumentSemantically(item.text || '', item.fileName || '', null, targetSemester);
+              if (mapping) {
+                analysis.isGeminiClassified = true;
+                analysis.suggestedTitle = mapping.suggestedTitle || analysis.suggestedTitle;
+                analysis.diseaseTopic = mapping.diseaseTopic || analysis.diseaseTopic;
+                analysis.justification = mapping.justification || analysis.justification;
+              }
+            } catch (err) {
+              console.warn('Falha no Gemini do servidor durante mapeamento:', err);
             }
           }
 
@@ -14762,7 +14823,8 @@ DIRETRIZES CIRÚRGICAS:
         pedagogicalSynthesis: optimization.pedagogicalSynthesis,
         clinicalImages: optimization.clinicalImages,
         compressionStats: optimization.compressionStats,
-        descriptiveIndex: descIndex
+        descriptiveIndex: descIndex,
+        visualAssociationAuthorized: Boolean(currentMat.visualAssociationAuthorized)
       };
 
       // GERAÇÃO AUTOMÁTICA DA APOSTILA DE LEITURA (FORMATO CARD LEITURA FOCADA DO CHAT)
@@ -14797,7 +14859,7 @@ DIRETRIZES CIRÚRGICAS:
       // O salvamento textual não espera a extração visual: a interface permanece
       // responsiva e as figuras originais são anexadas assim que terminarem.
       if (currentMat.file) {
-        attachOriginalDocumentImages(newMaterial, currentMat.file).catch(error => {
+        enrichUploadedMaterialWithVisualAssociations(newMaterial, currentMat.file).catch(error => {
           console.warn('[Imagens do material] Falha ao anexar imagens originais:', error);
         });
       }
@@ -15025,6 +15087,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       const textEl = document.getElementById('materialTextInput');
       const userText = textEl ? textEl.value.trim() : '';
       const files = fileInput && fileInput.files && fileInput.files.length > 0 ? Array.from(fileInput.files) : [];
+      const visualAssociationAuthorized = document.getElementById('universalUploadVisualAssociationCheckbox')?.checked || false;
 
       // Se o usuário está na aba do Drive ou digitou uma URL do Drive
       if (drivePanel && drivePanel.style.display !== 'none') {
@@ -15091,20 +15154,24 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
             fileName: f.name,
             text: combinedText,
             sizeStr: f.sizeStr || `${sizeMB >= 1 ? sizeMB.toFixed(1) + ' MB' : Math.round(sizeMB * 1024) + ' KB'}`,
-            file: f
+            file: f,
+            visualAssociationAuthorized
           });
         }
       } else if (userText) {
         queue.push({
           fileName: 'Resumo / Anotação Clínica',
           text: userText,
-          sizeStr: `${(userText.length / 1024).toFixed(1)} KB`
+          sizeStr: `${(userText.length / 1024).toFixed(1)} KB`,
+          visualAssociationAuthorized: false
         });
       }
 
       // Limpeza dos inputs
       if (fileInput) fileInput.value = '';
       if (textEl) textEl.value = '';
+      const visualCheckbox = document.getElementById('universalUploadVisualAssociationCheckbox');
+      if (visualCheckbox) visualCheckbox.checked = false;
       const zoneTitle = document.getElementById('materialUploadZoneTitle');
       const zoneSub = document.getElementById('materialUploadZoneSub');
       if (zoneTitle) zoneTitle.textContent = 'Selecione resumos, slides ou anotações (PDF / PPTX / Texto)';
