@@ -9748,7 +9748,6 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     // Filas visíveis do aluno: primeiro aprende o que nunca fez; depois revisa
     // estritamente pela data agendada. "all" permanece apenas por compatibilidade.
     var srsQueueFilter = 'new'; // 'new' | 'due' | 'tomorrow' | 'upcoming' | 'all'
-    const DAILY_NEW_CARD_LIMIT = 20;
     var quizStudyMode = 'tutor'; // 'tutor' | 'exam'
     var quizTutorChoices = {};
     var quizExamState = {
@@ -9833,7 +9832,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (fcPendingBanner) fcPendingBanner.style.display = 'none';
       if (qzPendingBanner) qzPendingBanner.style.display = 'none';
 
-      // 3. Planeja os inéditos em blocos sustentáveis antes de montar as filas.
+      // 3. Todo cartão inédito gerado fica disponível no mesmo dia.
       if (ensureNewCardSchedules(sharedQuestionsBank)) saveSharedQuestionsBank();
 
       // 4. Questões filtradas da matéria ativa
@@ -9867,34 +9866,22 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     function ensureNewCardSchedules(cards = sharedQuestionsBank) {
-      const today = getStartOfDay();
-      const scheduledPerDay = new Map();
+      const todayKey = getLocalDateKey();
       const candidates = (cards || []).filter(item => !item?.srs?.lastReviewed)
         .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
 
-      candidates.forEach(item => {
-        const key = item?.srs?.newScheduledDate;
-        const scheduled = key ? getStartOfDay(new Date(`${key}T12:00:00`)) : null;
-        if (scheduled && !Number.isNaN(scheduled.getTime()) && scheduled >= today) {
-          scheduledPerDay.set(key, (scheduledPerDay.get(key) || 0) + 1);
-        }
-      });
-
       let changed = false;
       candidates.forEach(item => {
-        if (item?.srs?.newScheduledDate) return;
-        let targetDay = new Date(today);
-        while ((scheduledPerDay.get(getLocalDateKey(targetDay)) || 0) >= DAILY_NEW_CARD_LIMIT) {
-          targetDay.setDate(targetDay.getDate() + 1);
-        }
-        const key = getLocalDateKey(targetDay);
+        // Não há limite diário automático: gerar um card é uma escolha explícita
+        // do estudante e ele deve poder estudá-lo hoje. Cartões já respondidos
+        // continuam usando exclusivamente o dueDate do SRS.
+        if (item?.srs?.newScheduledDate === todayKey && item?.srs?.state === 'new') return;
         item.srs = {
           ...(item.srs || { reps: 0, interval: 0, easeFactor: 2.5, lapses: 0, lastReviewed: null, history: [], state: 'new' }),
-          newScheduledDate: key,
+          newScheduledDate: todayKey,
           dueDate: null,
           state: 'new'
         };
-        scheduledPerDay.set(key, (scheduledPerDay.get(key) || 0) + 1);
         changed = true;
       });
       return changed;
