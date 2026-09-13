@@ -9998,6 +9998,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       if (currentCardIndex >= list.length) currentCardIndex = 0;
       const item = list[currentCardIndex];
+      const rawQuestion = item?.flashcard?.front || item?.question || item?.pergunta || '';
+      const sanitizedQuestion = sanitizeSharedQuestionStem(rawQuestion);
+      // Cards legados podem conter enunciados que não passam pela higienização
+      // atual; nesses casos, ainda exibimos o texto original em vez de deixar o
+      // placeholder do HTML na tela.
+      const visibleQuestion = isSharedQuestionStemValid(sanitizedQuestion)
+        ? sanitizedQuestion
+        : String(rawQuestion).trim();
 
       const tagEl = document.getElementById('fcTag');
       const countEl = document.getElementById('fcCounter');
