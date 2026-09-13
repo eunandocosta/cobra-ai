@@ -7158,7 +7158,7 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
     // =========================================================================
     const AcademicReportAgent = {
       // Gera o Artigo Acadêmico / Documento Formal
-      async generateReport({ materialId, materialName, subjectName, customPrompt, forceLocal }) {
+      async generateReport({ materialId, materialName, subjectName, customPrompt, forceLocal, validatedText }) {
         if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
           chatDriveMaterials = chatDriveMaterials.map(normalizeMaterial);
         }
@@ -7181,7 +7181,16 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
         const relevantMaterials = !isIndividualMaterialRequest && typeof getMaterialsForSubject === 'function'
           ? getMaterialsForSubject(effectiveSubject)
           : [];
-        let materialContent = mat?.markdownText || mat?.conteudo_md || mat?.text || mat?.readingDocText || '';
+        let materialContent = typeof validatedText === 'string' ? validatedText.trim() : '';
+        if (!materialContent && typeof MedTutorFirebaseService !== 'undefined') {
+          const authoritative = isIndividualMaterialRequest
+            ? await MedTutorFirebaseService.getAuthoritativeMaterialText(materialId || mat?.id || effectiveTitle, effectiveSubject)
+            : await MedTutorFirebaseService.getAuthoritativeSubjectText(effectiveSubject);
+          materialContent = String(authoritative?.text || '').trim();
+        }
+        if (materialContent.length < 500 || isSyntheticDriveSummary(materialContent)) {
+          throw new Error('O relatório não foi emitido porque o Firestore não possui texto clínico válido e suficiente para este material. Reimporte o arquivo original ou envie um PDF com texto selecionável.');
+        }
         if (!materialContent && !isIndividualMaterialRequest && relevantMaterials.length > 0) {
           materialContent = relevantMaterials.map(m => {
             const mTitle = m.name || m.nome || 'Conteúdo de Aula';
@@ -7196,9 +7205,7 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
           mat?.topic || mat?.disease ? `TEMA DECLARADO: ${mat.topic || mat.disease}` : '',
           mat?.folderPath ? `LOCAL NO DRIVE: ${mat.folderPath}` : ''
         ].filter(Boolean).join('\n');
-        // Metadados só orientam a geração quando a extração falhou; jamais são
-        // substituídos pelo conteúdo de outra aula da disciplina.
-        if (!materialContent && sourceIdentity) materialContent = sourceIdentity;
+        // Metadados identificam a fonte, mas nunca substituem o conteúdo clínico.
 
         // 1. Busca rigorosa na ementa oficial para garantir ancoragem estrita
         let officialDisciplineInfo = null;
@@ -9634,10 +9641,29 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const selectedMaterial = (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials))
         ? (chatDriveMaterials.find(m => m.id === materialIdOrName) || chatDriveMaterials.find(m => m.name === materialIdOrName || m.originalFileName === materialIdOrName))
         : null;
+      const targetMaterialId = selectedMaterial?.id || materialIdOrName;
+      const targetSubject = subjectName || currentStudySubject;
+      let validatedText = '';
+      try {
+        const validated = await MedTutorFirebaseService.getAuthoritativeMaterialText(targetMaterialId, targetSubject);
+        validatedText = String(validated?.text || '').trim();
+        if (validatedText.length < 500 || isSyntheticDriveSummary(validatedText)) {
+          throw new Error('O Firestore não contém texto clínico válido para este arquivo. O relatório não será emitido a partir de nome, tema ou tamanho do arquivo.');
+        }
+        if (subtitleEl) subtitleEl.textContent = `Conteúdo validado no Firestore • ${validatedText.length.toLocaleString('pt-BR')} caracteres`;
+      } catch (error) {
+        console.error('[Relatório] Conteúdo do material não validado:', error);
+        if (titleEl) titleEl.textContent = 'Relatório não emitido';
+        if (subtitleEl) subtitleEl.textContent = 'Aguardando conteúdo real do material';
+        content.innerHTML = `<div style="padding: 48px 24px; background: #ffffff; border-radius: 8px; color: #0f172a; text-align: center;"><div style="font-size: 34px; margin-bottom: 10px;">⚠️</div><h3 style="margin: 0 0 10px; font-size: 18px;">Não há texto validado para emitir o relatório</h3><p style="margin: 0 auto; max-width: 560px; color: #475569; line-height: 1.6; font-size: 13px;">${escapeHtml(error.message || 'Importe novamente o arquivo original e verifique se o Firestore possui o texto completo.')}</p></div>`;
+        if (typeof showToast === 'function') showToast('⚠️ Relatório bloqueado: importe um arquivo com texto clínico real.');
+        return;
+      }
       const rep = await AcademicReportAgent.generateReport({
-        materialId: selectedMaterial?.id,
+        materialId: targetMaterialId,
         materialName: displayName || selectedMaterial?.name || materialIdOrName,
-        subjectName: subjectName || currentStudySubject
+        subjectName: targetSubject,
+        validatedText
       });
 
       activeAcademicReportData = rep;
