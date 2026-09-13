@@ -18,6 +18,44 @@ function areQuestionsTooSimilar(first, second) {
   return intersection / new Set([...a, ...b]).size >= 0.45;
 }
 
+// Muitos slides trazem exercícios elaborados pelo próprio professor. Eles são uma
+// referência didática mais fiel que um tema solto: preservamos o foco e a redação
+// quando a resposta puder ser comprovada no conteúdo, sem transformar alternativas
+// ou comandos de múltipla escolha no enunciado compartilhado.
+function extractAuthoredQuestionsFromMaterial(value, limit = 12) {
+  const lines = String(value || '').replace(/\r/g, '').split('\n')
+    .map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const questions = [];
+  const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
+  const isContinuation = /^(?:[A-E]\s*[.)-]|(?:gabarito|resposta)\s*[:.)-])/i;
+
+  for (let index = 0; index < lines.length && questions.length < limit; index++) {
+    const line = lines[index];
+    if (!startsQuestion.test(line) && !line.includes('?')) continue;
+
+    let candidate = line;
+    for (let next = index + 1; next < lines.length && next <= index + 5; next++) {
+      const continuation = lines[next];
+      if (startsQuestion.test(continuation)) break;
+      if (!isContinuation.test(continuation) && candidate.includes('?')) break;
+      candidate = `${candidate} ${continuation}`.slice(0, 700);
+    }
+    candidate = candidate.replace(/\s+/g, ' ').trim();
+    if (candidate.length < 20 || (!candidate.includes('?') && !startsQuestion.test(candidate))) continue;
+    if (!questions.some(existing => areQuestionsTooSimilar(existing, candidate))) questions.push(candidate);
+  }
+  // Alguns extratores de PDF entregam uma aula inteira em uma única linha. Nesse
+  // caso, a interrogação ainda é um sinal útil para recuperar a questão original.
+  const inlineQuestions = String(value || '').replace(/\s+/g, ' ').match(/[^?]{20,700}\?/g) || [];
+  inlineQuestions.forEach(candidate => {
+    const normalized = candidate.replace(/\s+/g, ' ').trim();
+    if (questions.length < limit && !questions.some(existing => areQuestionsTooSimilar(existing, normalized))) {
+      questions.push(normalized);
+    }
+  });
+  return questions;
+}
+
 // O mesmo enunciado é usado no Quiz (com opções) e no Flashcard (sem opções).
 // Remove instruções que só fazem sentido em múltipla escolha antes de persistir.
 function sanitizeSharedQuestionStem(value) {
@@ -91,6 +129,12 @@ const questionsSchema = {
       titulo_flashcard: {
         type: SchemaType.STRING,
         description: "Título de contexto do flashcard, com 3 a 7 palavras. Nunca revele resposta, diagnóstico, alternativa correta ou conduta."
+      },
+      origem_pergunta: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["reaproveitada_da_fonte", "inspirada_na_fonte", "nova_a_partir_da_fonte"],
+        description: "Indique se a pergunta reaproveita uma questão autoral da fonte, usa apenas seu estilo/foco, ou foi criada diretamente a partir do conteúdo."
       }
     },
     required: [
@@ -100,7 +144,8 @@ const questionsSchema = {
       "texto_resposta_correta",
       "justificativa",
       "perola_clinica",
-      "titulo_flashcard"
+      "titulo_flashcard",
+      "origem_pergunta"
     ]
   }
 };
@@ -129,9 +174,16 @@ class QuizzesService {
       ? payload.difficulty
       : 'iniciante';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 30) : [];
+    const providedSourceQuestions = Array.isArray(payload.sourceQuestions)
+      ? payload.sourceQuestions.map(question => String(question || '').replace(/\s+/g, ' ').trim()).filter(question => question.length >= 20).slice(0, 12)
+      : [];
+    const authoredSourceQuestions = providedSourceQuestions.length
+      ? providedSourceQuestions
+      : extractAuthoredQuestionsFromMaterial(materialText);
 
     console.log("➡️ [Quiz Engine] Iniciando geração...");
     console.log("📄 [Quiz Engine] Tamanho do texto recebido:", materialText ? materialText.length : 0);
+    console.log("📝 [Quiz Engine] Questões autorais identificadas:", authoredSourceQuestions.length);
 
     if (!materialText || materialText.trim().length < 20) {
       throw new Error("O texto fornecido para a IA está vazio ou é excessivamente curto.");
@@ -159,6 +211,13 @@ class QuizzesService {
 
     const prompt = `
 Com base exclusivamente no conteúdo abaixo, crie ${totalQuestoes} questões de avaliação formativa. Nível solicitado: ${requestedDifficulty}.
+
+${authoredSourceQuestions.length ? `--- QUESTÕES JÁ CRIADAS PELO PROFESSOR NA FONTE ---
+${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}
+--- FIM DAS QUESTÕES AUTORAIS ---
+
+Antes de redigir, analise essas questões autorais. Priorize reaproveitar seu objetivo e sua formulação quando a resposta estiver explícita no conteúdo: nesse caso, remova comandos de múltipla escolha e alternativas do enunciado e marque origem_pergunta como "reaproveitada_da_fonte". Se a questão autoral não trouxer base suficiente para uma resposta verificável, use apenas seu estilo e foco didático, marque "inspirada_na_fonte" e construa uma pergunta nova sustentada pela fonte. Nunca invente resposta, gabarito ou dado ausente para reaproveitar uma questão.
+` : 'Não foram encontradas questões autorais claras na fonte; crie perguntas diretamente do conteúdo verificável e marque origem_pergunta como "nova_a_partir_da_fonte".\n'}
 
 --- CONTEÚDO MÉDICO ---
 ${materialText}
@@ -215,6 +274,7 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
           difficultyLevel: requestedDifficulty,
           cognitiveLevel: requestedDifficulty,
           cognitiveDomain: 'compreensao',
+          sourceQuestionOrigin: q.origem_pergunta || (authoredSourceQuestions.length ? 'inspirada_na_fonte' : 'nova_a_partir_da_fonte'),
           flashcardTitle,
           flashcard: {
             title: flashcardTitle,

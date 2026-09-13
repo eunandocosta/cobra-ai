@@ -4818,6 +4818,38 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return normalized.length >= 180 && /\b(e |o |a |os |as |de |do |da |que |por |para |em |com )\b/.test(normalized);
     }
 
+    // Captura exercícios que já existem no PDF/slide antes do planejamento. A lista
+    // acompanha cada trecho enviado ao servidor, assim o Gemini consegue reproduzir
+    // o recorte e a linguagem do professor mesmo quando a geração é feita em série.
+    function extractAuthoredQuestionsFromMaterial(materialText, limit = 12) {
+      const lines = String(materialText || '').replace(/\r/g, '').split('\n')
+        .map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+      const questions = [];
+      const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
+      const isContinuation = /^(?:[A-E]\s*[.)-]|(?:gabarito|resposta)\s*[:.)-])/i;
+      for (let index = 0; index < lines.length && questions.length < limit; index++) {
+        if (!startsQuestion.test(lines[index]) && !lines[index].includes('?')) continue;
+        let candidate = lines[index];
+        for (let next = index + 1; next < lines.length && next <= index + 5; next++) {
+          const continuation = lines[next];
+          if (startsQuestion.test(continuation)) break;
+          if (!isContinuation.test(continuation) && candidate.includes('?')) break;
+          candidate = `${candidate} ${continuation}`.slice(0, 700);
+        }
+        candidate = candidate.replace(/\s+/g, ' ').trim();
+        if (candidate.length < 20 || (!candidate.includes('?') && !startsQuestion.test(candidate))) continue;
+        if (!questions.some(existing => calculateLocalSimilarity(existing, candidate) >= 0.72)) questions.push(candidate);
+      }
+      // PDFs podem chegar como um único parágrafo; ainda assim cada interrogação
+      // permite recuperar uma questão original para orientar a geração.
+      const inlineQuestions = String(materialText || '').replace(/\s+/g, ' ').match(/[^?]{20,700}\?/g) || [];
+      inlineQuestions.forEach(candidate => {
+        const normalized = candidate.replace(/\s+/g, ' ').trim();
+        if (questions.length < limit && !questions.some(existing => calculateLocalSimilarity(existing, normalized) >= 0.72)) questions.push(normalized);
+      });
+      return questions;
+    }
+
     function inferTopicFromStudyContent(text, subjectName) {
       const source = String(text || '');
       const heading = source.match(/^\s{0,3}#{1,3}\s+([^\n]{4,120})/m) || source.match(/(?:tema|assunto|t[ií]tulo)\s*[:\-]\s*([^\n]{4,120})/i);
@@ -4993,12 +5025,15 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
       const previousQuestions = (config.acceptedStudyItems || []).map(item => item.question || item.pergunta || '').filter(Boolean);
+      const authoredSourceQuestions = Array.isArray(config.sourceQuestions)
+        ? config.sourceQuestions
+        : extractAuthoredQuestionsFromMaterial(materialText);
       const difficultyLevel = ['iniciante', 'intermediario', 'avancado'].includes(config.difficulty)
         ? config.difficulty
         : 'iniciante';
       const cognitiveDomain = 'compreensao';
       try {
-        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, difficultyLevel, previousCount: previousQuestions.length });
+        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, difficultyLevel, previousCount: previousQuestions.length, authoredQuestionsFound: authoredSourceQuestions.length });
         const response = await fetch('/api/quizzes/gerar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -5006,7 +5041,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             materialText,
             quantidade: count,
             difficulty: difficultyLevel,
-            previousQuestions
+            previousQuestions,
+            sourceQuestions: authoredSourceQuestions
           })
         });
         const data = await response.json().catch(() => ({}));
@@ -5037,7 +5073,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
           };
         }).filter(Boolean);
-        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, difficultyLevel, imagesRequested: items.filter(item => item.requer_imagem).length });
+        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, difficultyLevel, imagesRequested: items.filter(item => item.requer_imagem).length, sourceOrigins: items.map(item => item.sourceQuestionOrigin || 'nova_a_partir_da_fonte') });
         return items;
       } catch (error) {
         logQuizGenerationDebug('backend_generation_exception', { message: error.message });
@@ -5325,6 +5361,8 @@ ${cleanText}
     async function generateStudyItemsSequentially(materialText, metadata, config = {}, count = 5, existingItems = []) {
       const accepted = [];
       const total = Math.max(1, Math.min(30, count || 5));
+      const authoredSourceQuestions = extractAuthoredQuestionsFromMaterial(materialText);
+      logQuizGenerationDebug('authored_questions_scanned', { found: authoredSourceQuestions.length, requestedItems: total });
       let blueprint = buildLocalStudyBlueprint(materialText, total);
       // O planejamento é uma proteção de qualidade, não um pré-requisito para
       // textos válidos que vieram de PDF/Drive em um único bloco. O Gemini ainda
@@ -5343,7 +5381,7 @@ ${cleanText}
         logQuizGenerationDebug('blueprint_unavailable', { materialChars: String(materialText || '').length, requestedItems: total });
         return accepted;
       }
-      setStudyGenerationProgress({ current: 0, total, detail: 'Selecionando trechos distintos do conteúdo…' });
+      setStudyGenerationProgress({ current: 0, total, detail: authoredSourceQuestions.length ? `Encontradas ${authoredSourceQuestions.length} pergunta(s) do professor; preparando o plano…` : 'Selecionando trechos distintos do conteúdo…' });
       try {
         let attempts = 0;
         const maxAttempts = total * 2;
@@ -5362,6 +5400,7 @@ ${cleanText}
           const generated = await generateQuestionsWithGemini(buildQuestionContext(materialText, plan.evidencia_fonte), metadata, {
             ...config,
             difficulty,
+            sourceQuestions: authoredSourceQuestions,
             acceptedStudyItems: [...existingItems, ...accepted]
           }, 1);
           const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
