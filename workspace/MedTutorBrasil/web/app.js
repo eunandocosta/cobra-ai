@@ -10805,6 +10805,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       quizExamState.finished = false;
 
       let generated = null;
+      const existingQuestionsForSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj);
 
       // 3. Tenta gerar via Gemini
       if (slideText && slideText.length > 30) {
@@ -10814,7 +10815,7 @@ Retorne EXCLUSIVAMENTE um JSON:
             { materialName, subjectName: targetSubj, disease: targetFile.disease || materialName },
             config,
             qCount,
-            sharedQuestionsBank.filter(q => !(q.subject === targetSubj && q.slideName === materialName))
+            existingQuestionsForSubject
           );
         } catch (err) {
           console.error("❌ Falha na geração com Gemini:", err);
@@ -10829,7 +10830,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       generated = filterUniqueStudyItems(
         generated,
-        sharedQuestionsBank.filter(q => !(q.subject === targetSubj && q.slideName === materialName))
+        existingQuestionsForSubject
       );
       if (generated.length === 0) {
         showToast('⚠️ Não foi possível criar questões confiáveis e não redundantes. Envie um material com texto selecionável ou configure a IA.');
@@ -10838,8 +10839,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       await enrichStudyItemsWithMedicalImages(generated);
 
-      // 5. Salva e atualiza os estados da interface
-      sharedQuestionsBank = sharedQuestionsBank.filter(q => !(q.subject === targetSubj && q.slideName === materialName));
+      // 5. Acrescenta os novos pares ao banco: nunca descarta cartões já gerados.
       generated.reverse().forEach(q => sharedQuestionsBank.unshift(q));
       saveSharedQuestionsBank();
 
@@ -10867,7 +10867,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const qCount = Math.max(1, Math.min(30, count || 5));
       const materials = getMaterialsForSubject(targetSubj);
-      const preservedQuestions = sharedQuestionsBank.filter(q => q.subject !== targetSubj);
+      const existingQuestionsForSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj);
       const generatedForSubject = [];
       let totalCreated = 0;
 
@@ -10892,7 +10892,7 @@ Retorne EXCLUSIVAMENTE um JSON:
               { materialName: m.name, subjectName: targetSubj, disease: m.disease || m.name },
               config,
               toGen,
-              [...preservedQuestions, ...generatedForSubject]
+              [...existingQuestionsForSubject, ...generatedForSubject]
             );
           }
 
@@ -10900,7 +10900,7 @@ Retorne EXCLUSIVAMENTE um JSON:
             createdForMat = generateLocalMedCopilotQuestions(m.name, targetSubj, toGen, config, slideText);
           }
 
-          const uniqueItems = filterUniqueStudyItems(createdForMat, [...preservedQuestions, ...generatedForSubject]);
+          const uniqueItems = filterUniqueStudyItems(createdForMat, [...existingQuestionsForSubject, ...generatedForSubject]);
           uniqueItems.forEach(q => {
             q.slideName = m.name;
             generatedForSubject.push(q);
@@ -10917,10 +10917,11 @@ Retorne EXCLUSIVAMENTE um JSON:
         return;
       }
 
-      // Só substitui o deck anterior depois que um novo conjunto íntegro foi produzido.
-      sharedQuestionsBank = [...generatedForSubject.reverse(), ...preservedQuestions];
+      // Acrescenta ao deck já existente da disciplina; as questões anteriores e
+      // seus estados SRS permanecem intactos.
+      sharedQuestionsBank = [...generatedForSubject.reverse(), ...sharedQuestionsBank];
 
-      await enrichStudyItemsWithMedicalImages(sharedQuestionsBank.filter(q => q.subject === targetSubj));
+      await enrichStudyItemsWithMedicalImages(generatedForSubject);
 
       saveSharedQuestionsBank();
 
@@ -10939,7 +10940,8 @@ Retorne EXCLUSIVAMENTE um JSON:
       renderSceBars();
       updateSubjectFilterMenus();
 
-      showToast(`⚡ ${qCount} pares de estudo (Quiz & Flashcard) gerados para "${targetSubj}"!`);
+      const totalInSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj).length;
+      showToast(`⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • total: ${totalInSubject}.`);
     }
 
     function generateQuestionsForSubject(subjectName) {
