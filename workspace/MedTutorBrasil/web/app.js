@@ -1097,7 +1097,20 @@
                     console.warn('[Firestore] Não foi possível reconstruir o Markdown do material:', doc.id, chunkError);
                   }
                 }
-                cloudMats.push(normalizeMaterial(material));
+                const normalized = normalizeMaterial(material);
+                // Proteção contra regressão de dados: se a versão do IndexedDB tiver mais conteúdo
+                // do que a versão retornada pelo Firestore, preserva o conteúdo local completo.
+                const localMat = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m => m.id === normalized.id || m.name === normalized.name);
+                if (localMat) {
+                  const localLen = String(localMat.markdownText || localMat.conteudo_md || localMat.text || '').length;
+                  const cloudLen = String(normalized.markdownText || normalized.conteudo_md || normalized.text || '').length;
+                  if (localLen > cloudLen) {
+                    normalized.markdownText = localMat.markdownText || localMat.text;
+                    normalized.conteudo_md = localMat.conteudo_md || localMat.markdownText;
+                    normalized.text = localMat.text || localMat.markdownText;
+                  }
+                }
+                cloudMats.push(normalized);
               }
               if (cloudMats.length > 0) {
                 chatDriveMaterials = cloudMats;
@@ -5227,7 +5240,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             difficulty: difficultyLevel,
             previousQuestions,
             previousQuestionAnswers,
-            sourceQuestions: authoredSourceQuestions
+            sourceQuestions: authoredSourceQuestions,
+            targetConcept: config.targetConcept || '',
+            focusExcerpt: config.focusExcerpt || ''
           })
         });
         const data = await response.json().catch(() => ({}));
@@ -5582,9 +5597,11 @@ ${cleanText}
               ? 'Planejando e redigindo a primeira questão…'
               : `Validando contra ${accepted.length} questão(ões) já aceita(s)…`
           });
-          const generated = await generateQuestionsWithGemini(buildQuestionContext(materialText, plan.evidencia_fonte), metadata, {
+          const generated = await generateQuestionsWithGemini(materialText, metadata, {
             ...config,
             difficulty,
+            targetConcept: plan.conceito_alvo,
+            focusExcerpt: plan.evidencia_fonte,
             sourceQuestions: authoredSourceQuestions,
             acceptedStudyItems: [...existingItems, ...accepted]
           }, 1);

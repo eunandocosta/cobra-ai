@@ -209,8 +209,12 @@ class QuizzesService {
       ? providedSourceQuestions
       : extractAuthoredQuestionsFromMaterial(materialText);
 
+    const targetConcept = String(payload.targetConcept || payload.topic || '').trim();
+    const focusExcerpt = String(payload.focusExcerpt || '').trim();
+
     console.log("➡️ [Quiz Engine] Iniciando geração...");
     console.log("📄 [Quiz Engine] Tamanho do texto recebido:", materialText ? materialText.length : 0);
+    if (targetConcept) console.log("🎯 [Quiz Engine] Foco conceitual:", targetConcept);
     console.log("📝 [Quiz Engine] Questões autorais identificadas:", authoredSourceQuestions.length);
 
     if (!materialText || materialText.trim().length < 20) {
@@ -239,7 +243,8 @@ class QuizzesService {
 
     const prompt = `
 Com base exclusivamente no conteúdo abaixo, crie ${totalQuestoes} questões de avaliação formativa. Nível solicitado: ${requestedDifficulty}.
-
+${targetConcept ? `\nFOCO CONCEITUAL PRIORITÁRIO: "${targetConcept}".\nFormule a questão aprofundando este conceito e suas bases anátomo-fisiopatológicas ou semiológicas contidas no material.` : ''}
+${focusExcerpt ? `Trecho de referência no documento: "${focusExcerpt}"\n` : ''}
 ${authoredSourceQuestions.length ? `--- QUESTÕES JÁ CRIADAS PELO PROFESSOR NA FONTE ---
 ${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}
 --- FIM DAS QUESTÕES AUTORAIS ---
