@@ -12200,6 +12200,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       const existingQuestionsForSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj);
       const generatedForSubject = [];
       let totalCreated = 0;
+      let createdForMat = [];
 
       showToast(`⚡ MedCopilot: Gerando estudo com texto validado para "${targetSubj}"...`);
 
@@ -12209,7 +12210,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const effectiveText = (validatedText === '__bypass__') ? '' : validatedText;
       if (effectiveText && effectiveText.length >= 30) {
-        let createdForMat = await generateStudyItemsSequentially(
+        createdForMat = await generateStudyItemsSequentially(
           effectiveText,
           { materialName: targetSubj, subjectName: targetSubj, disease: targetSubj },
           config,
@@ -12232,6 +12233,8 @@ Retorne EXCLUSIVAMENTE um JSON:
         for (let mIdx = 0; mIdx < materials.length; mIdx++) {
           if (totalCreated >= qCount) break;
           const m = materials[mIdx];
+          const toGen = Math.max(1, Math.min(perMat, qCount - totalCreated));
+          createdForMat = [];
           let slideText = getMaterialStudyText(m);
           if ((!slideText || slideText.length < 500) && Array.isArray(chatDriveMaterials)) {
             const found = chatDriveMaterials.find(item => item.id === m.id || item.name === m.name);
@@ -12307,6 +12310,56 @@ Retorne EXCLUSIVAMENTE um JSON:
 
     function generateQuestionsForCurrentSubject() {
       generateUnifiedStudyForSubject(currentStudySubject, 5);
+    }
+
+    async function synchronizeSubjectQuestions(subjectName, options = {}) {
+      const targetSubject = String(subjectName || '').trim();
+      const materials = getMaterialsForSubject(targetSubject);
+      if (!targetSubject || !materials.length) {
+        showToast('ℹ️ Esta disciplina ainda não possui arquivos com texto para sincronizar.');
+        return 0;
+      }
+      const previousCount = sharedQuestionsBank.filter(question => question.subject === targetSubject).length;
+      // Uma questão inicial por arquivo (até o limite seguro da interface),
+      // enquanto o banco didático já varre todos os arquivos da disciplina.
+      const amount = Math.min(30, Math.max(5, materials.length));
+      try {
+        await MedTutorFirebaseService.rebuildDisciplineQuestionBanks(materials);
+        await generateUnifiedStudyForSubject(targetSubject, amount, { difficulty: 'balanced' }, '__bypass__');
+      } catch (error) {
+        console.error('[Sincronização de disciplina] Falha:', targetSubject, error);
+        if (!options.silent) showToast(`⚠️ Não foi possível sincronizar "${targetSubject}".`);
+      }
+      return Math.max(0, sharedQuestionsBank.filter(question => question.subject === targetSubject).length - previousCount);
+    }
+
+    async function synchronizePendingDisciplinesQuestions() {
+      const subjects = [];
+      (universityCurriculum || []).forEach(period => (period.subjects || []).forEach(subject => {
+        const name = typeof subject === 'string' ? subject : subject?.name;
+        if (!name || subjects.includes(name)) return;
+        const hasMaterials = getMaterialsForSubject(name).length > 0;
+        const hasQuestions = sharedQuestionsBank.some(question => question.subject === name || String(question.subject || '').toLowerCase() === name.toLowerCase());
+        if (hasMaterials && !hasQuestions) subjects.push(name);
+      }));
+      if (!subjects.length) {
+        showToast('✓ Não há disciplinas com materiais pendentes de questões.');
+        return;
+      }
+
+      const button = document.getElementById('btnSyncPendingQuestions');
+      if (button) { button.disabled = true; button.textContent = `⏳ Sincronizando 0/${subjects.length}`; }
+      let generated = 0;
+      try {
+        for (let index = 0; index < subjects.length; index++) {
+          if (button) button.textContent = `⏳ Sincronizando ${index + 1}/${subjects.length}`;
+          generated += await synchronizeSubjectQuestions(subjects[index], { silent: true });
+        }
+        showToast(`✓ Sincronização concluída: ${generated} novos pares em ${subjects.length} disciplina(s).`);
+      } finally {
+        if (button) { button.disabled = false; button.textContent = '✨ Sincronizar Questões Pendentes'; }
+        renderCurriculumGrid();
+      }
     }
 
     function auditSubjectRedundancy(subjectName) {
@@ -18795,7 +18848,7 @@ Para cada material, retorne um objeto no JSON com:
                       rightTag = `
                         <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
                         <button class="btn-outline-action primary" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
-                        <button class="btn-outline-action" style="padding: 3px 8px; font-size: 10.5px;" onclick="openGenerateStudyModal('', '${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Flashcards e Quizzes sob demanda com IA">⚡ Quizzes</button>
+                        <button class="btn-outline-action" style="padding: 3px 8px; font-size: 10.5px;" onclick="synchronizeSubjectQuestions('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ler todos os arquivos enviados desta disciplina e criar os primeiros Quiz e Flashcards">🔄 Sincronizar Questões</button>
                         <button class="btn-outline-action danger" style="padding: 3px 8px; font-size: 10.5px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
                       `;
                     } else {
