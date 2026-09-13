@@ -527,7 +527,30 @@
       const effectiveSubject = m.subject || m.disciplina || (typeof currentStudySubject !== 'undefined' ? currentStudySubject : 'Clínica Médica');
       const effectiveTopic = m.topic || m.materia || effectiveName;
       const effectiveDisease = m.disease || m.doenca || '';
-      const effectiveMd = m.markdownText || m.conteudo_md || m.text || '';
+
+      const textCandidates = [
+        m.material_md,
+        m.materialMd,
+        m.conteudo_md,
+        m.conteudoMd,
+        m.markdownText,
+        m.markdown,
+        m.readingDocText,
+        m.extractedText,
+        m.rawText,
+        m.fullText,
+        m.text,
+        m.content,
+        m.conteudo,
+        m.relatorio_academico?.conteudo_md,
+        m.relatorio_academico?.markdown,
+        m.academicReport?.conteudo_md,
+        m.academicReport?.markdown
+      ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+
+      textCandidates.sort((a, b) => b.length - a.length);
+      const effectiveMd = textCandidates[0] || '';
+
       return {
         ...m,
         id: m.id || ('mat_' + Math.random().toString(36).substring(2, 9)),
@@ -540,6 +563,7 @@
         materia: effectiveTopic,
         disease: effectiveDisease,
         doenca: effectiveDisease,
+        material_md: effectiveMd,
         markdownText: effectiveMd,
         conteudo_md: effectiveMd,
         text: effectiveMd,
@@ -1086,12 +1110,12 @@
                 if (material.conteudo_armazenamento === 'chunks_v1') {
                   try {
                     const completeText = await this.readMaterialTextChunks(doc.ref, Number(material.conteudo_chunks) || 0);
-                    // Nunca substitui a prévia por uma leitura parcial ou falha.
-                    if (completeText.length >= Number(material.conteudo_caracteres || 0)) {
+                    const currentLen = String(material.material_md || material.markdownText || material.conteudo_md || material.text || '').length;
+                    if (completeText && (completeText.length > currentLen || completeText.length >= Number(material.conteudo_caracteres || 0) * 0.85)) {
+                      material.material_md = completeText;
                       material.markdownText = completeText;
                       material.conteudo_md = completeText;
-                    } else {
-                      console.warn('[Firestore] Conteúdo em blocos incompleto; preservando prévia do material.', { id: doc.id, expected: material.conteudo_caracteres, received: completeText.length });
+                      material.text = completeText;
                     }
                   } catch (chunkError) {
                     console.warn('[Firestore] Não foi possível reconstruir o Markdown do material:', doc.id, chunkError);
@@ -1102,12 +1126,35 @@
                 // do que a versão retornada pelo Firestore, preserva o conteúdo local completo.
                 const localMat = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m => m.id === normalized.id || m.name === normalized.name);
                 if (localMat) {
-                  const localLen = String(localMat.markdownText || localMat.conteudo_md || localMat.text || '').length;
-                  const cloudLen = String(normalized.markdownText || normalized.conteudo_md || normalized.text || '').length;
-                  if (localLen > cloudLen) {
-                    normalized.markdownText = localMat.markdownText || localMat.text;
-                    normalized.conteudo_md = localMat.conteudo_md || localMat.markdownText;
-                    normalized.text = localMat.text || localMat.markdownText;
+                  const localCandidates = [
+                    localMat.material_md,
+                    localMat.materialMd,
+                    localMat.conteudo_md,
+                    localMat.conteudoMd,
+                    localMat.markdownText,
+                    localMat.markdown,
+                    localMat.text
+                  ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+                  localCandidates.sort((a, b) => b.length - a.length);
+                  const localBest = localCandidates[0] || '';
+
+                  const normCandidates = [
+                    normalized.material_md,
+                    normalized.materialMd,
+                    normalized.conteudo_md,
+                    normalized.conteudoMd,
+                    normalized.markdownText,
+                    normalized.markdown,
+                    normalized.text
+                  ].filter(t => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+                  normCandidates.sort((a, b) => b.length - a.length);
+                  const normBest = normCandidates[0] || '';
+
+                  if (localBest.length > normBest.length) {
+                    normalized.material_md = localBest;
+                    normalized.markdownText = localBest;
+                    normalized.conteudo_md = localBest;
+                    normalized.text = localBest;
                   }
                 }
                 cloudMats.push(normalized);
@@ -9819,7 +9866,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         docTitle,
         docSubtitle,
         fullHtml,
-        plainText: `${docTitle}\n${docSubtitle}${plainIndexText}\n\n${mainDisease} - Roteiro de Estudo e Revisão Médica`
+        plainText: (rawBody && rawBody.trim().length > 100)
+          ? `${docTitle}\n${docSubtitle}\n\n${rawBody.trim()}`
+          : `${docTitle}\n${docSubtitle}${plainIndexText}\n\n${mainDisease} - Roteiro de Estudo e Revisão Médica`
       };
     }
 
@@ -11323,16 +11372,33 @@ Retorne EXCLUSIVAMENTE um JSON:
     // leitura impede que uma disciplina pareça "sem conteúdo" apenas por ter sido
     // importada por outro caminho.
     function getMaterialStudyText(material = {}) {
-      const source = material.markdownText ||
-        material.conteudo_md ||
-        material.readingDocText ||
-        material.extractedText ||
-        material.text ||
-        material.content ||
-        material.conteudo ||
-        (material.pedagogicalSynthesis ? JSON.stringify(material.pedagogicalSynthesis) : '') ||
-        '';
-      return String(source).trim();
+      if (!material || typeof material !== 'object') return '';
+      const candidates = [
+        material.material_md,
+        material.materialMd,
+        material.conteudo_md,
+        material.conteudoMd,
+        material.markdownText,
+        material.markdown,
+        material.extractedText,
+        material.rawText,
+        material.fullText,
+        material.text,
+        material.content,
+        material.conteudo,
+        material.readingDocText,
+        material.relatorio_academico?.conteudo_md,
+        material.relatorio_academico?.markdown,
+        material.academicReport?.conteudo_md,
+        material.academicReport?.markdown,
+        material.pedagogicalSynthesis ? (typeof material.pedagogicalSynthesis === 'string' ? material.pedagogicalSynthesis : JSON.stringify(material.pedagogicalSynthesis)) : ''
+      ]
+        .filter(c => typeof c === 'string' && c.trim().length > 0)
+        .map(c => c.trim());
+
+      if (candidates.length === 0) return '';
+      candidates.sort((a, b) => b.length - a.length);
+      return candidates[0];
     }
 
     // 4.4 Geração Sob Demanda: IA Gemini + Motor Local MedCopilot
@@ -11353,13 +11419,32 @@ Retorne EXCLUSIVAMENTE um JSON:
       // 1. Resgata o texto completo do arquivo em qualquer propriedade onde ele possa ter sido salvo
       let slideText = getMaterialStudyText(targetFile);
 
-      // 2. Limpeza profunda: remove índices, sumários e cabeçalhos de módulos acadêmicos
+      // Se o targetFile tiver texto curto (< 500 chars), busca no banco geral de materiais da sessão
+      if ((!slideText || slideText.length < 500) && Array.isArray(chatDriveMaterials)) {
+        const found = chatDriveMaterials.find(m =>
+          m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
+          [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)
+        );
+        if (found) {
+          const altText = getMaterialStudyText(found);
+          if (altText && altText.length > (slideText ? slideText.length : 0)) {
+            slideText = altText;
+          }
+        }
+      }
+
+      // 2. Limpeza profunda: remove índices e cabeçalhos preservando o corpo médico integral
       if (slideText) {
+        const preClean = slideText;
         slideText = slideText
           .replace(/(?:sumário|índice|tabela de conteúdo|conteúdo programático)[\s\S]*?(?=(?:introdução|objetivos|1\.|\n#|[A-Z\s]{4,}\n))/i, '')
           .replace(/^.*?\b(item\s*\d+|conceitos[- ]chave|slide\s*\d+|página\s*\d+|M0\d+).*$/gim, '')
           .replace(/Med\s*Tutor\s*Brasil.*$/gim, '')
           .trim();
+        // Proteção contra regex gulosa: se a limpeza encolheu o texto excessivamente, restaura o original
+        if (slideText.length < 300 && preClean.length >= 300) {
+          slideText = preClean;
+        }
       }
 
       showToast(`⚡ MedCopilot: Gerando ${qCount} questões com ancoragem clínica...`);
@@ -11446,9 +11531,16 @@ Retorne EXCLUSIVAMENTE um JSON:
         for (let mIdx = 0; mIdx < materials.length; mIdx++) {
           if (totalCreated >= qCount) break;
           const m = materials[mIdx];
-          const toGen = (mIdx === materials.length - 1) ? (qCount - totalCreated) : perMat;
-          const slideText = getMaterialStudyText(m);
-          let createdForMat = null;
+          let slideText = getMaterialStudyText(m);
+          if ((!slideText || slideText.length < 500) && Array.isArray(chatDriveMaterials)) {
+            const found = chatDriveMaterials.find(item => item.id === m.id || item.name === m.name);
+            if (found) {
+              const altText = getMaterialStudyText(found);
+              if (altText && altText.length > (slideText || '').length) {
+                slideText = altText;
+              }
+            }
+          }
 
           if (slideText.length >= 30) {
             createdForMat = await generateStudyItemsSequentially(

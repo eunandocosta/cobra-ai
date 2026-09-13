@@ -217,8 +217,21 @@ class QuizzesService {
    * Extrai o texto clínico e parâmetros enviados no req.body
    */
   async generateQuestions(payload = {}) {
-    // Captura o texto independentemente do nome do campo enviado pelo frontend
-    const materialText = payload.materialText || payload.text || payload.conteudo || payload.content || '';
+    // Captura o texto mais completo dentre qualquer campo que o frontend/cliente tenha enviado
+    const candidates = [
+      payload.materialText,
+      payload.material_md,
+      payload.materialMd,
+      payload.conteudo_md,
+      payload.conteudoMd,
+      payload.markdownText,
+      payload.text,
+      payload.conteudo,
+      payload.content
+    ].filter(c => typeof c === 'string' && c.trim().length > 0);
+    candidates.sort((a, b) => b.length - a.length);
+    const materialText = candidates[0] || '';
+
     const quantidade = payload.quantidade || payload.amount || payload.total || 5;
     const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
       ? payload.difficulty
@@ -239,6 +252,9 @@ class QuizzesService {
 
     console.log("➡️ [Quiz Engine] Iniciando geração por seções...");
     console.log("📄 [Quiz Engine] Tamanho do texto recebido:", materialText ? materialText.length : 0);
+    if (materialText) {
+      console.log("🔍 [Quiz Engine] Início do texto recebido:", materialText.slice(0, 150).replace(/\s+/g, ' '));
+    }
     console.log("📝 [Quiz Engine] Questões autorais identificadas:", authoredSourceQuestions.length);
     console.log("📚 [Quiz Engine] Questões já existentes no deck:", previousQuestions.length);
 
@@ -276,7 +292,10 @@ METODOLOGIA OBRIGATÓRIA:
    - Crie ao menos 1 questão de nível "iniciante" (reconhecimento/anatomia/definição direta explícita).
    - Se a seção permitir aprofundar mecanismos fisiopatológicos ou comparações, crie também 1 questão de nível "intermediario".
    - Se a seção contiver elementos de raciocínio clínico, semiologia ou conduta, crie também 1 questão de nível "avancado".
-4. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
+4. DISTRIBUIÇÃO E PROPORÇÃO PEDAGÓGICA NO LOTE TOTAL DE ${totalQuestoes} QUESTÕES:
+   - Distribua aproximadamente 40% Iniciante (fundamentos/definição/anatomia direta), 40% Intermediário (mecanismos fisiopatológicos/diagnóstico diferencial) e 20% Avançado (raciocínio clínico/semiologia aplicada/conduta).
+   - Espalhe as questões harmonicamente ao longo de todas as seções do documento.
+5. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
 
 ${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATERIAL ---
 ${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}
@@ -419,7 +438,19 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       model: modelName,
       generationConfig: {
         temperature: 0.1,
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            accuracy: { type: "INTEGER" },
+            score: { type: "NUMBER" },
+            status: { type: "STRING" },
+            strengths: { type: "STRING" },
+            gaps: { type: "STRING" },
+            feedback: { type: "STRING" }
+          },
+          required: ["accuracy", "score", "status", "feedback"]
+        }
       }
     });
 
@@ -438,18 +469,54 @@ REGRAS OBRIGATÓRIAS DE PONTUAÇÃO (Cada questão vale 1.0 ponto):
 - Acima de 50% até 80% (> 50% e <= 80%): Resposta parcialmente correta. Pontuação = 0.5 ponto.
 - 50% ou menos (<= 50%): Resposta insuficiente ou incorreta. Pontuação = 0.0 pontos.
 
-Retorne EXCLUSIVAMENTE um JSON com:
+Retorne EXCLUSIVAMENTE um objeto JSON contendo:
 - "accuracy": número inteiro de 0 a 100 representando a porcentagem de acerto.
 - "score": número (1.0, 0.5 ou 0.0) correspondente à regra de pontuação.
 - "status": string ("completamente_correta", "parcialmente_correta" ou "insuficiente").
-- "strengths": texto ou array curto destacando os acertos do estudante.
-- "gaps": texto ou array curto apontando o que faltou ou erros.
+- "strengths": texto destacando os acertos conceituais do estudante.
+- "gaps": texto apontando o que faltou ou erros.
 - "feedback": síntese pedagógica encorajadora e orientações clínicas.`;
 
     try {
       const res = await runWithAiLimit(() => model.generateContent(prompt));
-      const text = res.response.text();
-      let parsed = JSON.parse(text);
+      const rawText = res.response.text();
+      let parsed = null;
+
+      try {
+        parsed = JSON.parse(rawText);
+      } catch (parseErr) {
+        // Tenta sanitizar JSON se houver caracteres residuais
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const sanitized = jsonMatch[0]
+              .replace(/,\s*([}\]])/g, '$1')
+              .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+            parsed = JSON.parse(sanitized);
+          } catch (e2) {
+            console.warn('⚠️ [Quiz Engine] Fallback no parse de JSON da avaliação:', e2.message);
+          }
+        }
+      }
+
+      if (!parsed || typeof parsed !== 'object') {
+        const expectedTerms = Array.isArray(keyConcepts) && keyConcepts.length > 0
+          ? keyConcepts
+          : String(referenceAnswer).split(/[,;.\s]+/).filter(w => w.length >= 4);
+        const lowerStudent = studentAnswer.toLowerCase();
+        const matched = expectedTerms.filter(t => lowerStudent.includes(String(t).toLowerCase()));
+        const calcAccuracy = expectedTerms.length > 0
+          ? Math.round((matched.length / expectedTerms.length) * 100)
+          : 60;
+        parsed = {
+          accuracy: calcAccuracy,
+          score: calcAccuracy > 80 ? 1.0 : (calcAccuracy > 50 ? 0.5 : 0.0),
+          status: calcAccuracy > 80 ? 'completamente_correta' : (calcAccuracy > 50 ? 'parcialmente_correta' : 'insuficiente'),
+          strengths: matched.length > 0 ? `Termos identificados: ${matched.join(', ')}` : 'Resposta recebida.',
+          gaps: matched.length < expectedTerms.length ? 'Aprofunde os conceitos da referência.' : 'Sem lacunas críticas.',
+          feedback: 'Avaliação de correspondência conceitual concluída.'
+        };
+      }
 
       let accuracy = Math.min(100, Math.max(0, parseInt(parsed.accuracy, 10) || 0));
       let score = 0.0;

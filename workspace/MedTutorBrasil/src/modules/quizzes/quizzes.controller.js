@@ -5,10 +5,23 @@ class QuizzesController {
   async generate(req, res) {
     try {
       const payload = req.body || {};
-      const materialText = payload.materialText || payload.text || payload.conteudo || payload.content || '';
+      const candidates = [
+        payload.materialText,
+        payload.material_md,
+        payload.materialMd,
+        payload.conteudo_md,
+        payload.conteudoMd,
+        payload.markdownText,
+        payload.text,
+        payload.conteudo,
+        payload.content
+      ].filter(c => typeof c === 'string' && c.trim().length > 0);
+      candidates.sort((a, b) => b.length - a.length);
+      const materialText = candidates[0] || '';
       if (typeof materialText !== 'string' || materialText.trim().length < 20) {
-        return res.status(400).json({ error: 'Texto de estudo insuficiente para gerar questões.', details: 'Envie materialText, text, conteudo ou content com ao menos 20 caracteres.' });
+        return res.status(400).json({ error: 'Texto de estudo insuficiente para gerar questões.', details: 'Envie materialText, material_md, conteudo_md ou text com ao menos 20 caracteres.' });
       }
+      payload.materialText = materialText;
       const data = await quizzesService.generateQuestions(payload);
       return res.json(data);
     } catch (err) {
