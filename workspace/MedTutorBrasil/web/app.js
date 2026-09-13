@@ -18593,6 +18593,10 @@ Para cada material, retorne um objeto no JSON com:
         sanitizedAsciiLines.push(curL);
       }
       md = sanitizedAsciiLines.join('\n');
+      // Alguns modelos omitem o separador Markdown (|---|) e prefixam a primeira
+      // célula com "1. |". Preserva a numeração como primeira coluna para que a
+      // resposta continue renderizável como tabela, em vez de virar texto solto.
+      md = md.replace(/(^|\n)\s*(\d{1,3})\.\s*(?=\|)/g, '$1| $2 ');
 
       const lines = md.split('\n');
       let html = '';
@@ -18651,6 +18655,40 @@ Para cada material, retorne um objeto no JSON com:
         }
 
         // 3. Tabelas Markdown: | Col 1 | Col 2 |
+        // Também aceita tabelas sem o separador |---|, um formato frequente nas
+        // respostas do chat. Linhas vazias internas não encerram a tabela.
+        const isPipeTableRow = candidate => {
+          const trimmed = String(candidate || '').trim();
+          return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.split('|').length >= 4;
+        };
+        const isMarkdownTableSeparator = candidate => /^\s*\|?\s*:?-+:?\s*(\|?\s*:?-+:?\s*)+\|?\s*$/.test(String(candidate || '').trim());
+        if (isPipeTableRow(line) && !(lines[i + 1] && isMarkdownTableSeparator(lines[i + 1]))) {
+          const splitLooseTableCells = tableLine => tableLine.trim().replace(/^\||\|$/g, '')
+            .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
+          const rows = [];
+          let cursor = i;
+          while (cursor < lines.length) {
+            if (!lines[cursor].trim() && isPipeTableRow(lines[cursor + 1])) {
+              cursor++;
+              continue;
+            }
+            if (!isPipeTableRow(lines[cursor])) break;
+            rows.push(splitLooseTableCells(lines[cursor]));
+            cursor++;
+          }
+          if (rows.length >= 2) {
+            if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+            const columnCount = Math.max(...rows.map(row => row.length));
+            const rowsHtml = rows.map(row => {
+              const normalized = [...row];
+              while (normalized.length < columnCount) normalized.push('');
+              return '<tr>' + normalized.slice(0, columnCount).map(cell => '<td>' + formatInlineMd(cell) + '</td>').join('') + '</tr>';
+            }).join('');
+            html += `<div class="doc-table-wrapper" role="region" aria-label="Tabela do conteúdo" tabindex="0"><table class="doc-table"><tbody>${rowsHtml}</tbody></table></div>`;
+            i = cursor;
+            continue;
+          }
+        }
         if (line.trim().startsWith('|') && line.trim().endsWith('|') && lines[i + 1] && /^\s*\|?\s*:?-+:?\s*(\|?\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1].trim())) {
           if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
           
