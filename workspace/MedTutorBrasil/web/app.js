@@ -15184,6 +15184,24 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
             file: f,
             visualAssociationAuthorized
           });
+
+          // Registra a leitura imediatamente, sem depender da confirmação de
+          // disciplina, da coleta de imagens ou do salvamento no Firestore.
+          // Assim uma falha posterior jamais esconde o resultado da extração.
+          const extractionDiagnostic = {
+            originalFileName: f.name,
+            uploadInputChars: String(combinedText || '').length,
+            markdownText: '',
+            aiEngine: 'Extração local (PDF.js / leitor de arquivo)',
+            clinicalImages: []
+          };
+          reportUploadDiagnostic(extractionDiagnostic, 'texto_extraido');
+          if (!combinedText || combinedText.trim().length < 20) {
+            console.warn(`[Upload MedTutor] Nenhum texto selecionável foi extraído de "${f.name}".`);
+            if (!visualAssociationAuthorized) {
+              showToast('⚠️ Este arquivo não possui texto selecionável. Para PDF/slide visual, marque “Interpretar páginas visuais com Gemini”.', 5500);
+            }
+          }
         }
       } else if (userText) {
         queue.push({
@@ -15207,7 +15225,19 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
         zoneSub.style.color = 'var(--text-muted)';
       }
 
-      await startItemByItemAllocationQueue(queue);
+      try {
+        await startItemByItemAllocationQueue(queue);
+      } catch (error) {
+        console.error('[Upload MedTutor] Falha após a extração, antes da alocação:', error);
+        queue.forEach(item => reportUploadDiagnostic({
+          originalFileName: item.fileName,
+          uploadInputChars: String(item.text || '').length,
+          markdownText: item.markdownText || '',
+          aiEngine: 'Processamento interrompido antes da alocação',
+          clinicalImages: []
+        }, 'falhou'));
+        showToast('⚠️ O arquivo foi lido, mas houve uma falha ao organizar o material. Veja o console para o detalhe.', 6000);
+      }
     }
 
     function toggleManualDirectionInputs() {

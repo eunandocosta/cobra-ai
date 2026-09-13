@@ -67,7 +67,7 @@ app.post('/api/diagnostics/upload', (req, res) => {
     imagensColetadas: Math.max(0, Math.min(Number(body.imagesCollected) || 0, 1000)),
     at: new Date().toISOString()
   };
-  const icon = safe.status === 'sucesso' ? '✅' : (safe.status === 'iniciando' ? '📥' : '⚠️');
+  const icon = safe.status === 'sucesso' ? '✅' : (safe.status === 'iniciando' ? '📥' : (safe.status === 'texto_extraido' ? '📄' : '⚠️'));
   console.log(`${icon} [Upload MedTutor]`, safe);
   res.status(204).end();
 });
