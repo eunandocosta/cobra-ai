@@ -145,9 +145,20 @@ class EmentasService {
     this.currentCurriculum = parsed.periods.map(p => ({
       period: p.period,
       cycleName: p.cycleName,
-      subjects: p.subjects.map(s => s.code ? `${s.code} ${s.name}` : s.name),
+      subjects: p.subjects
+        .filter(s => s && typeof s.name === 'string' && s.name.trim())
+        .map(s => ({
+          code: typeof s.code === 'string' ? s.code.trim() : '',
+          name: s.code ? `${s.code} ${s.name}` : s.name.trim(),
+          description: typeof s.description === 'string' ? s.description.trim() : '',
+          isUser: true
+        })),
       details: p.subjects
-    }));
+    })).filter(p => p.subjects.length > 0);
+
+    if (this.currentCurriculum.length === 0) {
+      throw new Error("A IA não encontrou disciplinas válidas no texto enviado.");
+    }
 
     return {
       metadata: this.institutionMetadata,
@@ -156,13 +167,16 @@ class EmentasService {
   }
 
   async classifyMaterialSemantically(materialContent, materialName) {
-    if (!this.genAI || this.currentCurriculum.length === 0) {
-      return { pedagogicalPhase: 5, targetSubject: 'Clínica Médica' };
+    if (this.currentCurriculum.length === 0) {
+      throw new Error('Importe a ementa oficial antes de classificar materiais.');
     }
 
     const flatSubjects = [];
     this.currentCurriculum.forEach(p => {
-      p.subjects.forEach(s => flatSubjects.push(`[${p.period}] ${s}`));
+      p.subjects.forEach(s => {
+        const name = typeof s === 'string' ? s : s.name;
+        if (name) flatSubjects.push(`[${p.period}] ${name}`);
+      });
     });
 
     const genAI = this._getGenAI();
@@ -216,8 +230,10 @@ ${(materialContent || materialName).slice(0, 4000)}
 
     for (const p of this.currentCurriculum) {
       for (const s of p.subjects) {
-        if (s.toLowerCase() === raw || s.toLowerCase().includes(raw) || raw.includes(s.toLowerCase())) {
-          return { nome: s, periodo: p.period, ciclo: p.cycleName, status: 'Ativa na Ementa' };
+        const name = typeof s === 'string' ? s : s.name;
+        const normalized = String(name || '').toLowerCase();
+        if (normalized && (normalized === raw || normalized.includes(raw) || raw.includes(normalized))) {
+          return { nome: name, periodo: p.period, ciclo: p.cycleName, status: 'Ativa na Ementa' };
         }
       }
     }

@@ -671,6 +671,7 @@
                   materias: Array.isArray(sub.topics) ? sub.topics : [subName],
                   maestria_xp: sub.masteryXp || 0,
                   itensEstudados: sub.studiedCount || 0,
+                  origem: period.source || '',
                   atualizadoEm: new Date().toISOString()
                 }, { merge: true });
               });
@@ -1050,8 +1051,9 @@
           }
 
           const loadedCurriculum = await MedTutorLocalDB.get('curriculum', uid);
-          if (Array.isArray(loadedCurriculum) && loadedCurriculum.length > 0) {
-            universityCurriculum = loadedCurriculum;
+          const sanitizedCurriculum = sanitizeSavedCurriculum(loadedCurriculum);
+          if (sanitizedCurriculum.length > 0) {
+            universityCurriculum = sanitizedCurriculum;
           }
 
           const loadedQuestions = await MedTutorLocalDB.get('questions', uid);
@@ -1108,12 +1110,16 @@
               const periodMap = new Map();
               currSnap.forEach(d => {
                 const item = d.data();
+                // Somente reidrata disciplinas criadas pela análise Gemini de
+                // uma ementa enviada pelo aluno; legados não são usados.
+                if (item.origem !== 'gemini-upload') return;
                 const p = item.periodo || 'Período Curricular';
                 if (!periodMap.has(p)) {
                   periodMap.set(p, {
                     period: p,
                     cycle: item.ciclo || '',
                     cycleName: item.ciclo || '',
+                    source: item.origem || '',
                     subjects: []
                   });
                 }
@@ -1124,8 +1130,9 @@
                   studiedCount: item.itensEstudados || 0
                 });
               });
-              if (periodMap.size > 0) {
-                const sortedPeriods = Array.from(periodMap.values()).sort((a, b) => {
+              const cloudCurriculum = sanitizeSavedCurriculum(Array.from(periodMap.values()));
+              if (cloudCurriculum.length > 0) {
+                const sortedPeriods = cloudCurriculum.sort((a, b) => {
                   const getNum = s => {
                     const m = (s.period || '').match(/\d+/);
                     return m ? parseInt(m[0], 10) : 999;
@@ -11800,7 +11807,7 @@ Retorne EXCLUSIVAMENTE um JSON:
     function getOfficialCurriculumDisciplineList() {
       const curriculum = (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0)
         ? universityCurriculum
-        : (typeof FULL_MEDICAL_CURRICULUM_DCN !== 'undefined' && Array.isArray(FULL_MEDICAL_CURRICULUM_DCN) ? FULL_MEDICAL_CURRICULUM_DCN : []);
+        : [];
 
       const list = [];
       curriculum.forEach(p => {
@@ -11833,7 +11840,7 @@ Retorne EXCLUSIVAMENTE um JSON:
     function getOfficialCurriculumCatalogString() {
       const disciplines = getOfficialCurriculumDisciplineList();
       if (!disciplines || disciplines.length === 0) {
-        return 'Grade Curricular Geral de Medicina: 1º ao 12º Período.';
+        return '';
       }
       const grouped = {};
       disciplines.forEach(d => {
@@ -11861,7 +11868,7 @@ Retorne EXCLUSIVAMENTE um JSON:
     function getOfficialCurriculumPeriodList() {
       const curriculum = (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0)
         ? universityCurriculum
-        : (typeof FULL_MEDICAL_CURRICULUM_DCN !== 'undefined' && Array.isArray(FULL_MEDICAL_CURRICULUM_DCN) ? FULL_MEDICAL_CURRICULUM_DCN : []);
+        : [];
 
       const periods = [];
       curriculum.forEach(p => {
@@ -15585,158 +15592,10 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       }, needsCompression ? 750 : 250);
     }
 
-    // 8. EMENTA & GRADE CURRICULAR COMPLETA DE MEDICINA (12 PERÍODOS • DCNs DO MEC)
-    const FULL_MEDICAL_CURRICULUM_DCN = [
-      {
-        period: '1º Período • Ciclo Básico',
-        cycle: 'basico',
-        cycleName: 'Ciclo Básico',
-        subjects: [
-          'Anatomia Humana I (Aparelho Locomotor e Cabeça/Pescoço)',
-          'Histologia e Embriologia Médica Geral',
-          'Biologia Celular e Molecular Humana',
-          'Bioquímica Médica e Metabólica',
-          'Saúde Coletiva I & Introdução à Atenção Básica',
-          'Introdução à Prática Médica, Ética e Humanidades'
-        ]
-      },
-      {
-        period: '2º Período • Ciclo Básico',
-        cycle: 'basico',
-        cycleName: 'Ciclo Básico',
-        subjects: [
-          'Anatomia Humana II (Esplancnologia & Tórax/Abdome)',
-          'Fisiologia Humana I (Neurofisiologia, Músculos e Sinapses)',
-          'Genética Médica e Clínica',
-          'Imunologia Médica Básica e Celular',
-          'Epidemiologia Clínica e Métodos Estatísticos em Saúde',
-          'Habilidades Médicas I (Comunicação Clínica e Relação Médico-Paciente)'
-        ]
-      },
-      {
-        period: '3º Período • Ciclo Básico',
-        cycle: 'basico',
-        cycleName: 'Ciclo Básico',
-        subjects: [
-          'Fisiologia Humana II (Cardiovascular, Renal e Respiratória)',
-          'Microbiologia Médica (Bacteriologia, Virologia e Micologia)',
-          'Parasitologia Médica e Vetores',
-          'Patologia Geral (Lesão, Adaptação e Morte Celular)',
-          'Farmacologia Básica e Farmacocinética',
-          'Habilidades Médicas II & Biossegurança'
-        ]
-      },
-      {
-        period: '4º Período • Ciclo Básico',
-        cycle: 'basico',
-        cycleName: 'Ciclo Básico',
-        subjects: [
-          'Fisiopatologia dos Órgãos e Sistemas Integrados',
-          'Patologia Especial dos Órgãos e Sistemas',
-          'Farmacologia Clínica e Terapêutica Racional',
-          'Semiologia Médica I (Anamnese Estruturada e Exame Físico Geral)',
-          'Mecanismos de Agressão e Defesa Imunopatológica',
-          'Bioestatística e Metodologia Científica Aplicada à Medicina'
-        ]
-      },
-      {
-        period: '5º Período • Ciclo Clínico',
-        cycle: 'clinico',
-        cycleName: 'Ciclo Clínico',
-        subjects: [
-          'Semiologia Médica II e Raciocínio Clínico Avançado',
-          'Cardiologia Clínica e Métodos Diagnósticos (ECG)',
-          'Pneumologia Clínica e Provas Funcionais Respiratórias',
-          'Nefrologia e Distúrbios Hidroeletrolíticos e Ácido-Base',
-          'Gastroenterologia e Hepatologia Clínica',
-          'Radiologia e Diagnóstico por Imagem'
-        ]
-      },
-      {
-        period: '6º Período • Ciclo Clínico',
-        cycle: 'clinico',
-        cycleName: 'Ciclo Clínico',
-        subjects: [
-          { name: 'Integração de Sistemas Humanos 2 (Dermatologia Clínica)', isUser: true },
-          'Endocrinologia Clínica e Metabologia',
-          'Hematologia Clínica e Hemoterapia Transfusional',
-          'Reumatologia Clínica e Doenças Autoimunes',
-          'Infectologia e Doenças Tropicais e Parasitárias',
-          'Psicologia Médica e Psicopatologia Clínica'
-        ]
-      },
-      {
-        period: '7º Período • Ciclo Clínico',
-        cycle: 'clinico',
-        cycleName: 'Ciclo Clínico',
-        subjects: [
-          'Clínica Cirúrgica I & Técnica Operatória e Anestesiologia',
-          'Ortopedia, Traumatologia e Reabilitação',
-          'Otorrinolaringologia e Oftalmologia Clínica',
-          'Neurologia Clínica e Neurocirurgia',
-          'Psiquiatria Clínica e Transtornos do Humor',
-          'Medicina Legal, Bioética Médica e Deontologia'
-        ]
-      },
-      {
-        period: '8º Período • Ciclo Clínico',
-        cycle: 'clinico',
-        cycleName: 'Ciclo Clínico',
-        subjects: [
-          'Ginecologia e Obstetrícia Fundamental',
-          'Pediatria e Puericultura I',
-          'Clínica Cirúrgica II & Urgências Cirúrgicas no Trauma',
-          'Oncologia Clínica, Hematologia Oncológica e Cuidados Paliativos',
-          'Medicina de Emergência e Suporte Avançado de Vida (ACLS)',
-          'Gestão em Saúde Pública, Políticas de Saúde e SUS'
-        ]
-      },
-      {
-        period: '9º Período • Internato Médico',
-        cycle: 'internato',
-        cycleName: 'Internato Médico',
-        subjects: [
-          'Internato Curricular em Saúde Coletiva e Atenção Primária à Saúde',
-          'Internato em Medicina de Família e Comunidade (MFC)',
-          'Visitas Domiciliares, Vigilância Epidemiológica e Saúde da População'
-        ]
-      },
-      {
-        period: '10º Período • Internato Médico',
-        cycle: 'internato',
-        cycleName: 'Internato Médico',
-        subjects: [
-          'Internato em Clínica Médica (Enfermarias Gerais e Ambulatórios Especializados)',
-          'Internato em Terapia Intensiva de Adultos (UTI Geral e Coronariana)',
-          'Raciocínio Clínico e Discussão Multidisciplinar de Casos Complexos'
-        ]
-      },
-      {
-        period: '11º Período • Internato Médico',
-        cycle: 'internato',
-        cycleName: 'Internato Médico',
-        subjects: [
-          'Internato em Cirurgia Geral, Eletiva e Cirurgia do Trauma',
-          'Internato em Urgência e Emergência (Pronto-Socorro Adulto e Sala Vermelha)',
-          'Procedimentos Invasivos de Urgência e Pequenas Cirurgias Ambulatoriais'
-        ]
-      },
-      {
-        period: '12º Período • Internato Médico',
-        cycle: 'internato',
-        cycleName: 'Internato Médico',
-        subjects: [
-          'Internato em Pediatria, Berçário, UTI Neonatal e Emergência Pediátrica',
-          'Internato em Ginecologia e Obstetrícia (Centro Obstétrico, Maternidade e Pré-Natal)',
-          'Avaliação Estruturada de Habilidades Clínicas Terminais (OSCE)'
-        ]
-      }
-    ];
-
     function sanitizeSavedCurriculum(curr) {
       if (!Array.isArray(curr)) return [];
       return curr.map(periodObj => {
-        if (!periodObj || !Array.isArray(periodObj.subjects)) return null;
+        if (!periodObj || periodObj.source !== 'gemini-upload' || !Array.isArray(periodObj.subjects)) return null;
         const validSubjects = periodObj.subjects.filter(s => {
           const name = typeof s === 'string' ? s : (s && s.name ? s.name : '');
           return isValidSubjectName(name);
@@ -16078,7 +15937,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
           showToast('🔑 Chave Gemini AI Studio salva com sucesso!');
         } else {
           localStorage.removeItem('medtutor_gemini_api_key');
-          showToast('Chave removida. O MedTutor usará o motor heurístico universal.');
+          showToast('Chave local removida. A ementa será analisada pelo Gemini do servidor.');
         }
         updateGeminiKeyBadge();
         updateSyllabusGeminiStatus();
@@ -16091,16 +15950,11 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
 
     function updateSyllabusGeminiStatus() {
       const statusEl = document.getElementById('syllabusAiModeStatus');
-      const keyInput = document.getElementById('syllabusGeminiApiKeyInput');
-      const key = getGeminiApiKey();
-      if (keyInput && key && !keyInput.value) keyInput.value = key;
       if (statusEl) {
-        if (key) {
-          statusEl.innerHTML = '<strong style="color: var(--neon);">⚡ IA Gemini 2.5 Flash-Lite Conectada</strong> (Menor Custo)';
-        } else if (window.__MEDTUTOR_BACKEND_GEMINI_CONFIGURED) {
+        if (window.__MEDTUTOR_BACKEND_GEMINI_CONFIGURED) {
           statusEl.innerHTML = '<strong style="color: var(--neon);">⚡ Gemini conectado pelo servidor</strong> <span style="color: var(--text-muted); font-size: 10.5px;">(chave protegida)</span>';
         } else {
-          statusEl.innerHTML = '<span>⚡ Motor Universal Local Ativo</span> <span style="color: var(--text-muted); font-size: 10.5px;">(100% Offline e Gratuito)</span>';
+          statusEl.innerHTML = '<span style="color: var(--danger);">⚠️ Gemini do servidor indisponível</span> <span style="color: var(--text-muted); font-size: 10.5px;">(nenhuma grade será criada localmente)</span>';
         }
       }
     }
@@ -17620,7 +17474,7 @@ Para cada material, retorne um objeto no JSON com:
         const inputEl = document.getElementById('syllabusTextInput');
         if (inputEl) inputEl.value = '';
         input.value = '';
-        showToast('⚠️ Não foi possível extrair texto selecionável deste PDF (pode ser escaneado como imagem ou protegido). Por favor, cole o texto da ementa abaixo ou clique em "Carregar Grade Nacional DCN".');
+        showToast('⚠️ Não foi possível extrair texto selecionável deste PDF (pode ser escaneado como imagem ou protegido). Cole o texto da ementa abaixo ou envie uma versão com texto selecionável.');
         return;
       }
 
@@ -17656,16 +17510,7 @@ Para cada material, retorne um objeto no JSON com:
     }
 
     function loadCompleteMedicalCurriculumDCN() {
-      universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
-      if (typeof expandedCurriculumPeriods !== 'undefined') expandedCurriculumPeriods.clear();
-      try {
-        localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
-        localStorage.removeItem('medtutor_reset_clean');
-      } catch (e) {}
-      currentCurriculumCycleFilter = 'all';
-      filterCurriculumCycle('all');
-      renderCurriculumGrid();
-      showToast('🎓 Grade Médica Nacional Completa (12 Períodos • 56 Disciplinas) pronta!');
+      showToast('Envie a ementa oficial da sua faculdade para criar a grade curricular.');
     }
 
     async function processSyllabusText() {
@@ -17677,50 +17522,7 @@ Para cada material, retorne um objeto no JSON com:
         return;
       }
 
-      showToast('⚡ Enviando ementa ao Gemini 3.5 Flash no backend...');
-
-      try {
-        let response;
-        try {
-          response = await fetch('/api/ementas/processar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rawText })
-          });
-        } catch (fetchErr) {
-          // Fallback para localhost direto caso acesse de porta diferente
-          response = await fetch('http://localhost:3001/api/ementas/processar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rawText })
-          });
-        }
-
-        if (!response.ok) {
-          const errPayload = await response.json().catch(() => ({}));
-          throw new Error(errPayload.details || errPayload.error || `Erro HTTP ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.success && Array.isArray(result.curriculum)) {
-          universityCurriculum = result.curriculum;
-          if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
-          if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
-          closeModals();
-          showToast(`🎓 Matriz curricular extraída com sucesso (${result.curriculum.length} períodos)!`);
-          return;
-        }
-
-        throw new Error('Formato de resposta inesperado do servidor.');
-      } catch (err) {
-        console.error('❌ Falha na conexão com o backend Node:', err);
-        alert(
-          'Não foi possível conectar ao backend Node na porta 3001.\n\n' +
-          'Verifique se o terminal executou: "node index.js" dentro de autonomous-agents/workspace/MedTutorBrasil.\n\n' +
-          'Detalhes do erro: ' + err.message
-        );
-      }
+      await processSyllabusTextAsync(rawText);
     }
 
     async function processSyllabusTextAsync(rawText) {
@@ -17734,8 +17536,6 @@ Para cada material, retorne um objeto no JSON com:
 
       // Yield assíncrono para garantir renderização fluida da tela
       await new Promise(resolve => setTimeout(resolve, 50));
-
-      let parsedSubjects = [];
 
       // O upload usa o mesmo endpoint seguro do botão "Integrar à Grade": a chave
       // fica exclusivamente no servidor e o conteúdo é analisado pelo Gemini.
@@ -17760,7 +17560,7 @@ Para cada material, retorne um objeto no JSON com:
           throw new Error(result.details || result.error || `Resposta inválida do servidor (${response.status})`);
         }
 
-        universityCurriculum = result.curriculum;
+        universityCurriculum = result.curriculum.map(period => ({ ...period, source: 'gemini-upload' }));
         expandedCurriculumPeriods.clear();
         universityCurriculum.forEach((period, index) => expandedCurriculumPeriods.add(period.id || period.period || `period_${index}`));
         try {
@@ -17776,57 +17576,10 @@ Para cada material, retorne um objeto no JSON com:
         showToast(`🎓 Ementa analisada pelo Gemini: ${result.curriculum.length} períodos integrados.`);
         return;
       } catch (backendError) {
-        console.warn('[Ementa] Gemini do servidor indisponível; usando parser local como contingência:', backendError.message);
-        showToast('⚠️ Gemini do servidor indisponível; aplicando leitura local de contingência.');
+        console.error('[Ementa] Gemini do servidor indisponível; nenhuma grade local será criada.', backendError);
+        showToast('⚠️ Não foi possível analisar a ementa com Gemini. Verifique o servidor e tente novamente; nenhuma disciplina genérica foi adicionada.');
+        return;
       }
-
-      // 2. Motor Heurístico Universal Local (somente contingência)
-      if (!parsedSubjects || parsedSubjects.length === 0) {
-        parsedSubjects = parseEmentaWithDescriptions(clean);
-        if (parsedSubjects && parsedSubjects.length > 0 && typeof AppExpenseTracker !== 'undefined') {
-          AppExpenseTracker.recordAction({
-            actionName: `Parsing Heurístico Local de Ementário (${parsedSubjects.length} disciplinas)`,
-            isLocal: true
-          });
-        }
-      }
-
-      // Fallback de segurança absoluta (garante que nada se perca)
-      if (!parsedSubjects || parsedSubjects.length === 0) {
-        parsedSubjects = [{
-          name: clean.split('\n')[0].slice(0, 80) || 'Disciplina Curricular',
-          period: '1º Período • Ciclo Básico',
-          cycle: 'basico',
-          cycleName: 'Ciclo Básico',
-          description: clean,
-          topics: [],
-          keywords: [],
-          isUser: true
-        }];
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      universityCurriculum = groupSubjectsIntoCurriculum(parsedSubjects);
-      expandedCurriculumPeriods.clear();
-      // Auto-expande todos os períodos importados para exibição imediata de toda a grade (1º ao 12º)
-      universityCurriculum.forEach((p, idx) => {
-        const pKey = p.id || p.period || ('period_' + idx);
-        expandedCurriculumPeriods.add(pKey);
-      });
-      try {
-        localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
-        localStorage.removeItem('medtutor_reset_clean');
-      } catch (e) {
-        console.warn('Erro ao salvar ementa no localStorage:', e);
-      }
-      if (typeof MedTutorFirebaseService !== 'undefined') {
-        MedTutorFirebaseService.saveCurriculum(universityCurriculum);
-      }
-
-      renderCurriculumGrid();
-      updateSubjectFilterMenus();
-      showToast(`🎓 ${parsedSubjects.length} disciplinas em ${universityCurriculum.length} períodos da sua ementa integradas com sucesso!`);
     }
 
     // CONTROLE DE ACORDEÃO E DETALHES DE DISCIPLINAS
@@ -22857,7 +22610,7 @@ ${textSample}
         { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' },
         { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed' }
       ];
-      universityCurriculum = JSON.parse(JSON.stringify(FULL_MEDICAL_CURRICULUM_DCN));
+      universityCurriculum = [];
       currentStudySubject = 'Integração de Sistemas Humanos 2 (Dermatologia)';
       subjectGenerationStatus = {
         'Integração de Sistemas Humanos 2 (Dermatologia)': {

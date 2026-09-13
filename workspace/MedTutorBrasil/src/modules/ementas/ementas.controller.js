@@ -10,13 +10,15 @@ class EmentasController {
         return res.status(400).json({ error: 'Texto da ementa ausente ou insuficiente.' });
       }
 
-      console.log('🤖 [Backend] Enviando texto da ementa para extração no Gemini 2.5 Flash...');
+      console.log(`🤖 [Backend] Enviando ementa ao Gemini (${process.env.MODEL_BALANCED || 'gemini-3.5-flash'})...`);
       const result = await ementasService.parseAndHarmonizeSyllabus(targetText);
 
       return res.json({
         success: true,
         metadata: result.metadata,
-        curriculum: result.curriculum
+        curriculum: result.curriculum,
+        engine: 'gemini-server',
+        model: process.env.MODEL_BALANCED || 'gemini-3.5-flash'
       });
     } catch (err) {
       console.error('❌ [Backend] Erro ao processar ementa no Gemini:', err.message);
