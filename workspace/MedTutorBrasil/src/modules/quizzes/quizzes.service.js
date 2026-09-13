@@ -149,6 +149,20 @@ function buildSafeFlashcardTitle(title, correctAnswer) {
   return 'Tema em revisão';
 }
 
+function buildDifficultyPlan(total, requestedDifficulty) {
+  if (requestedDifficulty !== 'balanced') return Array(total).fill(requestedDifficulty);
+  // "Balanceado" privilegia a construção de base: a aplicação é importante,
+  // mas não pode transformar uma aula introdutória em prova de residência.
+  const advancedCount = total >= 5 ? Math.max(1, Math.round(total * 0.1)) : 0;
+  const intermediateCount = Math.max(1, Math.round(total * 0.3));
+  const beginnerCount = Math.max(0, total - intermediateCount - advancedCount);
+  return [
+    ...Array(beginnerCount).fill('iniciante'),
+    ...Array(intermediateCount).fill('intermediario'),
+    ...Array(advancedCount).fill('avancado')
+  ];
+}
+
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -205,7 +219,7 @@ const questionsSchema = {
         type: SchemaType.STRING,
         format: "enum",
         enum: ["iniciante", "intermediario", "avancado"],
-        description: "Nível cognitivo da questão: iniciante (reconhecimento/definição direta), intermediario (fisiopatologia/relação/comparação) ou avancado (integração clínica/diagnóstico)"
+        description: "Nível acadêmico de graduação: iniciante (um fato explícito), intermediario (uma relação simples) ou avancado (aplicação limitada de um conceito explícito). Nunca use nível de residência."
       },
       secao_origem: {
         type: SchemaType.STRING,
@@ -235,11 +249,11 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
    - Divida o material nas suas seções temáticas conceituais reais (ex: Anatomia e Formação, Dinâmica Liquórica, Fisiopatologia, Apresentação Clínica/Semiologia, Diagnóstico e Conduta).
    - IGNORE categoricamente cabeçalhos de universidade, sumários, índices, numeração de páginas/slides, nomes de docentes, datas, referências bibliográficas ou títulos vazios.
 
-2. ESCADA PEDAGÓGICA OBRIGATÓRIA POR SEÇÃO:
-   Para CADA seção temática identificada no material:
-   - Gere OBRIGATORIAMENTE ao menos 1 questão INICIANTE: cobra reconhecimento direto, definição anatômica/histológica, partes, localização ou função descrita na fonte de forma explícita.
-   - Se a seção contiver mecanismos, relações causais ou diferenciações: gere TAMBÉM 1 questão INTERMEDIÁRIA: cobra fisiopatologia, relações causa-efeito, comparação entre estruturas/processos que a fonte permite concluir.
-   - Se a seção contiver dados clínicos, gravidade, critérios propedêuticos ou condutas: gere TAMBÉM 1 questão AVANÇADA: cobra integração clínica, raciocínio diagnóstico ou conduta ancorada estritamente no texto.
+2. ESCALA PEDAGÓGICA DE GRADUAÇÃO (OBRIGATÓRIA):
+   - INICIANTE: cobre UM único fato declarado de forma explícita (nome, definição, localização, parte, função ou associação direta). Resposta curta. Não use caso clínico, diagnóstico, conduta, diretriz, cálculo ou duas perguntas na mesma frase.
+   - INTERMEDIÁRIO: cobre UMA relação simples que a fonte explica (causa→efeito, estrutura→função ou comparação direta entre dois elementos). Não use vinheta clínica, diagnóstico diferencial, conduta, protocolo ou múltiplas etapas de raciocínio.
+   - AVANÇADO: cobre a aplicação limitada de UM conceito já apresentado. Só use um contexto breve se ele estiver na própria fonte. Não peça diagnóstico diferencial, investigação em sequência, escolha terapêutica, gravidade, emergência, guideline, cálculo ou integração de três ou mais variáveis. É nível de graduação, NUNCA de residência.
+   - Não force todos os níveis em cada seção: escolha o nível pedido e somente eleve a complexidade quando a fonte realmente oferecer base explícita.
 
 3. PULAR QUESTÕES JÁ EXISTENTES NO DECK:
    - Se uma pergunta, conceito ou gabarito já constar nas questões já aceitas/existentes no deck do aluno, PULE-A SUMARIAMENTE e formule a questão sobre outro ponto da mesma seção ou da seção seguinte.
@@ -248,7 +262,7 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 4. FOCO EXCLUSIVAMENTE BIOMÉDICO: A pergunta deve cobrar raciocínio clínico, anatomia, fisiopatologia, semiologia, critérios diagnósticos, condutas ou farmacologia. NUNCA faça meta-perguntas sobre o documento, a aula, a disciplina, o módulo ou o professor (ex.: É EXPRESSAMENTE PROIBIDO perguntar "Qual é o tema principal da aula...", "Na disciplina de...", "De acordo com o material...").
 5. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
 6. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
-7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado.
+7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado; mesmo nesse caso, mantenha uma única decisão conceitual simples.
 8. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
 9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
 10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
@@ -320,6 +334,7 @@ class QuizzesService {
     }
 
     const totalQuestoes = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
+    const difficultyPlan = buildDifficultyPlan(totalQuestoes, requestedDifficulty);
 
     const genAI = getGenAI();
     // Um único caminho de configuração: se não houver modelo exclusivo de quiz,
@@ -336,19 +351,22 @@ class QuizzesService {
       }
     });
 
+    const difficultyInstructions = requestedDifficulty === 'balanced'
+      ? `Use exatamente esta sequência de níveis, uma questão por posição: ${difficultyPlan.map((level, index) => `${index + 1}:${level}`).join(', ')}.`
+      : `Todas as ${totalQuestoes} questões devem ser exatamente do nível "${requestedDifficulty}".`;
+
     const prompt = `
 Faça uma leitura integral por seções do conteúdo médico abaixo e crie ${totalQuestoes} questões de avaliação formativa.
 
 METODOLOGIA OBRIGATÓRIA:
 1. Ignore cabeçalhos institucionais, sumários, numeração de páginas/slides, nomes de docentes ou títulos vazios.
 2. Divida o conteúdo nas suas seções temáticas conceituais reais.
-3. Para CADA seção temática do material:
-   - Crie ao menos 1 questão de nível "iniciante" (reconhecimento/anatomia/definição direta explícita).
-   - Se a seção permitir aprofundar mecanismos fisiopatológicos ou comparações, crie também 1 questão de nível "intermediario".
-   - Se a seção contiver elementos de raciocínio clínico, semiologia ou conduta, crie também 1 questão de nível "avancado".
-4. DISTRIBUIÇÃO E PROPORÇÃO PEDAGÓGICA NO LOTE TOTAL DE ${totalQuestoes} QUESTÕES:
-   - Distribua aproximadamente 40% Iniciante (fundamentos/definição/anatomia direta), 40% Intermediário (mecanismos fisiopatológicos/diagnóstico diferencial) e 20% Avançado (raciocínio clínico/semiologia aplicada/conduta).
-   - Espalhe as questões harmonicamente ao longo de todas as seções do documento.
+3. DIFICULDADE PEDIDA PELO ALUNO: ${difficultyInstructions}
+   - Iniciante = um fato explícito e direto, sem vinheta ou decisão clínica.
+   - Intermediário = uma relação simples causa→efeito, estrutura→função ou comparação direta, sem vinheta e sem conduta.
+   - Avançado = aplicação limitada de um conceito explícito; não é prova de residência e não pode exigir diagnóstico diferencial, conduta, protocolos, cálculos ou várias etapas.
+   - Retorne as questões na mesma ordem dessa sequência e registre o mesmo nível no campo nivel_dificuldade.
+4. Cada enunciado deve cobrar somente UM objetivo de aprendizagem e ter uma resposta principal inequívoca.
 5. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
 
 ${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATERIAL ---
@@ -406,11 +424,9 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         }
         const correctAnswer = q.texto_resposta_correta || cleanAlternatives[correctIdx] || '';
         const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer);
-        const actualDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(q.nivel_dificuldade)
-          ? q.nivel_dificuldade
-          : (requestedDifficulty === 'balanced'
-              ? (index % 5 === 0 || index % 5 === 1 ? 'iniciante' : (index % 5 === 2 || index % 5 === 3 ? 'intermediario' : 'avancado'))
-              : requestedDifficulty);
+        // A etiqueta segue o plano solicitado, e não uma classificação livre
+        // do modelo. Isso impede que "iniciante" seja salvo como avançado.
+        const actualDifficulty = difficultyPlan[index] || requestedDifficulty || 'iniciante';
 
         // Embaralha as 4 alternativas para distribuir uniformemente o gabarito (A, B, C, D)
         const { shuffledOptions, newCorrectIndex, newGabarito } = shuffleQuestionAlternatives(cleanAlternatives, correctIdx);
