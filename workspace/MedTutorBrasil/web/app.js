@@ -5049,12 +5049,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       for (const item of (items || [])) {
         const questionText = item?.question || item?.pergunta || item?.flashcard?.front || '';
         const answerText = item?.reference_answer || item?.answer || item?.flashcard?.back || item?.explanation || '';
-        if (questionText.trim().length < 24 || answerText.trim().length < 24) continue;
+        if (questionText.trim().length < 18 || answerText.trim().length < 3) continue;
         const candidateText = `${questionText} ${answerText}`;
         const duplicate = comparisonPool.some(other => {
           const otherText = `${other?.question || other?.pergunta || other?.flashcard?.front || ''} ${other?.reference_answer || other?.answer || other?.flashcard?.back || other?.explanation || ''}`;
           const otherAnswer = other?.reference_answer || other?.answer || other?.flashcard?.back || other?.explanation || '';
-          return calculateLocalSimilarity(candidateText, otherText) >= 0.45 || answerIsTooSimilar(answerText, otherAnswer);
+          const answersSimilar = answerIsTooSimilar(answerText, otherAnswer);
+          const sim = calculateLocalSimilarity(candidateText, otherText);
+          return (answersSimilar && sim >= 0.55) || sim >= 0.75;
         });
         if (!duplicate) {
           accepted.push(item);
@@ -5563,64 +5565,64 @@ ${cleanText}
       const total = Math.max(1, Math.min(30, count || 5));
       const authoredSourceQuestions = extractAuthoredQuestionsFromMaterial(materialText);
       logQuizGenerationDebug('authored_questions_scanned', { found: authoredSourceQuestions.length, requestedItems: total });
-      let blueprint = buildLocalStudyBlueprint(materialText, total);
-      // O planejamento é uma proteção de qualidade, não um pré-requisito para
-      // textos válidos que vieram de PDF/Drive em um único bloco. O Gemini ainda
-      // recebe a fonte e as perguntas já aceitas, portanto mantém a ancoragem e a
-      // verificação de duplicidade mesmo nesse formato de extração.
-      if (!blueprint && hasUsableStudyContent(materialText)) {
-        const evidence = String(materialText).replace(/\s+/g, ' ').trim().slice(0, 2_400);
-        blueprint = Array.from({ length: total }, () => ({
-          conceito_alvo: inferTopicFromStudyContent(evidence, metadata.subjectName),
-          evidencia_fonte: evidence,
-          objetivo: 'Cobrar compreensão de conteúdo extraído em bloco único.'
-        }));
-        logQuizGenerationDebug('blueprint_fallback_from_valid_content', { materialChars: evidence.length, requestedItems: total });
-      }
-      if (!blueprint) {
-        logQuizGenerationDebug('blueprint_unavailable', { materialChars: String(materialText || '').length, requestedItems: total });
-        return accepted;
-      }
-      setStudyGenerationProgress({ current: 0, total, detail: authoredSourceQuestions.length ? `Encontradas ${authoredSourceQuestions.length} pergunta(s) do professor; preparando o plano…` : 'Selecionando trechos distintos do conteúdo…' });
+
+      setStudyGenerationProgress({
+        current: 1,
+        total,
+        detail: 'Lendo material por seções e gerando escada de questões (iniciante, intermediária e avançada)…'
+      });
+
       try {
-        let attempts = 0;
-        const maxAttempts = total * 2;
-        while (accepted.length < total && attempts < maxAttempts) {
-          const position = accepted.length;
-          const plan = blueprint[attempts % blueprint.length];
-          const difficulty = getBalancedMaterialDifficulty(config.difficulty, total, position);
-          attempts++;
-          setStudyGenerationProgress({
-            current: position + 1,
-            total,
-            detail: position === 0
-              ? 'Planejando e redigindo a primeira questão…'
-              : `Validando contra ${accepted.length} questão(ões) já aceita(s)…`
-          });
-          const generated = await generateQuestionsWithGemini(materialText, metadata, {
-            ...config,
-            difficulty,
-            targetConcept: plan.conceito_alvo,
-            focusExcerpt: plan.evidencia_fonte,
-            sourceQuestions: authoredSourceQuestions,
-            acceptedStudyItems: [...existingItems, ...accepted]
-          }, 1);
-          const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
-          if (unique.length > 0) {
-            const acceptedItem = applyMaterialBasedStudyItem(unique[0], difficulty);
+        // Solicita a geração estruturada por seções diretamente ao backend Gemini
+        const generated = await generateQuestionsWithGemini(materialText, metadata, {
+          ...config,
+          sourceQuestions: authoredSourceQuestions,
+          acceptedStudyItems: existingItems
+        }, total);
+
+        if (Array.isArray(generated) && generated.length > 0) {
+          const unique = filterUniqueStudyItems(generated, existingItems);
+          for (const item of unique) {
+            if (accepted.length >= total) break;
+            const acceptedItem = applyMaterialBasedStudyItem(item, item.difficultyLevel || config.difficulty);
             accepted.push(acceptedItem);
-            logQuizGenerationDebug('sequential_item_accepted', { position: position + 1, total, model: acceptedItem.generatorModel || 'desconhecido', concept: acceptedItem.topic || '', difficultyLevel: acceptedItem.difficultyLevel });
-          } else {
-            logQuizGenerationDebug('sequential_item_rejected', { position: position + 1, total, attempt: attempts, reason: 'Sem item válido ou item redundante; tentando outro trecho.' });
+            setStudyGenerationProgress({
+              current: accepted.length,
+              total,
+              detail: `Adicionada questão (${acceptedItem.difficultyLevel}): "${(acceptedItem.question || '').slice(0, 50)}…"`
+            });
           }
         }
+
+        // Se o lote inicial ainda não tiver preenchido o total e restarem itens pendentes,
+        // realiza uma rodada de complemento informando as aceitas para evitar qualquer redundância
         if (accepted.length < total) {
-          logQuizGenerationDebug('sequential_generation_incomplete', { requestedItems: total, acceptedItems: accepted.length, attempts });
+          const needed = total - accepted.length;
+          setStudyGenerationProgress({
+            current: accepted.length + 1,
+            total,
+            detail: `Explorando seções adicionais para complementar ${needed} questão(ões)…`
+          });
+          const supplement = await generateQuestionsWithGemini(materialText, metadata, {
+            ...config,
+            sourceQuestions: authoredSourceQuestions,
+            acceptedStudyItems: [...existingItems, ...accepted]
+          }, needed);
+
+          if (Array.isArray(supplement) && supplement.length > 0) {
+            const uniqueSupplement = filterUniqueStudyItems(supplement, [...existingItems, ...accepted]);
+            for (const item of uniqueSupplement) {
+              if (accepted.length >= total) break;
+              const acceptedItem = applyMaterialBasedStudyItem(item, item.difficultyLevel || config.difficulty);
+              accepted.push(acceptedItem);
+            }
+          }
         }
+
+        logQuizGenerationDebug('section_based_generation_finished', { requestedItems: total, acceptedItems: accepted.length });
         return accepted;
       } finally {
         setStudyGenerationProgress({ done: true });
-        logQuizGenerationDebug('sequential_generation_finished', { requestedItems: total, acceptedItems: accepted.length });
       }
     }
 

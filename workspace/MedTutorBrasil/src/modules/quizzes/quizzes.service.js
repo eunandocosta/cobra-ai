@@ -10,12 +10,18 @@ function questionTokenSet(value) {
     .filter(token => token.length >= 4 && !['qual', 'sobre', 'para', 'como', 'essa', 'este', 'com', 'uma', 'entre'].includes(token)));
 }
 
-function areQuestionsTooSimilar(first, second) {
+function areQuestionsTooSimilar(first, second, firstAnswer = '', secondAnswer = '') {
   const a = questionTokenSet(first);
   const b = questionTokenSet(second);
   if (!a.size || !b.size) return false;
   const intersection = [...a].filter(token => b.has(token)).length;
-  return intersection / new Set([...a, ...b]).size >= 0.45;
+  const jaccard = intersection / new Set([...a, ...b]).size;
+  // Se ambas tiverem respostas/gabaritos muito similares, tolerância menor
+  if (firstAnswer && secondAnswer && areAnswersTooSimilar(firstAnswer, secondAnswer)) {
+    return jaccard >= 0.55;
+  }
+  // Se as respostas forem diferentes, só descarta se os enunciados forem essencialmente idênticos
+  return jaccard >= 0.75;
 }
 
 function areAnswersTooSimilar(first, second) {
@@ -29,9 +35,6 @@ function areAnswersTooSimilar(first, second) {
   const b = questionTokenSet(normalizedSecond);
   if (!a.size || !b.size) return false;
   const intersection = [...a].filter(token => b.has(token)).length;
-  // A resposta pode ser breve (por exemplo, apenas o nome de uma estrutura) em
-  // um card e explicada por extenso em outro. Cobrir quase todos os termos da
-  // menor resposta indica o mesmo gabarito, mesmo com enunciados diferentes.
   return intersection / Math.min(a.size, b.size) >= 0.85;
 }
 
@@ -115,7 +118,7 @@ function getGenAI() {
 
 const questionsSchema = {
   type: SchemaType.ARRAY,
-  description: "Lista de questões formativas ancoradas no conteúdo enviado",
+  description: "Lista de questões formativas estruturadas por seções e escada de dificuldade",
   items: {
     type: SchemaType.OBJECT,
     properties: {
@@ -155,6 +158,16 @@ const questionsSchema = {
         format: "enum",
         enum: ["reaproveitada_da_fonte", "inspirada_na_fonte", "nova_a_partir_da_fonte"],
         description: "Indique se a pergunta reaproveita uma questão autoral da fonte, usa apenas seu estilo/foco, ou foi criada diretamente a partir do conteúdo."
+      },
+      nivel_dificuldade: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["iniciante", "intermediario", "avancado"],
+        description: "Nível cognitivo da questão: iniciante (reconhecimento/definição direta), intermediario (fisiopatologia/relação/comparação) ou avancado (integração clínica/diagnóstico)"
+      },
+      secao_origem: {
+        type: SchemaType.STRING,
+        description: "Nome ou tema da seção temática do material da qual esta questão foi extraída"
       }
     },
     required: [
@@ -165,7 +178,9 @@ const questionsSchema = {
       "justificativa",
       "perola_clinica",
       "titulo_flashcard",
-      "origem_pergunta"
+      "origem_pergunta",
+      "nivel_dificuldade",
+      "secao_origem"
     ]
   }
 };
@@ -173,15 +188,28 @@ const questionsSchema = {
 const SYSTEM_INSTRUCTION = `
 Você cria questões formativas para estudantes de medicina estritamente baseadas no conteúdo enviado.
 
-DIRETRIZES FUNDAMENTAIS:
-1. FOCO EXCLUSIVAMENTE BIOMÉDICO: A pergunta deve cobrar raciocínio clínico, anatomia, fisiopatologia, semiologia, critérios diagnósticos, condutas ou farmacologia. NUNCA faça meta-perguntas sobre o documento, a aula, a disciplina, o módulo ou o professor (ex.: É EXPRESSAMENTE PROIBIDO perguntar "Qual é o tema principal da aula...", "Na disciplina de...", "De acordo com o material...").
-2. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
-3. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
-4. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado.
-5. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
-6. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
-7. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
-8. COBERTURA ESTRUTURAL DO MARKDOWN: Quando o material for extenso ou estruturado em títulos (#, ##), listas, tabelas comparativas ou critérios diagnósticos, distribua as questões de forma equilibrada por toda a extensão do documento (início, meio e fim). Não concentre as perguntas apenas nas seções iniciais. Explore ativamente relações, classificações e diferenciações descritas nas tabelas e seções conceituais distintas.
+DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
+1. LEITURA POR SEÇÕES TEMÁTICAS REAIS:
+   - Divida o material nas suas seções temáticas conceituais reais (ex: Anatomia e Formação, Dinâmica Liquórica, Fisiopatologia, Apresentação Clínica/Semiologia, Diagnóstico e Conduta).
+   - IGNORE categoricamente cabeçalhos de universidade, sumários, índices, numeração de páginas/slides, nomes de docentes, datas, referências bibliográficas ou títulos vazios.
+
+2. ESCADA PEDAGÓGICA OBRIGATÓRIA POR SEÇÃO:
+   Para CADA seção temática identificada no material:
+   - Gere OBRIGATORIAMENTE ao menos 1 questão INICIANTE: cobra reconhecimento direto, definição anatômica/histológica, partes, localização ou função descrita na fonte de forma explícita.
+   - Se a seção contiver mecanismos, relações causais ou diferenciações: gere TAMBÉM 1 questão INTERMEDIÁRIA: cobra fisiopatologia, relações causa-efeito, comparação entre estruturas/processos que a fonte permite concluir.
+   - Se a seção contiver dados clínicos, gravidade, critérios propedêuticos ou condutas: gere TAMBÉM 1 questão AVANÇADA: cobra integração clínica, raciocínio diagnóstico ou conduta ancorada estritamente no texto.
+
+3. PULAR QUESTÕES JÁ EXISTENTES NO DECK:
+   - Se uma pergunta, conceito ou gabarito já constar nas questões já aceitas/existentes no deck do aluno, PULE-A SUMARIAMENTE e formule a questão sobre outro ponto da mesma seção ou da seção seguinte.
+   - Nunca gere perguntas redundantes ou com o mesmo foco que as já existentes no deck.
+
+4. FOCO EXCLUSIVAMENTE BIOMÉDICO: A pergunta deve cobrar raciocínio clínico, anatomia, fisiopatologia, semiologia, critérios diagnósticos, condutas ou farmacologia. NUNCA faça meta-perguntas sobre o documento, a aula, a disciplina, o módulo ou o professor (ex.: É EXPRESSAMENTE PROIBIDO perguntar "Qual é o tema principal da aula...", "Na disciplina de...", "De acordo com o material...").
+5. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
+6. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
+7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado.
+8. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
+9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
+10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 `;
 
 class QuizzesService {
@@ -195,12 +223,12 @@ class QuizzesService {
     const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
       ? payload.difficulty
       : 'iniciante';
-    const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 30) : [];
+    const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 40) : [];
     const previousQuestionAnswers = Array.isArray(payload.previousQuestionAnswers)
       ? payload.previousQuestionAnswers.map(item => ({
         question: String(item?.question || '').replace(/\s+/g, ' ').trim(),
         answer: String(item?.answer || '').replace(/\s+/g, ' ').trim()
-      })).filter(item => item.question || item.answer).slice(0, 30)
+      })).filter(item => item.question || item.answer).slice(0, 40)
       : [];
     const providedSourceQuestions = Array.isArray(payload.sourceQuestions)
       ? payload.sourceQuestions.map(question => String(question || '').replace(/\s+/g, ' ').trim()).filter(question => question.length >= 20).slice(0, 12)
@@ -209,13 +237,10 @@ class QuizzesService {
       ? providedSourceQuestions
       : extractAuthoredQuestionsFromMaterial(materialText);
 
-    const targetConcept = String(payload.targetConcept || payload.topic || '').trim();
-    const focusExcerpt = String(payload.focusExcerpt || '').trim();
-
-    console.log("➡️ [Quiz Engine] Iniciando geração...");
+    console.log("➡️ [Quiz Engine] Iniciando geração por seções...");
     console.log("📄 [Quiz Engine] Tamanho do texto recebido:", materialText ? materialText.length : 0);
-    if (targetConcept) console.log("🎯 [Quiz Engine] Foco conceitual:", targetConcept);
     console.log("📝 [Quiz Engine] Questões autorais identificadas:", authoredSourceQuestions.length);
+    console.log("📚 [Quiz Engine] Questões já existentes no deck:", previousQuestions.length);
 
     if (!materialText || materialText.trim().length < 20) {
       throw new Error("O texto fornecido para a IA está vazio ou é excessivamente curto.");
@@ -242,23 +267,32 @@ class QuizzesService {
     });
 
     const prompt = `
-Com base exclusivamente no conteúdo abaixo, crie ${totalQuestoes} questões de avaliação formativa. Nível solicitado: ${requestedDifficulty}.
-${targetConcept ? `\nFOCO CONCEITUAL PRIORITÁRIO: "${targetConcept}".\nFormule a questão aprofundando este conceito e suas bases anátomo-fisiopatológicas ou semiológicas contidas no material.` : ''}
-${focusExcerpt ? `Trecho de referência no documento: "${focusExcerpt}"\n` : ''}
-${authoredSourceQuestions.length ? `--- QUESTÕES JÁ CRIADAS PELO PROFESSOR NA FONTE ---
+Faça uma leitura integral por seções do conteúdo médico abaixo e crie ${totalQuestoes} questões de avaliação formativa.
+
+METODOLOGIA OBRIGATÓRIA:
+1. Ignore cabeçalhos institucionais, sumários, numeração de páginas/slides, nomes de docentes ou títulos vazios.
+2. Divida o conteúdo nas suas seções temáticas conceituais reais.
+3. Para CADA seção temática do material:
+   - Crie ao menos 1 questão de nível "iniciante" (reconhecimento/anatomia/definição direta explícita).
+   - Se a seção permitir aprofundar mecanismos fisiopatológicos ou comparações, crie também 1 questão de nível "intermediario".
+   - Se a seção contiver elementos de raciocínio clínico, semiologia ou conduta, crie também 1 questão de nível "avancado".
+4. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
+
+${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATERIAL ---
 ${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}
+(Priorize o objetivo didático dessas questões, sem usar comandos de múltipla escolha no enunciado)
 --- FIM DAS QUESTÕES AUTORAIS ---
+` : ''}
 
-Antes de redigir, analise essas questões autorais. Priorize reaproveitar seu objetivo e sua formulação quando a resposta estiver explícita no conteúdo: nesse caso, remova comandos de múltipla escolha e alternativas do enunciado e marque origem_pergunta como "reaproveitada_da_fonte". Se a questão autoral não trouxer base suficiente para uma resposta verificável, use apenas seu estilo e foco didático, marque "inspirada_na_fonte" e construa uma pergunta nova sustentada pela fonte. Nunca invente resposta, gabarito ou dado ausente para reaproveitar uma questão.
-` : 'Não foram encontradas questões autorais claras na fonte; crie perguntas diretamente do conteúdo verificável e marque origem_pergunta como "nova_a_partir_da_fonte".\n'}
-
---- CONTEÚDO MÉDICO ---
+--- CONTEÚDO MÉDICO INTEGRAL ---
 ${materialText}
 --- FIM DO CONTEÚDO ---
 
-Regras: selecione trechos diferentes e verificáveis do conteúdo para cada questão, distribuindo a seleção proporcionalmente por toda a extensão do material (início, meio e fim), contemplando diferentes tópicos de títulos (#, ##), critérios diagnósticos e tabelas comparativas presentes no Markdown. Em nível iniciante, cobre reconhecimento, definição, partes, localização, relação ou função que estejam escritos na fonte, em linguagem direta. Em nível intermediário, peça comparação ou relação que a própria fonte permita concluir (incluindo diferenciações entre colunas de tabelas ou critérios). Em nível avançado, aumente a integração sem inserir dados externos; uma situação clínica só é permitida se estiver presente na fonte. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use a resposta correta ou um dado que resolva a questão. A justificativa e o ponto-chave devem permanecer estritamente dentro da fonte.
-${previousQuestions.length ? `Não repita nem reformule estas questões já aceitas:\n${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 500)}`).join('\n')}` : ''}
-${previousQuestionAnswers.length ? `Também não reutilize o mesmo gabarito, ainda que o enunciado pareça diferente. Questões e respostas já aceitas:\n${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.question.slice(0, 260)} | Resposta: ${item.answer.slice(0, 260)}`).join('\n')}` : ''}
+${previousQuestions.length ? `--- QUESTÕES JÁ EXISTENTES NO DECK DO ALUNO (PULE ESTAS E SEUS CONCEITOS) ---
+${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 400)}`).join('\n')}
+--- FIM DAS QUESTÕES EXISTENTES ---` : ''}
+${previousQuestionAnswers.length ? `Gabaritos já cobertos no deck (não repita o mesmo gabarito/resposta):
+${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.question.slice(0, 200)} | Resposta: ${item.answer.slice(0, 200)}`).join('\n')}` : ''}
 `;
 
     try {
@@ -278,15 +312,17 @@ ${previousQuestionAnswers.length ? `Também não reutilize o mesmo gabarito, ain
         const current = question?.pergunta || '';
         const currentAnswer = getCorrectAnswer(question);
         const repeatsInBatch = all.slice(0, index).some(previous =>
-          areQuestionsTooSimilar(current, previous?.pergunta || '') || areAnswersTooSimilar(currentAnswer, getCorrectAnswer(previous))
+          areQuestionsTooSimilar(current, previous?.pergunta || '', currentAnswer, getCorrectAnswer(previous))
         );
         const repeatsPreviousAnswer = previousQuestionAnswers.some(previous =>
-          areQuestionsTooSimilar(current, previous.question) || areAnswersTooSimilar(currentAnswer, previous.answer)
+          areQuestionsTooSimilar(current, previous.question, currentAnswer, previous.answer)
         );
         return !repeatsInBatch && !repeatsPreviousAnswer;
       });
+
       if (questoesUnicas.length === 0) {
-        throw new Error('A IA retornou questões redundantes ou sem enunciados válidos.');
+        console.warn('⚠️ [Quiz Engine] Todas as questões sugeridas pela IA já constam no deck do aluno.');
+        return [];
       }
 
       const formatadas = questoesUnicas.map((q, index) => {
@@ -297,6 +333,10 @@ ${previousQuestionAnswers.length ? `Também não reutilize o mesmo gabarito, ain
         }
         const correctAnswer = q.texto_resposta_correta || cleanAlternatives[correctIdx] || '';
         const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer);
+        const actualDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(q.nivel_dificuldade)
+          ? q.nivel_dificuldade
+          : requestedDifficulty;
+        const sectionTopic = q.secao_origem || 'Conceito da Seção';
 
         return {
           id: `q_${Date.now()}_${index + 1}`,
@@ -315,10 +355,13 @@ ${previousQuestionAnswers.length ? `Também não reutilize o mesmo gabarito, ain
           perola_clinica: q.perola_clinica,
           clinicalPearl: q.perola_clinica,
           learningFocus: 'material_base',
-          difficultyLevel: requestedDifficulty,
-          cognitiveLevel: requestedDifficulty,
-          cognitiveDomain: 'compreensao',
+          difficultyLevel: actualDifficulty,
+          cognitiveLevel: actualDifficulty,
+          cognitiveDomain: actualDifficulty === 'avancado' ? 'aplicacao' : (actualDifficulty === 'intermediario' ? 'analise' : 'compreensao'),
           sourceQuestionOrigin: q.origem_pergunta || (authoredSourceQuestions.length ? 'inspirada_na_fonte' : 'nova_a_partir_da_fonte'),
+          topic: sectionTopic,
+          disease: sectionTopic,
+          sectionOrigin: sectionTopic,
           flashcardTitle,
           flashcard: {
             title: flashcardTitle,
