@@ -19,7 +19,7 @@ create policy "MedTutor: inserir imagens próprias"
 on storage.objects for insert to authenticated
 with check (
   bucket_id = 'materiais-estudo'
-  and owner_id = (select auth.uid())
+  and owner_id = (select auth.uid()::text)
 );
 
 drop policy if exists "MedTutor: ler imagens próprias" on storage.objects;
@@ -27,7 +27,7 @@ create policy "MedTutor: ler imagens próprias"
 on storage.objects for select to authenticated
 using (
   bucket_id = 'materiais-estudo'
-  and owner_id = (select auth.uid())
+  and owner_id = (select auth.uid()::text)
 );
 
 drop policy if exists "MedTutor: atualizar imagens próprias" on storage.objects;
@@ -35,11 +35,11 @@ create policy "MedTutor: atualizar imagens próprias"
 on storage.objects for update to authenticated
 using (
   bucket_id = 'materiais-estudo'
-  and owner_id = (select auth.uid())
+  and owner_id = (select auth.uid()::text)
 )
 with check (
   bucket_id = 'materiais-estudo'
-  and owner_id = (select auth.uid())
+  and owner_id = (select auth.uid()::text)
 );
 
 drop policy if exists "MedTutor: remover imagens próprias" on storage.objects;
@@ -47,5 +47,5 @@ create policy "MedTutor: remover imagens próprias"
 on storage.objects for delete to authenticated
 using (
   bucket_id = 'materiais-estudo'
-  and owner_id = (select auth.uid())
+  and owner_id = (select auth.uid()::text)
 );
