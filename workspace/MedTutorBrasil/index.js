@@ -36,6 +36,24 @@ app.get('/api/config', (req, res) => {
   res.json({ geminiConfigured: !!process.env.GEMINI_API_KEY });
 });
 
+// O Firestore é acessado diretamente pelo navegador. Este endpoint espelha no
+// terminal apenas metadados de falhas de sincronização — nunca o conteúdo médico.
+app.post('/api/diagnostics/firebase-sync', (req, res) => {
+  const body = req.body || {};
+  const safe = {
+    event: String(body.event || 'unknown').slice(0, 80),
+    code: String(body.code || '').slice(0, 120),
+    message: String(body.message || '').replace(/[\r\n]+/g, ' ').slice(0, 400),
+    uid: String(body.uid || '').slice(0, 128),
+    authenticatedUid: String(body.authenticatedUid || '').slice(0, 128),
+    materials: Math.max(0, Math.min(Number(body.materials) || 0, 10_000)),
+    contentChars: Math.max(0, Math.min(Number(body.contentChars) || 0, 100_000_000)),
+    at: new Date().toISOString()
+  };
+  console.error('❌ [Firestore Sync]', safe);
+  res.status(204).end();
+});
+
 if (require.main === module) {
   const server = app.listen(PORT, () => {
     console.log(`🚀 MedTutor Brasil (Modular Monolith) ativo na porta ${PORT}`);

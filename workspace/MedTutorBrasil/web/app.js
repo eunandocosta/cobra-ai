@@ -595,6 +595,26 @@
       };
     }
 
+    function reportFirestoreSyncIssue(event, details = {}) {
+      const payload = {
+        event,
+        code: details.code || '',
+        message: details.message || '',
+        uid: details.uid || '',
+        authenticatedUid: details.authenticatedUid || '',
+        materials: Number(details.materials) || 0,
+        contentChars: Number(details.contentChars) || 0
+      };
+      console.error('[Firestore Sync]', payload);
+      if (typeof fetch !== 'function') return;
+      fetch('/api/diagnostics/firebase-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(() => {});
+    }
+
     const MedTutorFirebaseService = {
       getUserId() {
         return (MedTutorAuthService.currentUser && MedTutorAuthService.currentUser.uid) || 'aluno_medtutor_local';
@@ -699,7 +719,15 @@
         // 2. Cloud Firestore. O atalho visual antigo podia exibir um perfil sem
         // haver Firebase Auth real; as regras corretamente recusavam essa escrita.
         if (!this.hasAuthenticatedCloudSession(uid)) {
-          console.warn('[Firestore] Materiais mantidos no IndexedDB: sessão Firebase autenticada não disponível.', { uid, cloudActive: isFirebaseCloudActive, authenticatedUid: firebaseAuth?.currentUser?.uid || null });
+          const authenticatedUid = firebaseAuth?.currentUser?.uid || null;
+          reportFirestoreSyncIssue('sessao_firebase_ausente', {
+            code: 'auth/session-mismatch',
+            message: 'A escrita foi bloqueada porque o UID visual do app não corresponde a uma sessão Firebase Auth real.',
+            uid,
+            authenticatedUid,
+            materials: materialsArray.length,
+            contentChars: materialsArray.reduce((sum, mat) => sum + String(mat?.markdownText || mat?.conteudo_md || mat?.text || '').length, 0)
+          });
           return;
         }
         try {
@@ -713,7 +741,14 @@
           }
           console.info(`[Firestore] ${materialsArray.length} material(is) sincronizado(s) com conteúdo integral em blocos.`, { uid });
         } catch (e) {
-          console.error('[Firestore] Erro ao sincronizar materiais de estudo:', e);
+          reportFirestoreSyncIssue('falha_ao_gravar_materiais', {
+            code: e.code || 'firestore/write-failed',
+            message: e.message || 'Falha desconhecida ao gravar materiais.',
+            uid,
+            authenticatedUid: firebaseAuth?.currentUser?.uid || null,
+            materials: materialsArray.length,
+            contentChars: materialsArray.reduce((sum, mat) => sum + String(mat?.markdownText || mat?.conteudo_md || mat?.text || '').length, 0)
+          });
           if (typeof showToast === 'function') showToast(`⚠️ Materiais salvos localmente, mas a nuvem recusou a sincronização: ${e.code || e.message}`);
         }
       },
