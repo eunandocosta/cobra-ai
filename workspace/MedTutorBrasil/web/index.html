@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260913-doubts-structure-v3">
+  <link rel="stylesheet" href="/styles.css?v=20260913-question-dialog-v4">
 </head>
 <body>
 
@@ -494,6 +494,9 @@
             <div style="display: flex; justify-content: center; gap: 12px;">
               <button class="btn-outline-action" onclick="flipCardManual()">
                 🔄 Virar Cartão
+              </button>
+              <button class="btn-outline-action" onclick="openQuestionDiscussionForCurrentFlashcard()">
+                💬 Perguntar sobre esta questão
               </button>
             </div>
           </div>
@@ -2525,6 +2528,27 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
     </div>
   </div>
 
+  <!-- DIÁLOGO DE APOIO A UMA QUESTÃO DE QUIZ OU FLASHCARD -->
+  <div class="modal-overlay" id="questionDiscussionModal" onclick="closeQuestionDiscussion(event)">
+    <div class="modal-window question-discussion-modal" onclick="event.stopPropagation()">
+      <div class="question-discussion-header">
+        <div>
+          <p>APOIO À QUESTÃO</p>
+          <h2>Explique minha dúvida</h2>
+        </div>
+        <button class="doubts-icon-button" type="button" onclick="closeQuestionDiscussion()" aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="question-discussion-context" id="questionDiscussionContext"></div>
+      <label for="questionDiscussionInput">Qual é sua dúvida sobre esta questão?</label>
+      <textarea id="questionDiscussionInput" rows="3" maxlength="3000" placeholder="Ex.: por que essa estrutura produz esse efeito?" onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); submitQuestionDiscussion();}"></textarea>
+      <div class="question-discussion-actions">
+        <span>⌘/Ctrl + Enter para enviar</span>
+        <button class="btn-outline-action primary" type="button" onclick="submitQuestionDiscussion()">✨ Perguntar à IA</button>
+      </div>
+      <div class="question-discussion-answer" id="questionDiscussionAnswer" aria-live="polite"></div>
+    </div>
+  </div>
+
   <!-- CADERNO PESSOAL DE DÚVIDAS -->
   <button class="doubts-fab" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir caderno de dúvidas">
     <span class="doubts-fab-icon">?</span>
@@ -2553,7 +2577,7 @@ Tópicos: Psoríase, Líquen Plano, Dermatite Atópica, Lesões Elementares Cut�
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260913-doubts-structure-v3"></script>
+  <script defer src="/app.js?v=20260913-question-dialog-v4"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

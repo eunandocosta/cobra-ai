@@ -10122,6 +10122,77 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (fcBox) fcBox.classList.toggle('flipped');
     }
 
+    var activeQuestionDiscussion = null;
+
+    function openQuestionDiscussionForCurrentFlashcard() {
+      const list = getSrsFilteredList(getFilteredQuestions());
+      const item = list[currentCardIndex];
+      if (!item) {
+        showToast('Selecione um flashcard para abrir a pergunta.');
+        return;
+      }
+      openQuestionDiscussion(item);
+    }
+
+    function openQuestionDiscussionById(questionId) {
+      const item = sharedQuestionsBank.find(question => question.id === questionId);
+      if (!item) return;
+      openQuestionDiscussion(item);
+    }
+
+    function openQuestionDiscussion(item) {
+      const modal = document.getElementById('questionDiscussionModal');
+      const context = document.getElementById('questionDiscussionContext');
+      const input = document.getElementById('questionDiscussionInput');
+      const answer = document.getElementById('questionDiscussionAnswer');
+      if (!modal || !context || !input || !answer) return;
+      activeQuestionDiscussion = item;
+      const questionText = sanitizeSharedQuestionStem(item.question || item.pergunta || item.flashcard?.front || '');
+      const options = Array.isArray(item.quizOptions || item.alternativas) ? (item.quizOptions || item.alternativas) : [];
+      context.innerHTML = `<strong>${escapeHtml(item.flashcardTitle || item.topic || 'Questão em estudo')}</strong><p>${escapeHtml(questionText)}</p>${options.length ? `<span>${options.length} alternativas disponíveis no quiz</span>` : ''}`;
+      answer.innerHTML = '';
+      input.value = '';
+      modal.classList.add('active');
+      setTimeout(() => input.focus(), 80);
+    }
+
+    function closeQuestionDiscussion(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('questionDiscussionModal')?.classList.remove('active');
+      activeQuestionDiscussion = null;
+    }
+
+    async function submitQuestionDiscussion() {
+      const item = activeQuestionDiscussion;
+      const input = document.getElementById('questionDiscussionInput');
+      const answer = document.getElementById('questionDiscussionAnswer');
+      if (!item || !input || !answer) return;
+      const doubt = String(input.value || '').trim();
+      if (!doubt) {
+        input.focus();
+        return;
+      }
+      const questionText = sanitizeSharedQuestionStem(item.question || item.pergunta || item.flashcard?.front || '');
+      const options = Array.isArray(item.quizOptions || item.alternativas) ? (item.quizOptions || item.alternativas) : [];
+      const prompt = `O estudante tem uma dúvida sobre esta questão de estudo:\n\nENUNCIADO: ${questionText}\n${options.length ? `ALTERNATIVAS: ${options.map((option, index) => `${String.fromCharCode(65 + index)}) ${option}`).join(' | ')}` : ''}\n\nDÚVIDA DO ESTUDANTE: ${doubt}\n\nExplique de forma didática, priorizando estrutura, função e mecanismo. Não revele a alternativa correta nem dê a resposta final, a menos que o estudante peça isso explicitamente.`;
+      answer.innerHTML = '<div class="question-discussion-loading"><span class="loader-spinner"></span> Elaborando a explicação…</div>';
+      try {
+        const response = await fetch('/api/chat/mensagem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: `question-discussion-${item.id}`, message: prompt, subject: item.subject || currentStudySubject || 'Medicina' })
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.reply) throw new Error(payload.details || payload.error || 'Não foi possível gerar a explicação.');
+        answer.innerHTML = `<div class="question-discussion-answer-title">Resposta do tutor</div><div>${escapeHtml(payload.reply).replace(/\n/g, '<br>')}</div>`;
+        if (typeof AppExpenseTracker !== 'undefined') {
+          AppExpenseTracker.recordAction({ actionName: `Dúvida sobre questão: ${item.topic || item.subject || 'Estudo'}`, model: payload.generatorModel || 'gemini-3.5-flash', inputTokens: Number(payload.usage?.promptTokens) || 0, outputTokens: Number(payload.usage?.outputTokens) || 0 });
+        }
+      } catch (error) {
+        answer.innerHTML = `<div class="question-discussion-error">Não foi possível responder agora. ${escapeHtml(error.message)}</div>`;
+      }
+    }
+
     // Classificação Anki / SM-2 (1: Repetir, 2: Difícil, 3: Bom, 4: Fácil)
     function createNextDayReinforcementCard(item) {
       if (!item?.id) return false;
@@ -10670,6 +10741,9 @@ Retorne EXCLUSIVAMENTE um JSON:
               </span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px;" onclick="openQuestionDiscussionById('${item.id}')" title="Perguntar ao tutor sobre esta questão">
+                💬 Perguntar
+              </button>
               <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleStarQuizItem('${item.id}')">
                 ${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}
               </button>
