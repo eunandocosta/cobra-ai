@@ -5148,9 +5148,18 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     function buildQuestionContext(materialText, evidence) {
       const source = String(materialText || '');
-      const position = source.indexOf(String(evidence || '').trim());
-      if (position < 0) return String(evidence || source).slice(0, 2_400);
-      return source.slice(Math.max(0, position - 700), Math.min(source.length, position + String(evidence).length + 1_500));
+      const evidenceStr = String(evidence || '').replace(/\s+/g, ' ').trim();
+      // Normaliza espaços para comparação, pois PDFs e splitters podem alterar whitespace
+      const normalizedSource = source.replace(/\s+/g, ' ');
+      const position = normalizedSource.indexOf(evidenceStr);
+      if (position >= 0) {
+        // Encontrou a evidência: retorna janela de ~2200 chars ao redor
+        return normalizedSource.slice(Math.max(0, position - 700), Math.min(normalizedSource.length, position + evidenceStr.length + 1_500));
+      }
+      // Não encontrou a evidência no texto: envia o material completo (até 30k chars)
+      // para que o backend/Gemini tenha contexto suficiente para gerar questões ricas
+      const fullContext = (normalizedSource.length > 100 ? normalizedSource : source).slice(0, 30_000);
+      return fullContext.length > 100 ? fullContext : evidenceStr.slice(0, 2_400);
     }
 
     function applyMaterialBasedStudyItem(item, requestedDifficulty) {
