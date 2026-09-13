@@ -979,6 +979,264 @@
         }
       },
 
+      // Recupera o material autoritativo diretamente do Firestore com chunks reconstruídos
+      async getAuthoritativeMaterialText(materialIdOrName, subjectName) {
+        const uid = this.getUserId();
+        const isBoilerplate = text => typeof text === 'string' && (
+          /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
+          /• Diretrizes SUS, CFM & ENARE/i.test(text.trim()) ||
+          /ÍNDICE DESCRITIVO DO MATERIAL ANALISADO/i.test(text.trim())
+        );
+
+        if (firestoreDb && isFirebaseCloudActive && this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+            let doc = null;
+
+            // 1. Busca por ID direto
+            if (materialIdOrName) {
+              const directDoc = await colRef.doc(materialIdOrName).get();
+              if (directDoc.exists) {
+                doc = directDoc;
+              }
+            }
+
+            // 2. Busca por campo 'nome'
+            if (!doc && materialIdOrName) {
+              const querySnap = await colRef.where('nome', '==', materialIdOrName).limit(1).get();
+              if (!querySnap.empty) {
+                doc = querySnap.docs[0];
+              }
+            }
+
+            // 3. Busca por 'originalFileName'
+            if (!doc && materialIdOrName) {
+              const querySnap = await colRef.where('originalFileName', '==', materialIdOrName).limit(1).get();
+              if (!querySnap.empty) {
+                doc = querySnap.docs[0];
+              }
+            }
+
+            // 4. Busca flexível normalizada dentro da disciplina
+            if (!doc && materialIdOrName) {
+              const normalizedTarget = normalizeStudyComparisonText(materialIdOrName);
+              const allSnap = subjectName
+                ? await colRef.where('disciplina', '==', subjectName).get()
+                : await colRef.get();
+              for (const d of allSnap.docs) {
+                const data = d.data() || {};
+                if (normalizeStudyComparisonText(data.nome || '') === normalizedTarget ||
+                    normalizeStudyComparisonText(data.originalFileName || '') === normalizedTarget ||
+                    d.id === materialIdOrName) {
+                  doc = d;
+                  break;
+                }
+              }
+            }
+
+            if (doc) {
+              const data = doc.data() || {};
+              let completeChunksText = '';
+              if (data.conteudo_armazenamento === 'chunks_v1') {
+                try {
+                  completeChunksText = await this.readMaterialTextChunks(doc.ref, Number(data.conteudo_chunks) || 0);
+                } catch (ce) {
+                  console.warn('[Firestore] Erro ao ler chunks do material:', doc.id, ce);
+                }
+              }
+
+              const candidates = [
+                completeChunksText,
+                data.material_md,
+                data.materialMd,
+                data.conteudo_md,
+                data.conteudoMd,
+                data.markdownText,
+                data.markdown,
+                data.texto,
+                data.text,
+                data.conteudo,
+                data.content,
+                data.corpo,
+                data.body
+              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
+              candidates.sort((a, b) => b.length - a.length);
+
+              if (candidates.length > 0) {
+                return {
+                  text: candidates[0],
+                  source: 'firestore_direct',
+                  docId: doc.id,
+                  materialName: data.nome || data.name || materialIdOrName,
+                  subject: data.disciplina || data.subject || subjectName,
+                  data
+                };
+              }
+            }
+          } catch (err) {
+            console.warn('[Firestore] Erro na recuperação autoritativa do material:', err);
+          }
+        }
+
+        // Fallback para os materiais autoritativos já carregados da sessão (espelho estrito do Firestore)
+        const normalizedTarget = normalizeStudyComparisonText(materialIdOrName || '');
+        const found = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m =>
+          m.id === materialIdOrName ||
+          m.name === materialIdOrName ||
+          m.originalFileName === materialIdOrName ||
+          (materialIdOrName && normalizeStudyComparisonText(m.name) === normalizedTarget)
+        );
+
+        if (found) {
+          const text = getMaterialStudyText(found);
+          return {
+            text,
+            source: 'session_memory',
+            docId: found.id || '',
+            materialName: found.name || materialIdOrName,
+            subject: found.subject || subjectName,
+            data: found
+          };
+        }
+
+        return {
+          text: '',
+          source: 'none',
+          docId: '',
+          materialName: materialIdOrName || '',
+          subject: subjectName || '',
+          data: null
+        };
+      },
+
+      // Recupera o conjunto autoritativo de materiais de uma disciplina diretamente do Firestore
+      async getAuthoritativeSubjectText(subjectName) {
+        const uid = this.getUserId();
+        const isBoilerplate = text => typeof text === 'string' && (
+          /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
+          /• Diretrizes SUS, CFM & ENARE/i.test(text.trim()) ||
+          /ÍNDICE DESCRITIVO DO MATERIAL ANALISADO/i.test(text.trim())
+        );
+
+        const materialsFound = [];
+        if (firestoreDb && isFirebaseCloudActive && this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+            const querySnap = await colRef.where('disciplina', '==', subjectName).get();
+            for (const doc of querySnap.docs) {
+              const data = doc.data() || {};
+              let chunksText = '';
+              if (data.conteudo_armazenamento === 'chunks_v1') {
+                try {
+                  chunksText = await this.readMaterialTextChunks(doc.ref, Number(data.conteudo_chunks) || 0);
+                } catch (ce) {}
+              }
+              const candidates = [
+                chunksText,
+                data.material_md,
+                data.materialMd,
+                data.conteudo_md,
+                data.conteudoMd,
+                data.markdownText,
+                data.markdown,
+                data.texto,
+                data.text,
+                data.conteudo,
+                data.content,
+                data.corpo,
+                data.body
+              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
+              candidates.sort((a, b) => b.length - a.length);
+              if (candidates.length > 0) {
+                materialsFound.push({
+                  name: data.nome || doc.id,
+                  text: candidates[0],
+                  id: doc.id
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('[Firestore] Erro ao carregar materiais da disciplina:', e);
+          }
+        }
+
+        if (materialsFound.length === 0 && Array.isArray(chatDriveMaterials)) {
+          const localMats = chatDriveMaterials.filter(m => m.subject === subjectName);
+          localMats.forEach(m => {
+            const t = getMaterialStudyText(m);
+            if (t && !isBoilerplate(t)) {
+              materialsFound.push({ name: m.name, text: t, id: m.id });
+            }
+          });
+        }
+
+        if (materialsFound.length === 0) {
+          return { text: '', source: 'none', count: 0, materials: [] };
+        }
+
+        const combinedText = materialsFound.map(m => `--- INÍCIO DA AULA: ${m.name} ---\n\n${m.text}\n\n--- FIM DA AULA: ${m.name} ---`).join('\n\n');
+        return {
+          text: combinedText,
+          source: 'firestore_subject',
+          count: materialsFound.length,
+          materials: materialsFound
+        };
+      },
+
+      // Atualiza o conteúdo textual de um material no Firestore e na memória local
+      async updateMaterialContent(materialIdOrName, newMarkdown) {
+        if (!materialIdOrName || typeof newMarkdown !== 'string') return;
+        const uid = this.getUserId();
+        const trimmed = newMarkdown.trim();
+
+        // 1. Atualiza na memória global da sessão
+        if (Array.isArray(chatDriveMaterials)) {
+          const found = chatDriveMaterials.find(m => m.id === materialIdOrName || m.name === materialIdOrName || m.originalFileName === materialIdOrName);
+          if (found) {
+            found.material_md = trimmed;
+            found.markdownText = trimmed;
+            found.conteudo_md = trimmed;
+            found.text = trimmed;
+          }
+        }
+
+        // 2. Atualiza no IndexedDB
+        if (typeof MedTutorLocalDB !== 'undefined') {
+          try {
+            await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+          } catch (e) {}
+        }
+
+        // 3. Atualiza no Firestore
+        if (firestoreDb && isFirebaseCloudActive && this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+            let docRef = null;
+            const directDoc = await colRef.doc(materialIdOrName).get();
+            if (directDoc.exists) {
+              docRef = directDoc.ref;
+            } else {
+              const querySnap = await colRef.where('nome', '==', materialIdOrName).limit(1).get();
+              if (!querySnap.empty) {
+                docRef = querySnap.docs[0].ref;
+              }
+            }
+            if (docRef) {
+              await docRef.set({
+                conteudo_md: trimmed.slice(0, FIRESTORE_TEXT_CHUNK_SIZE),
+                conteudo_caracteres: trimmed.length,
+                conteudo_chunks: splitFirestoreText(trimmed).length,
+                atualizadoEm: new Date().toISOString()
+              }, { merge: true });
+              await this.writeMaterialTextChunks(docRef, trimmed);
+              console.info('[Firestore] Conteúdo do material atualizado com sucesso no Firestore:', docRef.id);
+            }
+          } catch (err) {
+            console.warn('[Firestore] Erro ao atualizar material no Firestore:', err);
+          }
+        }
+      },
+
       // Salva o Banco Unificado de Questões em users/{userId}/banco_questoes/{questionId}
       async saveAllQuestions(questionsArray) {
         if (!Array.isArray(questionsArray)) return;
@@ -1182,61 +1440,22 @@
                 }
 
                 const normalized = normalizeMaterial(material);
-                // Proteção contra regressão de dados: se a versão do IndexedDB tiver mais conteúdo
-                // do que a versão retornada pelo Firestore, preserva o conteúdo local completo.
-                // Mas se a versão do Firestore for igual ou mais completa, ela prevalece!
-                // Importante: conteúdos locais com boilerplate gerado NUNCA sobrescrevem dados reais!
-                const localMat = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(m =>
-                  m.id === normalized.id ||
-                  m.name === normalized.name ||
-                  normalizeStudyComparisonText(m.name) === normalizeStudyComparisonText(normalized.name)
-                );
-                if (localMat) {
-                  const localCandidates = [
-                    localMat.material_md,
-                    localMat.materialMd,
-                    localMat.conteudo_md,
-                    localMat.conteudoMd,
-                    localMat.markdownText,
-                    localMat.markdown,
-                    localMat.texto,
-                    localMat.text,
-                    localMat.conteudo,
-                    localMat.corpo,
-                    localMat.body
-                  ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
-                  localCandidates.sort((a, b) => b.length - a.length);
-                  const localBest = localCandidates[0] || '';
-
-                  const normCandidates = [
-                    normalized.material_md,
-                    normalized.materialMd,
-                    normalized.conteudo_md,
-                    normalized.conteudoMd,
-                    normalized.markdownText,
-                    normalized.markdown,
-                    normalized.texto,
-                    normalized.text,
-                    normalized.conteudo,
-                    normalized.corpo,
-                    normalized.body
-                  ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t)).map(t => t.trim());
-                  normCandidates.sort((a, b) => b.length - a.length);
-                  const normBest = normCandidates[0] || '';
-
-                  if (localBest.length > 0 && localBest.length > normBest.length) {
-                    normalized.material_md = localBest;
-                    normalized.markdownText = localBest;
-                    normalized.conteudo_md = localBest;
-                    normalized.text = localBest;
-                  }
-                }
+                // FIRESTORE É A FONTE ÚNICA E AUTORITATIVA:
+                // Nenhum dado do IndexedDB ou cache local pode sobrescrever o documento do Firestore.
                 cloudMats.push(normalized);
               }
               if (cloudMats.length > 0) {
                 chatDriveMaterials = cloudMats;
                 await MedTutorLocalDB.set('materials', uid, cloudMats);
+                console.info(`[Firestore] ${cloudMats.length} material(is) carregado(s) exclusivamente do Cloud Firestore como fonte única.`);
+              } else {
+                chatDriveMaterials = [];
+                await MedTutorLocalDB.set('materials', uid, []);
               }
+            } else {
+              // Se a coleção de materiais no Firestore está vazia, limpa materiais residuais locais
+              chatDriveMaterials = [];
+              await MedTutorLocalDB.set('materials', uid, []);
             }
 
             const currSnap = await firestoreDb.collection('users').doc(uid).collection('grade_curricular').get();
@@ -10174,6 +10393,168 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       saveStudyNavigationState();
     }
 
+    let pendingValidatedStudyContext = null;
+
+    async function openMaterialTextValidationModal(materialName, subjectName, count = 5, config = {}) {
+      const targetSubj = subjectName || currentStudySubject || 'Clínica Médica';
+      const qCount = Math.max(1, Math.min(30, count || 5));
+      const targetMat = materialName || '';
+
+      pendingValidatedStudyContext = {
+        materialName: targetMat,
+        subjectName: targetSubj,
+        count: qCount,
+        config: config || {},
+        docId: '',
+        originalFirestoreText: '',
+        currentText: ''
+      };
+
+      const modal = document.getElementById('modalValidateMaterialText');
+      if (!modal) {
+        console.warn('[Validação] Modal modalValidateMaterialText não encontrado, executando direto.');
+        if (targetMat) {
+          return generateUnifiedStudyForMaterial(targetMat, targetSubj, qCount, config, '__bypass__');
+        } else {
+          return generateUnifiedStudyForSubject(targetSubj, qCount, config, '__bypass__');
+        }
+      }
+
+      // 1. Configura UI inicial em estado de carregamento
+      const titleEl = document.getElementById('validateModalMaterialNameBadge');
+      const subjEl = document.getElementById('validateModalSubjectBadge');
+      const statsEl = document.getElementById('validateModalStatsBadge');
+      const configEl = document.getElementById('validateModalConfigBadge');
+      const alertEl = document.getElementById('validateModalQualityAlert');
+      const textareaEl = document.getElementById('validateModalTextarea');
+      const btnExec = document.getElementById('btnExecuteValidatedGeneration');
+
+      if (titleEl) titleEl.textContent = targetMat ? `📄 Material: ${targetMat}` : `📚 Coletânea: ${targetSubj}`;
+      if (subjEl) subjEl.textContent = `🏛️ Disciplina: ${targetSubj}`;
+      if (configEl) {
+        const styleMap = { bloom: 'Acadêmico (Bloom)', enare: 'FGV / ENARE', enamed: 'ENAMED / DCNs' };
+        const diffMap = { balanced: 'Balanceado', iniciante: 'Iniciante', intermediario: 'Intermediário', avancado: 'Avançado' };
+        configEl.textContent = `🎯 ${qCount} itens • ${styleMap[config.examStyle] || 'Bloom'} • Nível: ${diffMap[config.difficulty] || 'Balanceado'}`;
+      }
+
+      if (statsEl) statsEl.textContent = '⏳ Carregando...';
+      if (alertEl) {
+        alertEl.style.background = 'rgba(0, 229, 255, 0.08)';
+        alertEl.style.borderColor = 'rgba(0, 229, 255, 0.3)';
+        alertEl.innerHTML = `⏳ <strong>Consultando o Cloud Firestore:</strong> Recuperando texto original autêntico armazenado na nuvem...`;
+      }
+      if (textareaEl) {
+        textareaEl.value = '🔍 Conectando ao Cloud Firestore para extrair o texto original da aula...';
+        textareaEl.disabled = true;
+      }
+      if (btnExec) {
+        btnExec.disabled = true;
+        btnExec.innerHTML = `<span>⏳</span> Carregando do Firestore...`;
+      }
+
+      // Exibe o modal imediatamente para o aluno
+      modal.classList.add('active');
+
+      // 2. Busca o texto autoritativo estritamente no Firestore
+      let result = null;
+      if (targetMat) {
+        result = await MedTutorFirebaseService.getAuthoritativeMaterialText(targetMat, targetSubj);
+      } else {
+        result = await MedTutorFirebaseService.getAuthoritativeSubjectText(targetSubj);
+      }
+
+      const text = (result && typeof result.text === 'string') ? result.text.trim() : '';
+      pendingValidatedStudyContext.docId = result?.docId || '';
+      pendingValidatedStudyContext.originalFirestoreText = text;
+      pendingValidatedStudyContext.currentText = text;
+
+      // 3. Atualiza UI com o texto recuperado
+      if (textareaEl) {
+        textareaEl.value = text;
+        textareaEl.disabled = false;
+        textareaEl.oninput = function() {
+          updateValidationModalStats(this.value);
+        };
+      }
+      if (btnExec) {
+        btnExec.disabled = false;
+        btnExec.innerHTML = `<span>🚀</span> Validar & Gerar ${qCount} Questões`;
+      }
+
+      updateValidationModalStats(text);
+
+      if (alertEl) {
+        if (text.length >= 300) {
+          alertEl.style.background = 'rgba(0, 255, 102, 0.08)';
+          alertEl.style.borderColor = 'rgba(0, 255, 102, 0.3)';
+          alertEl.innerHTML = `✅ <strong>Texto autêntico validado do Cloud Firestore (${result?.source === 'firestore_direct' ? 'Documento Direto + Chunks' : 'Coleção Nuvem'}):</strong> Revise abaixo o conteúdo exato antes de autorizar a formulação das perguntas pela IA.`;
+        } else if (text.length > 0) {
+          alertEl.style.background = 'rgba(255, 170, 0, 0.1)';
+          alertEl.style.borderColor = 'rgba(255, 170, 0, 0.4)';
+          alertEl.innerHTML = `⚠️ <strong>Texto curto detectado (${text.length} caracteres):</strong> O conteúdo retornado do Firestore parece reduzido. Você pode colar anotações ou complementar o texto diretamente no editor abaixo antes de gerar.`;
+        } else {
+          alertEl.style.background = 'rgba(255, 59, 48, 0.1)';
+          alertEl.style.borderColor = 'rgba(255, 59, 48, 0.4)';
+          alertEl.innerHTML = `⚠️ <strong>Nenhum texto encontrado no Firestore para esta aula:</strong> Cole ou digite o texto da aula no campo abaixo para prosseguir com a geração.`;
+        }
+      }
+    }
+    window.openMaterialTextValidationModal = openMaterialTextValidationModal;
+
+    function updateValidationModalStats(content) {
+      const statsEl = document.getElementById('validateModalStatsBadge');
+      if (!statsEl) return;
+      const chars = (content || '').length;
+      const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
+      statsEl.textContent = `📊 ${chars.toLocaleString('pt-BR')} caracteres • ~${words.toLocaleString('pt-BR')} palavras`;
+      if (pendingValidatedStudyContext) {
+        pendingValidatedStudyContext.currentText = content;
+      }
+    }
+    window.updateValidationModalStats = updateValidationModalStats;
+
+    function reloadOriginalFromFirestore() {
+      if (!pendingValidatedStudyContext) return;
+      const textareaEl = document.getElementById('validateModalTextarea');
+      if (textareaEl) {
+        textareaEl.value = pendingValidatedStudyContext.originalFirestoreText;
+        updateValidationModalStats(pendingValidatedStudyContext.originalFirestoreText);
+      }
+      showToast('🔄 Texto original recarregado do Firestore.');
+    }
+    window.reloadOriginalFromFirestore = reloadOriginalFromFirestore;
+
+    async function executeValidatedGeneration() {
+      if (!pendingValidatedStudyContext) return;
+      const textareaEl = document.getElementById('validateModalTextarea');
+      const validatedText = (textareaEl ? textareaEl.value : '').trim();
+
+      if (validatedText.length < 30) {
+        showToast('⚠️ O texto precisa de pelo menos 30 caracteres para que a IA possa formular perguntas clínicas.');
+        return;
+      }
+
+      const { materialName, subjectName, count, config, docId, originalFirestoreText } = pendingValidatedStudyContext;
+
+      // Se o aluno editou ou complementou o texto na tela de validação, salva as melhorias no Firestore
+      if (docId && validatedText !== originalFirestoreText) {
+        MedTutorFirebaseService.updateMaterialContent(docId, validatedText);
+        showToast('💾 Alterações no texto salvas no Firestore.');
+      }
+
+      // Fecha o modal de validação
+      const modal = document.getElementById('modalValidateMaterialText');
+      if (modal) modal.classList.remove('active');
+
+      // Executa a geração com o texto estritamente validado
+      if (materialName) {
+        await generateUnifiedStudyForMaterial(materialName, subjectName, count, config, validatedText);
+      } else {
+        await generateUnifiedStudyForSubject(subjectName, count, config, validatedText);
+      }
+    }
+    window.executeValidatedGeneration = executeValidatedGeneration;
+
     function confirmGenerateStudyCount() {
       const inputEl = document.getElementById('generateStudyQuestionsCountInput');
       let count = inputEl ? parseInt(inputEl.value, 10) : 5;
@@ -10183,14 +10564,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const examStyle = document.getElementById('generateStudyExamStyleSelect')?.value || 'bloom';
       const difficulty = document.getElementById('generateStudyDifficultySelect')?.value || 'balanced';
 
-      const { materialName, subjectName } = pendingGenerateStudyContext;
+      const { materialName, subjectName } = pendingGenerateStudyContext || {};
       closeModals();
 
-      if (materialName) {
-        generateUnifiedStudyForMaterial(materialName, subjectName, count, { examStyle, difficulty });
-      } else {
-        generateUnifiedStudyForSubject(subjectName, count, { examStyle, difficulty });
-      }
+      // Transição direta e obrigatória para a tela de validação do texto original do Firestore
+      openMaterialTextValidationModal(materialName, subjectName, count, { examStyle, difficulty });
     }
 
     function renderSharedStudyItems() {
@@ -11541,9 +11919,14 @@ Retorne EXCLUSIVAMENTE um JSON:
     }
 
     // 4.4 Geração Sob Demanda: IA Gemini + Motor Local MedCopilot
-    async function generateUnifiedStudyForMaterial(materialName, subjectName, count, config = {}) {
+    async function generateUnifiedStudyForMaterial(materialName, subjectName, count, config = {}, validatedText = null) {
       const targetSubj = subjectName || currentStudySubject;
       if (!targetSubj || !materialName) return;
+
+      // Trava de segurança: se o texto original ainda não foi validado pelo usuário, abre a tela de validação!
+      if (!validatedText) {
+        return openMaterialTextValidationModal(materialName, targetSubj, count, config);
+      }
 
       const qCount = Math.max(1, Math.min(30, count || 5));
       const materials = getMaterialsForSubject(targetSubj);
@@ -11567,38 +11950,10 @@ Retorne EXCLUSIVAMENTE um JSON:
         };
       }
 
-      // 1. Resgata o texto completo do arquivo em qualquer propriedade onde ele possa ter sido salvo
-      let slideText = getMaterialStudyText(targetFile);
+      // 1. O texto a ser utilizado é EXCLUSIVAMENTE o texto validado pelo usuário diretamente do Firestore
+      let slideText = (validatedText === '__bypass__') ? getMaterialStudyText(targetFile) : validatedText;
 
-      // Sempre busca no banco geral de materiais da sessão para garantir a versão mais completa e longa disponível
-      if (Array.isArray(chatDriveMaterials)) {
-        const found = chatDriveMaterials.find(m =>
-          m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
-          [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)
-        );
-        if (found) {
-          const altText = getMaterialStudyText(found);
-          if (altText && altText.length > (slideText ? slideText.length : 0)) {
-            slideText = altText;
-          }
-        }
-      }
-
-      // 2. Limpeza profunda: remove índices e cabeçalhos preservando o corpo médico integral
-      if (slideText) {
-        const preClean = slideText;
-        slideText = slideText
-          .replace(/(?:sumário|índice|tabela de conteúdo|conteúdo programático)[\s\S]*?(?=(?:introdução|objetivos|1\.|\n#|[A-Z\s]{4,}\n))/i, '')
-          .replace(/^.*?\b(item\s*\d+|conceitos[- ]chave|slide\s*\d+|página\s*\d+|M0\d+).*$/gim, '')
-          .replace(/Med\s*Tutor\s*Brasil.*$/gim, '')
-          .trim();
-        // Proteção contra regex gulosa: se a limpeza encolheu o texto excessivamente, restaura o original
-        if (slideText.length < 300 && preClean.length >= 300) {
-          slideText = preClean;
-        }
-      }
-
-      showToast(`⚡ MedCopilot: Gerando ${qCount} questões com ancoragem clínica...`);
+      showToast(`⚡ MedCopilot: Gerando ${qCount} questões com texto validado da aula...`);
 
       quizTutorChoices = {};
       quizExamState.userChoices = {};
@@ -11661,9 +12016,14 @@ Retorne EXCLUSIVAMENTE um JSON:
       showToast(`⚡ ${generated.length} pares de estudo (Quiz & Flashcard) gerados com sucesso para "${materialName}"!`);
     }
 
-    async function generateUnifiedStudyForSubject(subjectName, count, config = {}) {
+    async function generateUnifiedStudyForSubject(subjectName, count, config = {}, validatedText = null) {
       const targetSubj = subjectName || currentStudySubject;
       if (!targetSubj) return;
+
+      // Trava de segurança: se o texto original ainda não foi validado pelo usuário, abre a tela de validação!
+      if (!validatedText) {
+        return openMaterialTextValidationModal('', targetSubj, count, config);
+      }
 
       const qCount = Math.max(1, Math.min(30, count || 5));
       const materials = getMaterialsForSubject(targetSubj);
@@ -11671,13 +12031,33 @@ Retorne EXCLUSIVAMENTE um JSON:
       const generatedForSubject = [];
       let totalCreated = 0;
 
-      showToast(`⚡ MedCopilot: Gerando estudo para a disciplina "${targetSubj}"...`);
+      showToast(`⚡ MedCopilot: Gerando estudo com texto validado para "${targetSubj}"...`);
 
       quizTutorChoices = {};
       quizExamState.userChoices = {};
       quizExamState.finished = false;
 
-      if (materials.length > 0) {
+      const effectiveText = (validatedText === '__bypass__') ? '' : validatedText;
+      if (effectiveText && effectiveText.length >= 30) {
+        let createdForMat = await generateStudyItemsSequentially(
+          effectiveText,
+          { materialName: targetSubj, subjectName: targetSubj, disease: targetSubj },
+          config,
+          qCount,
+          existingQuestionsForSubject
+        );
+
+        if (!createdForMat || createdForMat.length === 0) {
+          createdForMat = generateLocalMedCopilotQuestions(targetSubj, targetSubj, qCount, config, effectiveText);
+        }
+
+        const uniqueItems = filterUniqueStudyItems(createdForMat, existingQuestionsForSubject);
+        uniqueItems.forEach(q => {
+          q.slideName = targetSubj;
+          generatedForSubject.push(q);
+          totalCreated++;
+        });
+      } else if (materials.length > 0) {
         const perMat = Math.max(1, Math.floor(qCount / materials.length));
         for (let mIdx = 0; mIdx < materials.length; mIdx++) {
           if (totalCreated >= qCount) break;

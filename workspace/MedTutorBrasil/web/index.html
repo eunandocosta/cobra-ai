@@ -1587,8 +1587,82 @@
       <div style="display: flex; gap: 10px; justify-content: flex-end;">
         <button class="btn-outline-action" onclick="closeModals()">Cancelar</button>
         <button class="btn-outline-action primary" id="btnConfirmGenerateStudy" onclick="confirmGenerateStudyCount()" style="font-weight: 700;">
-          ⚡ Confirmar & Gerar Estudo
+          🔍 Avançar para Validação do Texto (Firestore)
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE VALIDAÇÃO DO TEXTO ORIGINAL (FONTE: FIRESTORE)
+       EXIBE O TEXTO ORIGINAL ANTES DE QUALQUER GERAÇÃO DE PERGUNTAS PELA IA
+       ========================================================= -->
+  <div class="modal-overlay" id="modalValidateMaterialText" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 860px; width: 95%; max-height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-head" style="margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">🔍</span>
+          <div>
+            <h3 style="font-size: 16px; margin: 0; color: var(--text-primary);">Validação do Texto Original da Aula</h3>
+            <div style="font-size: 11px; color: var(--neon); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+              <span>☁️ Fonte Obrigatória e Exclusiva: Cloud Firestore (<code>materiais_estudo</code>)</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Metadados do Material e Badges -->
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px 0; align-items: center; justify-content: space-between;">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <span id="validateModalMaterialNameBadge" style="background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+            📄 Material: ...
+          </span>
+          <span id="validateModalSubjectBadge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11.5px;">
+            📚 Disciplina: ...
+          </span>
+          <span id="validateModalStatsBadge" style="background: rgba(0, 255, 102, 0.1); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.25); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600;">
+            📊 0 caracteres • 0 palavras
+          </span>
+        </div>
+        <div id="validateModalConfigBadge" style="font-size: 11px; color: var(--text-muted); font-weight: 600; background: rgba(255, 255, 255, 0.03); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
+          🎯 5 itens • Acadêmico (Bloom)
+        </div>
+      </div>
+
+      <!-- Alerta Informativo / Status -->
+      <div id="validateModalQualityAlert" style="margin-bottom: 10px; padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.45; background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.3); color: var(--text-primary);">
+        ⏳ <strong>Consultando o Cloud Firestore:</strong> Recuperando texto original autêntico da aula...
+      </div>
+
+      <!-- Área de Visualização e Edição do Texto Original -->
+      <div style="display: flex; flex-direction: column; flex: 1; min-height: 260px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label for="validateModalTextarea" style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+            Texto Clínico da Aula (Auditável e Editável):
+          </label>
+          <span style="font-size: 11px; color: var(--text-muted);">
+            Você pode revisar ou colar trechos complementares antes de autorizar a IA
+          </span>
+        </div>
+        <textarea id="validateModalTextarea" class="written-textarea" style="flex: 1; min-height: 280px; max-height: 48vh; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12.5px; line-height: 1.6; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: #0c1017; color: #e6edf3; resize: vertical;" placeholder="Carregando texto original do Firestore..."></textarea>
+      </div>
+
+      <!-- Rodapé com Ações -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+        <button type="button" class="btn-outline-action" onclick="closeModals()" style="padding: 8px 16px;">
+          Cancelar
+        </button>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn-outline-action" onclick="reloadOriginalFromFirestore()" title="Recarregar texto limpo do Firestore descartando edições">
+            🔄 Recarregar do Firestore
+          </button>
+          <button type="button" class="btn-outline-action primary" id="btnExecuteValidatedGeneration" onclick="executeValidatedGeneration()" style="font-weight: 700; padding: 8px 20px; font-size: 13.5px; display: flex; align-items: center; gap: 8px;">
+            <span>🚀</span> Validar & Gerar Questões
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -2560,7 +2634,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260913-quiz-quality-fix-v4"></script>
+  <script defer src="/app.js?v=20260913-quiz-validate-screen-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
