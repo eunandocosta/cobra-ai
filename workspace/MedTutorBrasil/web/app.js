@@ -4854,11 +4854,25 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     function buildLocalStudyBlueprint(cleanText, count, excludedEvidence = []) {
       const blocked = /\b(sum[aá]rio|[ií]ndice|slide|aula|apostila|material|arquivo|cap[ií]tulo|refer[eê]ncia)\b/i;
-      const candidates = String(cleanText || '')
+      const sourceText = String(cleanText || '');
+      const candidates = sourceText
         .replace(/\s+/g, ' ')
         .split(/(?<=[.!?;:])\s+/)
         .map(sentence => sentence.trim())
         .filter(sentence => sentence.length >= 55 && sentence.length <= 420 && !blocked.test(sentence));
+      // Muitos PDFs extraídos preservam quebras de linha, listas ou tabelas sem
+      // pontuação final. Esses blocos também podem conter evidência válida; usá-los
+      // como segunda fonte evita descartar um material médico que tem texto útil.
+      if (candidates.length < Math.min(count, 2)) {
+        sourceText.split(/\n{1,}|(?<=\.)\s{2,}/)
+          .map(block => block.replace(/\s+/g, ' ').trim())
+          .filter(block => block.length >= 80 && block.length <= 900 && !blocked.test(block))
+          .forEach(block => {
+            if (!candidates.some(candidate => calculateLocalSimilarity(candidate, block) >= 0.75)) {
+              candidates.push(block);
+            }
+          });
+      }
       const selected = [];
       const focusForIndex = index => index < Math.ceil(count * 0.4)
         ? 'fundamentos'
@@ -5277,8 +5291,27 @@ ${cleanText}
     async function generateStudyItemsSequentially(materialText, metadata, config = {}, count = 5, existingItems = []) {
       const accepted = [];
       const total = Math.max(1, Math.min(30, count || 5));
-      const blueprint = buildLocalStudyBlueprint(materialText, total);
-      if (!blueprint) return accepted;
+      let blueprint = buildLocalStudyBlueprint(materialText, total);
+      // O planejamento é uma proteção de qualidade, não um pré-requisito para
+      // textos válidos que vieram de PDF/Drive em um único bloco. O Gemini ainda
+      // recebe a fonte e as perguntas já aceitas, portanto mantém a ancoragem e a
+      // verificação de duplicidade mesmo nesse formato de extração.
+      if (!blueprint && hasUsableStudyContent(materialText)) {
+        const evidence = String(materialText).replace(/\s+/g, ' ').trim().slice(0, 2_400);
+        blueprint = Array.from({ length: total }, (_, index) => ({
+          foco_aprendizagem: index < Math.ceil(total * 0.4)
+            ? 'fundamentos'
+            : (index < Math.ceil(total * 0.75) ? 'mecanismo_consequencia' : 'aplicacao_clinica'),
+          conceito_alvo: inferTopicFromStudyContent(evidence, metadata.subjectName),
+          evidencia_fonte: evidence,
+          objetivo: 'Cobrar compreensão de conteúdo extraído em bloco único.'
+        }));
+        logQuizGenerationDebug('blueprint_fallback_from_valid_content', { materialChars: evidence.length, requestedItems: total });
+      }
+      if (!blueprint) {
+        logQuizGenerationDebug('blueprint_unavailable', { materialChars: String(materialText || '').length, requestedItems: total });
+        return accepted;
+      }
       const requestedDifficulty = config.difficulty || 'balanced';
       const focusForPosition = (position) => {
         if (requestedDifficulty === 'iniciante') return 'fundamentos';
@@ -10941,7 +10974,9 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const qCount = Math.max(1, Math.min(30, count || 5));
       const materials = getMaterialsForSubject(targetSubj);
-      const targetFile = materials.find(m => m.name === materialName || m.id === materialName || m.originalFileName === materialName) || { 
+      const normalizedMaterialName = normalizeStudyComparisonText(materialName);
+      const targetFile = materials.find(m => m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
+        [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)) || {
         name: materialName, 
         disease: materialName, 
         topic: materialName 
