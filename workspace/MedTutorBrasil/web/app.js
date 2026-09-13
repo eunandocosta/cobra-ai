@@ -3778,6 +3778,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     async function enrichUploadedMaterialWithVisualAssociations(material, sourceFile) {
       if (!material?.visualAssociationAuthorized || !sourceFile) {
         if (sourceFile) await attachOriginalDocumentImages(material, sourceFile);
+        reportUploadDiagnostic(material, 'sucesso');
         return;
       }
       try {
@@ -3795,12 +3796,27 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         if (typeof AppExpenseTracker !== 'undefined' && associations.length) {
           AppExpenseTracker.recordAction({ actionName: `Associação visual: ${material.name}`, model: 'Gemini via servidor local', isLocal: false });
         }
+        reportUploadDiagnostic(material, 'sucesso');
         showToast(associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.');
       } catch (error) {
         console.error('[Associação visual] Falha no upload universal:', error);
         await attachOriginalDocumentImages(material, sourceFile);
+        reportUploadDiagnostic(material, 'parcial');
         showToast('⚠️ Não foi possível interpretar visualmente este arquivo; as imagens originais foram preservadas.');
       }
+    }
+
+    function reportUploadDiagnostic(material, status = 'sucesso') {
+      if (typeof fetch !== 'function' || !material) return;
+      const inputChars = Number(material.uploadInputChars) || String(material.readingDocText || material.text || '').length;
+      const outputChars = String(material.markdownText || material.text || '').length;
+      const aiEngine = material.visualAssociationAuthorized
+        ? 'Gemini via servidor local (associação visual)'
+        : (material.aiEngine || 'Motor local (sem chamada Gemini confirmada)');
+      fetch('/api/diagnostics/upload', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+        body: JSON.stringify({ status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected: Array.isArray(material.clinicalImages) ? material.clinicalImages.length : 0 })
+      }).catch(() => {});
     }
 
     async function classifyMaterialWithServerGemini(text, fileName, subjectName) {
@@ -14820,6 +14836,8 @@ DIRETRIZES CIRÚRGICAS:
         subject: finalSubject,
         text: currentMat.text || '',
         markdownText: optimization.markdownText,
+        uploadInputChars: String(currentMat.text || '').length,
+        aiEngine: currentMat.preloadedAnalysis?.isGeminiClassified ? 'Gemini via servidor local' : 'Motor local (triagem sem Gemini confirmada)',
         pedagogicalSynthesis: optimization.pedagogicalSynthesis,
         clinicalImages: optimization.clinicalImages,
         compressionStats: optimization.compressionStats,
@@ -22542,6 +22560,12 @@ Linha 04: __________________________________________________
           markdownText: `${extractedText}${visualMarkdown && !extractedText.includes('Associação Visual do Material') ? `\n\n${visualMarkdown}` : ''}`,
           visualAssociations,
           visualAssociationAuthorized: visualAssociationEnabled,
+          // Preserva métricas da importação para o diagnóstico operacional no terminal.
+          // O conteúdo do arquivo nunca é enviado para esse diagnóstico.
+          uploadInputChars: String(extractedText || '').length,
+          aiEngine: visualAssociationEnabled
+            ? 'Gemini via servidor local (associação visual)'
+            : (analysisResult.engine || 'Motor local (fallback)'),
           createdAt: new Date().toISOString()
         };
 
@@ -22552,9 +22576,14 @@ Linha 04: __________________________________________________
           }
           saveChatDriveMaterials();
           if (pendingImportStudyFile) {
-            attachOriginalDocumentImages(newMaterial, pendingImportStudyFile, visualAssociations).catch(error => {
-              console.warn('[Imagens do material] Falha ao anexar imagens da importação:', error);
-            });
+            attachOriginalDocumentImages(newMaterial, pendingImportStudyFile, visualAssociations)
+              .then(() => reportUploadDiagnostic(newMaterial, 'sucesso'))
+              .catch(error => {
+                console.warn('[Imagens do material] Falha ao anexar imagens da importação:', error);
+                reportUploadDiagnostic(newMaterial, 'parcial');
+              });
+          } else {
+            reportUploadDiagnostic(newMaterial, 'sucesso');
           }
         }
         importedStudyMaterial = newMaterial;
@@ -22562,6 +22591,16 @@ Linha 04: __________________________________________________
         // Aluno optou por NÃO salvar na biblioteca de materiais:
         // Mantém chatDriveMaterials intocado!
         console.log(`[Importação] Arquivo "${fileName}" processado estritamente para Quiz/Flashcards sem persistir na lista de materiais do aluno.`);
+        reportUploadDiagnostic({
+          originalFileName: fileName,
+          uploadInputChars: String(extractedText || '').length,
+          markdownText: `${extractedText || ''}${visualMarkdown || ''}`,
+          visualAssociationAuthorized: visualAssociationEnabled,
+          aiEngine: visualAssociationEnabled
+            ? 'Gemini via servidor local (associação visual)'
+            : (analysisResult.engine || 'Motor local (fallback)'),
+          clinicalImages: visualAssociations
+        }, 'sucesso');
       }
 
       // 5. Salva todas as questões e flashcards no sharedQuestionsBank
@@ -22696,6 +22735,7 @@ Linha 04: __________________________________________________
         if (response.ok) {
           const apiResult = await response.json();
           if (apiResult && Array.isArray(apiResult.items) && apiResult.items.length > 0) {
+            apiResult.engine = apiResult.model || 'Gemini via servidor local';
             console.log(`✅ [Importador IA] Análise concluída com sucesso pelo backend Gemini (${apiResult.items.length} itens).`);
             return apiResult;
           }
@@ -22714,6 +22754,7 @@ Linha 04: __________________________________________________
         try {
           const geminiResult = await analyzeAndTransformStudyMaterialWithGemini(cleanSample, metadata, apiKey);
           if (geminiResult && Array.isArray(geminiResult.items) && geminiResult.items.length > 0) {
+            geminiResult.engine = 'Gemini API direta';
             return geminiResult;
           }
         } catch (geminiErr) {
@@ -22722,7 +22763,9 @@ Linha 04: __________________________________________________
       }
 
       // 3. Fallback Heurístico Local Pericial Aperfeiçoado
-      return analyzeAndTransformStudyMaterialLocal(text, metadata);
+      const localResult = analyzeAndTransformStudyMaterialLocal(text, metadata);
+      localResult.engine = 'Motor local (fallback)';
+      return localResult;
     }
 
     /**

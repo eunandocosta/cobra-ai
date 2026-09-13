@@ -54,6 +54,24 @@ app.post('/api/diagnostics/firebase-sync', (req, res) => {
   res.status(204).end();
 });
 
+// Metadados operacionais de upload: nunca recebe o texto, as imagens ou dados
+// clínicos do estudante. Permite verificar o motor e o resultado no terminal.
+app.post('/api/diagnostics/upload', (req, res) => {
+  const body = req.body || {};
+  const safe = {
+    status: String(body.status || 'sucesso').slice(0, 32),
+    arquivo: String(body.fileName || 'Material').replace(/[\r\n]+/g, ' ').slice(0, 240),
+    motor: String(body.aiEngine || 'Não informado').replace(/[\r\n]+/g, ' ').slice(0, 160),
+    caracteresLidos: Math.max(0, Math.min(Number(body.inputChars) || 0, 100_000_000)),
+    caracteresGerados: Math.max(0, Math.min(Number(body.outputChars) || 0, 100_000_000)),
+    imagensColetadas: Math.max(0, Math.min(Number(body.imagesCollected) || 0, 1000)),
+    at: new Date().toISOString()
+  };
+  const icon = safe.status === 'sucesso' ? '✅' : '❌';
+  console.log(`${icon} [Upload MedTutor]`, safe);
+  res.status(204).end();
+});
+
 if (require.main === module) {
   const server = app.listen(PORT, () => {
     console.log(`🚀 MedTutor Brasil (Modular Monolith) ativo na porta ${PORT}`);
