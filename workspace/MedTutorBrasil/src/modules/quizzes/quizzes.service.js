@@ -33,7 +33,7 @@ function isSharedQuestionStemValid(stem) {
   return stem.length >= 18 && !/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem);
 }
 
-function buildSafeFlashcardTitle(title, correctAnswer, learningFocus) {
+function buildSafeFlashcardTitle(title, correctAnswer) {
   const candidate = String(title || '').replace(/\s+/g, ' ').trim();
   const normalize = value => String(value || '').normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -43,9 +43,7 @@ function buildSafeFlashcardTitle(title, correctAnswer, learningFocus) {
     normalizedAnswer.includes(normalizedTitle) || normalizedTitle.includes(normalizedAnswer)
   );
   if (candidate.length >= 3 && candidate.length <= 72 && !titleRevealsAnswer) return candidate;
-  if (learningFocus === 'fundamentos') return 'Fundamentos em revisão';
-  if (learningFocus === 'mecanismo_consequencia') return 'Mecanismo em revisão';
-  return 'Aplicação em revisão';
+  return 'Tema em revisão';
 }
 
 function getGenAI() {
@@ -59,7 +57,7 @@ function getGenAI() {
 
 const questionsSchema = {
   type: SchemaType.ARRAY,
-  description: "Lista de questões de residência médica",
+  description: "Lista de questões formativas ancoradas no conteúdo enviado",
   items: {
     type: SchemaType.OBJECT,
     properties: {
@@ -84,17 +82,11 @@ const questionsSchema = {
       },
       justificativa: {
         type: SchemaType.STRING,
-        description: "Explicação fisiopatológica e anatômica completa"
+        description: "Explicação clara baseada exclusivamente no conteúdo enviado"
       },
       perola_clinica: {
         type: SchemaType.STRING,
-        description: "Regra de memorização que conecte estrutura, função e consequência; conduta apenas quando pertinente"
-      },
-      foco_aprendizagem: {
-        type: SchemaType.STRING,
-        format: "enum",
-        enum: ["fundamentos", "mecanismo_consequencia", "aplicacao_clinica"],
-        description: "Categoria pedagógica obrigatória da questão"
+        description: "Ponto-chave breve para memorização, sem acrescentar informações ausentes da fonte"
       },
       titulo_flashcard: {
         type: SchemaType.STRING,
@@ -108,21 +100,21 @@ const questionsSchema = {
       "texto_resposta_correta",
       "justificativa",
       "perola_clinica",
-      "foco_aprendizagem",
       "titulo_flashcard"
     ]
   }
 };
 
 const SYSTEM_INSTRUCTION = `
-Você é uma banca de avaliação formativa para estudantes de medicina. Seu objetivo principal é consolidar compreensão de anatomia, componentes, relações, função, mecanismos e consequências; a prática clínica é a etapa de aplicação.
+Você cria questões formativas para estudantes de medicina estritamente baseadas no conteúdo enviado.
 
 DIRETRIZES FUNDAMENTAIS:
-1. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
-2. Em cada lote, distribua as questões o mais próximo possível de 40% fundamentos (definição, localização, partes, relações e função), 35% mecanismo_consequencia (causa, alteração e consequência) e 25% aplicacao_clinica (vinheta, semiologia, diagnóstico ou manejo). Para lotes pequenos, priorize sempre ao menos uma questão de fundamentos.
-3. PROIBIDO usar palavras como: "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
-4. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido.
-5. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
+1. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
+2. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
+3. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado.
+4. PROIBIDO usar palavras como: "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
+5. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido.
+6. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 `;
 
 class QuizzesService {
@@ -133,7 +125,9 @@ class QuizzesService {
     // Captura o texto independentemente do nome do campo enviado pelo frontend
     const materialText = payload.materialText || payload.text || payload.conteudo || payload.content || '';
     const quantidade = payload.quantidade || payload.amount || payload.total || 5;
-    const learningFocus = payload.learningFocus || payload.focoAprendizagem || '';
+    const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
+      ? payload.difficulty
+      : 'iniciante';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 30) : [];
 
     console.log("➡️ [Quiz Engine] Iniciando geração...");
@@ -164,14 +158,13 @@ class QuizzesService {
     });
 
     const prompt = `
-Com base nas estruturas anatômicas, vias neurais, síndromes e vascularização presentes abaixo, crie ${totalQuestoes} questões de avaliação formativa:
+Com base exclusivamente no conteúdo abaixo, crie ${totalQuestoes} questões de avaliação formativa. Nível solicitado: ${requestedDifficulty}.
 
 --- CONTEÚDO MÉDICO ---
 ${materialText}
 --- FIM DO CONTEÚDO ---
 
-Regras: respeite a distribuição 40% fundamentos, 35% mecanismo_consequencia e 25% aplicacao_clinica, identificando cada item em foco_aprendizagem. Só a última categoria exige vinheta clínica. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use o diagnóstico, a alternativa correta, a conduta ou um dado que resolva a questão.
-${learningFocus ? `Nesta chamada unitária, gere exclusivamente uma questão de foco_aprendizagem: ${learningFocus}.` : ''}
+Regras: selecione um trecho diferente e verificável do conteúdo para cada questão. Em nível iniciante, cobre reconhecimento, definição, partes, localização, relação ou função que estejam escritos na fonte, em linguagem direta. Em nível intermediário, peça comparação ou relação que a própria fonte permita concluir. Em nível avançado, aumente a integração sem inserir dados externos; uma situação clínica só é permitida se estiver presente na fonte. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use a resposta correta ou um dado que resolva a questão. A justificativa e o ponto-chave devem permanecer estritamente dentro da fonte.
 ${previousQuestions.length ? `Não repita nem reformule estas questões já aceitas:\n${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 500)}`).join('\n')}` : ''}
 `;
 
@@ -199,15 +192,8 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
         if (cleanAlternatives.length !== 4 || cleanAlternatives.some(option => !String(option || '').trim()) || correctIdx > 3) {
           return null;
         }
-        const resolvedFocus = learningFocus || q.foco_aprendizagem || 'fundamentos';
-        const difficultyLevel = resolvedFocus === 'fundamentos'
-          ? 'iniciante'
-          : (resolvedFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado');
-        const cognitiveDomain = resolvedFocus === 'fundamentos'
-          ? 'conceitual'
-          : (resolvedFocus === 'mecanismo_consequencia' ? 'mecanismo' : 'aplicacao');
         const correctAnswer = q.texto_resposta_correta || cleanAlternatives[correctIdx] || '';
-        const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer, resolvedFocus);
+        const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer);
 
         return {
           id: `q_${Date.now()}_${index + 1}`,
@@ -225,15 +211,15 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
           explanation: q.justificativa,
           perola_clinica: q.perola_clinica,
           clinicalPearl: q.perola_clinica,
-          learningFocus: resolvedFocus,
-          difficultyLevel,
-          cognitiveLevel: difficultyLevel,
-          cognitiveDomain,
+          learningFocus: 'material_base',
+          difficultyLevel: requestedDifficulty,
+          cognitiveLevel: requestedDifficulty,
+          cognitiveDomain: 'compreensao',
           flashcardTitle,
           flashcard: {
             title: flashcardTitle,
             front: q.pergunta,
-            back: `${correctAnswer}\n\n💡 Pérola Clínica: ${q.perola_clinica}`
+            back: `${correctAnswer}\n\n💡 Ponto-chave: ${q.perola_clinica}`
           },
           quizStats: {
             attempts: 0,
@@ -355,7 +341,7 @@ Retorne EXCLUSIVAMENTE um JSON com:
   /**
    * Analisa e transforma material biomédico (apostilas, listas de exercícios, estudos dirigidos, gabaritos ou teoria).
    * Reconhece questões existentes (inclusive discursivas com gabarito/respostas) reaproveitando-as com fidelidade,
-   * preserva vinhetas clínicas e transforma teoria em itens que consolidam fundamentos antes da aplicação.
+   * preserva questões existentes e transforma teoria em itens diretos e fiéis à fonte.
    */
   async analyzeMaterial(payload = {}) {
     const text = payload.text || payload.materialText || payload.conteudo || payload.content || '';
@@ -375,7 +361,7 @@ Retorne EXCLUSIVAMENTE um JSON com:
     const model = genAI.getGenerativeModel({
       model: modelName,
       systemInstruction: `Você é uma banca de avaliação formativa para estudantes de medicina.
-Sua missão é analisar o material biomédico fornecido pelo estudante (caderno de questões, estudo dirigido com gabarito, apostila ou resumo didático) e convertê-lo em Quizzes e Flashcards que priorizam compreensão de estrutura, função, mecanismos e consequências antes da aplicação clínica.
+Sua missão é analisar o conteúdo fornecido pelo estudante e convertê-lo em Quizzes e Flashcards diretos, estritamente fiéis à fonte.
 
 DIRETRIZES OBRIGATÓRIAS:
 1. IDENTIFICAÇÃO DO TIPO DE CONTEÚDO:
@@ -387,11 +373,11 @@ DIRETRIZES OBRIGATÓRIAS:
    - Quando houver perguntas no material (sejam de múltipla escolha ou discursivas de Estudo Dirigido/Gabarito): REAPROVEITE-AS INTEGRALMENTE!
    - Se houver caso clínico / vinheta descrita no material (ex: "Sebastião, 58 anos, sofreu trauma de crânio, pior cefaleia da vida, rigidez de nuca..."), PRESERVE E ATRIBUA essa vinheta às respectivas questões!
    - Cada questão deve ser convertida em um item de Quiz com exatamente 4 opções técnicas (A, B, C, D). A alternativa correta deve refletir fielmente o gabarito/resposta oficial do material, e as outras 3 devem ser distratores médicos verossímeis e instrutivos.
-   - Forneça justificativa completa, pérola de compreensão e um par de Flashcard com pergunta reflexiva na frente e resposta fundamentada no verso.
+   - Forneça justificativa e ponto-chave de memorização usando apenas informações presentes na fonte.
    - Marque essas questões com "source": "reused".
 
 3. TRANSFORMAÇÃO DE TEORIA DIDÁTICA ("text_only" ou "both"):
-   - Para trechos exclusivamente teóricos, distribua itens o mais próximo possível de 40% fundamentos (definição, localização, partes, relações e função), 35% mecanismo_consequencia (causa, alteração e consequência) e 25% aplicacao_clinica. Somente a última categoria exige vinheta clínica.
+   - Para trechos teóricos, formule perguntas diretas sobre informações explícitas, como definições, partes, localização, função e relações descritas. Não invente situações, condutas ou dados externos.
    - Marque com "source": "generated_from_text".
 
 4. RIGOR TERMINOLÓGICO ABSOLUTO:
@@ -430,9 +416,8 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
       "question": "pergunta aberta, autocontida e respondível sem alternativas",
       "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
       "correctIndex": número (0, 1, 2 ou 3),
-      "explanation": "explicação fisiopatológica e justificativa da alternativa correta",
-      "pearl": "regra de memorização que conecte estrutura, função e consequência",
-      "learningFocus": "fundamentos" | "mecanismo_consequencia" | "aplicacao_clinica",
+      "explanation": "explicação baseada exclusivamente no conteúdo fornecido",
+      "pearl": "ponto-chave de memorização baseado exclusivamente no conteúdo fornecido",
       "flashcardFront": "pergunta conceitual de alta retenção para a frente do flashcard",
       "flashcardBack": "resposta sintetizada e memorável para o verso do flashcard",
       "difficulty": "iniciante" | "intermediario" | "avancado"
@@ -468,12 +453,12 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
           options: opts,
           correctIndex: cIdx,
           correctAnswerText: opts[cIdx] || '',
-          explanation: item.explanation || 'Conforme diretrizes clínicas e material didático.',
+          explanation: item.explanation || 'Conforme o conteúdo fornecido.',
           pearl: item.pearl || '',
-          learningFocus: item.learningFocus || 'fundamentos',
+          learningFocus: 'material_base',
           flashcardFront: sharedStem,
           flashcardBack: item.flashcardBack || opts[cIdx] || item.explanation,
-          difficulty: item.difficulty || 'intermediario'
+          difficulty: ['iniciante', 'intermediario', 'avancado'].includes(item.difficulty) ? item.difficulty : 'iniciante'
         };
       }).filter(Boolean);
 

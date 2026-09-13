@@ -1032,9 +1032,9 @@
               qSnap.forEach(d => {
                 const q = d.data();
                 const learningFocus = q.learningFocus || q.foco_aprendizagem || '';
-                const difficultyLevel = q.difficultyLevel || q.nivel_dificuldade || (learningFocus === 'fundamentos'
+                const difficultyLevel = q.difficultyLevel || q.nivel_dificuldade || (learningFocus === 'material_base'
                   ? 'iniciante'
-                  : (learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
+                  : (learningFocus === 'fundamentos' ? 'iniciante' : (learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado')));
                 cloudQ.push({
                   ...q,
                   question: q.question || q.pergunta || '',
@@ -4874,9 +4874,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           });
       }
       const selected = [];
-      const focusForIndex = index => index < Math.ceil(count * 0.4)
-        ? 'fundamentos'
-        : (index < Math.ceil(count * 0.75) ? 'mecanismo_consequencia' : 'aplicacao_clinica');
 
       for (const sentence of candidates) {
         if (selected.length >= count) break;
@@ -4887,7 +4884,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const concept = sentence.replace(/^[^A-Za-zÀ-ÿ0-9]*/, '').split(/[,:;–—-]/)[0].trim();
         if (concept.length < 12) continue;
         selected.push({
-          foco_aprendizagem: focusForIndex(selected.length),
           conceito_alvo: concept.slice(0, 120),
           evidencia_fonte: sentence,
           objetivo: 'Cobrar compreensão de um conceito explicitamente presente na fonte.'
@@ -4926,20 +4922,18 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return source.slice(Math.max(0, position - 700), Math.min(source.length, position + String(evidence).length + 1_500));
     }
 
-    function applyLearningFocusToStudyItem(item, learningFocus) {
-      const focus = learningFocus || item.learningFocus || 'fundamentos';
-      const difficultyLevel = focus === 'fundamentos' ? 'iniciante'
-        : (focus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado');
-      const cognitiveDomain = focus === 'fundamentos' ? 'conceitual'
-        : (focus === 'mecanismo_consequencia' ? 'mecanismo' : 'aplicacao');
+    function applyMaterialBasedStudyItem(item, requestedDifficulty) {
+      const difficultyLevel = ['iniciante', 'intermediario', 'avancado'].includes(requestedDifficulty)
+        ? requestedDifficulty
+        : 'iniciante';
       return {
         ...item,
-        learningFocus: focus,
+        learningFocus: 'material_base',
         difficultyLevel,
         cognitiveLevel: difficultyLevel,
         cognitive_level: difficultyLevel,
-        cognitiveDomain,
-        cognitive_domain: cognitiveDomain
+        cognitiveDomain: 'compreensao',
+        cognitive_domain: 'compreensao'
       };
     }
 
@@ -4958,20 +4952,19 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
       const previousQuestions = (config.acceptedStudyItems || []).map(item => item.question || item.pergunta || '').filter(Boolean);
-      const learningFocus = config.forcedLearningFocus || 'fundamentos';
-      const difficultyLevel = learningFocus === 'fundamentos' ? 'iniciante'
-        : (learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado');
-      const cognitiveDomain = learningFocus === 'fundamentos' ? 'conceitual'
-        : (learningFocus === 'mecanismo_consequencia' ? 'mecanismo' : 'aplicacao');
+      const difficultyLevel = ['iniciante', 'intermediario', 'avancado'].includes(config.difficulty)
+        ? config.difficulty
+        : 'iniciante';
+      const cognitiveDomain = 'compreensao';
       try {
-        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, learningFocus, previousCount: previousQuestions.length });
+        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, difficultyLevel, previousCount: previousQuestions.length });
         const response = await fetch('/api/quizzes/gerar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             materialText,
             quantidade: count,
-            learningFocus,
+            difficulty: difficultyLevel,
             previousQuestions
           })
         });
@@ -4989,11 +4982,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           pergunta: sharedStem,
           subject: metadata.subjectName || item.subject || '',
           slideName: metadata.materialName || item.slideName || '',
-          topic: item.topic || item.learningFocus || 'Conceito do material',
-          disease: item.disease || item.learningFocus || 'Conceito do material',
+          topic: item.topic || 'Conceito do material',
+          disease: item.disease || 'Conceito do material',
           flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
           flashcard: { ...(item.flashcard || {}), front: sharedStem },
-          learningFocus,
+          learningFocus: 'material_base',
           difficultyLevel,
           cognitiveLevel: difficultyLevel,
           cognitiveDomain,
@@ -5003,7 +4996,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
           };
         }).filter(Boolean);
-        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, learningFocus, difficultyLevel, imagesRequested: items.filter(item => item.requer_imagem).length });
+        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, difficultyLevel, imagesRequested: items.filter(item => item.requer_imagem).length });
         return items;
       } catch (error) {
         logQuizGenerationDebug('backend_generation_exception', { message: error.message });
@@ -5298,10 +5291,7 @@ ${cleanText}
       // verificação de duplicidade mesmo nesse formato de extração.
       if (!blueprint && hasUsableStudyContent(materialText)) {
         const evidence = String(materialText).replace(/\s+/g, ' ').trim().slice(0, 2_400);
-        blueprint = Array.from({ length: total }, (_, index) => ({
-          foco_aprendizagem: index < Math.ceil(total * 0.4)
-            ? 'fundamentos'
-            : (index < Math.ceil(total * 0.75) ? 'mecanismo_consequencia' : 'aplicacao_clinica'),
+        blueprint = Array.from({ length: total }, () => ({
           conceito_alvo: inferTopicFromStudyContent(evidence, metadata.subjectName),
           evidencia_fonte: evidence,
           objetivo: 'Cobrar compreensão de conteúdo extraído em bloco único.'
@@ -5312,19 +5302,9 @@ ${cleanText}
         logQuizGenerationDebug('blueprint_unavailable', { materialChars: String(materialText || '').length, requestedItems: total });
         return accepted;
       }
-      const requestedDifficulty = config.difficulty || 'balanced';
-      const focusForPosition = (position) => {
-        if (requestedDifficulty === 'iniciante') return 'fundamentos';
-        if (requestedDifficulty === 'intermediario') return 'mecanismo_consequencia';
-        if (requestedDifficulty === 'avancado') return 'aplicacao_clinica';
-        return position < Math.ceil(total * 0.4)
-          ? 'fundamentos'
-          : (position < Math.ceil(total * 0.75) ? 'mecanismo_consequencia' : 'aplicacao_clinica');
-      };
       setStudyGenerationProgress({ current: 0, total, detail: 'Selecionando conceitos distintos no material…' });
       try {
         for (let position = 0; position < total; position++) {
-          const forcedLearningFocus = focusForPosition(position);
           const plan = blueprint[position];
           setStudyGenerationProgress({
             current: position + 1,
@@ -5335,12 +5315,11 @@ ${cleanText}
           });
           const generated = await generateQuestionsWithGemini(buildQuestionContext(materialText, plan.evidencia_fonte), metadata, {
             ...config,
-            acceptedStudyItems: [...existingItems, ...accepted],
-            forcedLearningFocus
+            acceptedStudyItems: [...existingItems, ...accepted]
           }, 1);
           const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
           if (unique.length > 0) {
-            const acceptedItem = applyLearningFocusToStudyItem(unique[0], forcedLearningFocus);
+            const acceptedItem = applyMaterialBasedStudyItem(unique[0], config.difficulty);
             accepted.push(acceptedItem);
             logQuizGenerationDebug('sequential_item_accepted', { position: position + 1, total, model: acceptedItem.generatorModel || 'desconhecido', concept: acceptedItem.topic || '', difficultyLevel: acceptedItem.difficultyLevel });
           } else {
@@ -9867,12 +9846,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function getSrsFilteredList(baseList) {
       const list = baseList || getFilteredQuestions();
       const selected = srsQueueFilter === 'all' ? list : list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter);
-      const focusOrder = { fundamentos: 0, mecanismo_consequencia: 1, aplicacao_clinica: 2 };
       return selected.slice().sort((a, b) => {
-        if (srsQueueFilter === 'new') {
-          const focusDiff = (focusOrder[a.learningFocus] ?? 0) - (focusOrder[b.learningFocus] ?? 0);
-          if (focusDiff) return focusDiff;
-        }
         const aDate = a.srs?.dueDate || a.srs?.newScheduledDate || a.createdAt || '';
         const bDate = b.srs?.dueDate || b.srs?.newScheduledDate || b.createdAt || '';
         return String(aDate).localeCompare(String(bDate));
@@ -9882,14 +9856,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function renderLearningGapPanel(baseList) {
       const panel = document.getElementById('learningGapPanel');
       if (!panel) return;
-      const focusDefinitions = [
-        ['fundamentos', 'Fundamentos'],
-        ['mecanismo_consequencia', 'Mecanismo e consequência'],
-        ['aplicacao_clinica', 'Aplicação clínica']
-      ];
+      const focusDefinitions = [['material_base', 'Conteúdo do material']];
       const dueNow = (baseList || []).filter(item => getFlashcardQueueKey(item) === 'due').length;
       panel.innerHTML = `<div style="font-size: 11px; font-weight: 800; color: var(--text-primary); margin-bottom: 7px;">🧭 Mapa de aprendizagem da matéria <span style="color: var(--text-muted); font-weight: 600;">• ${dueNow} revisão(ões) pendente(s) hoje</span></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px;">${focusDefinitions.map(([key, label]) => {
-        const items = (baseList || []).filter(item => (item.learningFocus || 'fundamentos') === key);
+        const items = (baseList || []).filter(item => (item.learningFocus || 'material_base') === key);
         const attempts = items.reduce((sum, item) => sum + (item.quizStats?.attempts || 0), 0);
         const correct = items.reduce((sum, item) => sum + (item.quizStats?.correct || 0), 0);
         const lapses = items.reduce((sum, item) => sum + (item.srs?.lapses || 0), 0);
@@ -9935,13 +9905,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (/m[úu]sculo|muscular/.test(question)) return 'Função musculoesquelética';
 
       const subject = clean(item.subject || '').replace(/^[A-Z]+\d+\s*[-:]?\s*/i, '');
-      const focus = item.learningFocus === 'fundamentos' ? 'Fundamentos em revisão'
-        : (item.learningFocus === 'mecanismo_consequencia' ? 'Mecanismo em revisão' : 'Aplicação em revisão');
-      return subject ? `${focus}: ${subject.slice(0, 42)}` : focus;
+      const fallback = 'Tema em revisão';
+      return subject ? `${fallback}: ${subject.slice(0, 42)}` : fallback;
     }
 
     function getFlashcardDifficultyLabel(item) {
-      const level = item.difficultyLevel || (item.learningFocus === 'fundamentos' ? 'iniciante'
+      const level = item.difficultyLevel || (item.learningFocus === 'material_base' || item.learningFocus === 'fundamentos'
+        ? 'iniciante'
         : (item.learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
       if (level === 'iniciante') return 'Iniciante';
       if (level === 'intermediario') return 'Intermediário';
@@ -10704,8 +10674,8 @@ Retorne EXCLUSIVAMENTE um JSON:
         const areaLabel = item.areaLabel || 'Clínica Médica';
 
         const styleLabel = item.examStyle === 'enare' ? 'ENARE / FGV' : (item.examStyle === 'enamed' ? 'ENAMED / MEC' : 'Taxonomia Bloom');
-        const resolvedDifficulty = item.difficultyLevel || (item.learningFocus === 'fundamentos' ? 'iniciante' : (item.learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
-        const diffLabel = resolvedDifficulty === 'iniciante' ? 'Iniciante (Conceito)' : (resolvedDifficulty === 'intermediario' ? 'Intermediário (Mecanismo)' : 'Avançado (Caso Clínico)');
+        const resolvedDifficulty = item.difficultyLevel || (item.learningFocus === 'material_base' || item.learningFocus === 'fundamentos' ? 'iniciante' : (item.learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
+        const diffLabel = resolvedDifficulty === 'iniciante' ? 'Iniciante' : (resolvedDifficulty === 'intermediario' ? 'Intermediário' : 'Avançado');
 
         const tutorChoice = quizTutorChoices[item.id];
         const isAnsweredInTutor = typeof tutorChoice === 'number';
