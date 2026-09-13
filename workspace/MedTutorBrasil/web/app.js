@@ -16332,41 +16332,99 @@ ${rawText}`;
       return -1;
     }
 
-    function calculatePedagogicalScore(material, subjectContext) {
-      const fileName = material.name || material.originalFileName || '';
-      const disease = material.disease || '';
-      const topic = material.topic || '';
-      const desc = material.desc || '';
-      const folderPath = material.folderPath || '';
-      const textSample = (material.text || material.readingDocText || '').slice(0, 1500);
+    // O título e o índice descritivo são sinais mais confiáveis do objetivo de uma aula
+    // que uma palavra isolada perdida em um PDF clínico extenso. Este perfil permite
+    // sequenciar a matéria a partir do material salvo, sem depender da ordem de upload.
+    const PEDAGOGICAL_PHASE_EVIDENCE = {
+      1: /\b(anatom|morfolog|histolog|embriolog|citolog|biologia\s+celular|tecido|estrutura|camadas?|topografia|neuroanatom|osteolog|miolog)\w*/gi,
+      2: /\b(fisiolog|homeostas|fun[cç][aã]o\s+normal|biof[ií]sic|transporte|receptor|sinapse|potencial\s+de\s+a[cç][aã]o|ventila[cç][aã]o|perfus[aã]o|filtra[cç][aã]o)\w*/gi,
+      3: /\b(imunolog|inflama[cç][aã]o|resposta\s+imune|citocin|anticorp|linf[oó]cit|microbiolog|patologia\s+geral|necrose|apoptose|agress[aã]o)\w*/gi,
+      4: /\b(semiolog|proped[eê]ut|anamnese|exame\s+f[ií]sico|inspe[cç][aã]o|palpa[cç][aã]o|ausculta|percuss[aã]o|sinais?\s+e\s+sintomas?|les[oõ]es?\s+elementares?)\w*/gi,
+      5: /\b(fisiopatolog|doen[cç]a|s[ií]ndrome|etiologia|causa|manifesta[cç][aã]o|complica[cç][aã]o|consequ[eê]ncia|preval[eê]ncia)\w*/gi,
+      6: /\b(diagn[oó]stic|exames?\s+complementares?|laborat[oó]rio|tomografia|resson[âa]ncia|radiografia|ultrassom|ecg|ecocardi|bi[oó]psia|diagn[oó]stico\s+diferencial|algoritmo)\w*/gi,
+      7: /\b(tratamento|terap[êe]utic|f[aá]rmaco|medicamento|posologia|prescri[cç][aã]o|antibi[oó]tico|corticoide|diretriz|protocolo\s+terap[êe]utico)\w*/gi,
+      8: /\b(caso\s+cl[ií]nico|vinheta|emerg[eê]ncia|urg[eê]ncia|pronto\s+socorro|uti|enare|revalida|resid[eê]ncia|conduta\s+imediata|choque|atls|acls)\w*/gi
+    };
 
-      const combinedText = `${fileName} ${disease} ${topic} ${desc} ${folderPath} ${textSample}`;
+    function getMaterialPedagogicalText(material) {
+      const index = material.descriptiveIndex || {};
+      const sections = Array.isArray(index.sections) ? index.sections.map(section => `${section.title || ''} ${section.description || ''}`).join(' ') : '';
+      const concepts = Array.isArray(index.keyConcepts) ? index.keyConcepts.join(' ') : '';
+      const title = `${material.name || material.originalFileName || ''} ${material.topic || ''} ${material.disease || ''}`;
+      const body = (material.text || material.readingDocText || '').slice(0, 12000);
+      return { title, full: `${title} ${material.desc || ''} ${material.folderPath || ''} ${concepts} ${sections} ${body}` };
+    }
+
+    function countPedagogicalEvidence(text, expression) {
+      if (!text || !expression) return 0;
+      const flags = expression.flags.includes('g') ? expression.flags : `${expression.flags}g`;
+      const matches = text.match(new RegExp(expression.source, flags));
+      return matches ? matches.length : 0;
+    }
+
+    function buildMaterialPedagogicalProfile(material, subjectContext) {
+      const { title, full } = getMaterialPedagogicalText(material);
       const sizeMB = material.sizeMB || (material.file ? material.file.size / (1024 * 1024) : 0);
       const isBook = material.isBook || material.type === 'book' || sizeMB > 50;
+      const normalizedTitle = title.toLowerCase();
+      const phaseEvidence = {};
 
-      const phaseDef = classifyPedagogicalPhase(combinedText, sizeMB, isBook);
-      const explicitNum = extractExplicitClassNumber(fileName);
-      const syllabusIndex = findSyllabusTopicIndex(combinedText, subjectContext || material.subject);
-
-      // Ponderação matemática do escore
-      // Phase 1: 1000-1999 | Phase 2: 2000-2999 | ... | Phase 8: 8000-8999 | Phase 9: 9000+
-      let score = phaseDef.phase * 1000;
-      if (syllabusIndex >= 0) {
-        score += syllabusIndex * 40;
+      for (let phase = 1; phase <= 8; phase++) {
+        // Título e índice recebem peso maior: são a intenção pedagógica da aula.
+        phaseEvidence[phase] = countPedagogicalEvidence(full, PEDAGOGICAL_PHASE_EVIDENCE[phase])
+          + (countPedagogicalEvidence(normalizedTitle, PEDAGOGICAL_PHASE_EVIDENCE[phase]) * 4);
       }
-      if (explicitNum > 0) {
-        score += explicitNum * 5;
+
+      let phase = 5;
+      if (isBook || /\b(tratado|livro[\s_-]*texto|manual\s+completo|harrison|cecil|guyton|robbins|azulay)\b/i.test(normalizedTitle)) {
+        phase = 9;
       } else {
-        score += 25;
+        phase = Object.keys(phaseEvidence).reduce((best, candidate) =>
+          phaseEvidence[candidate] > phaseEvidence[best] ? Number(candidate) : best, 5);
+        // Sem evidência suficiente: mantém a classificação legada, mas não deixa uma
+        // única menção clínica em aula básica determinar o resultado.
+        if ((phaseEvidence[phase] || 0) < 2) {
+          phase = classifyPedagogicalPhase(`${title} ${(material.descriptiveIndex?.summaryText || '')}`, sizeMB, isBook).phase;
+        }
       }
+
+      const explicitClassNumber = extractExplicitClassNumber(material.name || material.originalFileName || '');
+      const syllabusIndex = findSyllabusTopicIndex(full, subjectContext || material.subject);
+      const startsWithFoundation = /\b(introdu[cç][aã]o|vis[aã]o\s+geral|fundamentos?|bases?|conceitos?\s+b[aá]sicos?|parte\s+1|aula\s+1)\b/i.test(normalizedTitle);
+      const isContinuation = /\b(continua[cç][aã]o|aprofundamento|avan[cç]ado|parte\s+[2-9]|revis[aã]o|casos?)\b/i.test(normalizedTitle);
+      const phaseDef = PEDAGOGICAL_PHASES[phase];
+
+      return {
+        phase,
+        phaseDef,
+        phaseEvidence,
+        explicitClassNumber,
+        syllabusIndex,
+        startsWithFoundation,
+        isContinuation,
+        concepts: (material.descriptiveIndex?.keyConcepts || []).slice(0, 6),
+        confidence: Math.min(100, (phaseEvidence[phase] || 0) * 12)
+      };
+    }
+
+    function calculatePedagogicalScore(material, subjectContext) {
+      const profile = buildMaterialPedagogicalProfile(material, subjectContext);
+      const { phaseDef, explicitClassNumber, syllabusIndex } = profile;
+      // Mantém um escore estável para integrações legadas; a ordenação final usa
+      // também os critérios do perfil, evitando que o nome do arquivo prevaleça.
+      let score = phaseDef.phase * 10000;
+      score += syllabusIndex >= 0 ? syllabusIndex * 100 : 50;
+      score += explicitClassNumber > 0 ? explicitClassNumber : 50;
+      score += profile.startsWithFoundation ? -20 : (profile.isContinuation ? 20 : 0);
 
       material.pedagogicalPhase = phaseDef.phase;
       material.pedagogicalPhaseName = phaseDef.name;
       material.pedagogicalIcon = phaseDef.icon;
-      material.pedagogicalRationale = phaseDef.rationale;
+      material.pedagogicalRationale = `${phaseDef.rationale} ${profile.syllabusIndex >= 0 ? 'A posição também respeita o tópico correspondente na ementa.' : 'A posição foi inferida pelo título, índice e conceitos do próprio material.'}`;
       material.pedagogicalScore = score;
+      material.pedagogicalProfile = profile;
       if (!material.sequencingEngine) {
-        material.sequencingEngine = 'Motor Local (Free Tier / Custo Zero)';
+        material.sequencingEngine = 'Motor didático local por conteúdo salvo';
       }
 
       return score;
@@ -16386,7 +16444,23 @@ ${rawText}`;
       const copy = materialsList.slice();
       copy.forEach(m => calculatePedagogicalScore(m, subjectContext));
 
-      copy.sort((a, b) => (a.pedagogicalScore || 0) - (b.pedagogicalScore || 0));
+      copy.sort((a, b) => {
+        const pa = a.pedagogicalProfile;
+        const pb = b.pedagogicalProfile;
+        if (pa.phase !== pb.phase) return pa.phase - pb.phase;
+        // Dentro da mesma etapa, a ementa explícita organiza o encadeamento; na
+        // ausência dela, usa-se a numeração da aula e por fim a prontidão didática.
+        if (pa.syllabusIndex >= 0 && pb.syllabusIndex >= 0 && pa.syllabusIndex !== pb.syllabusIndex) {
+          return pa.syllabusIndex - pb.syllabusIndex;
+        }
+        if (pa.explicitClassNumber && pb.explicitClassNumber && pa.explicitClassNumber !== pb.explicitClassNumber) {
+          return pa.explicitClassNumber - pb.explicitClassNumber;
+        }
+        if (pa.startsWithFoundation !== pb.startsWithFoundation) return pa.startsWithFoundation ? -1 : 1;
+        if (pa.isContinuation !== pb.isContinuation) return pa.isContinuation ? 1 : -1;
+        return (a.pedagogicalScore || 0) - (b.pedagogicalScore || 0)
+          || String(a.name || a.originalFileName || '').localeCompare(String(b.name || b.originalFileName || ''), 'pt-BR');
+      });
 
       copy.forEach((m, idx) => {
         m.learningOrder = idx + 1;
