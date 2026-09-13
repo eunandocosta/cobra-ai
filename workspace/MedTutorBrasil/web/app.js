@@ -1058,6 +1058,9 @@
           }
         }
 
+        // Reaplica a última tela e matéria depois de carregar IndexedDB/Firestore.
+        if (typeof restoreStudyNavigationState === 'function') restoreStudyNavigationState();
+
         // Atualiza a renderização de todas as telas
         if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
         if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
@@ -1251,13 +1254,15 @@
       }
     };
 
-    function navigateTab(tabId, btn) {
+    function navigateTab(tabId, btn, options = {}) {
+      const targetTab = document.getElementById('tab-' + tabId);
+      if (!targetTab) return;
       currentTab = tabId;
       document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
       document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
 
-      document.getElementById('tab-' + tabId).classList.add('active');
+      targetTab.classList.add('active');
       document.getElementById('currentViewTitle').textContent = viewTitles[tabId];
 
       if (btn) btn.classList.add('active');
@@ -1269,7 +1274,7 @@
       }
       if (tabId === 'flashcards' && typeof renderSharedStudyItems === 'function') {
         // A sessão começa pelo que vence primeiro; sem pendências, libera os inéditos de hoje.
-        const queueCounts = typeof getSrsQueueCounts === 'function' ? getSrsQueueCounts(getFilteredQuestions()) : null;
+        const queueCounts = !options.preserveStudyContext && typeof getSrsQueueCounts === 'function' ? getSrsQueueCounts(getFilteredQuestions()) : null;
         if (queueCounts) {
           srsQueueFilter = queueCounts.due > 0 ? 'due'
             : (queueCounts.new > 0 ? 'new' : (queueCounts.tomorrow > 0 ? 'tomorrow' : 'upcoming'));
@@ -1277,6 +1282,7 @@
         }
         renderSharedStudyItems();
       }
+      if (!options.skipNavigationCache && typeof saveStudyNavigationState === 'function') saveStudyNavigationState();
     }
 
     function openCurrentTabHelp() {
@@ -5438,6 +5444,7 @@ ${cleanText}
       currentCardIndex = 0;
       updateSubjectFilterMenus();
       renderSharedStudyItems();
+      saveStudyNavigationState();
     }
 
     function openSubjectInTab(subjectName, tabId) {
@@ -5510,6 +5517,48 @@ ${cleanText}
 
     var currentStudyPeriodFilter = 'all';
     var pendingChangeMaterialContext = { materialName: '', currentSubject: '' };
+    const STUDY_NAVIGATION_STORAGE_KEY = 'medtutor_study_navigation_v1';
+
+    function saveStudyNavigationState() {
+      try {
+        localStorage.setItem(STUDY_NAVIGATION_STORAGE_KEY, JSON.stringify({
+          tabId: currentTab,
+          subject: currentStudySubject,
+          period: currentStudyPeriodFilter,
+          slide: currentQuizSlideFilter,
+          disease: currentDiseaseFilter,
+          queue: srsQueueFilter,
+          cardIndex: currentCardIndex,
+          savedAt: new Date().toISOString()
+        }));
+      } catch (error) {
+        console.warn('[Navegação] Não foi possível salvar o último contexto de estudo.', error);
+      }
+    }
+
+    function restoreStudyNavigationState() {
+      let saved;
+      try {
+        saved = JSON.parse(localStorage.getItem(STUDY_NAVIGATION_STORAGE_KEY) || 'null');
+      } catch (error) {
+        return;
+      }
+      if (!saved || typeof saved !== 'object') return;
+
+      const validTabs = new Set(['chat', 'flashcards', 'quizzes', 'curriculum', 'sce']);
+      if (saved.subject) currentStudySubject = saved.subject;
+      if (saved.period) currentStudyPeriodFilter = saved.period;
+      if (saved.slide) currentQuizSlideFilter = saved.slide;
+      if (saved.disease) currentDiseaseFilter = saved.disease;
+      if (['new', 'due', 'tomorrow', 'upcoming', 'all'].includes(saved.queue)) srsQueueFilter = saved.queue;
+      if (Number.isInteger(saved.cardIndex) && saved.cardIndex >= 0) currentCardIndex = saved.cardIndex;
+
+      if (validTabs.has(saved.tabId)) {
+        navigateTab(saved.tabId, null, { preserveStudyContext: true, skipNavigationCache: true });
+      }
+      if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
+      if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+    }
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -5643,6 +5692,7 @@ ${cleanText}
 
       renderSlideSelectors();
       renderSharedStudyItems();
+      saveStudyNavigationState();
     }
 
     function handleDisciplineSelectChange(subjectVal) {
@@ -5661,6 +5711,7 @@ ${cleanText}
       renderSlideSelectors();
       renderSharedStudyItems();
       updateSubjectFilterMenus();
+      saveStudyNavigationState();
     }
 
     function renderSlideSelectors() {
@@ -5824,6 +5875,7 @@ ${cleanText}
       if (fcSelect && fcSelect.value !== slideName) fcSelect.value = slideName;
 
       renderSharedStudyItems();
+      saveStudyNavigationState();
     }
 
     function clearSlideFilter() {
@@ -9713,6 +9765,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       srsQueueFilter = allowedFilters.has(filter) ? filter : 'new';
       currentCardIndex = 0;
       updateCardDisplay();
+      saveStudyNavigationState();
     }
 
     function confirmGenerateStudyCount() {
@@ -10150,6 +10203,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const step = Number(direction) < 0 ? -1 : 1;
       currentCardIndex = (currentCardIndex + step + list.length) % list.length;
       updateCardDisplay();
+      saveStudyNavigationState();
     }
 
     var activeQuestionDiscussion = null;
@@ -22618,6 +22672,7 @@ ${textSample}
     updateGeminiKeyBadge();
     setupMobileChatDrawer();
     loadDoubtsNotebook();
+    restoreStudyNavigationState();
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)
     if (typeof MedTutorAuthService !== 'undefined') {
