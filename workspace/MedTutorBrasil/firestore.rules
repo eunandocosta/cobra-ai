@@ -173,6 +173,16 @@ service cloud.firestore {
         allow create: if isOwner(userId) && isValidStudyMaterial(request.resource.data);
         allow update: if isOwner(userId) && isValidStudyMaterial(request.resource.data);
         allow delete: if isOwner(userId);
+
+        // O Markdown extenso é fragmentado para não ultrapassar o limite de 1 MiB
+        // de um documento Firestore. Continua isolado pelo mesmo UID do aluno.
+        match /conteudo_chunks/{chunkId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) &&
+            request.resource.data.index is int && request.resource.data.index >= 0 &&
+            request.resource.data.texto is string && request.resource.data.texto.size() <= 160000;
+          allow delete: if isOwner(userId);
+        }
       }
 
       // 4. Banco Unificado de Questões (Flashcards SM-2 e Quizzes)

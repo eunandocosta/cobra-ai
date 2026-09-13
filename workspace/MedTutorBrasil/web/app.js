@@ -550,6 +550,51 @@
       };
     }
 
+    const FIRESTORE_TEXT_CHUNK_SIZE = 160000;
+
+    function splitFirestoreText(value) {
+      const text = String(value || '');
+      const chunks = [];
+      for (let start = 0; start < text.length; start += FIRESTORE_TEXT_CHUNK_SIZE) {
+        chunks.push(text.slice(start, start + FIRESTORE_TEXT_CHUNK_SIZE));
+      }
+      return chunks.length ? chunks : [''];
+    }
+
+    function compactMaterialForFirestore(material, docId, markdown) {
+      const report = material.academicReport || material.relatorio_academico || null;
+      const safeImages = (Array.isArray(material.clinicalImages) ? material.clinicalImages : []).slice(0, 30).map(image => ({
+        title: image?.title || '', source: image?.source || '', imageUrl: /^https?:\/\//.test(image?.imageUrl || '') ? image.imageUrl : ''
+      }));
+      return {
+        id: docId,
+        nome: String(material.name || material.title || 'Aula Médica').slice(0, 250),
+        originalFileName: String(material.originalFileName || '').slice(0, 250),
+        disciplina: String(material.subject || '').slice(0, 200),
+        materia: String(material.topic || material.name || '').slice(0, 200),
+        doenca: String(material.disease || '').slice(0, 200),
+        // Mantém uma prévia no documento principal e o texto integral nos chunks.
+        conteudo_md: markdown.slice(0, FIRESTORE_TEXT_CHUNK_SIZE),
+        conteudo_armazenamento: 'chunks_v1',
+        conteudo_caracteres: markdown.length,
+        conteudo_chunks: splitFirestoreText(markdown).length,
+        sintese_pedagogica: material.pedagogicalSynthesis || null,
+        tamanho_original_kb: Number(material.compressionStats?.originalKb) || 0,
+        tamanho_otimizado_kb: Number(material.compressionStats?.optimizedKb) || 0,
+        percentual_reducao: Number(material.compressionStats?.reductionPercent) || 0,
+        figuras_clinicas: safeImages,
+        descriptiveIndex: material.descriptiveIndex || null,
+        // Relatórios extensos não podem ficar embutidos no mesmo documento de 1 MiB.
+        relatorio_academico: report ? {
+          titulo: String(report.title || report.titulo || 'Relatório Acadêmico').slice(0, 250),
+          data_geracao: report.createdAt || report.data_geracao || null,
+          sincronizado_localmente: true
+        } : null,
+        criadoEm: material.createdAt || new Date().toISOString(),
+        atualizadoEm: new Date().toISOString()
+      };
+    }
+
     const MedTutorFirebaseService = {
       getUserId() {
         return (MedTutorAuthService.currentUser && MedTutorAuthService.currentUser.uid) || 'aluno_medtutor_local';
@@ -617,6 +662,32 @@
         }
       },
 
+      hasAuthenticatedCloudSession(uid) {
+        return !!(firestoreDb && isFirebaseCloudActive && firebaseAuth?.currentUser?.uid === uid);
+      },
+
+      async writeMaterialTextChunks(docRef, markdown) {
+        const chunks = splitFirestoreText(markdown);
+        const chunkCollection = docRef.collection('conteudo_chunks');
+        for (let start = 0; start < chunks.length; start += 400) {
+          const batch = firestoreDb.batch();
+          chunks.slice(start, start + 400).forEach((text, offset) => {
+            const index = start + offset;
+            batch.set(chunkCollection.doc(String(index).padStart(5, '0')), {
+              index,
+              texto: text,
+              atualizadoEm: new Date().toISOString()
+            });
+          });
+          await batch.commit();
+        }
+      },
+
+      async readMaterialTextChunks(docRef, expectedChunks) {
+        const snapshot = await docRef.collection('conteudo_chunks').orderBy('index').limit(expectedChunks || 1000).get();
+        return snapshot.docs.map(doc => String(doc.data()?.texto || '')).join('');
+      },
+
       // Salva os Materiais de Estudo em users/{userId}/materiais_estudo/{materialId}
       async saveAllMaterials(materialsArray) {
         if (!Array.isArray(materialsArray)) return;
@@ -625,37 +696,25 @@
         // 1. Salva no IndexedDB (Suporta megabytes de Markdown e dados sem erro de cota)
         await MedTutorLocalDB.set('materials', uid, materialsArray);
 
-        // 2. Cloud Firestore
-        if (firestoreDb && isFirebaseCloudActive) {
-          try {
-            const batch = firestoreDb.batch();
-            const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
-            materialsArray.forEach(mat => {
-              const docId = mat.id || ('mat_' + Math.random().toString(36).substring(2, 9));
-              const docRef = colRef.doc(docId);
-              batch.set(docRef, {
-                id: docId,
-                nome: mat.name || mat.title || 'Aula Médica',
-                originalFileName: mat.originalFileName || '',
-                disciplina: mat.subject || '',
-                materia: mat.topic || mat.name || '',
-                doenca: mat.disease || '',
-                conteudo_md: mat.markdownText || mat.text || '',
-                sintese_pedagogica: mat.pedagogicalSynthesis || null,
-                tamanho_original_kb: mat.compressionStats?.originalKb || 0,
-                tamanho_otimizado_kb: mat.compressionStats?.optimizedKb || 0,
-                percentual_reducao: mat.compressionStats?.reductionPercent || 0,
-                figuras_clinicas: mat.clinicalImages || [],
-                descriptiveIndex: mat.descriptiveIndex || null,
-                relatorio_academico: mat.academicReport || mat.relatorio_academico || null,
-                criadoEm: mat.createdAt || new Date().toISOString(),
-                atualizadoEm: new Date().toISOString()
-              }, { merge: true });
-            });
-            await batch.commit();
-          } catch (e) {
-            console.warn('[Firestore] Erro ao sincronizar materiais de estudo:', e);
+        // 2. Cloud Firestore. O atalho visual antigo podia exibir um perfil sem
+        // haver Firebase Auth real; as regras corretamente recusavam essa escrita.
+        if (!this.hasAuthenticatedCloudSession(uid)) {
+          console.warn('[Firestore] Materiais mantidos no IndexedDB: sessão Firebase autenticada não disponível.', { uid, cloudActive: isFirebaseCloudActive, authenticatedUid: firebaseAuth?.currentUser?.uid || null });
+          return;
+        }
+        try {
+          const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+          for (const mat of materialsArray) {
+            const docId = mat.id || ('mat_' + Math.random().toString(36).substring(2, 9));
+            const markdown = String(mat.markdownText || mat.conteudo_md || mat.text || '');
+            const docRef = colRef.doc(docId);
+            await docRef.set(compactMaterialForFirestore(mat, docId, markdown), { merge: true });
+            await this.writeMaterialTextChunks(docRef, markdown);
           }
+          console.info(`[Firestore] ${materialsArray.length} material(is) sincronizado(s) com conteúdo integral em blocos.`, { uid });
+        } catch (e) {
+          console.error('[Firestore] Erro ao sincronizar materiais de estudo:', e);
+          if (typeof showToast === 'function') showToast(`⚠️ Materiais salvos localmente, mas a nuvem recusou a sincronização: ${e.code || e.message}`);
         }
       },
 
@@ -985,7 +1044,24 @@
             const matsSnap = await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').get();
             if (!matsSnap.empty) {
               const cloudMats = [];
-              matsSnap.forEach(d => cloudMats.push(normalizeMaterial(d.data())));
+              for (const doc of matsSnap.docs) {
+                const material = doc.data();
+                if (material.conteudo_armazenamento === 'chunks_v1') {
+                  try {
+                    const completeText = await this.readMaterialTextChunks(doc.ref, Number(material.conteudo_chunks) || 0);
+                    // Nunca substitui a prévia por uma leitura parcial ou falha.
+                    if (completeText.length >= Number(material.conteudo_caracteres || 0)) {
+                      material.markdownText = completeText;
+                      material.conteudo_md = completeText;
+                    } else {
+                      console.warn('[Firestore] Conteúdo em blocos incompleto; preservando prévia do material.', { id: doc.id, expected: material.conteudo_caracteres, received: completeText.length });
+                    }
+                  } catch (chunkError) {
+                    console.warn('[Firestore] Não foi possível reconstruir o Markdown do material:', doc.id, chunkError);
+                  }
+                }
+                cloudMats.push(normalizeMaterial(material));
+              }
               if (cloudMats.length > 0) {
                 chatDriveMaterials = cloudMats;
                 await MedTutorLocalDB.set('materials', uid, cloudMats);
