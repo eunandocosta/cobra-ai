@@ -33,7 +33,18 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ geminiConfigured: !!process.env.GEMINI_API_KEY });
+  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
+  const supabasePublishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || '').trim();
+  res.json({
+    geminiConfigured: !!process.env.GEMINI_API_KEY,
+    // A chave publicável é própria para o navegador. Chaves service_role e a
+    // senha PostgreSQL nunca são retornadas por esta rota.
+    supabaseStorage: supabaseUrl && supabasePublishableKey ? {
+      url: supabaseUrl,
+      publishableKey: supabasePublishableKey,
+      bucket: String(process.env.SUPABASE_STORAGE_BUCKET || 'materiais-estudo').trim()
+    } : null
+  });
 });
 
 // O Firestore é acessado diretamente pelo navegador. Este endpoint espelha no

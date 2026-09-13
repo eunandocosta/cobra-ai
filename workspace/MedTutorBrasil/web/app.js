@@ -18,7 +18,57 @@
     let firebaseStorage = null;
     let firebaseAuth = null;
     let isFirebaseCloudActive = false;
+    let supabaseStorageClient = null;
+    let supabaseStorageConfig = null;
+    let supabaseStorageInitPromise = null;
     let disciplineQuestionBankCache = {};
+
+    async function getSupabaseStorageClient() {
+      if (supabaseStorageClient && supabaseStorageConfig) return { client: supabaseStorageClient, config: supabaseStorageConfig };
+      if (supabaseStorageInitPromise) return supabaseStorageInitPromise;
+
+      supabaseStorageInitPromise = (async () => {
+        if (!window.supabase?.createClient) throw new Error('Biblioteca do Supabase não foi carregada. Recarregue a página.');
+        const response = await fetch('/api/config', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Configuração do Supabase indisponível (HTTP ${response.status}).`);
+        const config = (await response.json())?.supabaseStorage;
+        if (!config?.url || !config?.publishableKey || !config?.bucket) {
+          throw new Error('Supabase Storage ainda não foi configurado no servidor local.');
+        }
+
+        const client = window.supabase.createClient(config.url, config.publishableKey, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData?.session) {
+          const { error } = await client.auth.signInAnonymously();
+          if (error) throw error;
+          console.info('[Supabase Storage] Sessão anônima segura criada para as imagens deste navegador.');
+        }
+        supabaseStorageClient = client;
+        supabaseStorageConfig = config;
+        console.info(`[Supabase Storage] Pronto no bucket privado "${config.bucket}".`);
+        return { client, config };
+      })();
+
+      try {
+        return await supabaseStorageInitPromise;
+      } finally {
+        supabaseStorageInitPromise = null;
+      }
+    }
+
+    function imageSourceToBlob(imageSource, fallbackMime = 'image/webp') {
+      if (typeof imageSource !== 'string' || !imageSource.startsWith('data:')) return imageSource;
+      const [header, encoded = ''] = imageSource.split(',', 2);
+      const mime = header.match(/^data:([^;,]+)/i)?.[1] || fallbackMime;
+      const bytes = atob(encoded);
+      const buffer = new ArrayBuffer(bytes.length);
+      const view = new Uint8Array(buffer);
+      for (let index = 0; index < bytes.length; index++) view[index] = bytes.charCodeAt(index);
+      return new Blob([buffer], { type: mime });
+    }
 
     function getDisciplineQuestionBankId(subjectName) {
       const normalized = String(subjectName || '')
@@ -1400,7 +1450,8 @@
         }
       },
 
-      // Upload de Imagem Clínica WebP para o Firebase Storage
+      // Upload de imagem do material. Supabase é o provedor principal porque o
+      // bucket Firebase deste projeto ainda não está provisionado.
       async uploadClinicalImage(imageSource, materialId, imgIndex) {
         const uid = this.getUserId();
         const imageMime = typeof imageSource === 'string' && imageSource.startsWith('data:')
@@ -1409,6 +1460,36 @@
         const extension = imageMime.includes('png') ? 'png' : (imageMime.includes('jpeg') ? 'jpg' : 'webp');
         const fileName = `${materialId || 'aula'}_fig_${imgIndex || 0}.${extension}`;
         const storagePath = `usuarios/${uid}/imagens_aulas/${fileName}`;
+
+        // O Supabase usa uma sessão anônima persistida no navegador para obter
+        // a role authenticated. O bucket deve ser privado e as policies limitam
+        // cada arquivo ao dono autenticado pelo próprio Supabase.
+        try {
+          const { client, config } = await getSupabaseStorageClient();
+          const uploadBlob = imageSourceToBlob(imageSource, imageMime);
+          if (!(uploadBlob instanceof Blob)) throw new Error('Formato de imagem inválido para envio ao Supabase.');
+          const { error: uploadError } = await client.storage
+            .from(config.bucket)
+            .upload(storagePath, uploadBlob, { contentType: imageMime, upsert: true, cacheControl: '31536000' });
+          if (uploadError) throw uploadError;
+
+          // O bucket é privado. A URL temporária evita expor as figuras médicas
+          // publicamente; ela é renovável e não usa chave administrativa.
+          const { data: signedData, error: signedError } = await client.storage
+            .from(config.bucket)
+            .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+          if (signedError || !signedData?.signedUrl) throw signedError || new Error('Supabase não retornou URL assinada.');
+          console.info(`[Supabase Storage] Imagem clínica salva em ${config.bucket}/${storagePath}.`);
+          return signedData.signedUrl;
+        } catch (supabaseError) {
+          console.warn('[Supabase Storage] Falha ao persistir imagem; tentando Firebase como contingência:', supabaseError);
+          reportFirestoreSyncIssue('supabase_storage_upload_failed', {
+            code: supabaseError?.code || 'supabase/storage-upload-failed',
+            message: supabaseError?.message || 'Falha desconhecida ao enviar imagem ao Supabase Storage.',
+            uid,
+            authenticatedUid: firebaseAuth?.currentUser?.uid || null
+          });
+        }
 
         // O perfil mostrado na interface não substitui Firebase Auth. As regras
         // de Storage usam request.auth.uid e recusam qualquer UID apenas local.
@@ -1425,18 +1506,7 @@
         if (firebaseStorage && isFirebaseCloudActive) {
           try {
             const storageRef = firebaseStorage.ref(storagePath);
-            let uploadBlob = imageSource;
-            if (typeof imageSource === 'string' && imageSource.startsWith('data:')) {
-              // Converte base64 dataURI para Blob
-              const byteString = atob(imageSource.split(',')[1]);
-              const mimeString = imageSource.split(',')[0].split(':')[1].split(';')[0];
-              const ab = new ArrayBuffer(byteString.length);
-              const ia = new Uint8Array(ab);
-              for (let i = 0; i < byteString.length; i++) {
-                ia[i] = byteString.charCodeAt(i);
-              }
-              uploadBlob = new Blob([ab], { type: mimeString });
-            }
+            const uploadBlob = imageSourceToBlob(imageSource, imageMime);
             const snapshot = await storageRef.put(uploadBlob, { contentType: imageMime });
             const downloadUrl = await snapshot.ref.getDownloadURL();
             console.log(`[Firebase Storage] Imagem clínica salva em ${storagePath} -> ${downloadUrl}`);
@@ -3840,7 +3910,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         });
       }
       if (!uploadedImages.length) {
-        material.imagePersistenceError = `${selectedImages.length} imagem(ns) extraída(s), mas nenhuma recebeu URL persistida no Firebase Storage.`;
+        material.imagePersistenceError = `${selectedImages.length} imagem(ns) extraída(s), mas nenhuma recebeu URL persistida no Supabase Storage nem no Firebase Storage.`;
         console.warn('[Imagens do material]', material.imagePersistenceError);
         return;
       }
@@ -3940,7 +4010,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const uploadStatus = material.imagePersistenceError ? 'parcial' : 'sucesso';
         reportUploadDiagnostic(material, uploadStatus);
         showToast(material.imagePersistenceError
-          ? `⚠️ Gemini analisou ${associations.length} figura(s), mas o Firebase Storage não persistiu as imagens. Veja o terminal.`
+          ? `⚠️ Gemini analisou ${associations.length} figura(s), mas o armazenamento de imagens não persistiu as URLs. Veja o terminal.`
           : (associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.'));
       } catch (error) {
         console.error('[Associação visual] Falha no upload universal:', error);
