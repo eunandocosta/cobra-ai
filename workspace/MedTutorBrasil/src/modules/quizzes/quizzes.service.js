@@ -85,7 +85,10 @@ function sanitizeSharedQuestionStem(value) {
 }
 
 function isSharedQuestionStemValid(stem) {
-  return stem.length >= 18 && !/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem);
+  if (!stem || stem.length < 18) return false;
+  if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem)) return false;
+  if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(stem)) return false;
+  return true;
 }
 
 function buildSafeFlashcardTitle(title, correctAnswer) {
@@ -171,13 +174,14 @@ const SYSTEM_INSTRUCTION = `
 Você cria questões formativas para estudantes de medicina estritamente baseadas no conteúdo enviado.
 
 DIRETRIZES FUNDAMENTAIS:
-1. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
-2. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
-3. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado.
-4. PROIBIDO usar palavras como: "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
-5. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido.
-6. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
-7. COBERTURA ESTRUTURAL DO MARKDOWN: Quando o material for extenso ou estruturado em títulos (#, ##), listas, tabelas comparativas ou critérios diagnósticos, distribua as questões de forma equilibrada por toda a extensão do documento (início, meio e fim). Não concentre as perguntas apenas nas seções iniciais. Explore ativamente relações, classificações e diferenciações descritas nas tabelas e seções conceituais distintas.
+1. FOCO EXCLUSIVAMENTE BIOMÉDICO: A pergunta deve cobrar raciocínio clínico, anatomia, fisiopatologia, semiologia, critérios diagnósticos, condutas ou farmacologia. NUNCA faça meta-perguntas sobre o documento, a aula, a disciplina, o módulo ou o professor (ex.: É EXPRESSAMENTE PROIBIDO perguntar "Qual é o tema principal da aula...", "Na disciplina de...", "De acordo com o material...").
+2. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
+3. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
+4. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado.
+5. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
+6. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
+7. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
+8. COBERTURA ESTRUTURAL DO MARKDOWN: Quando o material for extenso ou estruturado em títulos (#, ##), listas, tabelas comparativas ou critérios diagnósticos, distribua as questões de forma equilibrada por toda a extensão do documento (início, meio e fim). Não concentre as perguntas apenas nas seções iniciais. Explore ativamente relações, classificações e diferenciações descritas nas tabelas e seções conceituais distintas.
 `;
 
 class QuizzesService {

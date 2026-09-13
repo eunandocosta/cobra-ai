@@ -5196,7 +5196,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     function isSharedQuestionStemValid(stem) {
-      return stem.length >= 18 && !/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem);
+      if (!stem || stem.length < 18) return false;
+      if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem)) return false;
+      if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(stem)) return false;
+      return true;
     }
 
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
