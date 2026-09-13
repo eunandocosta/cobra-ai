@@ -2137,7 +2137,19 @@
         });
       }
 
-      // 3. Arquivo PDF: descompressão via PDF.js oficial da Mozilla com preservação precisa de quebras de linha
+      // 3. PowerPoint (.pptx): é um ZIP com o texto de cada lâmina em
+      // ppt/slides/slide*.xml. Sem esta etapa, todo PPTX chegava como 0
+      // caracteres, apesar de conter uma apresentação completa.
+      if (file.name && /\.pptx$/i.test(file.name)) {
+        try {
+          return await extractTextFromPptx(file);
+        } catch (pptxError) {
+          console.warn('[MedTutor PPTX] Falha na extração textual:', pptxError);
+          return '';
+        }
+      }
+
+      // 4. Arquivo PDF: descompressão via PDF.js oficial da Mozilla com preservação precisa de quebras de linha
       if (file.type === 'application/pdf' || (file.name && file.name.toLowerCase().endsWith('.pdf'))) {
         return new Promise(async (resolve) => {
           try {
@@ -3678,6 +3690,65 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         images.push({ id: `pptx-${entry}`, title: name.split('/').pop(), clinicalLabel: 'Imagem extraída do slide', width: dimensions.width, height: dimensions.height, originalSizeKB: Math.round(raw.length / 1024), src: dataUrl });
       }
       return images;
+    }
+
+    // Lê o XML textual das lâminas diretamente do ZIP do PowerPoint no
+    // navegador. O arquivo bruto não é enviado a nenhum serviço nesta etapa.
+    async function extractTextFromPptx(file) {
+      if (typeof file?.arrayBuffer !== 'function') return '';
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      let eocd = -1;
+      for (let index = bytes.length - 22; index >= Math.max(0, bytes.length - 65557); index--) {
+        if (view.getUint32(index, true) === 0x06054b50) { eocd = index; break; }
+      }
+      if (eocd < 0) throw new Error('Estrutura ZIP do PPTX não encontrada.');
+
+      const totalEntries = view.getUint16(eocd + 10, true);
+      let cursor = view.getUint32(eocd + 16, true);
+      const decoder = new TextDecoder('utf-8');
+      const slides = [];
+
+      for (let entry = 0; entry < totalEntries && cursor + 46 <= bytes.length; entry++) {
+        if (view.getUint32(cursor, true) !== 0x02014b50) break;
+        const compression = view.getUint16(cursor + 10, true);
+        const compressedSize = view.getUint32(cursor + 20, true);
+        const nameLength = view.getUint16(cursor + 28, true);
+        const extraLength = view.getUint16(cursor + 30, true);
+        const commentLength = view.getUint16(cursor + 32, true);
+        const localOffset = view.getUint32(cursor + 42, true);
+        const name = decoder.decode(bytes.slice(cursor + 46, cursor + 46 + nameLength));
+        cursor += 46 + nameLength + extraLength + commentLength;
+
+        const slideMatch = name.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
+        if (!slideMatch || localOffset + 30 > bytes.length || view.getUint32(localOffset, true) !== 0x04034b50) continue;
+        const localNameLength = view.getUint16(localOffset + 26, true);
+        const localExtraLength = view.getUint16(localOffset + 28, true);
+        const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+        const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+        let raw = compressed;
+        if (compression === 8 && typeof DecompressionStream !== 'undefined') {
+          const stream = new DecompressionStream('deflate-raw');
+          const writer = stream.writable.getWriter();
+          await writer.write(compressed);
+          await writer.close();
+          raw = new Uint8Array(await new Response(stream.readable).arrayBuffer());
+        } else if (compression !== 0) {
+          continue;
+        }
+
+        const xml = decoder.decode(raw).replace(/<a:br\b[^>]*\/?\s*>/gi, '\n');
+        const textNodes = [...xml.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>/gi)]
+          .map(match => match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"))
+          .filter(Boolean);
+        const slideText = textNodes.join(' ').replace(/\s*\n\s*/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
+        if (slideText) slides.push({ number: Number(slideMatch[1]), text: slideText });
+      }
+
+      return slides.sort((a, b) => a.number - b.number)
+        .map(slide => `## Slide ${slide.number}\n\n${slide.text}`)
+        .join('\n\n')
+        .trim();
     }
 
     async function extractOriginalDocumentImages(file) {
