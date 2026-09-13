@@ -11572,6 +11572,99 @@ Retorne EXCLUSIVAMENTE um JSON:
       return extractDiseaseFromFilename(fName);
     }
 
+    function normalizeCurriculumText(value) {
+      return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+
+    function curriculumTerms(value, genericTerms) {
+      return normalizeCurriculumText(value).split(/[^a-z0-9]+/)
+        .filter(term => term.length >= 4 && !genericTerms.has(term));
+    }
+
+    function hasCurriculumPhrase(text, phrase) {
+      const normalizedPhrase = normalizeCurriculumText(phrase).trim();
+      if (normalizedPhrase.length < 4) return false;
+      return new RegExp(`(^|[^a-z0-9])${normalizedPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9])`, 'i').test(text);
+    }
+
+    function getMaterialAllocationEvidence(fileName, text) {
+      const body = normalizeCurriculumText(text).slice(0, 30000);
+      const header = body.slice(0, 5000);
+      return {
+        fileName: normalizeCurriculumText(fileName),
+        header,
+        body,
+        combined: `${normalizeCurriculumText(fileName)} ${header} ${body}`
+      };
+    }
+
+    function scoreSubjectContentFit(subject, source, genericTerms) {
+      const subjectName = subject.name || '';
+      const topics = Array.isArray(subject.topics) ? subject.topics : [];
+      const subjectContext = `${subjectName} ${subject.description || ''} ${topics.join(' ')}`;
+      const subjectNormalized = normalizeCurriculumText(subjectName);
+      const evidence = [];
+      let score = 0;
+
+      // O cabeçalho de disciplina só vale quando há correspondência específica.
+      if (subjectNormalized.length >= 5 && hasCurriculumPhrase(source.header, subjectNormalized)) {
+        score += 90;
+        evidence.push('cabeçalho da disciplina');
+      }
+
+      const subjectTerms = curriculumTerms(subjectName, genericTerms);
+      const headerHits = subjectTerms.filter(term => hasCurriculumPhrase(source.header, term));
+      const fileHits = subjectTerms.filter(term => hasCurriculumPhrase(source.fileName, term));
+      if (headerHits.length) {
+        score += Math.min(52, headerHits.length * 20);
+        evidence.push(`termos do cabeçalho: ${headerHits.slice(0, 2).join(', ')}`);
+      }
+      if (fileHits.length) {
+        score += Math.min(24, fileHits.length * 12);
+        evidence.push(`tema no arquivo: ${fileHits.slice(0, 2).join(', ')}`);
+      }
+
+      let bestTopicFit = 0;
+      let bestTopicLabel = '';
+      topics.forEach(topic => {
+        const label = String(topic || '');
+        const terms = curriculumTerms(label, genericTerms);
+        if (!terms.length) return;
+        const exactPhrase = label.length >= 7 && hasCurriculumPhrase(source.combined, label);
+        const inHeader = terms.filter(term => hasCurriculumPhrase(source.header, term)).length;
+        const inBody = terms.filter(term => hasCurriculumPhrase(source.body, term)).length;
+        const fit = (exactPhrase ? 48 : 0) + Math.min(30, inHeader * 14) + Math.min(24, inBody * 5);
+        if (fit > bestTopicFit) {
+          bestTopicFit = fit;
+          bestTopicLabel = label;
+        }
+      });
+      if (bestTopicFit) {
+        score += bestTopicFit;
+        evidence.push(`ementa: ${bestTopicLabel.slice(0, 48)}`);
+      }
+
+      const domainRules = [
+        [/\b(neuro|nervoso|encefal|mening|liquor|avc|epilep|cefale)/, /\b(neuro|nervoso|encefal|mening|liquor|avc|epilep|cefale)/],
+        [/\b(dermat|tegument|cutane|pele|psorias|eczema|urticaria)/, /\b(dermat|tegument|cutane|pele|psorias|eczema|urticaria)/],
+        [/\b(cardio|coracao|coronari|arritmi|ecg|valvopatia|miocard)/, /\b(cardio|coracao|coronari|arritmi|ecg|valvopatia|miocard)/],
+        [/\b(pneumo|pulmon|respirator|asma|dpoc|espirometr)/, /\b(pneumo|pulmon|respirator|asma|dpoc|espirometr)/],
+        [/\b(nefro|renal|glomerul|dialise|filtracao)/, /\b(nefro|renal|glomerul|dialise|filtracao)/],
+        [/\b(gastro|hepat|figado|pancrea|intestinal)/, /\b(gastro|hepat|figado|pancrea|intestinal)/],
+        [/\b(pediatr|infancia|neonat|lactente)/, /\b(pediatr|infancia|neonat|lactente)/],
+        [/\b(gineco|obstet|gestac|prenatal|parto)/, /\b(gineco|obstet|gestac|prenatal|parto)/],
+        [/\b(anatom|histolog|embriolog|fisiolog|semiolog|propedeut|farmacolog|patolog)/, /\b(anatom|histolog|embriolog|fisiolog|semiolog|propedeut|farmacolog|patolog)/]
+      ];
+      domainRules.forEach(([subjectPattern, documentPattern]) => {
+        if (subjectPattern.test(normalizeCurriculumText(subjectContext)) && documentPattern.test(source.combined)) {
+          score += 34;
+          evidence.push('domínio médico compatível');
+        }
+      });
+
+      return { score, evidence: Array.from(new Set(evidence)).slice(0, 3) };
+    }
+
     // 6.2 Motor de Inferência e Classificação Semântica Multidimensional
     function classifyMedicalDocumentSemantically(text, fileName, customCurriculum, targetSemester) {
       let disciplines = (customCurriculum && Array.isArray(customCurriculum) && customCurriculum.length > 0)
@@ -11643,6 +11736,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       // Palavras genéricas médicas que não devem pontuar sozinhas
       const GENERIC_MED_WORDS = new Set(['medica', 'médica', 'medico', 'médico', 'clinica', 'clínica', 'geral', 'humana', 'humano', 'integrada', 'integracao', 'integração', 'sistemas', 'estudo', 'saude', 'saúde', 'pratica', 'prática', 'curso', 'departamento', 'disciplina', 'modulo', 'módulo']);
+      const allocationEvidence = getMaterialAllocationEvidence(fName, fText);
 
       // Extração precisa de cabeçalhos institucionais
       let explicitDisciplineHeader = '';
@@ -11661,6 +11755,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       let bestCand = null;
       let highestScore = -1;
+      let runnerUpScore = -1;
       let matchedEvidenceTerms = [];
 
       disciplines.forEach(d => {
@@ -11669,6 +11764,12 @@ Retorne EXCLUSIVAMENTE um JSON:
         const dNameLower = (d.name || '').toLowerCase();
         const dPeriodLower = (d.period || '').toLowerCase();
         const dCycle = d.cycle || 'clinico';
+
+        // Aderência semântica ao conteúdo e à ementa: é deliberadamente mais forte
+        // que coincidências genéricas no nome da matéria ou no nome do arquivo.
+        const contentFit = scoreSubjectContentFit(d, allocationEvidence, GENERIC_MED_WORDS);
+        score += contentFit.score;
+        evidence.push(...contentFit.evidence);
 
         const specificKeywords = dNameLower
           .split(/[\s()/-]+/)
@@ -11783,9 +11884,12 @@ Retorne EXCLUSIVAMENTE um JSON:
         }
 
         if (score > highestScore) {
+          runnerUpScore = highestScore;
           highestScore = score;
           bestCand = d;
           matchedEvidenceTerms = evidence;
+        } else if (score > runnerUpScore) {
+          runnerUpScore = score;
         }
       });
 
@@ -11799,14 +11903,16 @@ Retorne EXCLUSIVAMENTE um JSON:
           fullName: fallbackSubj.fullName,
           confidencePercent: 78,
           justification: 'Alocação contextual alinhada à grade curricular ativa.',
-          diseaseTopic: detectedDisease
+          diseaseTopic: detectedDisease,
+          suggestedTitle: generateSmartMaterialTitle(fName, fText, detectedDisease, fallbackSubj.fullName)
         };
       }
 
-      const confidence = Math.min(98, Math.max(76, 75 + Math.floor(highestScore / 2.5)));
+      const margin = Math.max(0, highestScore - Math.max(0, runnerUpScore));
+      const confidence = Math.min(98, Math.max(58, 58 + Math.floor(highestScore / 5) + Math.min(18, Math.floor(margin / 3))));
       const uniqueEvidence = Array.from(new Set(matchedEvidenceTerms)).slice(0, 3);
       const justification = uniqueEvidence.length > 0
-        ? `Identificados indicadores de ${uniqueEvidence.join(', ')} altamente compatíveis com a ementa oficial.`
+        ? `Alocação baseada em ${uniqueEvidence.join(', ')}; margem de ${margin} ponto(s) sobre a segunda opção curricular.`
         : `Identificados termos conceituais de alta aderência à disciplina na grade médica.`;
 
       return {
@@ -11817,7 +11923,8 @@ Retorne EXCLUSIVAMENTE um JSON:
         fullName: bestCand.fullName,
         confidencePercent: confidence,
         justification: justification,
-        diseaseTopic: detectedDisease
+        diseaseTopic: detectedDisease,
+        suggestedTitle: generateSmartMaterialTitle(fName, fText, detectedDisease, bestCand.fullName)
       };
     }
 
@@ -12098,8 +12205,34 @@ DIRETRIZES CIRÚRGICAS:
       return 'Resumo Clínico e Diretrizes Terapêuticas';
     }
 
+    function refineAcademicMaterialTitle(rawTitle, fileName, text, diseaseTopic, matchedSubject) {
+      const fallbackTopic = extractClinicalTopicFromContent(text || '', fileName || '') || diseaseTopic || '';
+      let title = String(rawTitle || '')
+        .replace(/\.(?:pdf|pptx?|docx?|txt)$/i, '')
+        .replace(/[\^_]+LJ\b/gi, ' • ')
+        .replace(/\s+/g, ' ')
+        .replace(/^(?:material\s+(?:de\s+)?aula|arquivo\s+analisado|documento\s+importado)\s*[:\-–]?\s*/i, '')
+        .replace(/^(?:aula|slide|m[oó]dulo|cap[ií]tulo)\s*\d+\s*[-:–.]?\s*/i, '')
+        .replace(/\s*[-–]\s*(?:vers[aã]o|v\.)?\s*20\d\d.*$/i, '')
+        .replace(/\s*[|]\s*(?:prof\.?|universidade|faculdade).*$/i, '')
+        .trim();
+
+      const isWeak = !title || title.length < 5 || title.length > 115 ||
+        title.split(/[•;|]/).length > 4 ||
+        /^(?:resumo|conte[uú]do|material|documento|aula)$/i.test(title);
+      if (isWeak && fallbackTopic) title = fallbackTopic;
+
+      if (!title && matchedSubject) {
+        title = `${matchedSubject.replace(/^\d+[ºo]?\s*per[ií]odo\s*[-–]\s*/i, '')}: Conteúdo de Estudo`;
+      }
+
+      // Evita rótulos técnicos e preserva um título legível sem entregar respostas.
+      return title ? title.charAt(0).toUpperCase() + title.slice(1) : 'Material de Estudo';
+    }
+
     function generateSmartMaterialTitle(fileName, text, diseaseTopic, matchedSubject) {
-      return analyzeMedicalContentForTitle(fileName, text, diseaseTopic, matchedSubject);
+      const rawTitle = analyzeMedicalContentForTitle(fileName, text, diseaseTopic, matchedSubject);
+      return refineAcademicMaterialTitle(rawTitle, fileName, text, diseaseTopic, matchedSubject);
     }
 
     // 6.2.2 Gerador do Índice Descritivo do Material Analisado
@@ -16773,7 +16906,11 @@ Para cada material, retorne um objeto no JSON com:
 
       const curatedFiles = filesList.map(f => {
         const fileName = f.name || '';
-        const fileDisease = f.disease || extractDiseaseFromFilename(fileName);
+        const fileText = String(f.text || f.extractedText || f.content || '');
+        const semanticAnalysis = fileText.length >= 20
+          ? classifyMedicalDocumentSemantically(fileText, fileName)
+          : null;
+        const fileDisease = semanticAnalysis?.diseaseTopic || f.disease || extractDiseaseFromFilename(fileName);
         const fileTopic = f.topic || '';
         const folderPath = f.folderPath || '';
 
@@ -16824,15 +16961,22 @@ Para cada material, retorne um objeto no JSON com:
           });
         }
 
-        let finalSubject = (bestMatchSubject && highestScore >= 3)
+        let finalSubject = semanticAnalysis?.fullName || ((bestMatchSubject && highestScore >= 3)
           ? bestMatchSubject
-          : (allSubjects.length > 0 ? allSubjects[0].name : (currentScannedFolder?.disciplineKey || 'Clínica Médica'));
+          : (allSubjects.length > 0 ? allSubjects[0].name : (currentScannedFolder?.disciplineKey || 'Clínica Médica')));
+        const finalTitle = semanticAnalysis?.suggestedTitle || generateSmartMaterialTitle(
+          fileName,
+          fileText,
+          fileDisease,
+          finalSubject
+        );
 
         distributionSummary[finalSubject] = (distributionSummary[finalSubject] || 0) + 1;
 
         return {
           id: f.id,
-          name: f.name,
+          name: finalTitle,
+          originalFileName: fileName,
           sizeStr: f.sizeStr,
           type: f.type === 'slide' ? 'slides' : (f.type === 'book' ? 'book' : 'doc'),
           selected: true,
@@ -16841,7 +16985,8 @@ Para cada material, retorne um objeto no JSON com:
           topic: fileTopic || fileDisease,
           folderPath: folderPath,
           subject: finalSubject,
-          matchScore: highestScore
+          matchScore: semanticAnalysis ? semanticAnalysis.confidencePercent : highestScore,
+          allocationJustification: semanticAnalysis?.justification || 'Alocação por compatibilidade entre tema e ementa.'
         };
       });
 
