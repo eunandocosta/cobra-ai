@@ -5276,17 +5276,18 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     function applyMaterialBasedStudyItem(item, requestedDifficulty) {
-      const difficultyLevel = ['iniciante', 'intermediario', 'avancado'].includes(requestedDifficulty)
-        ? requestedDifficulty
-        : 'iniciante';
+      const difficultyLevel = ['iniciante', 'intermediario', 'avancado'].includes(item?.difficultyLevel || item?.cognitiveLevel || item?.nivel_dificuldade)
+        ? (item.difficultyLevel || item.cognitiveLevel || item.nivel_dificuldade)
+        : (['iniciante', 'intermediario', 'avancado'].includes(requestedDifficulty) ? requestedDifficulty : 'iniciante');
+      const domain = difficultyLevel === 'avancado' ? 'aplicacao' : (difficultyLevel === 'intermediario' ? 'analise' : 'compreensao');
       return {
         ...item,
         learningFocus: 'material_base',
         difficultyLevel,
         cognitiveLevel: difficultyLevel,
         cognitive_level: difficultyLevel,
-        cognitiveDomain: 'compreensao',
-        cognitive_domain: 'compreensao'
+        cognitiveDomain: domain,
+        cognitive_domain: domain
       };
     }
 
@@ -5325,19 +5326,18 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const authoredSourceQuestions = Array.isArray(config.sourceQuestions)
         ? config.sourceQuestions
         : extractAuthoredQuestionsFromMaterial(materialText);
-      const difficultyLevel = ['iniciante', 'intermediario', 'avancado'].includes(config.difficulty)
+      const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(config.difficulty)
         ? config.difficulty
-        : 'iniciante';
-      const cognitiveDomain = 'compreensao';
+        : 'balanced';
       try {
-        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, difficultyLevel, previousCount: previousQuestions.length, previousAnswersCount: previousQuestionAnswers.length, authoredQuestionsFound: authoredSourceQuestions.length });
+        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, requestedDifficulty, previousCount: previousQuestions.length, previousAnswersCount: previousQuestionAnswers.length, authoredQuestionsFound: authoredSourceQuestions.length });
         const response = await fetch('/api/quizzes/gerar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             materialText,
             quantidade: count,
-            difficulty: difficultyLevel,
+            difficulty: requestedDifficulty,
             previousQuestions,
             previousQuestionAnswers,
             sourceQuestions: authoredSourceQuestions,
@@ -5353,27 +5353,33 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const items = data.map(item => {
           const sharedStem = sanitizeSharedQuestionStem(item.question || item.pergunta || '');
           if (!isSharedQuestionStemValid(sharedStem)) return null;
+          const itemDiff = ['iniciante', 'intermediario', 'avancado'].includes(item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
+            ? (item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
+            : 'iniciante';
+          const domain = itemDiff === 'avancado' ? 'aplicacao' : (itemDiff === 'intermediario' ? 'analise' : 'compreensao');
           return {
-          ...item,
-          question: sharedStem,
-          pergunta: sharedStem,
-          subject: metadata.subjectName || item.subject || '',
-          slideName: metadata.materialName || item.slideName || '',
-          topic: item.topic || 'Conceito do material',
-          disease: item.disease || 'Conceito do material',
-          flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
-          flashcard: { ...(item.flashcard || {}), front: sharedStem },
-          learningFocus: 'material_base',
-          difficultyLevel,
-          cognitiveLevel: difficultyLevel,
-          cognitiveDomain,
-          reference_answer: item.reference_answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
-          answer: item.answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
-          requer_imagem: /\b(anatom|an[aá]tom|espa[cç]o|mening|nervo|vascul|art[eé]ria|veia|c[oó]rtex|ventr[ií]cul|l[ií]quor|l[ií]quido cefalorraquidiano|radiolog|tomograf|resson|raio.?x|ecg|les[aã]o|histolog)\b/i.test(`${item.question || ''} ${materialText}`),
-          evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
+            ...item,
+            question: sharedStem,
+            pergunta: sharedStem,
+            subject: metadata.subjectName || item.subject || '',
+            slideName: metadata.materialName || item.slideName || '',
+            topic: item.topic || 'Conceito do material',
+            disease: item.disease || 'Conceito do material',
+            flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
+            flashcard: { ...(item.flashcard || {}), front: sharedStem },
+            learningFocus: 'material_base',
+            difficultyLevel: itemDiff,
+            cognitiveLevel: itemDiff,
+            cognitive_level: itemDiff,
+            cognitiveDomain: domain,
+            cognitive_domain: domain,
+            reference_answer: item.reference_answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
+            answer: item.answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
+            requer_imagem: /\b(anatom|an[aá]tom|espa[cç]o|mening|nervo|vascul|art[eé]ria|veia|c[oó]rtex|ventr[ií]cul|l[ií]quor|l[ií]quido cefalorraquidiano|radiolog|tomograf|resson|raio.?x|ecg|les[aã]o|histolog)\b/i.test(`${item.question || ''} ${materialText}`),
+            evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
           };
         }).filter(Boolean);
-        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, difficultyLevel, imagesRequested: items.filter(item => item.requer_imagem).length, sourceOrigins: items.map(item => item.sourceQuestionOrigin || 'nova_a_partir_da_fonte') });
+        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, requestedDifficulty, imagesRequested: items.filter(item => item.requer_imagem).length, sourceOrigins: items.map(item => item.sourceQuestionOrigin || 'nova_a_partir_da_fonte') });
         return items;
       } catch (error) {
         logQuizGenerationDebug('backend_generation_exception', { message: error.message });
@@ -10340,12 +10346,20 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     function getFlashcardDifficultyLabel(item) {
-      const level = item.difficultyLevel || (item.learningFocus === 'material_base' || item.learningFocus === 'fundamentos'
-        ? 'iniciante'
-        : (item.learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
-      if (level === 'iniciante') return 'Iniciante';
+      let level = item?.difficultyLevel || item?.nivel_dificuldade || item?.cognitiveLevel;
+      if (!level || level === 'iniciante') {
+        const qText = `${item?.question || ''} ${item?.pergunta || ''} ${item?.reference_answer || ''} ${item?.clinicalPearl || ''} ${item?.topic || ''}`;
+        if (/\b(conduta|diagn[oó]stico diferencial|estratifica[cç][aã]o|emerg[eê]ncia|interven[cç][aã]o|tratamento|complica[cç][aã]o|progn[oó]stico|termoalgesia|decussa[cç][aã]o|brown[- ]s[eé]quard|s[ií]ndrome|hemissec[cç][aã]o)\b/i.test(qText)) {
+          level = 'avancado';
+        } else if (/\b(mecanismo|fisiopatolog|al[cç]a|aferente|eferente|por que|diferencia|por qual motivo|reabsor[cç][aã]o|semiolog|sinal de|reflexo|fun[cç][aã]o|sinais cl[ií]nicos|quadro cl[ií]nico)\b/i.test(qText)) {
+          level = 'intermediario';
+        } else {
+          level = 'iniciante';
+        }
+      }
       if (level === 'intermediario') return 'Intermediário';
-      return 'Avançado';
+      if (level === 'avancado') return 'Avançado';
+      return 'Iniciante';
     }
 
     function updateCardDisplay(filteredList) {
@@ -11086,8 +11100,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         const areaLabel = item.areaLabel || 'Clínica Médica';
 
         const styleLabel = item.examStyle === 'enare' ? 'ENARE / FGV' : (item.examStyle === 'enamed' ? 'ENAMED / MEC' : 'Taxonomia Bloom');
-        const resolvedDifficulty = item.difficultyLevel || (item.learningFocus === 'material_base' || item.learningFocus === 'fundamentos' ? 'iniciante' : (item.learningFocus === 'mecanismo_consequencia' ? 'intermediario' : 'avancado'));
-        const diffLabel = resolvedDifficulty === 'iniciante' ? 'Iniciante' : (resolvedDifficulty === 'intermediario' ? 'Intermediário' : 'Avançado');
+        const diffLabel = getFlashcardDifficultyLabel(item);
 
         const tutorChoice = quizTutorChoices[item.id];
         const isAnsweredInTutor = typeof tutorChoice === 'number';

@@ -238,7 +238,7 @@ class QuizzesService {
     const quantidade = payload.quantidade || payload.amount || payload.total || 5;
     const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
       ? payload.difficulty
-      : 'iniciante';
+      : 'balanced';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 40) : [];
     const previousQuestionAnswers = Array.isArray(payload.previousQuestionAnswers)
       ? payload.previousQuestionAnswers.map(item => ({
@@ -357,7 +357,9 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer);
         const actualDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(q.nivel_dificuldade)
           ? q.nivel_dificuldade
-          : requestedDifficulty;
+          : (requestedDifficulty === 'balanced'
+              ? (index % 5 === 0 || index % 5 === 1 ? 'iniciante' : (index % 5 === 2 || index % 5 === 3 ? 'intermediario' : 'avancado'))
+              : requestedDifficulty);
         const sectionTopic = q.secao_origem || 'Conceito da Seção';
 
         return {
