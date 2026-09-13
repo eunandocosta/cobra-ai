@@ -1267,6 +1267,9 @@
         renderSceTimeline();
         renderSceBars();
       }
+      if (tabId === 'flashcards' && typeof renderSharedStudyItems === 'function') {
+        renderSharedStudyItems();
+      }
     }
 
     function openCurrentTabHelp() {
@@ -3425,7 +3428,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         interval: 0,
         easeFactor: 2.5,
         lapses: 0,
-        dueDate: new Date().toISOString(),
+        // Cartões inéditos não entram na fila de revisão até que o aluno os faça.
+        dueDate: null,
         lastReviewed: null,
         history: []
       };
@@ -4288,8 +4292,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           interval: 0,
           easeFactor: 2.5,
           lapses: 0,
-          dueDate: new Date().toISOString(),
+          dueDate: null,
           lastReviewed: null,
+          state: 'new',
           history: []
         },
         quizStats: {
@@ -5199,8 +5204,9 @@ ${cleanText}
               interval: 0,
               easeFactor: 2.5,
               lapses: 0,
-              dueDate: new Date().toISOString(),
+              dueDate: null,
               lastReviewed: null,
+              state: 'new',
               history: []
             },
             quizStats: {
@@ -9545,10 +9551,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             sharedQuestionsBank = parsedLegacy.map(q => {
               if (!q.srs) {
                 q.srs = {
-                  interval: 1,
+                  interval: 0,
                   easeFactor: 2.5,
                   reps: 0,
-                  nextReview: new Date().toISOString(),
+                  dueDate: null,
                   lastReviewed: null,
                   state: 'new'
                 };
@@ -9588,7 +9594,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     // 4.2 Fila de Repetição Espaçada (SRS) e Modos de Estudo
-    var srsQueueFilter = 'all'; // 'all' | 'due' | 'new' | 'learning'
+    // Filas visíveis do aluno: primeiro aprende o que nunca fez; depois revisa
+    // estritamente pela data agendada. "all" permanece apenas por compatibilidade.
+    var srsQueueFilter = 'new'; // 'new' | 'due' | 'tomorrow' | 'upcoming' | 'all'
     var quizStudyMode = 'tutor'; // 'tutor' | 'exam'
     var quizTutorChoices = {};
     var quizExamState = {
@@ -9601,7 +9609,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     };
 
     function setSrsQueueFilter(filter) {
-      srsQueueFilter = filter || 'all';
+      const allowedFilters = new Set(['new', 'due', 'tomorrow', 'upcoming', 'all']);
+      srsQueueFilter = allowedFilters.has(filter) ? filter : 'new';
       currentCardIndex = 0;
       updateCardDisplay();
     }
@@ -9689,19 +9698,62 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       }
     }
 
+    function getStartOfDay(date = new Date()) {
+      const day = new Date(date);
+      day.setHours(0, 0, 0, 0);
+      return day;
+    }
+
+    function getFlashcardQueueKey(item, now = new Date()) {
+      const srs = item?.srs || {};
+      // "Não feitos" é definido por nunca ter sido respondido, não pela data
+      // técnica gravada no objeto legado. Assim um erro (rating Repetir) não volta
+      // para a fila de inéditos e cartões futuros não invadem a revisão de hoje.
+      if (!srs.lastReviewed) return 'new';
+
+      const due = srs.dueDate ? new Date(srs.dueDate) : null;
+      if (!due || Number.isNaN(due.getTime())) return 'due';
+      const today = getStartOfDay(now);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayAfterTomorrow = new Date(tomorrow);
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+      if (due < tomorrow) return 'due';
+      if (due < dayAfterTomorrow) return 'tomorrow';
+      return 'upcoming';
+    }
+
+    function getSrsQueueCounts(baseList) {
+      const counts = { new: 0, due: 0, tomorrow: 0, upcoming: 0 };
+      (baseList || []).forEach(item => {
+        const key = getFlashcardQueueKey(item);
+        counts[key]++;
+      });
+      return counts;
+    }
+
     function getSrsFilteredList(baseList) {
       const list = baseList || getFilteredQuestions();
-      const now = new Date();
-      if (srsQueueFilter === 'due') {
-        return list.filter(q => !q.srs || !q.srs.dueDate || new Date(q.srs.dueDate) <= now);
-      }
-      if (srsQueueFilter === 'new') {
-        return list.filter(q => !q.srs || q.srs.reps === 0);
-      }
-      if (srsQueueFilter === 'learning') {
-        return list.filter(q => q.srs && q.srs.reps > 0 && q.srs.interval < 7);
-      }
-      return list;
+      if (srsQueueFilter === 'all') return list;
+      return list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter);
+    }
+
+    function renderSrsQueueNavigation(baseList) {
+      const counts = getSrsQueueCounts(baseList);
+      const labels = {
+        new: `Não feitos: ${counts.new}`,
+        due: `Revisão de Hoje: ${counts.due}`,
+        tomorrow: `Revisão de amanhã: ${counts.tomorrow}`,
+        upcoming: `Revisão dos próximos dias: ${counts.upcoming}`
+      };
+      Object.entries(labels).forEach(([key, label]) => {
+        const button = document.getElementById(`srsQueue-${key}`);
+        if (!button) return;
+        button.textContent = label;
+        button.classList.toggle('primary', srsQueueFilter === key);
+        button.setAttribute('aria-pressed', srsQueueFilter === key ? 'true' : 'false');
+      });
     }
 
     function resolveFlashcardTitle(item) {
@@ -9741,10 +9793,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const list = getSrsFilteredList(baseList);
 
       // Atualiza badges de contagem da fila SRS no deck
-      const now = new Date();
-      const newCount = baseList.filter(q => !q.srs || q.srs.reps === 0).length;
-      const dueCount = baseList.filter(q => !q.srs || !q.srs.dueDate || new Date(q.srs.dueDate) <= now).length;
-      const gradCount = baseList.filter(q => q.srs && q.srs.reps >= 2 && q.srs.interval >= 7).length;
+      const queueCounts = getSrsQueueCounts(baseList);
+      const newCount = queueCounts.new;
+      const dueCount = queueCounts.due;
+      const gradCount = baseList.filter(q => getFlashcardQueueKey(q) === 'upcoming' && q.srs?.interval >= 7).length;
 
       const badgeNew = document.getElementById('srsBadgeNew');
       const badgeDue = document.getElementById('srsBadgeDue');
@@ -9752,6 +9804,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (badgeNew) badgeNew.textContent = `🔵 Novos: ${newCount}`;
       if (badgeDue) badgeDue.textContent = `🟠 Para Hoje: ${dueCount}`;
       if (badgeGrad) badgeGrad.textContent = `🟢 Dominados: ${gradCount}`;
+      renderSrsQueueNavigation(baseList);
 
       const badgeScore = document.getElementById('srsBadgeScore');
       if (badgeScore) {
@@ -9770,10 +9823,15 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const backEl = document.getElementById('fcBackAnswer');
         const countEl = document.getElementById('fcCounter');
         const difficultyBadge = document.getElementById('fcDifficultyBadge');
-        if (countEl) countEl.textContent = 'Fila Vazia';
+        const emptyLabels = { new: 'Não feitos', due: 'Revisão de Hoje', tomorrow: 'Revisão de amanhã', upcoming: 'Revisão dos próximos dias' };
+        if (countEl) countEl.textContent = `${emptyLabels[srsQueueFilter] || 'Fila'} • vazia`;
         if (difficultyBadge) difficultyBadge.style.display = 'none';
-        if (frontEl) frontEl.textContent = '🎉 Todos os flashcards desta fila foram revisados!';
-        if (backEl) backEl.innerHTML = 'Parabéns! Seu cérebro consolidou os conceitos desta sessão. Retorne amanhã para a próxima rodada de repetição espaçada.';
+        if (frontEl) frontEl.textContent = srsQueueFilter === 'new'
+          ? '🎉 Não há cartões inéditos neste filtro.'
+          : '🎉 Todos os flashcards desta fila foram revisados!';
+        if (backEl) backEl.innerHTML = srsQueueFilter === 'new'
+          ? 'Gere novos cartões ou troque a disciplina/material para começar uma nova sessão.'
+          : 'Parabéns! Seu cérebro consolidou os conceitos desta sessão. Selecione outra fila ou retorne na data de revisão.';
         return;
       }
 
@@ -9792,7 +9850,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         difficultyBadge.style.display = 'inline-block';
         difficultyBadge.textContent = getFlashcardDifficultyLabel(item);
       }
-      if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length}${srsQueueFilter !== 'all' ? ' • Fila: ' + srsQueueFilter : ''}`;
+      const queueNames = { new: 'Não feitos', due: 'Revisão de Hoje', tomorrow: 'Revisão de amanhã', upcoming: 'Revisão dos próximos dias' };
+      if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length} • ${queueNames[srsQueueFilter] || 'Todos os cards'}`;
       if (frontEl) frontEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.front || item.question || '') : (item.flashcard?.front || item.question || '');
       if (backEl) backEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.back || item.reference_answer || item.answer || '') : (item.flashcard?.back || item.reference_answer || item.answer || '');
       if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item));

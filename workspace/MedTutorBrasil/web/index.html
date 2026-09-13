@@ -381,10 +381,10 @@
              <div class="srs-deck-status-bar" style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 8px 14px; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                  <span id="srsBadgeNew" style="background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">
-                   🔵 Novos: 0
+                   🔵 Não feitos: 0
                  </span>
                  <span id="srsBadgeDue" style="background: rgba(255, 153, 0, 0.12); color: #ff9900; border: 1px solid rgba(255, 153, 0, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">
-                   🟠 Para Hoje: 0
+                   🟠 Revisão de Hoje: 0
                  </span>
                  <span id="srsBadgeGraduated" style="background: rgba(0, 255, 102, 0.12); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">
                    🟢 Dominados: 0
@@ -393,14 +393,11 @@
                    ⭐ Pontos: 0,0 / 0 pts (0%)
                  </span>
                </div>
-               <div style="display: flex; gap: 6px; align-items: center;">
-                 <label for="srsQueueFilterSelect" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Filtrar Fila:</label>
-                 <select id="srsQueueFilterSelect" class="study-nav-select" style="font-size: 11.5px; padding: 3px 8px; height: 30px;" onchange="setSrsQueueFilter(this.value)">
-                   <option value="all" selected>📚 Todos os Cards</option>
-                   <option value="due">⏰ Revisão de Hoje</option>
-                   <option value="new">✨ Apenas Novos</option>
-                   <option value="learning">🔄 Em Aprendizado</option>
-                 </select>
+               <div role="group" aria-label="Filas de flashcards" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                 <button id="srsQueue-new" class="btn-outline-action primary" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('new')" aria-pressed="true">Não feitos: 0</button>
+                 <button id="srsQueue-due" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('due')" aria-pressed="false">Revisão de Hoje: 0</button>
+                 <button id="srsQueue-tomorrow" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('tomorrow')" aria-pressed="false">Revisão de amanhã: 0</button>
+                 <button id="srsQueue-upcoming" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('upcoming')" aria-pressed="false">Revisão dos próximos dias: 0</button>
                </div>
              </div>
  
