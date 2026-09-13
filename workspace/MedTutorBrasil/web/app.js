@@ -4889,7 +4889,31 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           objetivo: 'Cobrar compreensão de um conceito explicitamente presente na fonte.'
         });
       }
-      return selected.length >= Math.min(count, 2) ? selected : null;
+
+      // PDFs com tabelas, tópicos ou poucas quebras de frase podem oferecer poucos
+      // candidatos apesar de conterem bastante conteúdo. Completa o plano com janelas
+      // não sobrepostas do próprio texto, para que o lote solicitado não seja cortado.
+      if (selected.length < count) {
+        const compactText = sourceText.replace(/\s+/g, ' ').trim();
+        const windowSize = 900;
+        const maxStart = Math.max(0, compactText.length - windowSize);
+        const windows = Math.max(count * 2, 4);
+        for (let index = 0; index < windows && selected.length < count; index++) {
+          const start = Math.round((maxStart * index) / Math.max(1, windows - 1));
+          const excerpt = compactText.slice(start, start + windowSize).trim();
+          if (excerpt.length < 100) continue;
+          const wasUsed = excludedEvidence.some(evidence => calculateLocalSimilarity(excerpt, evidence) >= 0.78);
+          const isDistinct = selected.every(item => calculateLocalSimilarity(excerpt, item.evidencia_fonte) < 0.62);
+          if (wasUsed || !isDistinct) continue;
+          const concept = excerpt.split(/[.!?;:]/)[0].replace(/^[^A-Za-zÀ-ÿ0-9]*/, '').trim();
+          selected.push({
+            conceito_alvo: (concept || 'Trecho do conteúdo').slice(0, 120),
+            evidencia_fonte: excerpt,
+            objetivo: 'Cobrar compreensão de um trecho distinto presente na fonte.'
+          });
+        }
+      }
+      return selected.length ? selected : null;
     }
 
     function setStudyGenerationProgress(state = {}) {
@@ -4935,6 +4959,15 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         cognitiveDomain: 'compreensao',
         cognitive_domain: 'compreensao'
       };
+    }
+
+    function getBalancedMaterialDifficulty(requestedDifficulty, total, position) {
+      if (['iniciante', 'intermediario', 'avancado'].includes(requestedDifficulty)) return requestedDifficulty;
+      const beginnerCount = Math.ceil(total * 0.5);
+      const intermediateCount = Math.ceil(total * 0.3);
+      if (position < beginnerCount) return 'iniciante';
+      if (position < beginnerCount + intermediateCount) return 'intermediario';
+      return 'avancado';
     }
 
     function sanitizeSharedQuestionStem(value) {
@@ -5302,10 +5335,15 @@ ${cleanText}
         logQuizGenerationDebug('blueprint_unavailable', { materialChars: String(materialText || '').length, requestedItems: total });
         return accepted;
       }
-      setStudyGenerationProgress({ current: 0, total, detail: 'Selecionando conceitos distintos no material…' });
+      setStudyGenerationProgress({ current: 0, total, detail: 'Selecionando trechos distintos do conteúdo…' });
       try {
-        for (let position = 0; position < total; position++) {
-          const plan = blueprint[position];
+        let attempts = 0;
+        const maxAttempts = total * 2;
+        while (accepted.length < total && attempts < maxAttempts) {
+          const position = accepted.length;
+          const plan = blueprint[attempts % blueprint.length];
+          const difficulty = getBalancedMaterialDifficulty(config.difficulty, total, position);
+          attempts++;
           setStudyGenerationProgress({
             current: position + 1,
             total,
@@ -5315,16 +5353,20 @@ ${cleanText}
           });
           const generated = await generateQuestionsWithGemini(buildQuestionContext(materialText, plan.evidencia_fonte), metadata, {
             ...config,
+            difficulty,
             acceptedStudyItems: [...existingItems, ...accepted]
           }, 1);
           const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
           if (unique.length > 0) {
-            const acceptedItem = applyMaterialBasedStudyItem(unique[0], config.difficulty);
+            const acceptedItem = applyMaterialBasedStudyItem(unique[0], difficulty);
             accepted.push(acceptedItem);
             logQuizGenerationDebug('sequential_item_accepted', { position: position + 1, total, model: acceptedItem.generatorModel || 'desconhecido', concept: acceptedItem.topic || '', difficultyLevel: acceptedItem.difficultyLevel });
           } else {
-            logQuizGenerationDebug('sequential_item_rejected', { position: position + 1, total, reason: 'Sem item válido ou item redundante.' });
+            logQuizGenerationDebug('sequential_item_rejected', { position: position + 1, total, attempt: attempts, reason: 'Sem item válido ou item redundante; tentando outro trecho.' });
           }
+        }
+        if (accepted.length < total) {
+          logQuizGenerationDebug('sequential_generation_incomplete', { requestedItems: total, acceptedItems: accepted.length, attempts });
         }
         return accepted;
       } finally {
