@@ -38,6 +38,48 @@ function areAnswersTooSimilar(first, second) {
   return intersection / Math.min(a.size, b.size) >= 0.85;
 }
 
+function isAuthoredQuestionCandidate(line) {
+  const clean = String(line || '').trim();
+  if (clean.length < 18) return false;
+  // Cabeçalhos que terminam com dois pontos (ex: "Perguntas do Caso 1:", "Questões para discutir:")
+  if (/^.*[:]\s*$/.test(clean) && !clean.includes('?')) return false;
+  // Seções estruturais de sumário/índice
+  if (/\b(fundamentos|propedeutica|metodos diagnosticos|diagnostico diferencial|diretrizes|sumario|indice|apostila|slides|modulo|capitulo|secao|conteudo programatico|referencias|objetivos|etiopatogenicos|fisiopatologia)\b/i.test(clean) && !clean.includes('?')) return false;
+
+  const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio|caso)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
+  const hasInterrogative = /\b(qual|quais|como|por que|porque|explique|descreva|discuta|identifique|cite|justifique|analise|calcule|relacione|aponte|defina)\b/i.test(clean);
+
+  if (clean.includes('?')) return true;
+  if (startsQuestion.test(clean) && hasInterrogative) return true;
+  return false;
+}
+
+function shuffleQuestionAlternatives(alternativas, correctIdx) {
+  const safeIdx = (typeof correctIdx === 'number' && correctIdx >= 0 && correctIdx < alternativas.length) ? correctIdx : 0;
+  const items = alternativas.map((text, idx) => ({ text, isCorrect: idx === safeIdx }));
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  const letters = ['A', 'B', 'C', 'D'];
+  const newIndex = items.findIndex(it => it.isCorrect);
+  const finalIdx = newIndex >= 0 ? newIndex : 0;
+  return {
+    shuffledOptions: items.map(it => it.text),
+    newCorrectIndex: finalIdx,
+    newGabarito: letters[finalIdx] || 'A'
+  };
+}
+
+function sanitizeTopicName(candidate, fallback) {
+  const text = String(candidate || '').trim();
+  if (!text || text.length < 3) return fallback || 'Tema de estudo';
+  if (/\b(fundamentos|propedeutica|metodos diagnosticos|diagnostico diferencial|diretrizes|oficiais|sus|protocolos|apostila|slides|modulo|secao)\b/i.test(text)) {
+    return fallback || 'Tema Clínico';
+  }
+  return text;
+}
+
 // Muitos slides trazem exercícios elaborados pelo próprio professor. Eles são uma
 // referência didática mais fiel que um tema solto: preservamos o foco e a redação
 // quando a resposta puder ser comprovada no conteúdo, sem transformar alternativas
@@ -46,22 +88,22 @@ function extractAuthoredQuestionsFromMaterial(value, limit = 12) {
   const lines = String(value || '').replace(/\r/g, '').split('\n')
     .map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
   const questions = [];
-  const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
+  const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio|caso)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
   const isContinuation = /^(?:[A-E]\s*[.)-]|(?:gabarito|resposta)\s*[:.)-])/i;
 
   for (let index = 0; index < lines.length && questions.length < limit; index++) {
     const line = lines[index];
-    if (!startsQuestion.test(line) && !line.includes('?')) continue;
+    if (!isAuthoredQuestionCandidate(line)) continue;
 
     let candidate = line;
     for (let next = index + 1; next < lines.length && next <= index + 5; next++) {
       const continuation = lines[next];
-      if (startsQuestion.test(continuation)) break;
+      if (startsQuestion.test(continuation) && isAuthoredQuestionCandidate(continuation)) break;
       if (!isContinuation.test(continuation) && candidate.includes('?')) break;
       candidate = `${candidate} ${continuation}`.slice(0, 700);
     }
     candidate = candidate.replace(/\s+/g, ' ').trim();
-    if (candidate.length < 20 || (!candidate.includes('?') && !startsQuestion.test(candidate))) continue;
+    if (candidate.length < 20 || !isAuthoredQuestionCandidate(candidate)) continue;
     if (!questions.some(existing => areQuestionsTooSimilar(existing, candidate))) questions.push(candidate);
   }
   // Alguns extratores de PDF entregam uma aula inteira em uma única linha. Nesse
@@ -69,7 +111,7 @@ function extractAuthoredQuestionsFromMaterial(value, limit = 12) {
   const inlineQuestions = String(value || '').replace(/\s+/g, ' ').match(/[^?]{20,700}\?/g) || [];
   inlineQuestions.forEach(candidate => {
     const normalized = candidate.replace(/\s+/g, ' ').trim();
-    if (questions.length < limit && !questions.some(existing => areQuestionsTooSimilar(existing, normalized))) {
+    if (questions.length < limit && isAuthoredQuestionCandidate(normalized) && !questions.some(existing => areQuestionsTooSimilar(existing, normalized))) {
       questions.push(normalized);
     }
   });
@@ -210,6 +252,15 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 8. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
 9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
 10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
+11. ALTA QUALIDADE DOS DISTRATORES MÉDICOS:
+    - Todas as 4 alternativas (1 correta e 3 distratores) devem pertencer rigorosamente ao mesmo universo anatomofisiológico ou clínico do tema.
+    - É EXPRESSAMENTE PROIBIDO criar distratores ingênuos, caricatos ou absurdos (ex.: em questão sobre exame de líquor, NUNCA use 'eletroencefalograma' ou 'biópsia de nervo'; use alternativas e diagnósticos diferenciais reais do contexto neurológico).
+    - As 4 alternativas devem ter extensão, formato e refinamento técnico homogêneos.
+12. ANCORAGEM CLÍNICA NOS CASOS DO MATERIAL:
+    - Se o material contiver relatos de pacientes ou vinhetas clínicas (ex.: idade, profissão, caso Sommelier, trauma, achados ao exame físico), formule questões contextualizadas que apliquem e discutam diretamente esses elementos clínicos.
+    - O campo secao_origem deve ser um tema anatômico ou clínico específico (ex.: 'Pares Cranianos e Sensibilidade Lingual', 'Hemorragia Subaracnóidea'), NUNCA títulos vazios de sumário como 'Fundamentos Etiopatogênicos'.
+13. DISTRIBUIÇÃO DAS RESPOSTAS:
+    - Varie a alternativa correta naturalmente entre A, B, C e D no array e no gabarito ao longo do lote gerado.
 `;
 
 class QuizzesService {
@@ -360,7 +411,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           : (requestedDifficulty === 'balanced'
               ? (index % 5 === 0 || index % 5 === 1 ? 'iniciante' : (index % 5 === 2 || index % 5 === 3 ? 'intermediario' : 'avancado'))
               : requestedDifficulty);
-        const sectionTopic = q.secao_origem || 'Conceito da Seção';
+
+        // Embaralha as 4 alternativas para distribuir uniformemente o gabarito (A, B, C, D)
+        const { shuffledOptions, newCorrectIndex, newGabarito } = shuffleQuestionAlternatives(cleanAlternatives, correctIdx);
+        const rawSection = q.secao_origem || '';
+        const cleanTopic = sanitizeTopicName(rawSection, payload.targetSubject || payload.materialName || 'Clínica Médica');
+        const cleanDisease = sanitizeTopicName(rawSection, payload.disease || payload.materialName || cleanTopic);
 
         return {
           id: `q_${Date.now()}_${index + 1}`,
@@ -368,10 +424,11 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           generatorEngine: 'backend-gemini',
           question: q.pergunta,
           pergunta: q.pergunta,
-          quizOptions: cleanAlternatives,
-          alternativas: cleanAlternatives,
-          gabarito: q.gabarito,
-          correctIndex: correctIdx,
+          quizOptions: shuffledOptions,
+          alternativas: shuffledOptions,
+          options: shuffledOptions,
+          gabarito: newGabarito,
+          correctIndex: newCorrectIndex,
           correctAnswerText: correctAnswer,
           resposta_correta: correctAnswer,
           answer: correctAnswer,
@@ -383,11 +440,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           learningFocus: 'material_base',
           difficultyLevel: actualDifficulty,
           cognitiveLevel: actualDifficulty,
+          cognitive_level: actualDifficulty,
           cognitiveDomain: actualDifficulty === 'avancado' ? 'aplicacao' : (actualDifficulty === 'intermediario' ? 'analise' : 'compreensao'),
           sourceQuestionOrigin: q.origem_pergunta || (authoredSourceQuestions.length ? 'inspirada_na_fonte' : 'nova_a_partir_da_fonte'),
-          topic: sectionTopic,
-          disease: sectionTopic,
-          sectionOrigin: sectionTopic,
+          topic: cleanTopic,
+          disease: cleanDisease,
+          sectionOrigin: rawSection || cleanTopic,
           flashcardTitle,
           flashcard: {
             title: flashcardTitle,

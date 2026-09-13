@@ -5082,6 +5082,18 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return normalized.length >= 180 && /\b(e |o |a |os |as |de |do |da |que |por |para |em |com )\b/.test(normalized);
     }
 
+    function isAuthoredQuestionCandidateLocal(line) {
+      const clean = String(line || '').trim();
+      if (clean.length < 18) return false;
+      if (/^.*[:]\s*$/.test(clean) && !clean.includes('?')) return false;
+      if (/\b(fundamentos|propedeutica|metodos diagnosticos|diagnostico diferencial|diretrizes|sumario|indice|apostila|slides|modulo|capitulo|secao|conteudo programatico|referencias|objetivos|etiopatogenicos|fisiopatologia)\b/i.test(clean) && !clean.includes('?')) return false;
+      const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio|caso)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
+      const hasInterrogative = /\b(qual|quais|como|por que|porque|explique|descreva|discuta|identifique|cite|justifique|analise|calcule|relacione|aponte|defina)\b/i.test(clean);
+      if (clean.includes('?')) return true;
+      if (startsQuestion.test(clean) && hasInterrogative) return true;
+      return false;
+    }
+
     // Captura exercícios que já existem no PDF/slide antes do planejamento. A lista
     // acompanha cada trecho enviado ao servidor, assim o Gemini consegue reproduzir
     // o recorte e a linguagem do professor mesmo quando a geração é feita em série.
@@ -5089,19 +5101,19 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const lines = String(materialText || '').replace(/\r/g, '').split('\n')
         .map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
       const questions = [];
-      const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
+      const startsQuestion = /^(?:(?:quest[aã]o|pergunta|exerc[ií]cio|caso)\s*\d*\s*[:.)-]*|\d{1,3}\s*[.)-])\s*/i;
       const isContinuation = /^(?:[A-E]\s*[.)-]|(?:gabarito|resposta)\s*[:.)-])/i;
       for (let index = 0; index < lines.length && questions.length < limit; index++) {
-        if (!startsQuestion.test(lines[index]) && !lines[index].includes('?')) continue;
+        if (!isAuthoredQuestionCandidateLocal(lines[index])) continue;
         let candidate = lines[index];
         for (let next = index + 1; next < lines.length && next <= index + 5; next++) {
           const continuation = lines[next];
-          if (startsQuestion.test(continuation)) break;
+          if (startsQuestion.test(continuation) && isAuthoredQuestionCandidateLocal(continuation)) break;
           if (!isContinuation.test(continuation) && candidate.includes('?')) break;
           candidate = `${candidate} ${continuation}`.slice(0, 700);
         }
         candidate = candidate.replace(/\s+/g, ' ').trim();
-        if (candidate.length < 20 || (!candidate.includes('?') && !startsQuestion.test(candidate))) continue;
+        if (candidate.length < 20 || !isAuthoredQuestionCandidateLocal(candidate)) continue;
         if (!questions.some(existing => calculateLocalSimilarity(existing, candidate) >= 0.72)) questions.push(candidate);
       }
       // PDFs podem chegar como um único parágrafo; ainda assim cada interrogação
@@ -5109,7 +5121,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const inlineQuestions = String(materialText || '').replace(/\s+/g, ' ').match(/[^?]{20,700}\?/g) || [];
       inlineQuestions.forEach(candidate => {
         const normalized = candidate.replace(/\s+/g, ' ').trim();
-        if (questions.length < limit && !questions.some(existing => calculateLocalSimilarity(existing, normalized) >= 0.72)) questions.push(normalized);
+        if (questions.length < limit && isAuthoredQuestionCandidateLocal(normalized) && !questions.some(existing => calculateLocalSimilarity(existing, normalized) >= 0.72)) questions.push(normalized);
       });
       return questions;
     }
@@ -5357,14 +5369,25 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             ? (item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             : 'iniciante';
           const domain = itemDiff === 'avancado' ? 'aplicacao' : (itemDiff === 'intermediario' ? 'analise' : 'compreensao');
+          const cleanTopic = (item.topic && !/\b(fundamentos|propedeutica|metodos|diretrizes)\b/i.test(item.topic)) ? item.topic : (metadata.disease || metadata.materialName || 'Conceito do material');
+          const cleanDisease = (item.disease && !/\b(fundamentos|propedeutica|metodos|diretrizes)\b/i.test(item.disease)) ? item.disease : (metadata.disease || metadata.materialName || cleanTopic);
+          const safeOptions = Array.isArray(item.quizOptions) && item.quizOptions.length === 4
+            ? item.quizOptions
+            : (Array.isArray(item.alternativas) && item.alternativas.length === 4 ? item.alternativas : (item.options || []));
+          const safeCorrectIndex = typeof item.correctIndex === 'number' && item.correctIndex >= 0 && item.correctIndex < safeOptions.length
+            ? item.correctIndex
+            : 0;
+          const safeGabarito = item.gabarito || String.fromCharCode(65 + safeCorrectIndex);
+          const safeAnswer = item.correctAnswerText || item.resposta_correta || safeOptions[safeCorrectIndex] || item.answer || item.reference_answer || '';
+
           return {
             ...item,
             question: sharedStem,
             pergunta: sharedStem,
             subject: metadata.subjectName || item.subject || '',
             slideName: metadata.materialName || item.slideName || '',
-            topic: item.topic || 'Conceito do material',
-            disease: item.disease || 'Conceito do material',
+            topic: cleanTopic,
+            disease: cleanDisease,
             flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
             flashcard: { ...(item.flashcard || {}), front: sharedStem },
             learningFocus: 'material_base',
@@ -5373,8 +5396,15 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             cognitive_level: itemDiff,
             cognitiveDomain: domain,
             cognitive_domain: domain,
-            reference_answer: item.reference_answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
-            answer: item.answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
+            quizOptions: safeOptions,
+            alternativas: safeOptions,
+            options: safeOptions,
+            correctIndex: safeCorrectIndex,
+            gabarito: safeGabarito,
+            correctAnswerText: safeAnswer,
+            resposta_correta: safeAnswer,
+            answer: safeAnswer,
+            reference_answer: safeAnswer,
             requer_imagem: /\b(anatom|an[aá]tom|espa[cç]o|mening|nervo|vascul|art[eé]ria|veia|c[oó]rtex|ventr[ií]cul|l[ií]quor|l[ií]quido cefalorraquidiano|radiolog|tomograf|resson|raio.?x|ecg|les[aã]o|histolog)\b/i.test(`${item.question || ''} ${materialText}`),
             evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
           };
@@ -11437,7 +11467,14 @@ Retorne EXCLUSIVAMENTE um JSON:
     // importada por outro caminho.
     function getMaterialStudyText(material = {}) {
       if (!material || typeof material !== 'object') return '';
-      const candidates = [
+
+      const isBoilerplate = text => typeof text === 'string' && (
+        /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
+        /• Diretrizes SUS, CFM & ENARE/i.test(text.trim())
+      );
+
+      // Prioridade 1: textos clínicos originais e autênticos do material
+      const primaryCandidates = [
         material.material_md,
         material.materialMd,
         material.conteudo_md,
@@ -11452,21 +11489,32 @@ Retorne EXCLUSIVAMENTE um JSON:
         material.content,
         material.conteudo,
         material.corpo,
-        material.body,
-        material.descricao,
-        material.readingDocText,
+        material.body
+      ]
+        .filter(c => typeof c === 'string' && c.trim().length > 0 && !isBoilerplate(c))
+        .map(c => c.trim());
+
+      if (primaryCandidates.length > 0) {
+        primaryCandidates.sort((a, b) => b.length - a.length);
+        return primaryCandidates[0];
+      }
+
+      // Prioridade 2: relatórios e resumos secundários
+      const secondaryCandidates = [
         material.relatorio_academico?.conteudo_md,
         material.relatorio_academico?.markdown,
         material.academicReport?.conteudo_md,
         material.academicReport?.markdown,
+        material.descricao,
+        material.readingDocText,
         material.pedagogicalSynthesis ? (typeof material.pedagogicalSynthesis === 'string' ? material.pedagogicalSynthesis : JSON.stringify(material.pedagogicalSynthesis)) : ''
       ]
         .filter(c => typeof c === 'string' && c.trim().length > 0)
         .map(c => c.trim());
 
-      if (candidates.length === 0) return '';
-      candidates.sort((a, b) => b.length - a.length);
-      return candidates[0];
+      if (secondaryCandidates.length === 0) return '';
+      secondaryCandidates.sort((a, b) => b.length - a.length);
+      return secondaryCandidates[0];
     }
 
     // 4.4 Geração Sob Demanda: IA Gemini + Motor Local MedCopilot
