@@ -1268,6 +1268,13 @@
         renderSceBars();
       }
       if (tabId === 'flashcards' && typeof renderSharedStudyItems === 'function') {
+        // A sessão começa pelo que vence primeiro; sem pendências, libera os inéditos de hoje.
+        const queueCounts = typeof getSrsQueueCounts === 'function' ? getSrsQueueCounts(getFilteredQuestions()) : null;
+        if (queueCounts) {
+          srsQueueFilter = queueCounts.due > 0 ? 'due'
+            : (queueCounts.new > 0 ? 'new' : (queueCounts.tomorrow > 0 ? 'tomorrow' : 'upcoming'));
+          currentCardIndex = 0;
+        }
         renderSharedStudyItems();
       }
     }
@@ -9622,6 +9629,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     // Filas visíveis do aluno: primeiro aprende o que nunca fez; depois revisa
     // estritamente pela data agendada. "all" permanece apenas por compatibilidade.
     var srsQueueFilter = 'new'; // 'new' | 'due' | 'tomorrow' | 'upcoming' | 'all'
+    const DAILY_NEW_CARD_LIMIT = 20;
     var quizStudyMode = 'tutor'; // 'tutor' | 'exam'
     var quizTutorChoices = {};
     var quizExamState = {
@@ -9705,7 +9713,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (fcPendingBanner) fcPendingBanner.style.display = 'none';
       if (qzPendingBanner) qzPendingBanner.style.display = 'none';
 
-      // 3. Questões filtradas da matéria ativa
+      // 3. Planeja os inéditos em blocos sustentáveis antes de montar as filas.
+      if (ensureNewCardSchedules(sharedQuestionsBank)) saveSharedQuestionsBank();
+
+      // 4. Questões filtradas da matéria ativa
       const filtered = getFilteredQuestions();
       const hasItems = filtered.length > 0;
 
@@ -9729,12 +9740,61 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       return day;
     }
 
+    function getLocalDateKey(date) {
+      const day = getStartOfDay(date);
+      const offset = day.getTimezoneOffset() * 60000;
+      return new Date(day.getTime() - offset).toISOString().slice(0, 10);
+    }
+
+    function ensureNewCardSchedules(cards = sharedQuestionsBank) {
+      const today = getStartOfDay();
+      const scheduledPerDay = new Map();
+      const candidates = (cards || []).filter(item => !item?.srs?.lastReviewed)
+        .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+
+      candidates.forEach(item => {
+        const key = item?.srs?.newScheduledDate;
+        const scheduled = key ? getStartOfDay(new Date(`${key}T12:00:00`)) : null;
+        if (scheduled && !Number.isNaN(scheduled.getTime()) && scheduled >= today) {
+          scheduledPerDay.set(key, (scheduledPerDay.get(key) || 0) + 1);
+        }
+      });
+
+      let changed = false;
+      candidates.forEach(item => {
+        if (item?.srs?.newScheduledDate) return;
+        let targetDay = new Date(today);
+        while ((scheduledPerDay.get(getLocalDateKey(targetDay)) || 0) >= DAILY_NEW_CARD_LIMIT) {
+          targetDay.setDate(targetDay.getDate() + 1);
+        }
+        const key = getLocalDateKey(targetDay);
+        item.srs = {
+          ...(item.srs || { reps: 0, interval: 0, easeFactor: 2.5, lapses: 0, lastReviewed: null, history: [], state: 'new' }),
+          newScheduledDate: key,
+          dueDate: null,
+          state: 'new'
+        };
+        scheduledPerDay.set(key, (scheduledPerDay.get(key) || 0) + 1);
+        changed = true;
+      });
+      return changed;
+    }
+
     function getFlashcardQueueKey(item, now = new Date()) {
       const srs = item?.srs || {};
       // "Não feitos" é definido por nunca ter sido respondido, não pela data
       // técnica gravada no objeto legado. Assim um erro (rating Repetir) não volta
       // para a fila de inéditos e cartões futuros não invadem a revisão de hoje.
-      if (!srs.lastReviewed) return 'new';
+      if (!srs.lastReviewed) {
+        const scheduledNew = srs.newScheduledDate ? getStartOfDay(new Date(`${srs.newScheduledDate}T12:00:00`)) : null;
+        const today = getStartOfDay(now);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dayAfterTomorrow = new Date(tomorrow);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+        if (scheduledNew && scheduledNew >= tomorrow) return scheduledNew < dayAfterTomorrow ? 'tomorrow' : 'upcoming';
+        return 'new';
+      }
 
       const due = srs.dueDate ? new Date(srs.dueDate) : null;
       if (!due || Number.isNaN(due.getTime())) return 'due';
@@ -9760,8 +9820,37 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     function getSrsFilteredList(baseList) {
       const list = baseList || getFilteredQuestions();
-      if (srsQueueFilter === 'all') return list;
-      return list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter);
+      const selected = srsQueueFilter === 'all' ? list : list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter);
+      const focusOrder = { fundamentos: 0, mecanismo_consequencia: 1, aplicacao_clinica: 2 };
+      return selected.slice().sort((a, b) => {
+        if (srsQueueFilter === 'new') {
+          const focusDiff = (focusOrder[a.learningFocus] ?? 0) - (focusOrder[b.learningFocus] ?? 0);
+          if (focusDiff) return focusDiff;
+        }
+        const aDate = a.srs?.dueDate || a.srs?.newScheduledDate || a.createdAt || '';
+        const bDate = b.srs?.dueDate || b.srs?.newScheduledDate || b.createdAt || '';
+        return String(aDate).localeCompare(String(bDate));
+      });
+    }
+
+    function renderLearningGapPanel(baseList) {
+      const panel = document.getElementById('learningGapPanel');
+      if (!panel) return;
+      const focusDefinitions = [
+        ['fundamentos', 'Fundamentos'],
+        ['mecanismo_consequencia', 'Mecanismo e consequência'],
+        ['aplicacao_clinica', 'Aplicação clínica']
+      ];
+      const dueNow = (baseList || []).filter(item => getFlashcardQueueKey(item) === 'due').length;
+      panel.innerHTML = `<div style="font-size: 11px; font-weight: 800; color: var(--text-primary); margin-bottom: 7px;">🧭 Mapa de aprendizagem da matéria <span style="color: var(--text-muted); font-weight: 600;">• ${dueNow} revisão(ões) pendente(s) hoje</span></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px;">${focusDefinitions.map(([key, label]) => {
+        const items = (baseList || []).filter(item => (item.learningFocus || 'fundamentos') === key);
+        const attempts = items.reduce((sum, item) => sum + (item.quizStats?.attempts || 0), 0);
+        const correct = items.reduce((sum, item) => sum + (item.quizStats?.correct || 0), 0);
+        const lapses = items.reduce((sum, item) => sum + (item.srs?.lapses || 0), 0);
+        const rate = attempts ? Math.round((correct / attempts) * 100) : null;
+        const color = rate === null ? 'var(--text-muted)' : (rate >= 80 ? '#00ff66' : (rate >= 55 ? '#ffaa00' : '#ff6666'));
+        return `<div style="padding: 7px 8px; border: 1px solid var(--border); border-radius: 7px; background: rgba(255,255,255,0.025); font-size: 10.5px;"><strong>${label}</strong><div style="margin-top: 3px; color: ${color}; font-weight: 800;">${rate === null ? 'Sem respostas ainda' : `${rate}% de acerto`}</div><div style="margin-top: 2px; color: var(--text-muted);">${items.length} cartões • ${lapses} erro(s) SRS</div></div>`;
+      }).join('')}</div>`;
     }
 
     function renderSrsQueueNavigation(baseList) {
@@ -9830,6 +9919,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (badgeDue) badgeDue.textContent = `🟠 Para Hoje: ${dueCount}`;
       if (badgeGrad) badgeGrad.textContent = `🟢 Dominados: ${gradCount}`;
       renderSrsQueueNavigation(baseList);
+      renderLearningGapPanel(baseList);
 
       const badgeScore = document.getElementById('srsBadgeScore');
       if (badgeScore) {
@@ -9979,6 +10069,51 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     // Classificação Anki / SM-2 (1: Repetir, 2: Difícil, 3: Bom, 4: Fácil)
+    function createNextDayReinforcementCard(item) {
+      if (!item?.id) return false;
+
+      const alreadyScheduled = sharedQuestionsBank.some(candidate => candidate.reinforcementOf === item.id
+        && candidate.srs?.dueDate && new Date(candidate.srs.dueDate) > new Date());
+      if (alreadyScheduled) return false;
+
+      const tomorrow = getStartOfDay();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(8, 0, 0, 0);
+      const originalQuestion = sanitizeSharedQuestionStem(item.flashcard?.front || item.question || item.pergunta || '');
+      const title = resolveFlashcardTitle(item);
+      const reinforcementQuestion = originalQuestion
+        ? `Relembre este conceito sem consultar alternativas: ${originalQuestion.replace(/[?!.]+$/, '')}. Explique o mecanismo ou a consequência que justifica sua resposta.`
+        : `Explique, com suas palavras, o mecanismo ou a consequência central de ${title}.`;
+      const answer = item.flashcard?.back || item.reference_answer || item.answer || '';
+      const now = new Date().toISOString();
+
+      sharedQuestionsBank.unshift({
+        ...item,
+        id: `reinforcement-${item.id}-${Date.now()}`,
+        question: reinforcementQuestion,
+        pergunta: reinforcementQuestion,
+        flashcard: { ...(item.flashcard || {}), front: reinforcementQuestion, back: answer, title },
+        flashcardTitle: title,
+        flashcardOnly: true,
+        reinforcementOf: item.id,
+        sourceOrigin: 'Reforço após erro',
+        createdAt: now,
+        quizStats: { answered: false, userChoice: null, isCorrect: false, attempts: 0, correct: 0 },
+        srs: {
+          interval: 1,
+          easeFactor: 2.5,
+          reps: 0,
+          lapses: 0,
+          dueDate: tomorrow.toISOString(),
+          lastReviewed: now,
+          state: 'review',
+          history: [],
+          newScheduledDate: null
+        }
+      });
+      return true;
+    }
+
     function answerFlashcardSrs(rating) {
       const baseList = getFilteredQuestions();
       const list = getSrsFilteredList(baseList);
@@ -9987,10 +10122,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (!item) return;
 
       item.srs = calculateSrsNext(item.srs, rating);
+      const reinforcementCreated = rating === 1 && createNextDayReinforcementCard(item);
       saveSharedQuestionsBank();
 
       const ratingNames = { 1: 'Repetir', 2: 'Difícil', 3: 'Bom', 4: 'Fácil' };
-      showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.`);
+      showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.${reinforcementCreated ? ' Reforço reformulado agendado para amanhã.' : ''}`);
 
       // Registra ação de estudo no controle de custos (Free Tier / Local)
       if (typeof AppExpenseTracker !== 'undefined') {
@@ -10406,7 +10542,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       const quizDeck = document.getElementById('quizDeck');
       if (!quizDeck) return;
       quizDeck.innerHTML = '';
-      let list = filteredList || getFilteredQuestions();
+      let list = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
 
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
