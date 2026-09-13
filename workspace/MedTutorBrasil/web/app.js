@@ -3234,14 +3234,16 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         return { isRedundant: false, score: 0, percentage: 0, matchedCard: null };
       }
 
-      const cardText = `${card.flashcard?.front || card.front || card.question || ''} ${card.flashcard?.back || card.back || card.answer || ''}`;
+      const cardQuestion = card.flashcard?.front || card.front || card.question || '';
+      const cardSubject = normalizeString(card.subject || '');
       let maxScore = 0.0;
       let matched = null;
 
       for (const other of allCards) {
         if (other.id === card.id) continue;
-        const otherText = `${other.flashcard?.front || other.front || other.question || ''} ${other.flashcard?.back || other.back || other.answer || ''}`;
-        const score = calculateLocalSimilarity(cardText, otherText);
+        if (cardSubject && normalizeString(other.subject || '') !== cardSubject) continue;
+        const otherQuestion = other.flashcard?.front || other.front || other.question || '';
+        const score = calculateLocalSimilarity(cardQuestion, otherQuestion);
         if (score > maxScore) {
           maxScore = score;
           matched = other;
@@ -3249,7 +3251,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       }
 
       return {
-        isRedundant: maxScore >= 0.50, // Limiar de 50% de similaridade
+        isRedundant: maxScore >= 0.82, // Só sinaliza cópias quase idênticas, não temas relacionados.
         score: maxScore,
         percentage: Math.round(maxScore * 100),
         matchedCard: matched
@@ -5491,7 +5493,10 @@ ${cleanText}
 
     function getFilteredQuestions() {
       ensureCurrentSubjectValid();
-      let list = sharedQuestionsBank;
+      // Reforços legados eram cópias do mesmo cartão após "Repetir". Mantemos o
+      // registro para auditoria, mas não o recolocamos nas filas se o original existe.
+      const originalIds = new Set(sharedQuestionsBank.map(item => item?.id).filter(Boolean));
+      let list = sharedQuestionsBank.filter(item => !(item?.reinforcementOf && originalIds.has(item.reinforcementOf)));
       if (currentStudySubject) {
         list = list.filter(q => q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase()));
       }
@@ -10264,52 +10269,6 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       }
     }
 
-    // Classificação Anki / SM-2 (1: Repetir, 2: Difícil, 3: Bom, 4: Fácil)
-    function createNextDayReinforcementCard(item) {
-      if (!item?.id) return false;
-
-      const alreadyScheduled = sharedQuestionsBank.some(candidate => candidate.reinforcementOf === item.id
-        && candidate.srs?.dueDate && new Date(candidate.srs.dueDate) > new Date());
-      if (alreadyScheduled) return false;
-
-      const tomorrow = getStartOfDay();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(8, 0, 0, 0);
-      const originalQuestion = sanitizeSharedQuestionStem(item.flashcard?.front || item.question || item.pergunta || '');
-      const title = resolveFlashcardTitle(item);
-      const reinforcementQuestion = originalQuestion
-        ? `Relembre este conceito sem consultar alternativas: ${originalQuestion.replace(/[?!.]+$/, '')}. Explique o mecanismo ou a consequência que justifica sua resposta.`
-        : `Explique, com suas palavras, o mecanismo ou a consequência central de ${title}.`;
-      const answer = item.flashcard?.back || item.reference_answer || item.answer || '';
-      const now = new Date().toISOString();
-
-      sharedQuestionsBank.unshift({
-        ...item,
-        id: `reinforcement-${item.id}-${Date.now()}`,
-        question: reinforcementQuestion,
-        pergunta: reinforcementQuestion,
-        flashcard: { ...(item.flashcard || {}), front: reinforcementQuestion, back: answer, title },
-        flashcardTitle: title,
-        flashcardOnly: true,
-        reinforcementOf: item.id,
-        sourceOrigin: 'Reforço após erro',
-        createdAt: now,
-        quizStats: { answered: false, userChoice: null, isCorrect: false, attempts: 0, correct: 0 },
-        srs: {
-          interval: 1,
-          easeFactor: 2.5,
-          reps: 0,
-          lapses: 0,
-          dueDate: tomorrow.toISOString(),
-          lastReviewed: now,
-          state: 'review',
-          history: [],
-          newScheduledDate: null
-        }
-      });
-      return true;
-    }
-
     function answerFlashcardSrs(rating) {
       const baseList = getFilteredQuestions();
       const list = getSrsFilteredList(baseList);
@@ -10318,11 +10277,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (!item) return;
 
       item.srs = calculateSrsNext(item.srs, rating);
-      const reinforcementCreated = rating === 1 && createNextDayReinforcementCard(item);
       saveSharedQuestionsBank();
 
       const ratingNames = { 1: 'Repetir', 2: 'Difícil', 3: 'Bom', 4: 'Fácil' };
-      showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.${reinforcementCreated ? ' Reforço reformulado agendado para amanhã.' : ''}`);
+      showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.`);
 
       // Registra ação de estudo no controle de custos (Free Tier / Local)
       if (typeof AppExpenseTracker !== 'undefined') {
@@ -11329,7 +11287,7 @@ Retorne EXCLUSIVAMENTE um JSON:
           const qA = questions[i];
           const qB = questions[j];
           const sim = calculateLocalSimilarity(qA.question, qB.question);
-          if (sim >= 0.40) {
+          if (sim >= 0.82) {
             pairs.push({ qA, qB, score: Math.round(sim * 100) });
             redundantIds.add(qB.id);
           }
@@ -11437,7 +11395,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         for (let j = i + 1; j < questions.length; j++) {
           if (toRemove.has(questions[j].id)) continue;
           const sim = calculateLocalSimilarity(questions[i].question, questions[j].question);
-          if (sim >= 0.40) {
+          if (sim >= 0.82) {
             toRemove.add(questions[j].id);
           }
         }
