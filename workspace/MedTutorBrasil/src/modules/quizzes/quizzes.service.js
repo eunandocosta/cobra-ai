@@ -18,6 +18,21 @@ function areQuestionsTooSimilar(first, second) {
   return intersection / new Set([...a, ...b]).size >= 0.45;
 }
 
+// O mesmo enunciado é usado no Quiz (com opções) e no Flashcard (sem opções).
+// Remove instruções que só fazem sentido em múltipla escolha antes de persistir.
+function sanitizeSharedQuestionStem(value) {
+  return String(value || '')
+    .replace(/(?:^|\s)(?:de acordo com (?:as )?opções|com base nas alternativas|considerando as alternativas)[,:;]?\s*/gi, ' ')
+    .replace(/(?:^|\s)(?:assinale|marque|selecione|indique)\s+(?:a\s+)?alternativa\s+(?:correta|mais correta|adequada|incorreta)[,:;]?\s*/gi, ' ')
+    .replace(/(?:^|\n)\s*(?:\[\s*\]\s*)?[A-D][).:\-]\s*[^\n]+/gim, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isSharedQuestionStemValid(stem) {
+  return stem.length >= 18 && !/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem);
+}
+
 function buildSafeFlashcardTitle(title, correctAnswer, learningFocus) {
   const candidate = String(title || '').replace(/\s+/g, ' ').trim();
   const normalize = value => String(value || '').normalize('NFD')
@@ -50,7 +65,7 @@ const questionsSchema = {
     properties: {
       pergunta: {
         type: SchemaType.STRING,
-        description: "Enunciado focado em caso clínico ou correlação anátomo-funcional direta. Nunca cite o texto, índice ou apostila."
+        description: "Pergunta aberta, autocontida e respondível sem alternativas; será usada igual no Quiz e no Flashcard. Nunca use 'assinale', 'alternativa', 'opções', nem inclua opções no enunciado."
       },
       alternativas: {
         type: SchemaType.ARRAY,
@@ -107,6 +122,7 @@ DIRETRIZES FUNDAMENTAIS:
 2. Em cada lote, distribua as questões o mais próximo possível de 40% fundamentos (definição, localização, partes, relações e função), 35% mecanismo_consequencia (causa, alteração e consequência) e 25% aplicacao_clinica (vinheta, semiologia, diagnóstico ou manejo). Para lotes pequenos, priorize sempre ao menos uma questão de fundamentos.
 3. PROIBIDO usar palavras como: "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
 4. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido.
+5. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 `;
 
 class QuizzesService {
@@ -151,7 +167,7 @@ Com base nas estruturas anatômicas, vias neurais, síndromes e vascularização
 ${materialText}
 --- FIM DO CONTEÚDO ---
 
-Regras: respeite a distribuição 40% fundamentos, 35% mecanismo_consequencia e 25% aplicacao_clinica, identificando cada item em foco_aprendizagem. Só a última categoria exige vinheta clínica. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use o diagnóstico, a alternativa correta, a conduta ou um dado que resolva a questão.
+Regras: respeite a distribuição 40% fundamentos, 35% mecanismo_consequencia e 25% aplicacao_clinica, identificando cada item em foco_aprendizagem. Só a última categoria exige vinheta clínica. Não mencione o texto nem termos de índice. Não trate anatomia como se fosse nome de doença. A pergunta deve ser aberta e autocontida: o estudante precisa conseguir respondê-la no Flashcard sem ler opções. Nunca escreva no enunciado “assinale”, “alternativa”, “opção”, “marque” ou as próprias alternativas. Em titulo_flashcard, forneça um rótulo temático curto que contextualize a pergunta sem antecipar sua resposta; nunca use o diagnóstico, a alternativa correta, a conduta ou um dado que resolva a questão.
 ${learningFocus ? `Nesta chamada unitária, gere exclusivamente uma questão de foco_aprendizagem: ${learningFocus}.` : ''}
 ${previousQuestions.length ? `Não repita nem reformule estas questões já aceitas:\n${previousQuestions.map((question, index) => `${index + 1}. ${String(question).slice(0, 500)}`).join('\n')}` : ''}
 `;
@@ -160,7 +176,11 @@ ${previousQuestions.length ? `Não repita nem reformule estas questões já acei
       const result = await runWithAiLimit(() => model.generateContent(prompt));
       const responseText = result.response.text();
       const questoes = JSON.parse(responseText);
-      const questoesUnicas = (Array.isArray(questoes) ? questoes : []).filter((question, index, all) => {
+      const questoesNormalizadas = (Array.isArray(questoes) ? questoes : []).map(question => ({
+        ...question,
+        pergunta: sanitizeSharedQuestionStem(question?.pergunta)
+      })).filter(question => isSharedQuestionStemValid(question.pergunta));
+      const questoesUnicas = questoesNormalizadas.filter((question, index, all) => {
         const current = question?.pergunta || '';
         return all.slice(0, index).every(previous => !areQuestionsTooSimilar(current, previous?.pergunta || ''));
       });
@@ -367,7 +387,11 @@ DIRETRIZES OBRIGATÓRIAS:
 4. RIGOR TERMINOLÓGICO ABSOLUTO:
    - JAMAIS confunda nomes de arquivo, cabeçalhos ou termos de metadados ("GABARITO", "E.D.", "ESTUDO DIRIGIDO", "SIMULADO", "PROVA", "APOSTILA") com nomes de doenças!
    - Identifique e defina o tema clínico real em "clinicalSubject" (ex: "Hemorragia Subaracnóidea", "Hipertensão Intracraniana", "Síndrome de Wallenberg", "Neuroanatomia do Líquor e Meninges").
-   - Nunca crie frases como "paciente com sintomas característicos de GABARITO E.D".`,
+   - Nunca crie frases como "paciente com sintomas característicos de GABARITO E.D".
+
+5. ENUNCIADO COMPARTILHADO:
+   - O campo question será usado igual no Quiz e na frente do Flashcard. Ele deve ser uma pergunta aberta, autocontida e respondível sem alternativas.
+   - É proibido escrever “assinale a alternativa”, “marque a opção”, “de acordo com as opções” ou incluir opções no próprio enunciado.`,
       generationConfig: {
         temperature: 0.15,
         responseMimeType: "application/json"
@@ -393,7 +417,7 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {
       "source": "reused" | "generated_from_text",
       "vignette": "vinheta clínica ou caso de estudo (se presente)",
-      "question": "enunciado da questão",
+      "question": "pergunta aberta, autocontida e respondível sem alternativas",
       "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
       "correctIndex": número (0, 1, 2 ou 3),
       "explanation": "explicação fisiopatológica e justificativa da alternativa correta",
@@ -425,21 +449,23 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
           ? item.correctIndex 
           : 0;
 
+        const sharedStem = sanitizeSharedQuestionStem(item.question || `Questão ${index + 1} sobre ${parsed.clinicalSubject || targetSubject}`);
+        if (!isSharedQuestionStemValid(sharedStem)) return null;
         return {
           source: isReused ? 'reused' : 'generated_from_text',
           vignette: item.vignette || '',
-          question: item.question || `Questão ${index + 1} sobre ${parsed.clinicalSubject || targetSubject}`,
+          question: sharedStem,
           options: opts,
           correctIndex: cIdx,
           correctAnswerText: opts[cIdx] || '',
           explanation: item.explanation || 'Conforme diretrizes clínicas e material didático.',
           pearl: item.pearl || '',
           learningFocus: item.learningFocus || 'fundamentos',
-          flashcardFront: item.flashcardFront || item.question,
+          flashcardFront: sharedStem,
           flashcardBack: item.flashcardBack || opts[cIdx] || item.explanation,
           difficulty: item.difficulty || 'intermediario'
         };
-      });
+      }).filter(Boolean);
 
       console.log(`✅ [Quiz Engine - Analisar Material] Sucesso: Tipo "${parsed.detectedType}", ${reusedCount} reaproveitadas, ${genCount} geradas.`);
 

@@ -3248,6 +3248,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const list = getSrsFilteredList(baseList);
       if (list.length === 0) return;
       const item = list[currentCardIndex];
+      const sharedStem = sanitizeSharedQuestionStem(item.flashcard?.front || item.question || '');
+      const visibleQuestion = isSharedQuestionStemValid(sharedStem)
+        ? sharedStem
+        : (item.flashcard?.front || item.question || '');
       if (!item || !item.redundancyInfo || !item.redundancyInfo.isRedundant) {
         showToast('Nenhuma redundância crítica detectada neste card.');
         return;
@@ -4155,7 +4159,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           } else {
             vignette = `Na fundamentação biomédica e anatomo-clínica de ${clinicalTopic}, a identificação precoce das definições nucleares é indispensável para a prática médica.`;
           }
-          question = `Em relação aos conceitos estruturais e critérios diagnósticos primários de ${clinicalTopic}, assinale a assertiva correta de acordo com a literatura médica padrão:`;
+          question = `Quais conceitos estruturais e critérios diagnósticos primários caracterizam ${clinicalTopic}?`;
           rawOptions = [
             `A abordagem inicial em ${clinicalTopic} baseia-se na caracterização semiológica rigorosa, identificação dos fatores de risco e estratificação segundo os protocolos vigentes.`,
             `O diagnóstico de ${clinicalTopic} dispensa qualquer correlação clínica ou propedêutica armada em todos os casos.`,
@@ -4201,7 +4205,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           keyConcepts = [clinicalTopic.toLowerCase(), 'fisiopatologia', 'homeostase', 'mecanismo'];
         } else {
           vignette = `${patientDesc}, ${settingDesc}. O quadro clínico tem evolução progressiva, com sinais e sintomas congruentes com a hipótese de ${clinicalTopic} de moderada a alta gravidade.`;
-          question = `Diante do cenário clínico apresentado e das diretrizes vigentes (${guidelineLabel}), assinale a conduta propedêutica e terapêutica prioritária de primeira linha:`;
+          question = `Diante do cenário clínico apresentado e das diretrizes vigentes (${guidelineLabel}), qual é a conduta propedêutica e terapêutica prioritária de primeira linha?`;
           rawOptions = [
             `Proceder à estabilização clínica imediata, vigilância de sinais de alarme e instituição do esquema terapêutico de primeira linha preconizado pelas diretrizes oficiais para ${clinicalTopic}.`,
             `Adotar conduta estritamente passiva e expectante sem solicitar exames ou prestar orientações preventivas.`,
@@ -4912,6 +4916,19 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       };
     }
 
+    function sanitizeSharedQuestionStem(value) {
+      return String(value || '')
+        .replace(/(?:^|\s)(?:de acordo com (?:as )?opções|com base nas alternativas|considerando as alternativas)[,:;]?\s*/gi, ' ')
+        .replace(/(?:^|\s)(?:assinale|marque|selecione|indique)\s+(?:a\s+)?alternativa\s+(?:correta|mais correta|adequada|incorreta)[,:;]?\s*/gi, ' ')
+        .replace(/(?:^|\n)\s*(?:\[\s*\]\s*)?[A-D][).:\-]\s*[^\n]+/gim, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function isSharedQuestionStemValid(stem) {
+      return stem.length >= 18 && !/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem);
+    }
+
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
       const previousQuestions = (config.acceptedStudyItems || []).map(item => item.question || item.pergunta || '').filter(Boolean);
       const learningFocus = config.forcedLearningFocus || 'fundamentos';
@@ -4936,13 +4953,19 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           logQuizGenerationDebug('backend_generation_failed', { status: response.status, details: data?.details || data?.error || 'Resposta inválida' });
           return null;
         }
-        const items = data.map(item => ({
+        const items = data.map(item => {
+          const sharedStem = sanitizeSharedQuestionStem(item.question || item.pergunta || '');
+          if (!isSharedQuestionStemValid(sharedStem)) return null;
+          return {
           ...item,
+          question: sharedStem,
+          pergunta: sharedStem,
           subject: metadata.subjectName || item.subject || '',
           slideName: metadata.materialName || item.slideName || '',
           topic: item.topic || item.learningFocus || 'Conceito do material',
           disease: item.disease || item.learningFocus || 'Conceito do material',
           flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
+          flashcard: { ...(item.flashcard || {}), front: sharedStem },
           learningFocus,
           difficultyLevel,
           cognitiveLevel: difficultyLevel,
@@ -4951,7 +4974,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           answer: item.answer || item.resposta_correta || item.correctAnswerText || item.explanation || '',
           requer_imagem: /\b(anatom|an[aá]tom|espa[cç]o|mening|nervo|vascul|art[eé]ria|veia|c[oó]rtex|ventr[ií]cul|l[ií]quor|l[ií]quido cefalorraquidiano|radiolog|tomograf|resson|raio.?x|ecg|les[aã]o|histolog)\b/i.test(`${item.question || ''} ${materialText}`),
           evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
-        }));
+          };
+        }).filter(Boolean);
         logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, learningFocus, difficultyLevel, imagesRequested: items.filter(item => item.requer_imagem).length });
         return items;
       } catch (error) {
@@ -5033,6 +5057,7 @@ DIRETRIZES DE FORMULAÇÃO CLÍNICA:
 7. Cada questão deve corresponder a EXATAMENTE um item do plano abaixo. Não crie conceitos fora dele, não repita conceito, estrutura, mecanismo, resposta correta, vinheta ou formulação.
 8. Nunca use o nome do arquivo, da aula, do slide, da disciplina ou do material como estrutura anatômica, doença, procedimento ou resposta. Use exclusivamente conceitos que apareçam no conteúdo biomédico-fonte.
 9. Copie em evidencia_fonte a evidência do item de plano utilizado; ela deve sustentar diretamente a pergunta e a resposta correta.
+10. O mesmo enunciado será mostrado no Quiz e na frente do Flashcard. Portanto, ele deve ser uma pergunta aberta e autocontida, respondível sem alternativas. É proibido escrever “assinale a alternativa”, “marque a opção”, “de acordo com as opções” ou incluir alternativas no campo pergunta.
 
 PLANO PEDAGÓGICO VERIFICADO:
 ${JSON.stringify(blueprint)}
@@ -5096,12 +5121,12 @@ ${cleanText}
       if (Array.isArray(parsed) && parsed.length > 0) {
         // 3. Filtro de Auditoria Pós-Geração: descarta qualquer questão contaminada com termos de metadados
         const itensValidados = parsed.filter(item => {
-          const p = item.pergunta || item.question || '';
+          const p = sanitizeSharedQuestionStem(item.pergunta || item.question || '');
           const planned = blueprint.some(plan =>
             normalizeStudyComparisonText(plan.conceito_alvo) === normalizeStudyComparisonText(item.conceito_alvo) &&
             plan.foco_aprendizagem === item.foco_aprendizagem
           );
-          return !regexTermosProibidos.test(p) && planned && isEvidenceGroundedInMaterial(item.evidencia_fonte, cleanText);
+          return isSharedQuestionStemValid(p) && !regexTermosProibidos.test(p) && planned && isEvidenceGroundedInMaterial(item.evidencia_fonte, cleanText);
         });
 
         // Se o modelo desrespeitou as regras em tudo, tenta o próximo modelo da lista
@@ -5148,7 +5173,7 @@ ${cleanText}
             : { area: 'clinica', areaLabel: 'Clínica Médica' };
 
           const itemTopic = item.conceito_alvo;
-          const qText = item.pergunta || item.question || `Questão sobre ${disease}`;
+          const qText = sanitizeSharedQuestionStem(item.pergunta || item.question || `Questão sobre ${disease}`);
           const justifText = item.justificativa || item.explanation || 'Justificativa anatomofisiopatológica fundamentada nas diretrizes clínicas.';
           const newCorrectLetter = String.fromCharCode(65 + newCorrectIndex);
 
@@ -9852,7 +9877,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       }
       const queueNames = { new: 'Não feitos', due: 'Revisão de Hoje', tomorrow: 'Revisão de amanhã', upcoming: 'Revisão dos próximos dias' };
       if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length} • ${queueNames[srsQueueFilter] || 'Todos os cards'}`;
-      if (frontEl) frontEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.front || item.question || '') : (item.flashcard?.front || item.question || '');
+      if (frontEl) frontEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(visibleQuestion) : visibleQuestion;
       if (backEl) backEl.innerHTML = (typeof formatInlineMd === 'function') ? formatInlineMd(item.flashcard?.back || item.reference_answer || item.answer || '') : (item.flashcard?.back || item.reference_answer || item.answer || '');
       if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item));
 
@@ -20435,7 +20460,10 @@ Linha 04: __________________________________________________
       }
 
       // 5. Salva todas as questões e flashcards no sharedQuestionsBank
-      const items = analysisResult.items || [];
+      const items = (analysisResult.items || []).map(item => ({
+        ...item,
+        question: sanitizeSharedQuestionStem(item.question || item.flashcardFront || '')
+      })).filter(item => isSharedQuestionStemValid(item.question));
       let cleanFileTitle = fileName.replace(/\.[^/.]+$/, '').trim();
       cleanFileTitle = cleanFileTitle.replace(/\b(gabarito|e\.?d\.?|estudo\s*dirigido|simulado|prova|caderno|apostila|quest[oõ]es|aula|slide|modulo|capitulo)\s*\d*\b/gi, '').trim();
       cleanFileTitle = cleanFileTitle.replace(/^[_\-\s\.\:]+|[_\-\s\.\:]+$/g, '').trim();
@@ -20471,7 +20499,7 @@ Linha 04: __________________________________________________
           reference_answer: item.explanation || '',
           answer: item.explanation || '',
           flashcard: {
-            front: item.flashcardFront || item.question,
+            front: item.question,
             back: item.flashcardBack || item.explanation || '',
             keyConcepts: [targetSubject.toLowerCase(), isReused ? 'reaproveitada' : 'gerada_ia']
           },
@@ -20615,6 +20643,7 @@ DIRETRIZES OBRIGATÓRIAS:
    - SE HOUVER TEXTO DIDÁTICO ("text_only" ou "both"):
      TRANSFORME o texto em questões clínicas inéditas no padrão ENARE/Residência, com 4 alternativas, gabarito justificado e par de Flashcard correspondente. Defina "source": "generated_from_text".
    - NUNCA use termos de cabeçalho ou arquivos (GABARITO, E.D.) como nome de patologia.
+   - O campo "question" e "flashcardFront" devem ser a mesma pergunta aberta, autocontida e respondível sem alternativas. Não use “assinale a alternativa”, “marque a opção”, “de acordo com as opções” nem coloque opções no enunciado.
 
 CONTEÚDO DO MATERIAL:
 """
