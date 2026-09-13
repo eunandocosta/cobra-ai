@@ -101,6 +101,7 @@
       userProfile: null,
       authMode: 'guest', // 'firebase' | 'guest'
       googleSignInInProgress: false,
+      authStateResolved: false,
 
       init() {
         // Carrega dados locais persistidos do usuário
@@ -109,9 +110,18 @@
           if (savedProfile) {
             this.userProfile = JSON.parse(savedProfile);
           }
-          // Um perfil salvo localmente não é uma credencial Firebase. A sessão
-          // oficial será restaurada exclusivamente por onAuthStateChanged.
-          localStorage.removeItem('medtutor_auth_user');
+          // O registro local serve apenas para evitar o "pisca" da tela de
+          // login enquanto o Firebase restaura a sessão. Ele nunca é usado
+          // como autorização para ler ou gravar dados na nuvem.
+          const savedAuthUser = localStorage.getItem('medtutor_auth_user');
+          if (savedAuthUser) {
+            const parsedUser = JSON.parse(savedAuthUser);
+            const isLocalUser = /^(guest_|local_email_|local_user_)/.test(parsedUser?.uid || '');
+            if (!isLocalUser && parsedUser?.uid) {
+              this.currentUser = parsedUser;
+              this.authMode = 'restoring';
+            }
+          }
         } catch (e) {}
 
         // Se estiver rodando via file://, exibe aviso explicativo na tela de login
@@ -126,21 +136,28 @@
         // Atualiza a UI da topbar
         this.updateUserTopbarUI();
 
-        // Verifica estado de autenticação para exibir tela de login ou manter app ativo
+        // Enquanto a confirmação assíncrona do Firebase não chega, mantém a
+        // interface do último usuário visível. A autenticação real continua
+        // sendo exigida por hasAuthenticatedCloudSession().
         const authScreen = document.getElementById('authScreenContainer');
         if (!this.currentUser) {
           if (authScreen) authScreen.classList.add('active');
         } else {
           if (authScreen) authScreen.classList.remove('active');
-          if (!this.userProfile || !this.userProfile.nome || !this.userProfile.faculdade) {
-            openMedicalOnboardingModal(false);
-          }
         }
       },
 
       initFirebaseSDK() {
         if (typeof firebase === 'undefined') {
           console.log('[MedTutor Firebase] SDK não detectado no ambiente, operando em modo local resiliente.');
+          this.authStateResolved = true;
+          if (this.authMode === 'restoring') {
+            this.currentUser = null;
+            this.authMode = 'guest';
+            localStorage.removeItem('medtutor_auth_user');
+            document.getElementById('authScreenContainer')?.classList.add('active');
+            this.updateUserTopbarUI();
+          }
           return;
         }
 
@@ -189,6 +206,7 @@
             }
 
             firebaseAuth.onAuthStateChanged(async (user) => {
+              this.authStateResolved = true;
               if (user) {
                 this.currentUser = {
                   uid: user.uid,
@@ -198,11 +216,19 @@
                 };
                 this.authMode = 'firebase';
                 localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-                await this.fetchUserProfileFromFirestore(user.uid);
-                await MedTutorFirebaseService.loadAllDataFromPersistence();
                 this.updateUserTopbarUI();
                 const authScreen = document.getElementById('authScreenContainer');
                 if (authScreen) authScreen.classList.remove('active');
+                // Libera a navegação assim que o Firebase confirma a sessão.
+                // As leituras podem continuar em segundo plano, sem transformar
+                // cada F5 em uma nova tela de login.
+                try {
+                  await this.fetchUserProfileFromFirestore(user.uid);
+                  await MedTutorFirebaseService.loadAllDataFromPersistence();
+                } catch (loadError) {
+                  console.warn('[MedTutor Firebase] Sessão restaurada, mas houve falha ao atualizar dados:', loadError);
+                }
+                this.updateUserTopbarUI();
                 if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
                 if (typeof renderDashboardView === 'function') renderDashboardView();
                 if (typeof renderCurriculumView === 'function') renderCurriculumView();
@@ -454,6 +480,8 @@
           try { await firebaseAuth.signOut(); } catch (e) {}
         }
         this.currentUser = null;
+        this.authMode = 'guest';
+        this.authStateResolved = true;
         localStorage.removeItem('medtutor_auth_user');
         const dropdown = document.getElementById('userProfileDropdown');
         if (dropdown) dropdown.classList.remove('active');
