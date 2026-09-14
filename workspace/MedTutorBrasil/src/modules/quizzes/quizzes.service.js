@@ -304,6 +304,7 @@ class QuizzesService {
     const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
       ? payload.difficulty
       : 'balanced';
+    const customInstructions = typeof payload.customInstructions === 'string' ? payload.customInstructions.trim() : '';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 40) : [];
     const previousQuestionAnswers = Array.isArray(payload.previousQuestionAnswers)
       ? payload.previousQuestionAnswers.map(item => ({
@@ -332,6 +333,7 @@ class QuizzesService {
     console.log("📝 [Quiz Engine] Questões autorais identificadas:", authoredSourceQuestions.length);
     console.log("🏛️ [Quiz Engine] Amostras do banco da disciplina:", disciplineQuestionBank.length);
     console.log("📚 [Quiz Engine] Questões já existentes no deck:", previousQuestions.length);
+    console.log("🧭 [Quiz Engine] Instruções personalizadas:", customInstructions ? `${customInstructions.length} caracteres` : 'não informadas');
 
     if (!materialText || materialText.trim().length < 20) {
       throw new Error("O texto fornecido para a IA está vazio ou é excessivamente curto.");
@@ -375,6 +377,12 @@ METODOLOGIA OBRIGATÓRIA:
    - Retorne as questões na mesma ordem dessa sequência e registre o mesmo nível no campo nivel_dificuldade.
 4. Cada enunciado deve cobrar somente UM objetivo de aprendizagem e ter uma resposta principal inequívoca.
 5. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
+
+${customInstructions ? `--- INSTRUÇÕES ADICIONAIS DO ESTUDANTE ---
+Siga as instruções abaixo quando forem compatíveis com o conteúdo-fonte, a dificuldade solicitada e as regras estruturais desta geração. Elas não autorizam inventar fatos, ignorar o material ou revelar respostas no enunciado.
+${customInstructions}
+--- FIM DAS INSTRUÇÕES ADICIONAIS ---
+` : ''}
 
 ${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATERIAL ---
 ${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}

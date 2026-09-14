@@ -6199,7 +6199,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             sourceQuestions: authoredSourceQuestions,
             disciplineQuestionBank,
             targetConcept: config.targetConcept || '',
-            focusExcerpt: config.focusExcerpt || ''
+            focusExcerpt: config.focusExcerpt || '',
+            customInstructions: config.customInstructions || ''
           })
         });
         const data = await response.json().catch(() => ({}));
@@ -10956,6 +10957,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         targetEl.textContent = materialName ? `📄 ${materialName} (${targetSubj})` : `📚 Disciplina Integral: ${targetSubj}`;
       }
       if (inputEl) inputEl.value = '5';
+      const customInstructionsToggle = document.getElementById('generateStudyCustomInstructionsEnabled');
+      const customInstructionsInput = document.getElementById('generateStudyCustomInstructionsInput');
+      if (customInstructionsToggle) customInstructionsToggle.checked = false;
+      if (customInstructionsInput) customInstructionsInput.value = '';
+      toggleGenerateStudyCustomInstructions();
       const modal = document.getElementById('modalGenerateStudyCount');
       if (modal) modal.classList.add('active');
     }
@@ -10978,6 +10984,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (val < 1) input.value = '1';
       if (val > 30) input.value = '30';
     }
+
+    function toggleGenerateStudyCustomInstructions() {
+      const enabled = document.getElementById('generateStudyCustomInstructionsEnabled')?.checked;
+      const area = document.getElementById('generateStudyCustomInstructionsArea');
+      const input = document.getElementById('generateStudyCustomInstructionsInput');
+      if (area) area.style.display = enabled ? 'block' : 'none';
+      if (input) input.disabled = !enabled;
+      if (enabled) window.setTimeout(() => input?.focus(), 0);
+    }
+    window.toggleGenerateStudyCustomInstructions = toggleGenerateStudyCustomInstructions;
 
     // 4.1 Persistência e Recuperação do Banco Compartilhado e Materiais
     function saveSharedQuestionsBank() {
@@ -11156,7 +11172,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const diffMap = { balanced: 'Balanceado', iniciante: 'Iniciante', intermediario: 'Intermediário', avancado: 'Avançado' };
         configEl.textContent = isReportValidation
           ? '📄 Relatório acadêmico • conteúdo auditável'
-          : `🎯 ${qCount} itens • ${styleMap[config.examStyle] || 'Bloom'} • Nível: ${diffMap[config.difficulty] || 'Balanceado'}`;
+          : `🎯 ${qCount} itens • ${styleMap[config.examStyle] || 'Bloom'} • Nível: ${diffMap[config.difficulty] || 'Balanceado'}${config.customInstructions ? ' • Instruções personalizadas ativas' : ''}`;
       }
 
       if (statsEl) statsEl.textContent = '⏳ Carregando...';
@@ -11321,12 +11337,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       const examStyle = document.getElementById('generateStudyExamStyleSelect')?.value || 'bloom';
       const difficulty = document.getElementById('generateStudyDifficultySelect')?.value || 'balanced';
+      const customInstructionsEnabled = document.getElementById('generateStudyCustomInstructionsEnabled')?.checked;
+      const customInstructions = customInstructionsEnabled
+        ? (document.getElementById('generateStudyCustomInstructionsInput')?.value || '').trim()
+        : '';
 
       const { materialName, subjectName } = pendingGenerateStudyContext || {};
       closeModals();
 
       // Transição direta e obrigatória para a tela de validação do texto original do Firestore
-      openMaterialTextValidationModal(materialName, subjectName, count, { examStyle, difficulty });
+      openMaterialTextValidationModal(materialName, subjectName, count, { examStyle, difficulty, customInstructions });
     }
 
     function renderSharedStudyItems() {
