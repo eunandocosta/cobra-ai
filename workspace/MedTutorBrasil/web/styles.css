@@ -1615,7 +1615,7 @@
 
     .flashcard-wrapper {
       perspective: 1000px;
-      max-width: 580px;
+      max-width: 680px;
       width: 100%;
       margin: 0 auto 24px auto;
     }
@@ -1624,7 +1624,8 @@
       position: relative;
       width: 100%;
       /* Mantém a proporção original do cartão e delimita sua área de leitura. */
-      height: 480px;
+      height: min(560px, calc(100dvh - 250px));
+      min-height: 440px;
     }
 
     /* Em Safari, uma face 3D invisível pode interceptar a rolagem da outra.
@@ -1656,6 +1657,10 @@
       scrollbar-color: var(--border-accent) transparent;
       scrollbar-gutter: stable;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .flashcard-side > * {
+      min-width: 0;
     }
 
     .flashcard-side::-webkit-scrollbar {
@@ -1690,6 +1695,12 @@
       color: var(--neon);
       letter-spacing: 0.5px;
       flex-shrink: 0;
+      position: sticky;
+      top: -24px;
+      z-index: 2;
+      padding: 2px 0 10px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
     }
 
     .flashcard-meta-items {
@@ -1700,9 +1711,9 @@
     }
 
     .card-main-text {
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 600;
-      line-height: 1.5;
+      line-height: 1.6;
       text-align: left;
       margin: 4px 0 8px 0;
       flex-shrink: 0;
@@ -1714,6 +1725,8 @@
       gap: 10px;
       margin-top: 6px;
       width: 100%;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
     }
 
     .written-textarea {
@@ -1746,6 +1759,19 @@
       line-height: 1.45;
       display: none;
       animation: fadeIn 0.3s ease;
+    }
+
+    .study-review-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      max-width: 680px;
+      margin: -8px auto 0;
+    }
+
+    .study-review-actions .btn-outline-action {
+      min-height: 38px;
     }
 
     /* Banner de Alerta de Redundância (>= 50%) */
@@ -1794,6 +1820,46 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }
+
+    .quiz-card-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .quiz-card-metadata,
+    .quiz-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .quiz-card-actions {
+      margin-left: auto;
+    }
+
+    .quiz-question-prompt {
+      font-size: 16px;
+      font-weight: 650;
+      line-height: 1.6;
+      margin: 2px 0 4px;
+      color: var(--text-primary);
+      overflow-wrap: anywhere;
+    }
+
+    .quiz-question-prompt > :first-child {
+      margin-top: 0;
+    }
+
+    .quiz-question-prompt > :last-child {
+      margin-bottom: 0;
     }
 
     .quiz-options-list {
@@ -4936,7 +5002,7 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(8, 10, 9, 0.96);
+      background: var(--bg-main);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       z-index: 9999;
@@ -4952,6 +5018,58 @@
     .auth-screen-overlay.active {
       opacity: 1;
       pointer-events: auto;
+    }
+
+    .auth-session-check {
+      display: none;
+      width: min(100%, 340px);
+      min-height: 220px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+      color: var(--text-primary);
+    }
+
+    .auth-session-check .loader-spinner {
+      width: 24px;
+      height: 24px;
+      border-width: 3px;
+    }
+
+    .auth-session-check strong {
+      font-size: 15px;
+    }
+
+    .auth-session-check small {
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .auth-session-mark {
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border-accent);
+      border-radius: 18px;
+      background: var(--neon-subtle);
+      color: var(--neon);
+      box-shadow: 0 0 28px var(--neon-glow);
+    }
+
+    .auth-session-mark .icon {
+      width: 28px;
+      height: 28px;
+    }
+
+    .auth-screen-overlay.auth-state-resolving .auth-card {
+      display: none;
+    }
+
+    .auth-screen-overlay.auth-state-resolving .auth-session-check {
+      display: flex;
     }
 
     .auth-card {
@@ -6033,6 +6151,27 @@
         border-radius: 15px;
         padding: 16px;
         gap: 14px;
+      }
+
+      .quiz-card-topbar {
+        align-items: stretch;
+      }
+
+      .quiz-card-actions {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      .quiz-card-actions .btn-outline-action {
+        flex: 1 1 110px;
+      }
+
+      .study-review-actions {
+        justify-content: stretch;
+      }
+
+      .study-review-actions .btn-outline-action {
+        flex: 1 1 132px;
       }
 
       .quiz-opt {

@@ -172,6 +172,16 @@
       googleSignInInProgress: false,
       authStateResolved: false,
 
+      setAuthScreenState(state) {
+        const authScreen = document.getElementById('authScreenContainer');
+        if (!authScreen) return;
+        const isChecking = state === 'checking';
+        const isVisible = isChecking || state === 'login';
+        authScreen.classList.toggle('active', isVisible);
+        authScreen.classList.toggle('auth-state-resolving', isChecking);
+        authScreen.setAttribute('aria-busy', String(isChecking));
+      },
+
       init() {
         // Carrega dados locais persistidos do usuário
         try {
@@ -208,12 +218,7 @@
         // Enquanto a confirmação assíncrona do Firebase não chega, mantém a
         // interface do último usuário visível. A autenticação real continua
         // sendo exigida por hasAuthenticatedCloudSession().
-        const authScreen = document.getElementById('authScreenContainer');
-        if (!this.currentUser) {
-          if (authScreen) authScreen.classList.add('active');
-        } else {
-          if (authScreen) authScreen.classList.remove('active');
-        }
+        this.setAuthScreenState(this.currentUser ? 'checking' : 'login');
       },
 
       initFirebaseSDK() {
@@ -224,7 +229,7 @@
             this.currentUser = null;
             this.authMode = 'guest';
             localStorage.removeItem('medtutor_auth_user');
-            document.getElementById('authScreenContainer')?.classList.add('active');
+            this.setAuthScreenState('login');
             this.updateUserTopbarUI();
           }
           return;
@@ -263,10 +268,10 @@
                   this.authMode = 'firebase';
                   localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                   showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
-                  const authScreen = document.getElementById('authScreenContainer');
-                  if (authScreen) authScreen.classList.remove('active');
+                  this.setAuthScreenState('checking');
                   await this.fetchUserProfileFromFirestore(user.uid);
                   await MedTutorFirebaseService.loadAllDataFromPersistence();
+                  this.setAuthScreenState('hidden');
                   this.updateUserTopbarUI();
                 }
               }).catch((redirectErr) => {
@@ -286,8 +291,7 @@
                 this.authMode = 'firebase';
                 localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                 this.updateUserTopbarUI();
-                const authScreen = document.getElementById('authScreenContainer');
-                if (authScreen) authScreen.classList.remove('active');
+                this.setAuthScreenState('checking');
                 // Libera a navegação assim que o Firebase confirma a sessão.
                 // As leituras podem continuar em segundo plano, sem transformar
                 // cada F5 em uma nova tela de login.
@@ -297,6 +301,7 @@
                 } catch (loadError) {
                   console.warn('[MedTutor Firebase] Sessão restaurada, mas houve falha ao atualizar dados:', loadError);
                 }
+                this.setAuthScreenState('hidden');
                 this.updateUserTopbarUI();
                 if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
                 if (typeof renderDashboardView === 'function') renderDashboardView();
@@ -311,8 +316,7 @@
                 localStorage.removeItem('medtutor_auth_user');
                 this.updateUserTopbarUI();
                 this.updateFirebaseConfigModalUI();
-                const authScreen = document.getElementById('authScreenContainer');
-                if (authScreen) authScreen.classList.add('active');
+                this.setAuthScreenState('login');
               }
             });
           }
@@ -416,9 +420,10 @@
               this.authMode = 'firebase';
               localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
               showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
-              document.getElementById('authScreenContainer').classList.remove('active');
+              this.setAuthScreenState('checking');
               await this.fetchUserProfileFromFirestore(user.uid);
               await MedTutorFirebaseService.loadAllDataFromPersistence();
+              this.setAuthScreenState('hidden');
               this.updateUserTopbarUI();
               return;
             }
@@ -455,9 +460,10 @@
             this.authMode = 'firebase';
             localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
             showToast('✓ Login realizado com sucesso!');
-            document.getElementById('authScreenContainer').classList.remove('active');
+            this.setAuthScreenState('checking');
             await this.fetchUserProfileFromFirestore(cred.user.uid);
             await MedTutorFirebaseService.loadAllDataFromPersistence();
+            this.setAuthScreenState('hidden');
             this.updateUserTopbarUI();
             if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
             if (typeof renderDashboardView === 'function') renderDashboardView();
@@ -479,7 +485,7 @@
         this.authMode = 'guest';
         localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
         showToast('✓ Acesso local concedido!');
-        document.getElementById('authScreenContainer').classList.remove('active');
+        this.setAuthScreenState('hidden');
         if (!this.userProfile) openMedicalOnboardingModal(false);
         this.updateUserTopbarUI();
         return true;
@@ -497,7 +503,7 @@
             this.authMode = 'firebase';
             localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
             showToast('🎉 Conta criada com sucesso! Complete seu perfil médico.');
-            document.getElementById('authScreenContainer').classList.remove('active');
+            this.setAuthScreenState('hidden');
             openMedicalOnboardingModal(false);
             return true;
           } catch (err) {
@@ -514,7 +520,7 @@
         this.authMode = 'guest';
         localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
         showToast('🎉 Conta local registrada!');
-        document.getElementById('authScreenContainer').classList.remove('active');
+        this.setAuthScreenState('hidden');
         openMedicalOnboardingModal(false);
         return true;
       },
@@ -542,7 +548,7 @@
           localStorage.setItem('medtutor_user_profile', JSON.stringify(this.userProfile));
         }
         showToast('⚡ Modo Demonstração Rápida Ativado!');
-        document.getElementById('authScreenContainer').classList.remove('active');
+        this.setAuthScreenState('hidden');
         this.updateUserTopbarUI();
       },
 
@@ -556,8 +562,7 @@
         localStorage.removeItem('medtutor_auth_user');
         const dropdown = document.getElementById('userProfileDropdown');
         if (dropdown) dropdown.classList.remove('active');
-        const authScreen = document.getElementById('authScreenContainer');
-        if (authScreen) authScreen.classList.add('active');
+        this.setAuthScreenState('login');
         this.updateUserTopbarUI();
         showToast('👋 Sessão encerrada.');
       },
@@ -6116,25 +6121,36 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return selected.length ? selected : null;
     }
 
+    let studyProcessingStartedAt = 0;
+    let studyProcessingTimer = null;
+
     function setStudyGenerationProgress(state = {}) {
       let overlay = document.getElementById('studyGenerationOverlay');
       if (state.done) {
         if (overlay) overlay.remove();
+        if (studyProcessingTimer) window.clearInterval(studyProcessingTimer);
+        studyProcessingTimer = null;
+        studyProcessingStartedAt = 0;
         return;
       }
       if (!overlay) {
+        studyProcessingStartedAt = Date.now();
         overlay = document.createElement('div');
         overlay.id = 'studyGenerationOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;background:rgba(4,12,24,.72);backdrop-filter:blur(4px);';
-        overlay.innerHTML = `<div style="width:min(420px,calc(100vw - 40px));padding:26px;border:1px solid rgba(0,229,255,.38);border-radius:16px;background:#101b2d;color:#f4f8ff;box-shadow:0 20px 70px rgba(0,0,0,.4);text-align:center;"><div class="loader-spinner" style="width:36px;height:36px;margin:0 auto 16px;border:3px solid rgba(255,255,255,.22);border-top-color:#00e5ff;border-radius:50%;animation:spin .8s linear infinite;"></div><strong id="studyGenerationTitle">Preparando questões…</strong><p id="studyGenerationDetail" style="margin:9px 0 14px;color:#b8c6dc;font-size:13px;"></p><div style="height:7px;background:#26354d;border-radius:8px;overflow:hidden;"><div id="studyGenerationProgressBar" style="height:100%;width:0;background:linear-gradient(90deg,#00e5ff,#00ff9d);transition:width .25s ease;"></div></div></div>`;
+        overlay.innerHTML = `<div role="status" aria-live="polite" style="width:min(420px,calc(100vw - 40px));padding:26px;border:1px solid rgba(0,229,255,.38);border-radius:16px;background:#101b2d;color:#f4f8ff;box-shadow:0 20px 70px rgba(0,0,0,.4);text-align:center;"><div class="loader-spinner" style="width:36px;height:36px;margin:0 auto 16px;border:3px solid rgba(255,255,255,.22);border-top-color:#00e5ff;border-radius:50%;animation:spin .8s linear infinite;"></div><strong id="studyGenerationTitle">Preparando…</strong><p id="studyGenerationDetail" style="margin:9px 0 8px;color:#b8c6dc;font-size:13px;"></p><small id="studyGenerationElapsed" style="display:block;margin-bottom:14px;color:#8292aa;font-size:11px;">Tempo decorrido: 0 s</small><div style="height:7px;background:#26354d;border-radius:8px;overflow:hidden;"><div id="studyGenerationProgressBar" style="height:100%;width:0;background:linear-gradient(90deg,#00e5ff,#00ff9d);transition:width .25s ease;"></div></div></div>`;
         document.body.appendChild(overlay);
+        studyProcessingTimer = window.setInterval(() => {
+          const elapsed = document.getElementById('studyGenerationElapsed');
+          if (elapsed && studyProcessingStartedAt) elapsed.textContent = `Tempo decorrido: ${Math.max(1, Math.floor((Date.now() - studyProcessingStartedAt) / 1000))} s`;
+        }, 1000);
       }
       const total = Math.max(1, state.total || 1);
       const current = Math.min(total, state.current || 0);
       const title = document.getElementById('studyGenerationTitle');
       const detail = document.getElementById('studyGenerationDetail');
       const bar = document.getElementById('studyGenerationProgressBar');
-      if (title) title.textContent = `Gerando questão ${current} de ${total}`;
+      if (title) title.textContent = state.title || `Gerando questão ${current} de ${total}`;
       if (detail) detail.textContent = state.detail || 'Planejando, redigindo e comparando com as questões anteriores.';
       if (bar) bar.style.width = `${Math.round((current / total) * 100)}%`;
     }
@@ -10354,6 +10370,12 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (typeof showToast === 'function') {
         showToast('📄 Compilando Tratado Acadêmico de Estudo...');
       }
+      setStudyGenerationProgress({
+        title: 'Preparando relatório acadêmico',
+        current: 1,
+        total: 3,
+        detail: 'Validando o texto original do material antes de estruturar o documento.'
+      });
 
       if (titleEl) titleEl.textContent = `Compilando Tratado Acadêmico...`;
       if (subtitleEl) subtitleEl.textContent = `Aguarde a estruturação do documento oficial de medicina`;
@@ -10385,7 +10407,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           throw new Error('O Firestore não contém texto clínico válido para este arquivo. O relatório não será emitido a partir de nome, tema ou tamanho do arquivo.');
         }
         if (subtitleEl) subtitleEl.textContent = `Conteúdo validado no Firestore • ${validatedText.length.toLocaleString('pt-BR')} caracteres`;
+        setStudyGenerationProgress({
+          title: 'Estruturando relatório acadêmico',
+          current: 2,
+          total: 3,
+          detail: 'Organizando o conteúdo validado em uma sequência didática de estudo.'
+        });
       } catch (error) {
+        setStudyGenerationProgress({ done: true });
         console.error('[Relatório] Conteúdo do material não validado:', error);
         if (titleEl) titleEl.textContent = 'Relatório não emitido';
         if (subtitleEl) subtitleEl.textContent = 'Aguardando conteúdo real do material';
@@ -10393,12 +10422,17 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (typeof showToast === 'function') showToast('⚠️ Relatório bloqueado: importe um arquivo com texto clínico real.');
         return;
       }
-      const rep = await AcademicReportAgent.generateReport({
-        materialId: targetMaterialId,
-        materialName: displayName || selectedMaterial?.name || materialIdOrName,
-        subjectName: targetSubject,
-        validatedText
-      });
+      let rep;
+      try {
+        rep = await AcademicReportAgent.generateReport({
+          materialId: targetMaterialId,
+          materialName: displayName || selectedMaterial?.name || materialIdOrName,
+          subjectName: targetSubject,
+          validatedText
+        });
+      } finally {
+        setStudyGenerationProgress({ done: true });
+      }
 
       activeAcademicReportData = rep;
       if (titleEl) {
@@ -12348,8 +12382,8 @@ Retorne EXCLUSIVAMENTE um JSON:
         const hasChoice = typeof currentChoice === 'number';
 
         quizBox.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <div class="quiz-card-topbar">
+            <div class="quiz-card-metadata">
               <span class="area-badge area-${areaClass}">${areaLabel}</span>
               <span style="font-size: 10px; font-weight: 700; background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); padding: 2px 6px; border-radius: 4px;">
                 ${styleLabel}
@@ -12371,7 +12405,7 @@ Retorne EXCLUSIVAMENTE um JSON:
                 • #${qIdx + 1}
               </span>
             </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
+            <div class="quiz-card-actions">
               <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px;" onclick="openQuestionDiscussionById('${item.id}')" title="Perguntar ao tutor sobre esta questão">
                 💬 Perguntar
               </button>
@@ -12393,7 +12427,7 @@ Retorne EXCLUSIVAMENTE um JSON:
             </div>
           ` : ''}
 
-          <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin: 8px 0 10px 0; color: var(--text-primary);">
+          <div class="quiz-question-prompt">
             ${formatStudyRichText(item.question)}
           </div>
 
@@ -12857,14 +12891,31 @@ Retorne EXCLUSIVAMENTE um JSON:
         existingQuestionsForSubject
       );
       if (generated.length === 0) {
+        setStudyGenerationProgress({ done: true });
         showToast('⚠️ Não foi possível criar questões confiáveis e não redundantes. Envie um material com texto selecionável ou configure a IA.');
         return;
       }
 
       // Prioriza figuras extraídas do próprio PDF/slide; busca externa fica só
       // como contingência para itens que não tenham figura correspondente.
+      setStudyGenerationProgress({
+        title: 'Finalizando seu material de estudo',
+        current: 1,
+        total: 2,
+        detail: 'Verificando figuras de apoio e preparando Quiz e Flashcards.'
+      });
       attachMaterialImagesToStudyItems(generated, targetFile);
-      await enrichStudyItemsWithMedicalImages(generated);
+      try {
+        await enrichStudyItemsWithMedicalImages(generated);
+      } catch (imageError) {
+        console.warn('[Estudo] Não foi possível concluir todas as figuras de apoio:', imageError);
+      }
+      setStudyGenerationProgress({
+        title: 'Salvando seu material de estudo',
+        current: 2,
+        total: 2,
+        detail: 'Adicionando as novas questões ao deck sem alterar suas revisões anteriores.'
+      });
 
       // 5. Acrescenta os novos pares ao banco: nunca descarta cartões já gerados.
       generated.reverse().forEach(q => sharedQuestionsBank.unshift(q));
@@ -12886,6 +12937,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       updateSubjectFilterMenus();
 
       showToast(`⚡ ${generated.length} pares de estudo (Quiz & Flashcard) gerados com sucesso para "${materialName}"!`);
+      setStudyGenerationProgress({ done: true });
     }
 
     async function generateUnifiedStudyForSubject(subjectName, count, config = {}, validatedText = null) {
@@ -12975,15 +13027,32 @@ Retorne EXCLUSIVAMENTE um JSON:
       }
 
       if (totalCreated === 0) {
+        setStudyGenerationProgress({ done: true });
         showToast('⚠️ Nenhum item novo passou pela validação de conteúdo e redundância.');
         return;
       }
 
       // Acrescenta ao deck já existente da disciplina; as questões anteriores e
       // seus estados SRS permanecem intactos.
+      setStudyGenerationProgress({
+        title: 'Finalizando seu material de estudo',
+        current: 1,
+        total: 2,
+        detail: 'Associando figuras de apoio e preservando os cartões já estudados.'
+      });
       attachMaterialImagesToStudyItems(generatedForSubject);
       sharedQuestionsBank = [...generatedForSubject.reverse(), ...sharedQuestionsBank];
-      await enrichStudyItemsWithMedicalImages(generatedForSubject);
+      try {
+        await enrichStudyItemsWithMedicalImages(generatedForSubject);
+      } catch (imageError) {
+        console.warn('[Estudo] Não foi possível concluir todas as figuras de apoio:', imageError);
+      }
+      setStudyGenerationProgress({
+        title: 'Salvando seu material de estudo',
+        current: 2,
+        total: 2,
+        detail: 'Atualizando o deck da disciplina e seu planejamento de revisões.'
+      });
 
       saveSharedQuestionsBank();
 
@@ -13004,6 +13073,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const totalInSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj).length;
       showToast(`⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • total: ${totalInSubject}.`);
+      setStudyGenerationProgress({ done: true });
     }
 
     function generateQuestionsForSubject(subjectName) {
@@ -22977,6 +23047,12 @@ Linha 04: __________________________________________________
       if (progStatus) progStatus.textContent = '1. Extraindo texto do material...';
       if (progBar) progBar.style.width = '25%';
       if (progDetail) progDetail.textContent = isTextTab ? 'Lendo texto fornecido...' : `Lendo ${pendingImportStudyFile.name} com PDF.js e parsers nativos...`;
+      setStudyGenerationProgress({
+        title: 'Processando material de estudo',
+        current: 1,
+        total: 4,
+        detail: isTextTab ? 'Lendo o texto informado.' : 'Extraindo texto e estrutura do arquivo enviado.'
+      });
 
       let extractedText = '';
       let fileName = 'Material Importado';
@@ -22999,10 +23075,12 @@ Linha 04: __________________________________________________
         if (progStatus) progStatus.textContent = '2. Interpretando páginas e marcos visuais com Gemini...';
         if (progBar) progBar.style.width = '55%';
         if (progDetail) progDetail.textContent = 'Enviando somente as imagens do PDF/slide autorizadas nesta importação...';
+        setStudyGenerationProgress({ title: 'Interpretando conteúdo visual', current: 2, total: 4, detail: 'Associando estruturas e imagens autorizadas ao material.' });
         visualAssociations = await analyzeVisualMaterialAssociations(pendingImportStudyFile, { fileName, targetSubject });
       }
 
       if ((!extractedText || extractedText.trim().length < 20) && !visualAssociations.length) {
+        setStudyGenerationProgress({ done: true });
         showToast('⚠️ Não foi possível extrair texto suficiente deste arquivo. Tente colar o texto diretamente.');
         if (progressBox) progressBox.style.display = 'none';
         if (btnConfirm) {
@@ -23015,6 +23093,7 @@ Linha 04: __________________________________________________
       if (progStatus) progStatus.textContent = '2. Analisando perguntas e texto com IA...';
       if (progBar) progBar.style.width = '60%';
       if (progDetail) progDetail.textContent = 'Identificando se são questões existentes, teoria ou misto...';
+      setStudyGenerationProgress({ title: 'Analisando conteúdo com IA', current: 3, total: 4, detail: 'Identificando teoria, questões autorais e possíveis repetições.' });
 
       // Executa análise e transformação por IA (Gemini ou Heurística Local)
       const visualMarkdown = visualAssociations.length
@@ -23035,6 +23114,7 @@ Linha 04: __________________________________________________
       if (progStatus) progStatus.textContent = '3. Integrando questões e flashcards...';
       if (progBar) progBar.style.width = '90%';
       if (progDetail) progDetail.textContent = 'Indexando no banco de estudos...';
+      setStudyGenerationProgress({ title: 'Integrando ao seu estudo', current: 4, total: 4, detail: 'Salvando material, figuras e questões no deck da disciplina.' });
 
       // 4. Trata o salvamento ou não na seção de Materiais do Aluno
       let importedStudyMaterial = null;
@@ -23208,6 +23288,7 @@ Linha 04: __________________________________________________
       if (generateIndividualReport && importedStudyMaterial) {
         await openAcademicReportForMaterial(importedStudyMaterial.id, targetSubject, importedStudyMaterial.name);
       }
+      setStudyGenerationProgress({ done: true });
     }
 
     /**

@@ -493,7 +493,7 @@
               </div>
             </div>
 
-            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+            <div class="study-review-actions" aria-label="Navegação e ações do flashcard">
               <button id="fcPreviousButton" class="btn-outline-action" onclick="navigateFlashcardWithoutAnswer(-1)" title="Volta sem alterar o agendamento do cartão">
                 ◀ Voltar
               </button>
@@ -2461,7 +2461,15 @@
   <!-- =========================================================
        TELA DE AUTENTICAÇÃO / LOGIN SOCIAL & E-MAIL (FIREBASE AUTH)
        ========================================================= -->
-  <div id="authScreenContainer" class="auth-screen-overlay">
+  <div id="authScreenContainer" class="auth-screen-overlay active auth-state-resolving" aria-live="polite" aria-busy="true">
+    <div class="auth-session-check" id="authSessionCheck">
+      <div class="auth-session-mark" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <span class="loader-spinner" aria-hidden="true"></span>
+      <strong>Verificando sua sessão</strong>
+      <small>Preparando seu espaço de estudo…</small>
+    </div>
     <div class="auth-card">
       <div class="auth-brand">
         <div class="auth-logo-badge">
@@ -2663,7 +2671,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260914-supabase-retry-v7"></script>
+  <script defer src="/app.js?v=20260914-layout-refinement-v8"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
