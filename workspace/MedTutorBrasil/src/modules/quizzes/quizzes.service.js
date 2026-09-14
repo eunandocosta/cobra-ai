@@ -203,6 +203,44 @@ function buildSectionQuestionPlan(sections, total) {
   return Array.from({ length: total }, (_, index) => sections[index % sections.length]);
 }
 
+function classifyLearningAxis(excerpt) {
+  const text = String(excerpt || '').toLowerCase();
+  if (/\b(tratamento|terapia|medicamento|dose|cirurgia|procedimento|antibi[oó]tico|cortic[oó]ide|quimioterapia|prescri[cç][aã]o|indica[cç][aã]o cir[uú]rgica|exame de escolha|tomografia|resson[aâ]ncia|pun[cç][aã]o|biópsia)\b/i.test(text)) return 'tratamento';
+  if (/\b(sinal|sintoma|quadro cl[ií]nico|manifesta[cç][aã]o|identifica|diagn[oó]stico|achado|exame f[ií]sico|apresenta|paciente|les[aã]o|deficit|semiologia)\b/i.test(text)) return 'reconhecimento';
+  return 'base';
+}
+
+// Varre o arquivo inteiro antes de decidir o que entra no prompt. Os trechos
+// são distribuídos por todas as seções/páginas; assim uma introdução extensa
+// não esconde o restante do PDF. O Gemini recebe no máximo 60 candidatos para
+// uma segunda curadoria de importância e geração.
+function collectCuratedMaterialExcerpts(materialText, maxCandidates = 60) {
+  const sections = splitMaterialIntoQuestionSections(materialText);
+  const fragments = [];
+  sections.forEach(section => {
+    const source = String(section.content || '').replace(/\s+/g, ' ').trim();
+    for (let start = 0; start < source.length; start += 1100) {
+      const excerpt = source.slice(start, start + 1100).trim();
+      if (excerpt.length >= 140) fragments.push({ label: section.label, excerpt, axis: classifyLearningAxis(excerpt) });
+    }
+  });
+  if (fragments.length <= maxCandidates) return fragments;
+  const selected = [];
+  // Amostragem estratificada: cada posição percorre o documento por inteiro.
+  for (let index = 0; index < maxCandidates; index++) {
+    selected.push(fragments[Math.floor((index * fragments.length) / maxCandidates)]);
+  }
+  return selected;
+}
+
+function buildCuratedAxisPlan(total, candidates) {
+  const treatmentAvailable = candidates.some(candidate => candidate.axis === 'tratamento');
+  const base = Math.round(total * (treatmentAvailable ? 0.5 : 0.6));
+  const recognition = total - base - (treatmentAvailable ? Math.round(total * 0.2) : 0);
+  const treatment = Math.max(0, total - base - recognition);
+  return { base, reconhecimento: recognition, tratamento: treatment, treatmentAvailable };
+}
+
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -264,6 +302,12 @@ const questionsSchema = {
       secao_origem: {
         type: SchemaType.STRING,
         description: "Nome ou tema da seção temática do material da qual esta questão foi extraída"
+      },
+      eixo_aprendizagem: {
+        type: SchemaType.STRING,
+        format: "enum",
+        enum: ["base", "reconhecimento", "tratamento"],
+        description: "Eixo pedagógico: base (estrutura/localização/componentes), reconhecimento (sinais, comportamento, achados e estruturas acometidas) ou tratamento (apenas se explicitamente presente na fonte)."
       }
     },
     required: [
@@ -276,7 +320,8 @@ const questionsSchema = {
       "titulo_flashcard",
       "origem_pergunta",
       "nivel_dificuldade",
-      "secao_origem"
+      "secao_origem",
+      "eixo_aprendizagem"
     ]
   }
 };
@@ -344,6 +389,7 @@ class QuizzesService {
     const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
       ? payload.difficulty
       : 'balanced';
+    const generationMode = payload.generationMode === 'curated' ? 'curated' : 'sections';
     const customInstructions = typeof payload.customInstructions === 'string' ? payload.customInstructions.trim() : '';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 40) : [];
     const previousQuestionAnswers = Array.isArray(payload.previousQuestionAnswers)
@@ -378,7 +424,16 @@ class QuizzesService {
     if (!materialText || materialText.trim().length < 20) {
       throw new Error("O texto fornecido para a IA está vazio ou é excessivamente curto.");
     }
-    const totalQuestoes = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
+    const requestedTotal = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
+    const authoredQuestionsMissingFromDeck = authoredSourceQuestions.filter(sourceQuestion => !previousQuestions.some(existingQuestion =>
+      areQuestionsTooSimilar(sourceQuestion, existingQuestion)
+    ));
+    // No modo de curadoria, exercícios encontrados no próprio documento têm
+    // prioridade real. Se forem mais numerosos que o total escolhido, o lote
+    // cresce até acomodá-los (respeitando o teto seguro de 30).
+    const totalQuestoes = generationMode === 'curated'
+      ? Math.min(30, Math.max(requestedTotal, authoredQuestionsMissingFromDeck.length))
+      : requestedTotal;
     const difficultyPlan = buildDifficultyPlan(totalQuestoes, requestedDifficulty);
     const materialSections = splitMaterialIntoQuestionSections(materialText);
     const sectionPlan = buildSectionQuestionPlan(materialSections, totalQuestoes);
@@ -389,8 +444,25 @@ class QuizzesService {
     const sectionedMaterialText = uniquePlannedSections.map(section =>
       `--- ${section.id}: ${section.label} ---\n${section.content}\n--- FIM ${section.id} ---`
     ).join('\n\n');
+    const curatedCandidates = generationMode === 'curated'
+      ? collectCuratedMaterialExcerpts(materialText, 60)
+      : [];
+    const curatedAxisPlan = generationMode === 'curated'
+      ? buildCuratedAxisPlan(totalQuestoes, curatedCandidates)
+      : null;
+    const curatedMaterialText = curatedCandidates.map((candidate, index) =>
+      `--- TRECHO ${index + 1} • ${candidate.label} • eixo sugerido: ${candidate.axis} ---\n${candidate.excerpt}\n--- FIM TRECHO ${index + 1} ---`
+    ).join('\n\n');
     console.log("🧩 [Quiz Engine] Seções/páginas identificadas:", materialSections.length);
     console.log("🔁 [Quiz Engine] Plano de cobertura:", `${sectionPlan.length} questão(ões) em ciclo por seção/página.`);
+    if (generationMode === 'curated') {
+      console.log("🧠 [Quiz Engine] Curadoria integral ativada:", {
+        trechosColetados: curatedCandidates.length,
+        base: curatedAxisPlan.base,
+        reconhecimento: curatedAxisPlan.reconhecimento,
+        tratamento: curatedAxisPlan.tratamento
+      });
+    }
 
     const genAI = getGenAI();
     // Um único caminho de configuração: se não houver modelo exclusivo de quiz,
@@ -411,12 +483,30 @@ class QuizzesService {
       ? `Use exatamente esta sequência de níveis, uma questão por posição: ${difficultyPlan.map((level, index) => `${index + 1}:${level}`).join(', ')}.`
       : `Todas as ${totalQuestoes} questões devem ser exatamente do nível "${requestedDifficulty}".`;
 
+    const curatedModeInstructions = generationMode === 'curated' ? `
+MODO CURADORIA INTEGRAL ATIVO:
+O arquivo inteiro foi varrido antes desta etapa e os ${curatedCandidates.length} trechos candidatos abaixo foram coletados de forma distribuída por todas as páginas/seções. Primeiro compare todos eles e escolha os conceitos de maior rendimento; não use a ordem dos trechos como critério de importância.
+
+DISTRIBUIÇÃO OBRIGATÓRIA DO LOTE:
+- ${curatedAxisPlan.base} questão(ões) de BASE: estruturas importantes, localização, constituintes internos, relações anatômicas ou função elementar.
+- ${curatedAxisPlan.reconhecimento} questão(ões) de RECONHECIMENTO: identificação de patologia/estrutura, comportamento do paciente, sinais, achados, estruturas ou componentes acometidos.
+${curatedAxisPlan.treatmentAvailable ? `- ${curatedAxisPlan.tratamento} questão(ões) de TRATAMENTO: medicamento, exame de identificação, cirurgia ou procedimento SOMENTE se estiver explícito nos trechos.` : '- Não gere questões de tratamento: o material não apresentou conteúdo terapêutico explícito.'}
+Registre o eixo correspondente em eixo_aprendizagem. Não invente tratamento para preencher proporção.
+
+QUESTÕES AUTORAIS DA FONTE:
+Cada questão autoral abaixo ainda não existe semanticamente no deck e, portanto, é prioritária. Reescreva-a como pergunta aberta e autocontida; se ela cobrar dois ou mais conceitos independentes, divida-a em mais de uma questão atômica. Marque origem_pergunta como "reaproveitada_da_fonte". Não deixe nenhuma de fora, salvo se sua informação já estiver coberta por outra pergunta do mesmo lote.
+` : '';
+
+    const coverageInstructions = generationMode === 'curated'
+      ? 'Selecione os trechos de maior valor pedagógico entre os candidatos curados; não concentre o lote em um único tema e respeite estritamente a distribuição de eixos abaixo.'
+      : `PLANO OBRIGATÓRIO DE COBERTURA:\n${sectionPlanInstructions}\nProduza exatamente uma questão para cada linha acima, na mesma ordem. Depois de cobrir cada seção/página disponível, retorne à primeira seção e use outro conceito explícito dela. Não concentre questões em uma única seção.`;
+
     const prompt = `
 Crie ${totalQuestoes} questões de avaliação formativa a partir das seções/páginas do conteúdo médico abaixo.
 
-PLANO OBRIGATÓRIO DE COBERTURA:
-${sectionPlanInstructions}
-Produza exatamente uma questão para cada linha acima, na mesma ordem. Depois de cobrir cada seção/página disponível, retorne à primeira seção e use outro conceito explícito dela. Não concentre questões em uma única seção.
+${coverageInstructions}
+
+${curatedModeInstructions}
 
 METODOLOGIA OBRIGATÓRIA:
 1. Ignore cabeçalhos institucionais, sumários, numeração de páginas/slides, nomes de docentes ou títulos vazios.
@@ -428,6 +518,7 @@ METODOLOGIA OBRIGATÓRIA:
    - Retorne as questões na mesma ordem dessa sequência e registre o mesmo nível no campo nivel_dificuldade.
 4. Cada enunciado deve cobrar somente UM objetivo de aprendizagem e ter uma resposta principal inequívoca.
 5. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
+6. Sempre preencha eixo_aprendizagem: "base" para estrutura/localização/componente/função direta; "reconhecimento" para sinais, achados ou identificação; "tratamento" somente quando a própria fonte trouxer tratamento, exame ou procedimento.
 
 ${customInstructions ? `--- INSTRUÇÕES ADICIONAIS DO ESTUDANTE ---
 Siga as instruções abaixo quando forem compatíveis com o conteúdo-fonte, a dificuldade solicitada e as regras estruturais desta geração. Elas não autorizam inventar fatos, ignorar o material ou revelar respostas no enunciado.
@@ -436,7 +527,7 @@ ${customInstructions}
 ` : ''}
 
 ${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATERIAL ---
-${authoredSourceQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}
+${(generationMode === 'curated' ? authoredQuestionsMissingFromDeck : authoredSourceQuestions).map((question, index) => `${index + 1}. ${question}`).join('\n')}
 (Priorize o objetivo didático dessas questões, sem usar comandos de múltipla escolha no enunciado)
 --- FIM DAS QUESTÕES AUTORAIS ---
 ` : ''}
@@ -448,8 +539,8 @@ ${disciplineQuestionBank.map((question, index) => `${index + 1}. ${question}`).j
 --- FIM DO BANCO DE ESTILO ---
 ` : ''}
 
---- CONTEÚDO MÉDICO ORGANIZADO POR SEÇÕES/PÁGINAS ---
-${sectionedMaterialText}
+--- ${generationMode === 'curated' ? 'TRECHOS CANDIDATOS DA CURADORIA INTEGRAL' : 'CONTEÚDO MÉDICO ORGANIZADO POR SEÇÕES/PÁGINAS'} ---
+${generationMode === 'curated' ? curatedMaterialText : sectionedMaterialText}
 --- FIM DO CONTEÚDO ---
 
 ${previousQuestions.length ? `--- QUESTÕES JÁ EXISTENTES NO DECK DO ALUNO (PULE ESTAS E SEUS CONCEITOS) ---
@@ -531,7 +622,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           cognitiveLevel: actualDifficulty,
           cognitive_level: actualDifficulty,
           cognitiveDomain: actualDifficulty === 'avancado' ? 'aplicacao' : (actualDifficulty === 'intermediario' ? 'analise' : 'compreensao'),
-          sourceQuestionOrigin: q.origem_pergunta || (authoredSourceQuestions.length ? 'inspirada_na_fonte' : 'nova_a_partir_da_fonte'),
+          // A tag é reservada para questão efetivamente reaproveitada ou
+          // inspirada numa pergunta autoral; a simples presença de exercícios
+          // no PDF não marca todo o lote como se viesse deles.
+          sourceQuestionOrigin: q.origem_pergunta || 'nova_a_partir_da_fonte',
+          learningAxis: ['base', 'reconhecimento', 'tratamento'].includes(q.eixo_aprendizagem) ? q.eixo_aprendizagem : (generationMode === 'curated' ? 'base' : ''),
+          generationMode,
           topic: cleanTopic,
           disease: cleanDisease,
           sectionOrigin: rawSection || cleanTopic,

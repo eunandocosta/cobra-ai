@@ -426,6 +426,8 @@
                      <div class="flashcard-meta-items">
                        <span id="fcTag">DISCIPLINA</span>
                        <span id="fcDifficultyBadge" style="display: none; font-size: 10px; background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-weight: 700;"></span>
+                       <span id="fcLearningAxisBadge" style="display: none; font-size: 10px; background: rgba(0, 229, 255, 0.10); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.28); padding: 2px 6px; border-radius: 4px; font-weight: 700;"></span>
+                       <span id="fcMaterialInspirationBadge" style="display: none; font-size: 10px; background: rgba(183, 148, 246, 0.14); color: #c4b5fd; border: 1px solid rgba(196, 181, 253, 0.35); padding: 2px 6px; border-radius: 4px; font-weight: 700;">✦ Inspiração do material</span>
                        <span id="fcModelBadge" style="display: none; font-size: 10px; background: rgba(140, 158, 255, 0.15); color: #8c9eff; border: 1px solid rgba(140, 158, 255, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700;">✨ Gemini 3.5 Flash-Lite</span>
                        <span id="fcVisualBadge" style="display: none; font-size: 10px; background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700;">📷 Inspeção Visual</span>
                        <span id="fcRedundancyAlertBadge" style="display: none; font-size: 10px; background: rgba(255, 68, 68, 0.15); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.4); padding: 2px 6px; border-radius: 4px; font-weight: 800; cursor: pointer;" onclick="showCardRedundancyDetails()" title="Clique para auditar card similar (>50%)">⚠️ ! Redundante</span>
@@ -1587,6 +1589,17 @@
           </div>
         </div>
 
+        <div style="margin-bottom: 14px;">
+          <label for="generateStudyModeSelect" style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">
+            Estratégia de geração:
+          </label>
+          <select id="generateStudyModeSelect" class="study-nav-select" style="width: 100%; font-size: 12px; padding: 7px 10px; height: 38px;">
+            <option value="sections" selected>📄 Cobertura por seções/páginas</option>
+            <option value="curated">🧠 Curadoria integral do arquivo (base 50% • reconhecimento 30% • tratamento 20% se houver)</option>
+          </select>
+          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.35;">No modo Curadoria, o arquivo inteiro é varrido, até 60 trechos relevantes são comparados e as questões autorais do material têm prioridade quando ainda não estiverem no deck.</div>
+        </div>
+
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-primary); margin: 2px 0 9px;">
           <input type="checkbox" id="generateStudyCustomInstructionsEnabled" onchange="toggleGenerateStudyCustomInstructions()" style="width: 16px; height: 16px; accent-color: var(--neon);">
           Quero dar instruções para o desenvolvimento das questões
@@ -2674,7 +2687,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260914-unified-material-count-v14"></script>
+  <script defer src="/app.js?v=20260914-curated-study-mode-v15"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

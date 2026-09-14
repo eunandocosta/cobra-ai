@@ -6435,6 +6435,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             previousQuestionAnswers,
             sourceQuestions: authoredSourceQuestions,
             disciplineQuestionBank,
+            generationMode: config.generationMode === 'curated' ? 'curated' : 'sections',
             targetConcept: config.targetConcept || '',
             focusExcerpt: config.focusExcerpt || '',
             customInstructions: config.customInstructions || ''
@@ -6474,6 +6475,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             flashcardTitle: item.flashcardTitle || item.titulo_flashcard || item.flashcard?.title || '',
             flashcard: { ...(item.flashcard || {}), front: sharedStem },
             learningFocus: 'material_base',
+            learningAxis: ['base', 'reconhecimento', 'tratamento'].includes(item.learningAxis || item.eixo_aprendizagem)
+              ? (item.learningAxis || item.eixo_aprendizagem)
+              : '',
+            materialInspired: ['reaproveitada_da_fonte', 'inspirada_na_fonte'].includes(item.sourceQuestionOrigin || item.origem_pergunta),
+            generationMode: item.generationMode || config.generationMode || 'sections',
             difficultyLevel: itemDiff,
             cognitiveLevel: itemDiff,
             cognitive_level: itemDiff,
@@ -11592,6 +11598,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       const examStyle = document.getElementById('generateStudyExamStyleSelect')?.value || 'bloom';
       const difficulty = document.getElementById('generateStudyDifficultySelect')?.value || 'balanced';
+      const generationMode = document.getElementById('generateStudyModeSelect')?.value === 'curated' ? 'curated' : 'sections';
       const customInstructionsEnabled = document.getElementById('generateStudyCustomInstructionsEnabled')?.checked;
       const customInstructions = customInstructionsEnabled
         ? (document.getElementById('generateStudyCustomInstructionsInput')?.value || '').trim()
@@ -11601,7 +11608,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       closeModals();
 
       // Transição direta e obrigatória para a tela de validação do texto original do Firestore
-      openMaterialTextValidationModal(materialName, subjectName, count, { examStyle, difficulty, customInstructions });
+      openMaterialTextValidationModal(materialName, subjectName, count, { examStyle, difficulty, generationMode, customInstructions });
     }
 
     function renderSharedStudyItems() {
@@ -11901,11 +11908,23 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const backEl = document.getElementById('fcBackAnswer');
       const visualBadge = document.getElementById('fcVisualBadge');
       const difficultyBadge = document.getElementById('fcDifficultyBadge');
+      const learningAxisBadge = document.getElementById('fcLearningAxisBadge');
+      const materialInspirationBadge = document.getElementById('fcMaterialInspirationBadge');
 
       if (tagEl) tagEl.textContent = resolveFlashcardTitle(item).toUpperCase();
       if (difficultyBadge) {
         difficultyBadge.style.display = 'inline-block';
         difficultyBadge.textContent = getFlashcardDifficultyLabel(item);
+      }
+      if (learningAxisBadge) {
+        const axisLabels = { base: 'Base', reconhecimento: 'Reconhecimento', tratamento: 'Tratamento' };
+        const axis = item.learningAxis || item.eixo_aprendizagem || '';
+        learningAxisBadge.style.display = axisLabels[axis] ? 'inline-block' : 'none';
+        if (axisLabels[axis]) learningAxisBadge.textContent = axisLabels[axis];
+      }
+      if (materialInspirationBadge) {
+        const inspired = item.materialInspired || ['reaproveitada_da_fonte', 'inspirada_na_fonte'].includes(item.sourceQuestionOrigin || item.origem_pergunta);
+        materialInspirationBadge.style.display = inspired ? 'inline-block' : 'none';
       }
       const queueNames = { new: 'Não feitos', due: 'Revisão de Hoje', tomorrow: 'Revisão de amanhã', upcoming: 'Revisão dos próximos dias' };
       if (countEl) countEl.textContent = `Card ${currentCardIndex + 1} de ${list.length} • ${queueNames[srsQueueFilter] || 'Todos os cards'}`;
@@ -12591,6 +12610,14 @@ Retorne EXCLUSIVAMENTE um JSON:
               <span style="font-size: 10px; font-weight: 600; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px;">
                 ${diffLabel}
               </span>
+              ${['base', 'reconhecimento', 'tratamento'].includes(item.learningAxis || item.eixo_aprendizagem) ? `
+                <span style="font-size: 10px; font-weight: 700; background: rgba(0, 229, 255, 0.10); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.28); padding: 2px 6px; border-radius: 4px;">
+                  ${{ base: 'Base', reconhecimento: 'Reconhecimento', tratamento: 'Tratamento' }[item.learningAxis || item.eixo_aprendizagem]}
+                </span>
+              ` : ''}
+              ${(item.materialInspired || ['reaproveitada_da_fonte', 'inspirada_na_fonte'].includes(item.sourceQuestionOrigin || item.origem_pergunta)) ? `
+                <span style="font-size: 10px; font-weight: 700; background: rgba(183, 148, 246, 0.14); color: #c4b5fd; border: 1px solid rgba(196, 181, 253, 0.35); padding: 2px 6px; border-radius: 4px;">✦ Inspiração do material</span>
+              ` : ''}
               ${(item.generatorModel || item.generatorEngine) ? `
                 <span style="font-size: 10px; font-weight: 700; background: rgba(140, 158, 255, 0.15); color: #8c9eff; border: 1px solid rgba(140, 158, 255, 0.3); padding: 2px 6px; border-radius: 4px;">
                   ✨ ${(item.generatorModel && item.generatorModel.includes('3.5-flash-lite')) ? 'Gemini 3.5 Flash-Lite' : (item.generatorEngine || 'Gemini 3.5 Flash-Lite')}
