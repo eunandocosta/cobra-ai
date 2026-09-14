@@ -742,6 +742,41 @@
       };
     }
 
+    function getMaterialMergeKey(material) {
+      const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      return `${normalize(material?.subject || material?.disciplina)}::${normalize(material?.originalFileName || material?.name || material?.nome)}`;
+    }
+
+    function mergeStudyMaterialsPreservingContent(...collections) {
+      const byKey = new Map();
+      collections.flat().filter(Boolean).map(normalizeMaterial).forEach(material => {
+        const key = material.id ? `id:${material.id}` : `name:${getMaterialMergeKey(material)}`;
+        const prior = byKey.get(key);
+        if (!prior) {
+          byKey.set(key, material);
+          return;
+        }
+        const score = value => String(value?.markdownText || value?.conteudo_md || value?.text || '').length
+          + ((value?.clinicalImages || []).length * 1000)
+          + (value?.academicReport || value?.relatorio_academico ? 500 : 0);
+        byKey.set(key, score(material) > score(prior) ? { ...prior, ...material, markdownText: material.markdownText || prior.markdownText } : { ...material, ...prior, markdownText: prior.markdownText || material.markdownText });
+      });
+      // Alguns uploads antigos receberam IDs diferentes para o mesmo arquivo.
+      // Mantemos a versão mais rica visualmente, sem excluir nada da nuvem.
+      const byName = new Map();
+      byKey.forEach(material => {
+        const key = getMaterialMergeKey(material);
+        const prior = byName.get(key);
+        if (!prior) {
+          byName.set(key, material);
+          return;
+        }
+        const score = value => String(value?.markdownText || value?.conteudo_md || value?.text || '').length + ((value?.clinicalImages || []).length * 1000);
+        byName.set(key, score(material) > score(prior) ? material : prior);
+      });
+      return [...byName.values()];
+    }
+
     const FIRESTORE_TEXT_CHUNK_SIZE = 160000;
     const FIRESTORE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -1657,7 +1692,7 @@
         try {
           const loadedMaterials = await MedTutorLocalDB.get('materials', uid);
           if (Array.isArray(loadedMaterials) && loadedMaterials.length > 0) {
-            chatDriveMaterials = loadedMaterials.map(normalizeMaterial);
+            chatDriveMaterials = mergeStudyMaterialsPreservingContent(loadedMaterials);
           }
 
           const loadedCurriculum = await MedTutorLocalDB.get('curriculum', uid);
@@ -1744,17 +1779,16 @@
                 cloudMats.push(normalized);
               }
               if (cloudMats.length > 0) {
-                chatDriveMaterials = cloudMats;
-                await MedTutorLocalDB.set('materials', uid, cloudMats);
-                console.info(`[Firestore] ${cloudMats.length} material(is) carregado(s) exclusivamente do Cloud Firestore como fonte única.`);
+                chatDriveMaterials = mergeStudyMaterialsPreservingContent(chatDriveMaterials, cloudMats);
+                await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+                console.info(`[Firestore] ${cloudMats.length} material(is) recebido(s) da nuvem e unido(s) com a cópia local sem perdas.`);
               } else {
-                chatDriveMaterials = [];
-                await MedTutorLocalDB.set('materials', uid, []);
+                console.warn('[Firestore] A coleção de materiais veio vazia; a cópia local foi preservada para evitar perda de dados.');
               }
             } else {
-              // Se a coleção de materiais no Firestore está vazia, limpa materiais residuais locais
-              chatDriveMaterials = [];
-              await MedTutorLocalDB.set('materials', uid, []);
+              // Uma resposta vazia pode ser causada por cota, regras ou atraso de
+              // rede. Nunca elimine uploads locais automaticamente por isso.
+              console.warn('[Firestore] Nenhum material retornado pela nuvem; mantendo a cópia local intacta.');
             }
 
             const currSnap = await firestoreDb.collection('users').doc(uid).collection('grade_curricular').get();
@@ -1819,8 +1853,10 @@
                 });
               });
               if (cloudQ.length > 0) {
-                sharedQuestionsBank = cloudQ;
-                await MedTutorLocalDB.set('questions', uid, cloudQ);
+                const localById = new Map((sharedQuestionsBank || []).map(question => [question.id, question]));
+                cloudQ.forEach(question => localById.set(question.id, { ...(localById.get(question.id) || {}), ...question }));
+                sharedQuestionsBank = [...localById.values()];
+                await MedTutorLocalDB.set('questions', uid, sharedQuestionsBank);
               }
             }
             try { localStorage.setItem(refreshKey, String(Date.now())); } catch (error) {}
@@ -13481,14 +13517,10 @@ Retorne EXCLUSIVAMENTE um JSON:
 
     // ELIMINAÇÃO DE CACHE DE MATÉRIAS SEM UPLOAD AO FECHAR OU ATUALIZAR
     function pruneUnuploadedSubjectsCache() {
-      if (typeof chatDriveMaterials === 'undefined') return;
-      const uploadedSubjects = new Set(chatDriveMaterials.map(m => m.subject).filter(Boolean));
-      Object.keys(subjectGenerationStatus).forEach(s => {
-        if (!uploadedSubjects.has(s)) {
-          delete subjectGenerationStatus[s];
-        }
-      });
-      sharedQuestionsBank = sharedQuestionsBank.filter(q => uploadedSubjects.has(q.subject));
+      // Não descarte questões automaticamente ao fechar a página. Durante uma
+      // falha de quota/sincronização, a lista de materiais pode chegar parcial e
+      // esse filtro apagava a única cópia visível do banco de estudo.
+      return;
     }
 
     window.addEventListener('beforeunload', () => {
