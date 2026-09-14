@@ -171,6 +171,8 @@
       authMode: 'guest', // 'firebase' | 'guest'
       googleSignInInProgress: false,
       authStateResolved: false,
+      cloudRefreshPromise: null,
+      cloudRefreshUid: '',
 
       setAuthScreenState(state) {
         const authScreen = document.getElementById('authScreenContainer');
@@ -180,6 +182,24 @@
         authScreen.classList.toggle('active', isVisible);
         authScreen.classList.toggle('auth-state-resolving', isChecking);
         authScreen.setAttribute('aria-busy', String(isChecking));
+      },
+
+      refreshCloudDataInBackground(uid) {
+        if (!uid || !firebaseAuth?.currentUser || firebaseAuth.currentUser.uid !== uid) return Promise.resolve();
+        if (this.cloudRefreshPromise && this.cloudRefreshUid === uid) return this.cloudRefreshPromise;
+
+        this.cloudRefreshUid = uid;
+        this.cloudRefreshPromise = (async () => {
+          try {
+            await this.fetchUserProfileFromFirestore(uid);
+            await MedTutorFirebaseService.loadAllDataFromPersistence();
+          } catch (loadError) {
+            console.warn('[MedTutor Firebase] Sessão ativa; sincronização em nuvem será tentada novamente quando disponível:', loadError);
+          } finally {
+            this.cloudRefreshPromise = null;
+          }
+        })();
+        return this.cloudRefreshPromise;
       },
 
       init() {
@@ -268,11 +288,9 @@
                   this.authMode = 'firebase';
                   localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                   showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
-                  this.setAuthScreenState('checking');
-                  await this.fetchUserProfileFromFirestore(user.uid);
-                  await MedTutorFirebaseService.loadAllDataFromPersistence();
                   this.setAuthScreenState('hidden');
                   this.updateUserTopbarUI();
+                  this.refreshCloudDataInBackground(user.uid);
                 }
               }).catch((redirectErr) => {
                 console.warn('[MedTutor Redirect Auth]', redirectErr);
@@ -291,18 +309,12 @@
                 this.authMode = 'firebase';
                 localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                 this.updateUserTopbarUI();
-                this.setAuthScreenState('checking');
-                // Libera a navegação assim que o Firebase confirma a sessão.
-                // As leituras podem continuar em segundo plano, sem transformar
-                // cada F5 em uma nova tela de login.
-                try {
-                  await this.fetchUserProfileFromFirestore(user.uid);
-                  await MedTutorFirebaseService.loadAllDataFromPersistence();
-                } catch (loadError) {
-                  console.warn('[MedTutor Firebase] Sessão restaurada, mas houve falha ao atualizar dados:', loadError);
-                }
+                // A sessão autenticada libera o app imediatamente. Com a cota
+                // do Firestore em backoff, aguardar todo o conteúdo aqui poderia
+                // deixar a tela de entrada presa indefinidamente.
                 this.setAuthScreenState('hidden');
                 this.updateUserTopbarUI();
+                this.refreshCloudDataInBackground(user.uid);
                 if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
                 if (typeof renderDashboardView === 'function') renderDashboardView();
                 if (typeof renderCurriculumView === 'function') renderCurriculumView();
@@ -420,14 +432,13 @@
               this.authMode = 'firebase';
               localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
               showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
-              this.setAuthScreenState('checking');
-              await this.fetchUserProfileFromFirestore(user.uid);
-              await MedTutorFirebaseService.loadAllDataFromPersistence();
               this.setAuthScreenState('hidden');
               this.updateUserTopbarUI();
+              this.refreshCloudDataInBackground(user.uid);
               return;
             }
           } catch (err) {
+            this.setAuthScreenState('login');
             console.error('[Google Auth Error]:', err);
             const friendlyMsg = this.mapAuthErrorMessage(err.code || err.message);
             showAuthError(`Falha na autenticação Google (${err.code || 'erro'}): ${friendlyMsg}.`);
@@ -460,11 +471,9 @@
             this.authMode = 'firebase';
             localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
             showToast('✓ Login realizado com sucesso!');
-            this.setAuthScreenState('checking');
-            await this.fetchUserProfileFromFirestore(cred.user.uid);
-            await MedTutorFirebaseService.loadAllDataFromPersistence();
             this.setAuthScreenState('hidden');
             this.updateUserTopbarUI();
+            this.refreshCloudDataInBackground(cred.user.uid);
             if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
             if (typeof renderDashboardView === 'function') renderDashboardView();
             if (typeof renderCurriculumView === 'function') renderCurriculumView();
@@ -472,6 +481,7 @@
             if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
             return true;
           } catch (err) {
+            this.setAuthScreenState('login');
             showAuthError(this.mapAuthErrorMessage(err.code || err.message));
             return false;
           }
