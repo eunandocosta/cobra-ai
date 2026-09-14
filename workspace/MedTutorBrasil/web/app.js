@@ -743,6 +743,25 @@
     }
 
     const FIRESTORE_TEXT_CHUNK_SIZE = 160000;
+    const FIRESTORE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+
+    function firestoreFingerprint(value) {
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      let hash = 2166136261;
+      for (let index = 0; index < text.length; index++) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return `${text.length}:${(hash >>> 0).toString(36)}`;
+    }
+
+    function getFirestoreSyncRegistry(uid, scope) {
+      try { return JSON.parse(localStorage.getItem(`medtutor_firestore_sync_${scope}_${uid}`) || '{}') || {}; } catch (error) { return {}; }
+    }
+
+    function saveFirestoreSyncRegistry(uid, scope, registry) {
+      try { localStorage.setItem(`medtutor_firestore_sync_${scope}_${uid}`, JSON.stringify(registry)); } catch (error) {}
+    }
 
     function splitFirestoreText(value) {
       const text = String(value || '');
@@ -933,15 +952,28 @@
         }
         try {
           const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+          const registry = getFirestoreSyncRegistry(uid, 'materiais');
+          let changedCount = 0;
           for (const mat of materialsArray) {
             const docId = mat.id || ('mat_' + Math.random().toString(36).substring(2, 9));
             const markdown = String(mat.markdownText || mat.conteudo_md || mat.text || '');
+            const fingerprint = firestoreFingerprint({
+              markdown,
+              name: mat.name || mat.nome || '',
+              subject: mat.subject || mat.disciplina || '',
+              topic: mat.topic || mat.materia || '',
+              images: (mat.clinicalImages || mat.figuras_clinicas || []).map(image => image?.imageUrl || image?.thumbnailUrl || image?.src || '')
+            });
+            if (registry[docId] === fingerprint) continue;
             const docRef = colRef.doc(docId);
             await docRef.set(compactMaterialForFirestore(mat, docId, markdown), { merge: true });
             await this.writeMaterialTextChunks(docRef, markdown);
+            registry[docId] = fingerprint;
+            changedCount++;
           }
-          console.info(`[Firestore] ${materialsArray.length} material(is) sincronizado(s) com conteúdo integral em blocos.`, { uid });
-          await this.rebuildDisciplineQuestionBanks(materialsArray);
+          saveFirestoreSyncRegistry(uid, 'materiais', registry);
+          console.info(`[Firestore] ${changedCount} de ${materialsArray.length} material(is) exigiu(ram) sincronização.`, { uid });
+          if (changedCount > 0) await this.rebuildDisciplineQuestionBanks(materialsArray);
         } catch (e) {
           reportFirestoreSyncIssue('falha_ao_gravar_materiais', {
             code: e.code || 'firestore/write-failed',
@@ -1440,10 +1472,12 @@
           try {
             const batch = firestoreDb.batch();
             const colRef = firestoreDb.collection('users').doc(uid).collection('banco_questoes');
+            const registry = getFirestoreSyncRegistry(uid, 'questoes');
+            let changedCount = 0;
             questionsArray.forEach(q => {
               const docId = q.id || ('q_' + Math.random().toString(36).substring(2, 9));
               const docRef = colRef.doc(docId);
-              batch.set(docRef, {
+              const payload = {
                 id: docId,
                 pergunta: q.question || '',
                 resposta_correta: q.answer || q.referenceAnswer || '',
@@ -1460,11 +1494,17 @@
                 srs: q.srs || null,
                 quizStats: q.quizStats || null,
                 isRedundant: !!q.isRedundant,
-                redundancyScore: q.redundancyScore || 0,
-                atualizadoEm: new Date().toISOString()
-              }, { merge: true });
+                redundancyScore: q.redundancyScore || 0
+              };
+              const fingerprint = firestoreFingerprint(payload);
+              if (registry[docId] === fingerprint) return;
+              batch.set(docRef, { ...payload, atualizadoEm: new Date().toISOString() }, { merge: true });
+              registry[docId] = fingerprint;
+              changedCount++;
             });
-            await batch.commit();
+            if (changedCount > 0) await batch.commit();
+            saveFirestoreSyncRegistry(uid, 'questoes', registry);
+            console.info(`[Firestore] ${changedCount} de ${questionsArray.length} questão(ões) sincronizada(s).`);
           } catch (e) {
             console.warn('[Firestore] Erro ao sincronizar questões:', e);
           }
@@ -1487,20 +1527,28 @@
           try {
             const batch = firestoreDb.batch();
             const colRef = firestoreDb.collection('users').doc(uid).collection('historico_chats');
+            const registry = getFirestoreSyncRegistry(uid, 'chats');
+            let changedCount = 0;
             sessionsArray.forEach(session => {
               const docId = session.id || ('chat_' + Math.random().toString(36).substring(2, 9));
               const docRef = colRef.doc(docId);
-              batch.set(docRef, {
+              const payload = {
                 id: docId,
                 titulo: session.title || 'Atendimento Clínico',
                 disciplina: session.subject || '',
                 mensagens: (session.messages || []).slice(-100), // Proteção de payload
                 memoria_compacta: session.compactMemory || '',
-                tokensConsumidos: session.tokensUsed || 0,
-                atualizadoEm: new Date().toISOString()
-              }, { merge: true });
+                tokensConsumidos: session.tokensUsed || 0
+              };
+              const fingerprint = firestoreFingerprint(payload);
+              if (registry[docId] === fingerprint) return;
+              batch.set(docRef, { ...payload, atualizadoEm: new Date().toISOString() }, { merge: true });
+              registry[docId] = fingerprint;
+              changedCount++;
             });
-            await batch.commit();
+            if (changedCount > 0) await batch.commit();
+            saveFirestoreSyncRegistry(uid, 'chats', registry);
+            console.info(`[Firestore] ${changedCount} de ${sessionsArray.length} conversa(s) sincronizada(s).`);
           } catch (e) {
             console.warn('[Firestore] Erro ao sincronizar chats:', e);
           }
@@ -1631,8 +1679,13 @@
           console.warn('[MedTutor] Falha na leitura do IndexedDB:', e);
         }
 
-        // 2. Se o Firestore estiver online, sincroniza dados atualizados da nuvem
-        if (this.hasAuthenticatedCloudSession(uid)) {
+        // 2. A cópia local abre o app sem custo. A leitura completa da nuvem é
+        // limitada por tempo para não reler toda a biblioteca a cada F5.
+        const refreshKey = `medtutor_firestore_last_refresh_${uid}`;
+        const lastRefreshAt = Number(localStorage.getItem(refreshKey) || 0);
+        const shouldRefreshCloud = this.hasAuthenticatedCloudSession(uid)
+          && (Date.now() - lastRefreshAt >= FIRESTORE_REFRESH_INTERVAL_MS);
+        if (shouldRefreshCloud) {
           try {
             const userDoc = await firestoreDb.collection('users').doc(uid).get();
             if (userDoc.exists) {
@@ -1645,14 +1698,13 @@
               const cloudMats = [];
               for (const doc of matsSnap.docs) {
                 const material = { ...doc.data(), id: doc.id };
-                let completeChunksText = '';
-                if (material.conteudo_armazenamento === 'chunks_v1') {
-                  try {
-                    completeChunksText = await this.readMaterialTextChunks(doc.ref, Number(material.conteudo_chunks) || 0);
-                  } catch (chunkError) {
-                    console.warn('[Firestore] Não foi possível reconstruir o Markdown do material:', doc.id, chunkError);
-                  }
-                }
+                // Não lê todos os chunks durante a abertura. Se já existir uma
+                // cópia completa no IndexedDB, ela é reutilizada; caso contrário,
+                // o texto integral é buscado sob demanda ao abrir/gerar o estudo.
+                const localMaterial = (chatDriveMaterials || []).find(item => item?.id === doc.id);
+                const cachedText = localMaterial ? String(localMaterial.markdownText || localMaterial.conteudo_md || localMaterial.text || '') : '';
+                const rootText = String(material.conteudo_md || material.markdownText || material.text || '');
+                const completeChunksText = cachedText.length > rootText.length ? cachedText : '';
 
                 const isBoilerplate = text => typeof text === 'string' && (
                   /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
@@ -1771,9 +1823,12 @@
                 await MedTutorLocalDB.set('questions', uid, cloudQ);
               }
             }
+            try { localStorage.setItem(refreshKey, String(Date.now())); } catch (error) {}
           } catch (cloudErr) {
             console.warn('[Firestore] Erro ao sincronizar leitura com nuvem:', cloudErr);
           }
+        } else if (this.hasAuthenticatedCloudSession(uid)) {
+          console.info('[Firestore] Leitura completa adiada: cópia local recente disponível.');
         }
 
         // Reaplica a última tela e matéria depois de carregar IndexedDB/Firestore.
