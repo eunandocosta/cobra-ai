@@ -11608,7 +11608,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       ensureCurrentSubjectValid();
 
       const currentStatus = subjectGenerationStatus[currentStudySubject] || { status: 'ready', materialsCount: 0, questionsCount: 0 };
-      const matCount = (typeof chatDriveMaterials !== 'undefined' ? chatDriveMaterials.filter(m => m.subject === currentStudySubject).length : 0) || currentStatus.materialsCount || 0;
+      // Usa a mesma resolução de disciplina da tela Matérias Curriculares.
+      // Antes, a igualdade literal excluía arquivos vinculados a um nome
+      // curricular equivalente (por exemplo, módulo M011 / Sistema Nervoso).
+      const resolvedMaterials = typeof getMaterialsForSubject === 'function'
+        ? getMaterialsForSubject(currentStudySubject)
+        : [];
+      const matCount = resolvedMaterials.length || currentStatus.materialsCount || 0;
       const qCount = sharedQuestionsBank.filter(q => q.subject === currentStudySubject).length;
       const isPending = currentStatus.status === 'pending' || (matCount > 0 && qCount === 0);
 
