@@ -1,8 +1,6 @@
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
 
-const MAX_MATERIAL_CHARS = 120_000;
-
 function questionTokenSet(value) {
   return new Set(String(value || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -338,10 +336,6 @@ class QuizzesService {
     if (!materialText || materialText.trim().length < 20) {
       throw new Error("O texto fornecido para a IA está vazio ou é excessivamente curto.");
     }
-    if (materialText.length > MAX_MATERIAL_CHARS) {
-      throw new Error(`O texto excede o limite de ${MAX_MATERIAL_CHARS} caracteres.`);
-    }
-
     const totalQuestoes = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
     const difficultyPlan = buildDifficultyPlan(totalQuestoes, requestedDifficulty);
 
