@@ -706,6 +706,9 @@
               <button class="btn-outline-action primary" id="btnSyncPendingQuestions" onclick="synchronizePendingDisciplinesQuestions()" title="Criar questões para as disciplinas que já possuem materiais enviados, mas ainda não possuem Quiz ou Flashcards">
                 ✨ Sincronizar Questões Pendentes
               </button>
+              <button class="btn-outline-action" onclick="removeExactMaterialDuplicates()" title="Compara o conteúdo integral e remove somente cópias idênticas, preservando materiais diferentes">
+                🔎 Limpar Cópias Idênticas
+              </button>
               <button class="btn-outline-action" id="btnToggleAllCurriculum" onclick="toggleAllCurriculumPeriods()" title="Expandir ou recolher todas as listas de matérias">
                 ▼ Expandir Todas
               </button>
@@ -2671,7 +2674,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.js?v=20260914-safe-study-recovery-v12"></script>
+  <script defer src="/app.js?v=20260914-exact-material-dedupe-v13"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

@@ -747,6 +747,13 @@
       return `${normalize(material?.subject || material?.disciplina)}::${normalize(material?.originalFileName || material?.name || material?.nome)}`;
     }
 
+    // Nome igual não significa material igual: dois arquivos podem ter sido
+    // nomeados como "Aula 1" e ainda assim conter capítulos diferentes.
+    function getMaterialContentSignature(material) {
+      const text = String(material?.markdownText || material?.conteudo_md || material?.material_md || material?.text || '');
+      return firestoreFingerprint(text);
+    }
+
     function mergeStudyMaterialsPreservingContent(...collections) {
       const byKey = new Map();
       collections.flat().filter(Boolean).map(normalizeMaterial).forEach(material => {
@@ -761,11 +768,12 @@
           + (value?.academicReport || value?.relatorio_academico ? 500 : 0);
         byKey.set(key, score(material) > score(prior) ? { ...prior, ...material, markdownText: material.markdownText || prior.markdownText } : { ...material, ...prior, markdownText: prior.markdownText || material.markdownText });
       });
-      // Alguns uploads antigos receberam IDs diferentes para o mesmo arquivo.
-      // Mantemos a versão mais rica visualmente, sem excluir nada da nuvem.
+      // Alguns uploads antigos receberam IDs diferentes para a mesma cópia.
+      // Não unifique por nome: só cópias com conteúdo idêntico são escondidas
+      // localmente. A exclusão na nuvem depende da auditoria confirmada abaixo.
       const byName = new Map();
       byKey.forEach(material => {
-        const key = getMaterialMergeKey(material);
+        const key = `${getMaterialMergeKey(material)}::${getMaterialContentSignature(material)}`;
         const prior = byName.get(key);
         if (!prior) {
           byName.set(key, material);
@@ -961,6 +969,89 @@
       async readMaterialTextChunks(docRef, expectedChunks) {
         const snapshot = await docRef.collection('conteudo_chunks').orderBy('index').limit(expectedChunks || 1000).get();
         return snapshot.docs.map(doc => String(doc.data()?.texto || '')).join('');
+      },
+
+      async deleteMaterialDocumentAndChunks(docRef) {
+        const chunks = await docRef.collection('conteudo_chunks').get();
+        const refs = chunks.docs.map(doc => doc.ref);
+        refs.push(docRef);
+        for (let start = 0; start < refs.length; start += 400) {
+          const batch = firestoreDb.batch();
+          refs.slice(start, start + 400).forEach(ref => batch.delete(ref));
+          await batch.commit();
+        }
+      },
+
+      // Só exclui registros com mesma disciplina, nome e assinatura do texto
+      // integral. Antes, une imagens e conserva o relatório mais completo.
+      async removeExactCloudMaterialDuplicates() {
+        const uid = this.getUserId();
+        if (!this.hasAuthenticatedCloudSession(uid)) {
+          throw new Error('Entre novamente com a conta Firebase antes de limpar materiais na nuvem.');
+        }
+        const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+        const snapshot = await colRef.get();
+        const groups = new Map();
+        snapshot.docs.forEach(doc => {
+          const data = { ...doc.data(), id: doc.id };
+          const key = getMaterialMergeKey(data);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push({ doc, data });
+        });
+
+        let candidateGroups = 0;
+        let removed = 0;
+        const removedIds = new Set();
+        for (const items of groups.values()) {
+          if (items.length < 2) continue;
+          candidateGroups++;
+          const expanded = [];
+          for (const item of items) {
+            const expectedChunks = Number(item.data.conteudo_chunks) || 0;
+            const rootText = String(item.data.conteudo_md || item.data.markdownText || item.data.text || '');
+            const chunksText = expectedChunks > 1 ? await this.readMaterialTextChunks(item.doc.ref, expectedChunks) : '';
+            const text = chunksText.length >= rootText.length ? chunksText : rootText;
+            expanded.push({ ...item, text, signature: firestoreFingerprint(text) });
+          }
+          const exactSets = new Map();
+          expanded.forEach(item => {
+            if (!exactSets.has(item.signature)) exactSets.set(item.signature, []);
+            exactSets.get(item.signature).push(item);
+          });
+          for (const sameContent of exactSets.values()) {
+            if (sameContent.length < 2) continue;
+            const score = item => item.text.length
+              + (Array.isArray(item.data.figuras_clinicas) ? item.data.figuras_clinicas.length * 1000 : 0)
+              + String(item.data.relatorio_academico?.conteudo_md || '').length
+              + (item.data.relatorio_academico ? 500 : 0);
+            sameContent.sort((a, b) => score(b) - score(a));
+            const primary = sameContent[0];
+            const allImages = new Map();
+            sameContent.forEach(item => (item.data.figuras_clinicas || []).forEach(image => {
+              const url = image?.imageUrl || image?.thumbnailUrl || image?.src;
+              if (url && !allImages.has(url)) allImages.set(url, image);
+            }));
+            const bestReport = sameContent.map(item => item.data.relatorio_academico).filter(Boolean)
+              .sort((a, b) => String(b?.conteudo_md || '').length - String(a?.conteudo_md || '').length)[0] || null;
+            await primary.doc.ref.set({
+              figuras_clinicas: [...allImages.values()],
+              ...(bestReport ? { relatorio_academico: bestReport } : {}),
+              atualizadoEm: new Date().toISOString()
+            }, { merge: true });
+            for (const duplicate of sameContent.slice(1)) {
+              await this.deleteMaterialDocumentAndChunks(duplicate.doc.ref);
+              removedIds.add(duplicate.doc.id);
+              removed++;
+            }
+          }
+        }
+        if (removedIds.size && Array.isArray(chatDriveMaterials)) {
+          chatDriveMaterials = chatDriveMaterials.filter(material => !removedIds.has(material.id));
+          chatDriveMaterials = mergeStudyMaterialsPreservingContent(chatDriveMaterials);
+          await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+        }
+        console.info('[Firestore] Auditoria de duplicatas concluída.', { candidateGroups, removed, uid });
+        return { candidateGroups, removed };
       },
 
       // Salva os Materiais de Estudo em users/{userId}/materiais_estudo/{materialId}
@@ -13429,6 +13520,29 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       showToast(`🗑️ Conteúdo "${targetName}" excluído com sucesso!`);
     }
+
+    async function removeExactMaterialDuplicates() {
+      if (!firestoreDb || !isFirebaseCloudActive || !MedTutorFirebaseService?.hasAuthenticatedCloudSession?.(MedTutorFirebaseService.getUserId())) {
+        showToast('⚠️ Entre novamente na conta Firebase antes de auditar materiais na nuvem.');
+        return;
+      }
+      const confirmed = confirm('Auditar e remover somente cópias exatamente idênticas?\n\nA comparação considera disciplina, nome e conteúdo integral. Arquivos com o mesmo nome, mas texto diferente, serão preservados. Imagens e o relatório mais completo serão mantidos na cópia principal.');
+      if (!confirmed) return;
+      showToast('🔎 Auditando cópias idênticas na nuvem...');
+      try {
+        const result = await MedTutorFirebaseService.removeExactCloudMaterialDuplicates();
+        renderCurriculumGrid();
+        if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
+        if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
+        showToast(result.removed > 0
+          ? `✅ ${result.removed} cópia(s) idêntica(s) removida(s); conteúdos diferentes foram preservados.`
+          : '✅ Auditoria concluída: não há cópias exatamente idênticas para remover.');
+      } catch (error) {
+        console.error('[Firestore] Falha na auditoria de duplicatas:', error);
+        showToast(`⚠️ Não foi possível concluir a auditoria: ${error.message || 'erro de sincronização'}`);
+      }
+    }
+    window.removeExactMaterialDuplicates = removeExactMaterialDuplicates;
 
     async function deleteSubjectAllMaterials(subjectName) {
       const target = subjectName || (typeof currentDetailedSubjectName !== 'undefined' ? currentDetailedSubjectName : '') || currentStudySubject;
