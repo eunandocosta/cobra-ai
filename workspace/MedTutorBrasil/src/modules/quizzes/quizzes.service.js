@@ -161,6 +161,48 @@ function buildDifficultyPlan(total, requestedDifficulty) {
   ];
 }
 
+// Mantém a cobertura do documento: a geração percorre cada seção/página antes
+// de voltar ao início. Se o extrator não preservou títulos, parágrafos longos
+// ainda formam blocos didáticos, sem descartar conteúdo do material.
+function splitMaterialIntoQuestionSections(value) {
+  const text = String(value || '').replace(/\r/g, '').trim();
+  if (!text) return [];
+  const headingPattern = /^(?:#{1,6}\s+.+|(?:p[aá]gina|slide)\s+\d+\b.*)$/gim;
+  const matches = [...text.matchAll(headingPattern)];
+  const rawSections = matches.length > 1
+    ? matches.map((match, index) => text.slice(match.index, matches[index + 1]?.index || text.length).trim())
+    : text.split(/\n\s*\n(?=[^\n]{12,})/).map(part => part.trim()).filter(Boolean);
+  const sections = [];
+  rawSections.forEach((raw, index) => {
+    if (raw.length < 80) return;
+    const firstLine = raw.split('\n').find(line => line.trim()) || '';
+    const baseLabel = firstLine.replace(/^#{1,6}\s*/, '').replace(/^(?:p[aá]gina|slide)\s+\d+\s*[:\-–]?\s*/i, '').trim() || `Bloco ${index + 1}`;
+    // Um bloco sem subtítulos pode ser enorme após a extração de PDF. Ele é
+    // fatiado em trechos contíguos para caber em uma chamada, mas todos os
+    // caracteres continuam no ciclo de cobertura.
+    let remaining = raw;
+    let part = 1;
+    while (remaining.length) {
+      if (remaining.length <= 16000) {
+        sections.push({ id: `secao-${sections.length + 1}`, label: part === 1 ? baseLabel.slice(0, 160) : `${baseLabel.slice(0, 140)} — parte ${part}`, content: remaining });
+        break;
+      }
+      const windowText = remaining.slice(0, 16000);
+      const splitAt = Math.max(windowText.lastIndexOf('\n\n'), windowText.lastIndexOf('\n'), windowText.lastIndexOf('. '), windowText.lastIndexOf(' '));
+      const safeSplit = splitAt > 4000 ? splitAt + 1 : 16000;
+      sections.push({ id: `secao-${sections.length + 1}`, label: `${baseLabel.slice(0, 140)} — parte ${part}`, content: remaining.slice(0, safeSplit).trim() });
+      remaining = remaining.slice(safeSplit).trim();
+      part++;
+    }
+  });
+  return sections.length ? sections : [{ id: 'secao-1', label: 'Conteúdo do material', content: text }];
+}
+
+function buildSectionQuestionPlan(sections, total) {
+  if (!sections.length) return [];
+  return Array.from({ length: total }, (_, index) => sections[index % sections.length]);
+}
+
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -338,6 +380,17 @@ class QuizzesService {
     }
     const totalQuestoes = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
     const difficultyPlan = buildDifficultyPlan(totalQuestoes, requestedDifficulty);
+    const materialSections = splitMaterialIntoQuestionSections(materialText);
+    const sectionPlan = buildSectionQuestionPlan(materialSections, totalQuestoes);
+    const uniquePlannedSections = [...new Map(sectionPlan.map(section => [section.id, section])).values()];
+    const sectionPlanInstructions = sectionPlan.map((section, index) =>
+      `Questão ${index + 1}: ${section.label} (${section.id})`
+    ).join('\n');
+    const sectionedMaterialText = uniquePlannedSections.map(section =>
+      `--- ${section.id}: ${section.label} ---\n${section.content}\n--- FIM ${section.id} ---`
+    ).join('\n\n');
+    console.log("🧩 [Quiz Engine] Seções/páginas identificadas:", materialSections.length);
+    console.log("🔁 [Quiz Engine] Plano de cobertura:", `${sectionPlan.length} questão(ões) em ciclo por seção/página.`);
 
     const genAI = getGenAI();
     // Um único caminho de configuração: se não houver modelo exclusivo de quiz,
@@ -359,7 +412,11 @@ class QuizzesService {
       : `Todas as ${totalQuestoes} questões devem ser exatamente do nível "${requestedDifficulty}".`;
 
     const prompt = `
-Faça uma leitura integral por seções do conteúdo médico abaixo e crie ${totalQuestoes} questões de avaliação formativa.
+Crie ${totalQuestoes} questões de avaliação formativa a partir das seções/páginas do conteúdo médico abaixo.
+
+PLANO OBRIGATÓRIO DE COBERTURA:
+${sectionPlanInstructions}
+Produza exatamente uma questão para cada linha acima, na mesma ordem. Depois de cobrir cada seção/página disponível, retorne à primeira seção e use outro conceito explícito dela. Não concentre questões em uma única seção.
 
 METODOLOGIA OBRIGATÓRIA:
 1. Ignore cabeçalhos institucionais, sumários, numeração de páginas/slides, nomes de docentes ou títulos vazios.
@@ -391,8 +448,8 @@ ${disciplineQuestionBank.map((question, index) => `${index + 1}. ${question}`).j
 --- FIM DO BANCO DE ESTILO ---
 ` : ''}
 
---- CONTEÚDO MÉDICO INTEGRAL ---
-${materialText}
+--- CONTEÚDO MÉDICO ORGANIZADO POR SEÇÕES/PÁGINAS ---
+${sectionedMaterialText}
 --- FIM DO CONTEÚDO ---
 
 ${previousQuestions.length ? `--- QUESTÕES JÁ EXISTENTES NO DECK DO ALUNO (PULE ESTAS E SEUS CONCEITOS) ---
