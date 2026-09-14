@@ -12801,7 +12801,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
           <!-- Explicação Concisa do Mecanismo (1-2 frases) -->
           ${item.explanation ? `
-            <div style="background: rgba(0, 229, 255, 0.06); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 12px; color: var(--text-primary); line-height: 1.45;">
+            <div class="quiz-mechanism-card">
               ⚡ <strong>Mecanismo Central:</strong> ${(typeof formatInlineMd === 'function') ? formatInlineMd(item.explanation) : item.explanation}
             </div>
           ` : ''}
