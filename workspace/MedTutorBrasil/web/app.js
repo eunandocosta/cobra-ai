@@ -1716,7 +1716,9 @@
 
         // 2. A cópia local abre o app sem custo. A leitura completa da nuvem é
         // limitada por tempo para não reler toda a biblioteca a cada F5.
-        const refreshKey = `medtutor_firestore_last_refresh_${uid}`;
+        // Versão separada para executar uma recuperação segura única após a
+        // correção que passou a preservar bancos locais e respostas parciais.
+        const refreshKey = `medtutor_firestore_last_refresh_recovery_v2_${uid}`;
         const lastRefreshAt = Number(localStorage.getItem(refreshKey) || 0);
         const shouldRefreshCloud = this.hasAuthenticatedCloudSession(uid)
           && (Date.now() - lastRefreshAt >= FIRESTORE_REFRESH_INTERVAL_MS);
