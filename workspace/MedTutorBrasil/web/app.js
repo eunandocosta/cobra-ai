@@ -620,6 +620,20 @@
       }
     };
 
+    function extractPersistedImagesFromMarkdown(markdown) {
+      const references = [];
+      const seen = new Set();
+      const pattern = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
+      for (const match of String(markdown || '').matchAll(pattern)) {
+        const title = String(match[1] || 'Figura do material').trim();
+        const imageUrl = String(match[2] || '').trim();
+        if (!imageUrl || seen.has(imageUrl)) continue;
+        seen.add(imageUrl);
+        references.push({ title, clinicalLabel: title, imageUrl, thumbnailUrl: imageUrl, source: 'Material enviado pelo estudante' });
+      }
+      return references;
+    }
+
     function normalizeMaterial(m) {
       if (!m || typeof m !== 'object') return m;
       const effectiveName = m.name || m.nome || m.originalFileName || 'Aula Médica';
@@ -669,6 +683,14 @@
         secondaryCandidates.sort((a, b) => b.length - a.length);
         effectiveMd = secondaryCandidates[0] || '';
       }
+      const persistedImages = Array.isArray(m.clinicalImages) ? m.clinicalImages : (Array.isArray(m.figuras_clinicas) ? m.figuras_clinicas : []);
+      const imageByUrl = new Map();
+      [...persistedImages, ...extractPersistedImagesFromMarkdown(effectiveMd)].forEach(image => {
+        const imageUrl = image?.imageUrl || image?.thumbnailUrl || image?.src;
+        if (typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl) && !imageByUrl.has(imageUrl)) {
+          imageByUrl.set(imageUrl, { ...image, imageUrl, thumbnailUrl: image.thumbnailUrl || imageUrl });
+        }
+      });
 
       return {
         ...m,
@@ -688,7 +710,7 @@
         text: effectiveMd,
         pedagogicalSynthesis: m.pedagogicalSynthesis || m.sintese_pedagogica || null,
         sintese_pedagogica: m.sintese_pedagogica || m.pedagogicalSynthesis || null,
-        clinicalImages: Array.isArray(m.clinicalImages) ? m.clinicalImages : (Array.isArray(m.figuras_clinicas) ? m.figuras_clinicas : []),
+        clinicalImages: [...imageByUrl.values()],
         academicReport: m.academicReport || m.relatorio_academico || null,
         relatorio_academico: m.relatorio_academico || m.academicReport || null
       };
@@ -10746,7 +10768,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       ` : '';
 
       let clinicalFiguresHtml = '';
-      const cImages = matList[0]?.clinicalImages || [];
+      // Reúne figuras de todos os materiais que alimentam o relatório. Para
+      // itens carregados do Firestore, a imagem persistida está em imageUrl,
+      // não em src (que só existe durante o upload local).
+      const cImages = matList.flatMap(material => Array.isArray(material?.clinicalImages) ? material.clinicalImages : [])
+        .filter((image, index, list) => {
+          const url = image?.imageUrl || image?.thumbnailUrl || image?.src || '';
+          return /^https?:\/\//i.test(url) && list.findIndex(candidate => (candidate?.imageUrl || candidate?.thumbnailUrl || candidate?.src || '') === url) === index;
+        });
       if (cImages.length > 0) {
         clinicalFiguresHtml = `
           <div class="doc-section">
@@ -10757,11 +10786,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
               ${cImages.map(img => `
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
                   <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--neon); font-weight: 600;">
-                    <span>${escapeHtml(img.clinicalLabel)}</span>
-                    <span style="color: #00ff66;">${img.compressedSizeKB} KB (-${img.reductionPercent}%)</span>
+                    <span>${escapeHtml(img.clinicalLabel || img.title || 'Figura do material')}</span>
+                    <span style="color: #00ff66;">Material original</span>
                   </div>
                   <div style="background: #000; border-radius: 4px; min-height: 120px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);">
-                    ${img.src && !img.src.includes('placeholder') ? `<img src="${img.src}" alt="${escapeHtml(img.title)}" style="max-width: 100%; max-height: 140px; object-fit: contain;">` : `
+                    ${(img.imageUrl || img.thumbnailUrl || img.src) && !(img.imageUrl || img.thumbnailUrl || img.src).includes('placeholder') ? `<img src="${escapeHtml(img.imageUrl || img.thumbnailUrl || img.src)}" alt="${escapeHtml(img.title || img.clinicalLabel || 'Figura do material')}" loading="lazy" style="max-width: 100%; max-height: 140px; object-fit: contain;">` : `
                       <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">
                         <span style="font-size: 24px; display: block; margin-bottom: 2px;">🩻</span>
                         <strong style="color: #ffffff;">${escapeHtml(img.title)}</strong>
