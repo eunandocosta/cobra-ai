@@ -7836,6 +7836,15 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
         const effectiveSubject = subjectName || mat?.subject || mat?.disciplina || currentStudySubject || 'Clínica Médica';
         const effectiveTitle = mat?.name || mat?.nome || materialName || effectiveSubject;
         const diseaseTopic = mat?.disease || mat?.doenca || mat?.topic || mat?.materia || effectiveTitle.replace(/\.[^/.]+$/, '');
+        const reportFigures = (Array.isArray(mat?.clinicalImages) ? mat.clinicalImages : [])
+          .map((image, index) => ({
+            id: image?.id || `figura-${index + 1}`,
+            url: image?.imageUrl || image?.thumbnailUrl || image?.src || '',
+            description: image?.clinicalLabel || image?.title || `Figura ${index + 1} do material`,
+            page: Number(image?.page) || null,
+            association: image?.visualAssociation || ''
+          }))
+          .filter(figure => /^https?:\/\//i.test(figure.url));
 
         // Só relatórios explicitamente solicitados para uma disciplina podem reunir
         // fontes. Um PDF/slide escolhido nunca pode herdar o texto de outro arquivo.
@@ -7917,7 +7926,8 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
                 subject: effectiveSubject,
                 content: `${sourceIdentity}\n\n--- CONTEÚDO EXTRAÍDO DESTE ARQUIVO ---\n${materialContent}`,
                 studentName,
-                medicalSchool
+                medicalSchool,
+                figures: reportFigures
               })
             });
             if (serverResponse.ok) {
@@ -8116,6 +8126,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           ? this.formatAiArticleToHtml(aiGeneratedArticle, effectiveSubject, effectiveTitle, studentName, medicalSchool, periodStr, cycleStr)
           : this.generateLocalAcademicReport(effectiveSubject, effectiveTitle, diseaseTopic, studentName, medicalSchool, periodStr, cycleStr, materialContent);
 
+        // A figura é parte do material de estudo, não uma sugestão opcional do
+        // modelo. Incluímos o anexo visual diretamente no HTML para garantir
+        // que relatórios também exibam imagens quando o Gemini não as citar.
+        if (reportFigures.length) {
+          reportData.html = `${reportData.html}${this.renderMaterialFiguresHtml(reportFigures)}`;
+          reportData.markdown = `${reportData.markdown || ''}\n\n${this.renderMaterialFiguresMarkdown(reportFigures)}`;
+        }
+
         if (pedagogicalData) {
           reportData.pedagogicalData = pedagogicalData;
           reportData.pedagogicalSynthesis = pedagogicalData;
@@ -8128,6 +8146,30 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         }
 
         return reportData;
+      },
+
+      renderMaterialFiguresMarkdown(figures = []) {
+        if (!figures.length) return '';
+        return `## Figuras do Material Original\n\n${figures.map((figure, index) => `![${figure.description}](${figure.url})\n*Figura ${index + 1}${figure.page ? ` — página ${figure.page}` : ''}: ${figure.description}.*`).join('\n\n')}`;
+      },
+
+      renderMaterialFiguresHtml(figures = []) {
+        if (!figures.length) return '';
+        return `
+          <section class="academic-article-container" style="margin-top: 18px;">
+            <div class="academic-body-content">
+              <div class="academic-section">
+                <h2>Figuras do Material Original</h2>
+                <p>Imagens extraídas do arquivo enviado pelo estudante e preservadas como apoio visual deste relatório.</p>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
+                  ${figures.map((figure, index) => `<figure style="margin:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; break-inside:avoid;">
+                    <img src="${escapeHtml(figure.url)}" alt="${escapeHtml(figure.description)}" loading="lazy" style="display:block; width:100%; max-height:360px; object-fit:contain; background:#fff; border-radius:5px;">
+                    <figcaption style="margin-top:8px; color:#1e293b; font-size:10.5pt; line-height:1.45;"><strong>Figura ${index + 1}${figure.page ? ` — página ${figure.page}` : ''}.</strong> ${escapeHtml(figure.description)}${figure.association ? `<br><span style="color:#475569;">${escapeHtml(figure.association)}</span>` : ''}</figcaption>
+                  </figure>`).join('')}
+                </div>
+              </div>
+            </div>
+          </section>`;
       },
 
       // Formata o artigo Markdown gerado pelo Gemini em HTML acadêmico no padrão ABNT
