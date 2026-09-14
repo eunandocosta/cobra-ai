@@ -1479,6 +1479,7 @@
             .from(config.bucket)
             .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
           if (signedError || !signedData?.signedUrl) throw signedError || new Error('Supabase não retornou URL assinada.');
+          this.lastClinicalImageStorageProvider = 'Supabase Storage';
           console.info(`[Supabase Storage] Imagem clínica salva em ${config.bucket}/${storagePath}.`);
           return signedData.signedUrl;
         } catch (supabaseError) {
@@ -1509,6 +1510,7 @@
             const uploadBlob = imageSourceToBlob(imageSource, imageMime);
             const snapshot = await storageRef.put(uploadBlob, { contentType: imageMime });
             const downloadUrl = await snapshot.ref.getDownloadURL();
+            this.lastClinicalImageStorageProvider = 'Firebase Storage';
             console.log(`[Firebase Storage] Imagem clínica salva em ${storagePath} -> ${downloadUrl}`);
             return downloadUrl;
           } catch (e) {
@@ -3892,10 +3894,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages;
       if (!selectedImages.length) return;
       const uploadedImages = [];
+      const storageProviders = new Set();
       for (let index = 0; index < selectedImages.length; index++) {
         const image = selectedImages[index];
         const url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
         if (!/^https?:\/\//i.test(url || '')) continue; // Nunca grava Base64 no Markdown/Firestore
+        if (MedTutorFirebaseService.lastClinicalImageStorageProvider) {
+          storageProviders.add(MedTutorFirebaseService.lastClinicalImageStorageProvider);
+        }
         const association = visualAssociations.find(item =>
           item?.sourceImageId === image.id ||
           (Number.isFinite(Number(item?.sourcePage)) && Number(item.sourcePage) === Number(image.page))
@@ -3918,6 +3924,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         return;
       }
       material.clinicalImages = uploadedImages;
+      material.imageStorageProvider = [...storageProviders].join(' + ') || 'Armazenamento em nuvem';
       material.visualAssociations = visualAssociations;
       material.markdownText = `${material.markdownText || material.text || ''}\n\n## Figuras do Material Original\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Figura ${index + 1}`}](${image.imageUrl})\n*Figura ${index + 1}: extraída do PDF/slide enviado pelo estudante.*${image.visualAssociation ? `\n\n**Associação didática:** ${image.visualAssociation}` : ''}${image.studyQuestion ? `\n\n**Pergunta de recuperação:** ${image.studyQuestion}` : ''}`).join('\n\n')}`;
       material.text = material.markdownText;
@@ -4038,7 +4045,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const aiEngine = material.visualAssociationAuthorized
         ? 'Gemini via servidor local (associação visual)'
         : (material.aiEngine || 'Motor local (sem chamada Gemini confirmada)');
-      const payload = { status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected, imagesPersisted, storageStatus: material.imagePersistenceError || (imagesPersisted ? 'persistido no Firebase Storage' : 'coleta pendente') };
+      const payload = { status, fileName: material.originalFileName || material.name, aiEngine, inputChars, outputChars, imagesCollected, imagesPersisted, storageStatus: material.imagePersistenceError || (imagesPersisted ? `persistido no ${material.imageStorageProvider || 'armazenamento em nuvem'}` : 'coleta pendente') };
       console.info('[Upload MedTutor] Enviando diagnóstico operacional:', payload);
       fetch('/api/diagnostics/upload', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
