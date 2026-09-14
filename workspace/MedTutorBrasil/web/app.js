@@ -70,6 +70,17 @@
       return new Blob([buffer], { type: mime });
     }
 
+    function isTransientSupabaseStorageError(error) {
+      const status = Number(error?.status || error?.statusCode || error?.cause?.status || 0);
+      if ([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(status)) return true;
+      const message = String(error?.message || error || '');
+      return /\b(?:HTTP\s*)?(?:5\d{2}|520|521|522|523|524)\b|network|networkerror|failed to fetch|load failed|timeout/i.test(message);
+    }
+
+    function waitForStorageRetry(delayMs) {
+      return new Promise(resolve => window.setTimeout(resolve, delayMs));
+    }
+
     function getDisciplineQuestionBankId(subjectName) {
       const normalized = String(subjectName || '')
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -1485,6 +1496,7 @@
       // bucket Firebase deste projeto ainda não está provisionado.
       async uploadClinicalImage(imageSource, materialId, imgIndex) {
         const uid = this.getUserId();
+        this.lastClinicalImageStorageProvider = null;
         const imageMime = typeof imageSource === 'string' && imageSource.startsWith('data:')
           ? (imageSource.match(/^data:([^;,]+)/i)?.[1] || 'image/webp')
           : (imageSource?.type || 'image/webp');
@@ -1499,20 +1511,35 @@
           const { client, config } = await getSupabaseStorageClient();
           const uploadBlob = imageSourceToBlob(imageSource, imageMime);
           if (!(uploadBlob instanceof Blob)) throw new Error('Formato de imagem inválido para envio ao Supabase.');
-          const { error: uploadError } = await client.storage
-            .from(config.bucket)
-            .upload(storagePath, uploadBlob, { contentType: imageMime, upsert: true, cacheControl: '31536000' });
-          if (uploadError) throw uploadError;
+          const maxAttempts = 3;
+          let lastError = null;
 
-          // O bucket é privado. A URL temporária evita expor as figuras médicas
-          // publicamente; ela é renovável e não usa chave administrativa.
-          const { data: signedData, error: signedError } = await client.storage
-            .from(config.bucket)
-            .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
-          if (signedError || !signedData?.signedUrl) throw signedError || new Error('Supabase não retornou URL assinada.');
-          this.lastClinicalImageStorageProvider = 'Supabase Storage';
-          console.info(`[Supabase Storage] Imagem clínica salva em ${config.bucket}/${storagePath}.`);
-          return signedData.signedUrl;
+          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+              const { error: uploadError } = await client.storage
+                .from(config.bucket)
+                .upload(storagePath, uploadBlob, { contentType: imageMime, upsert: true, cacheControl: '31536000' });
+              if (uploadError) throw uploadError;
+
+              // O bucket é privado. A URL temporária evita expor as figuras médicas
+              // publicamente; ela é renovável e não usa chave administrativa.
+              const { data: signedData, error: signedError } = await client.storage
+                .from(config.bucket)
+                .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+              if (signedError || !signedData?.signedUrl) throw signedError || new Error('Supabase não retornou URL assinada.');
+              this.lastClinicalImageStorageProvider = 'Supabase Storage';
+              console.info(`[Supabase Storage] Imagem clínica salva em ${config.bucket}/${storagePath} (tentativa ${attempt}/${maxAttempts}).`);
+              return signedData.signedUrl;
+            } catch (attemptError) {
+              lastError = attemptError;
+              if (attempt === maxAttempts || !isTransientSupabaseStorageError(attemptError)) break;
+              const delayMs = attempt * 900;
+              console.warn(`[Supabase Storage] Falha transitória ao salvar imagem (tentativa ${attempt}/${maxAttempts}); nova tentativa em ${delayMs} ms.`, attemptError);
+              await waitForStorageRetry(delayMs);
+            }
+          }
+
+          throw lastError || new Error('Supabase não concluiu o envio da imagem.');
         } catch (supabaseError) {
           console.warn('[Supabase Storage] Falha ao persistir imagem; tentando Firebase como contingência:', supabaseError);
           reportFirestoreSyncIssue('supabase_storage_upload_failed', {
