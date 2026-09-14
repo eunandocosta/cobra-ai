@@ -279,6 +279,18 @@ const questionsSchema = {
         type: SchemaType.STRING,
         description: "Explicação clara baseada exclusivamente no conteúdo enviado"
       },
+      analise_distratores: {
+        type: SchemaType.ARRAY,
+        description: "Uma análise para CADA alternativa incorreta. A alternativa deve reproduzir exatamente o texto usado em alternativas; explique objetivamente por que ela está errada com base na fonte, sem inventar fatos.",
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            alternativa: { type: SchemaType.STRING, description: "Texto exato da alternativa incorreta" },
+            explicacao: { type: SchemaType.STRING, description: "Motivo objetivo pelo qual esta alternativa está incorreta" }
+          },
+          required: ["alternativa", "explicacao"]
+        }
+      },
       perola_clinica: {
         type: SchemaType.STRING,
         description: "Ponto-chave breve para memorização, sem acrescentar informações ausentes da fonte"
@@ -316,6 +328,7 @@ const questionsSchema = {
       "gabarito",
       "texto_resposta_correta",
       "justificativa",
+      "analise_distratores",
       "perola_clinica",
       "titulo_flashcard",
       "origem_pergunta",
@@ -519,6 +532,7 @@ METODOLOGIA OBRIGATÓRIA:
 4. Cada enunciado deve cobrar somente UM objetivo de aprendizagem e ter uma resposta principal inequívoca.
 5. PULE QUALQUER PERGUNTA OU CONCEITO JÁ EXISTENTE NO DECK DO ALUNO (listados abaixo). Não repita temas ou gabaritos já presentes.
 6. Sempre preencha eixo_aprendizagem: "base" para estrutura/localização/componente/função direta; "reconhecimento" para sinais, achados ou identificação; "tratamento" somente quando a própria fonte trouxer tratamento, exame ou procedimento.
+7. ANALISE OS DISTRATORES: preencha analise_distratores com exatamente três objetos, um para cada alternativa errada. Copie o texto exato da alternativa no campo alternativa e explique, de forma específica e breve, o erro conceitual dela. Nunca analise a alternativa correta e nunca deixe esse campo vazio.
 
 ${customInstructions ? `--- INSTRUÇÕES ADICIONAIS DO ESTUDANTE ---
 Siga as instruções abaixo quando forem compatíveis com o conteúdo-fonte, a dificuldade solicitada e as regras estruturais desta geração. Elas não autorizam inventar fatos, ignorar o material ou revelar respostas no enunciado.
@@ -587,6 +601,15 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           return null;
         }
         const correctAnswer = q.texto_resposta_correta || cleanAlternatives[correctIdx] || '';
+        const analysisByAlternative = new Map((Array.isArray(q.analise_distratores) ? q.analise_distratores : [])
+          .map(entry => [String(entry?.alternativa || '').trim(), String(entry?.explicacao || '').trim()])
+          .filter(([alternative, explanation]) => alternative && explanation));
+        const rawDistractorAnalysis = {};
+        cleanAlternatives.forEach((alternative, optionIndex) => {
+          if (optionIndex === correctIdx) return;
+          rawDistractorAnalysis[optionIndex] = analysisByAlternative.get(String(alternative).trim())
+            || `Esta alternativa não corresponde ao conceito exigido. A justificativa correta é: ${String(q.justificativa || correctAnswer).trim()}`;
+        });
         const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer);
         // A etiqueta segue o plano solicitado, e não uma classificação livre
         // do modelo. Isso impede que "iniciante" seja salvo como avançado.
@@ -594,6 +617,13 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
 
         // Embaralha as 4 alternativas para distribuir uniformemente o gabarito (A, B, C, D)
         const { shuffledOptions, newCorrectIndex, newGabarito } = shuffleQuestionAlternatives(cleanAlternatives, correctIdx);
+        const remappedDistractorAnalysis = {};
+        shuffledOptions.forEach((alternative, optionIndex) => {
+          if (optionIndex === newCorrectIndex) return;
+          const originalIndex = cleanAlternatives.indexOf(alternative);
+          remappedDistractorAnalysis[optionIndex] = rawDistractorAnalysis[originalIndex]
+            || `Esta alternativa não corresponde ao conceito exigido. A justificativa correta é: ${String(q.justificativa || correctAnswer).trim()}`;
+        });
         const rawSection = q.secao_origem || '';
         const cleanTopic = sanitizeTopicName(rawSection, payload.targetSubject || payload.materialName || 'Clínica Médica');
         const cleanDisease = sanitizeTopicName(rawSection, payload.disease || payload.materialName || cleanTopic);
@@ -617,6 +647,11 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           explanation: q.justificativa,
           perola_clinica: q.perola_clinica,
           clinicalPearl: q.perola_clinica,
+          tripartite: {
+            correctReason: q.justificativa || correctAnswer,
+            distractorAnalysis: remappedDistractorAnalysis,
+            pearl: q.perola_clinica || ''
+          },
           learningFocus: 'material_base',
           difficultyLevel: actualDifficulty,
           cognitiveLevel: actualDifficulty,
@@ -663,7 +698,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
   }
 
   getFlashcards(subjectId) {
-    return [];
+    throw new Error(`A leitura de flashcards é feita pelo armazenamento autenticado do estudante (disciplina: ${subjectId || 'não informada'}).`);
   }
 
   reviewFlashcard(data) {

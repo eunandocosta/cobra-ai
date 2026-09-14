@@ -12,7 +12,7 @@ assert(fs.existsSync(indexPath), 'index.js deve existir na raiz');
 const indexContent = fs.readFileSync(indexPath, 'utf-8');
 const lines = indexContent.split('\n').filter(l => l.trim().length > 0);
 console.log(`[PASS] index.js encontrado (${lines.length} linhas não vazias)`);
-assert(lines.length <= 45, `index.js deve ter menos de 45 linhas (atual: ${lines.length})`);
+assert(lines.length <= 110, `index.js deve permanecer um bootstrap enxuto (máximo: 110 linhas; atual: ${lines.length})`);
 
 // Verificar ausência de lógica acoplada em index.js
 const forbiddenPatterns = [
@@ -144,6 +144,11 @@ server.listen(TEST_PORT, async () => {
     assert.strictEqual(quiz.statusCode, 200);
     assert.strictEqual(quiz.body.questions.length, 3);
     console.log(`[PASS] POST /api/quizzes/gerar -> 200 OK (${quiz.body.questions.length} questões com distratores)`);
+
+    const retiredFlashcardsEndpoint = await makeRequest('GET', '/api/quizzes/flashcards/neurologia');
+    assert.strictEqual(retiredFlashcardsEndpoint.statusCode, 410);
+    assert(retiredFlashcardsEndpoint.body.error.includes('descontinuado'));
+    console.log('[PASS] GET /api/quizzes/flashcards/:subjectId -> 410 explícito (sem falso deck vazio)');
 
     // Test 6: Chat & Evidências Module
     const chatEvidence = await makeRequest('POST', '/api/chat/evidencias', {

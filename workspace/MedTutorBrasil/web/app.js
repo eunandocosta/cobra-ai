@@ -786,6 +786,8 @@
     }
 
     const FIRESTORE_TEXT_CHUNK_SIZE = 160000;
+    // A cópia local abre imediatamente. A checagem de versão remota é leve e a
+    // leitura completa das coleções só ocorre quando a versão mudou.
     const FIRESTORE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 
     function firestoreFingerprint(value) {
@@ -939,6 +941,7 @@
               });
             });
             await batch.commit();
+            await this.markCloudDataRevision(uid);
           } catch (e) {
             console.warn('[Firestore] Erro ao sincronizar grade curricular:', e);
           }
@@ -947,6 +950,21 @@
 
       hasAuthenticatedCloudSession(uid) {
         return !!(firestoreDb && isFirebaseCloudActive && firebaseAuth?.currentUser?.uid === uid);
+      },
+
+      getCloudDataRevisionKey(uid) {
+        return `medtutor_firestore_data_revision_v1_${uid}`;
+      },
+
+      async markCloudDataRevision(uid) {
+        if (!this.hasAuthenticatedCloudSession(uid)) return null;
+        const revision = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        await firestoreDb.collection('users').doc(uid).set({
+          medtutor_dados_revision: revision,
+          medtutor_dados_atualizados_em: new Date().toISOString()
+        }, { merge: true });
+        try { localStorage.setItem(this.getCloudDataRevisionKey(uid), revision); } catch (error) {}
+        return revision;
       },
 
       async writeMaterialTextChunks(docRef, markdown) {
@@ -962,6 +980,17 @@
               atualizadoEm: new Date().toISOString()
             });
           });
+          await batch.commit();
+        }
+        // Quando um texto fica menor, os chunks antigos excedentes não podem
+        // permanecer: eles ressurgiriam ao reconstruir o conteúdo no futuro.
+        const existing = await chunkCollection.get();
+        const staleRefs = existing.docs
+          .filter(doc => Number(doc.data()?.index) >= chunks.length)
+          .map(doc => doc.ref);
+        for (let start = 0; start < staleRefs.length; start += 400) {
+          const batch = firestoreDb.batch();
+          staleRefs.slice(start, start + 400).forEach(ref => batch.delete(ref));
           await batch.commit();
         }
       },
@@ -1099,7 +1128,10 @@
           }
           saveFirestoreSyncRegistry(uid, 'materiais', registry);
           console.info(`[Firestore] ${changedCount} de ${materialsArray.length} material(is) exigiu(ram) sincronização.`, { uid });
-          if (changedCount > 0) await this.rebuildDisciplineQuestionBanks(materialsArray);
+          if (changedCount > 0) {
+            await this.rebuildDisciplineQuestionBanks(materialsArray);
+            await this.markCloudDataRevision(uid);
+          }
         } catch (e) {
           reportFirestoreSyncIssue('falha_ao_gravar_materiais', {
             code: e.code || 'firestore/write-failed',
@@ -1230,6 +1262,7 @@
               },
               atualizadoEm: new Date().toISOString()
             }, { merge: true });
+            await this.markCloudDataRevision(uid);
             console.log('[Firestore] Relatório acadêmico salvo com sucesso para material:', materialId);
           } catch (e) {
             console.warn('[Firestore] Erro ao salvar relatório acadêmico:', e);
@@ -1242,16 +1275,17 @@
         if (!materialIdOrName) return;
         const uid = this.getUserId();
 
-        // 1. Remove da memória global
-        let targetId = materialIdOrName;
-        let targetName = materialIdOrName;
+        // 1. Resolve um único material. Nome nunca é critério suficiente para
+        // excluir na nuvem, pois "Aula 1" pode existir em várias disciplinas.
+        let targetId = String(materialIdOrName);
+        let targetName = '';
         if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
           const found = chatDriveMaterials.find(m => m.id === materialIdOrName || m.name === materialIdOrName || m.originalFileName === materialIdOrName);
           if (found) {
             targetId = found.id || targetId;
-            targetName = found.name || targetName;
+            targetName = found.name || '';
           }
-          chatDriveMaterials = chatDriveMaterials.filter(m => m.id !== materialIdOrName && m.name !== materialIdOrName && m.originalFileName !== materialIdOrName);
+          chatDriveMaterials = chatDriveMaterials.filter(m => m.id !== targetId);
         }
 
         // 2. Atualiza IndexedDB (materials e remove academic_reports)
@@ -1268,21 +1302,12 @@
         }
 
         // 3. Remove do Cloud Firestore
-        if (firestoreDb && isFirebaseCloudActive) {
+        if (this.hasAuthenticatedCloudSession(uid)) {
           try {
             const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
-            if (targetId) {
-              await colRef.doc(targetId).delete();
-            }
-            if (targetName) {
-              const querySnap = await colRef.where('nome', '==', targetName).get();
-              if (!querySnap.empty) {
-                const batch = firestoreDb.batch();
-                querySnap.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-              }
-            }
-            console.log('[Firestore] Material excluído com sucesso do Firestore:', targetId, targetName);
+            await this.deleteMaterialDocumentAndChunks(colRef.doc(targetId));
+            await this.markCloudDataRevision(uid);
+            console.log('[Firestore] Material excluído com segurança do Firestore:', targetId, targetName);
           } catch (e) {
             console.warn('[Firestore] Erro ao excluir material do Firestore:', e);
           }
@@ -1324,30 +1349,23 @@
           }
         }
 
-        // 3. Remove do Cloud Firestore em lote (batch)
-        if (firestoreDb && isFirebaseCloudActive) {
+        // 3. Remove cada documento e sua subcoleção de chunks. O lote simples
+        // do Firestore não remove subcoleções automaticamente.
+        if (this.hasAuthenticatedCloudSession(uid)) {
           try {
             const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
-            const batch = firestoreDb.batch();
-            let batchCount = 0;
-
+            const refs = new Map();
             deletedItems.forEach(item => {
-              const id = item.id || item.name;
-              if (id) {
-                batch.delete(colRef.doc(id));
-                batchCount++;
-              }
+              if (item.id) refs.set(item.id, colRef.doc(item.id));
             });
-
             const querySnap = await colRef.where('disciplina', '==', subjectName).get();
-            querySnap.forEach(doc => {
-              batch.delete(doc.ref);
-              batchCount++;
-            });
-
-            if (batchCount > 0) {
-              await batch.commit();
-              console.log(`[Firestore] ${batchCount} documentos de materiais excluídos para a matéria "${subjectName}".`);
+            querySnap.forEach(doc => refs.set(doc.id, doc.ref));
+            for (const docRef of refs.values()) {
+              await this.deleteMaterialDocumentAndChunks(docRef);
+            }
+            if (refs.size > 0) {
+              await this.markCloudDataRevision(uid);
+              console.log(`[Firestore] ${refs.size} material(is), incluindo seus chunks, excluído(s) para a matéria "${subjectName}".`);
             }
           } catch (e) {
             console.warn('[Firestore] Erro ao excluir materiais da matéria no Firestore:', e);
@@ -1574,6 +1592,7 @@
                 atualizadoEm: new Date().toISOString()
               }, { merge: true });
               await this.writeMaterialTextChunks(docRef, trimmed);
+              await this.markCloudDataRevision(uid);
               console.info('[Firestore] Conteúdo do material atualizado com sucesso no Firestore:', docRef.id);
             }
           } catch (err) {
@@ -1593,20 +1612,25 @@
         } catch (e) {}
         await MedTutorLocalDB.set('questions', uid, questionsArray);
 
-        // 2. Cloud Firestore
-        if (firestoreDb && isFirebaseCloudActive) {
+        // 2. Cloud Firestore. O registro local de sincronização permite apagar
+        // também os documentos que saíram do deck, sem tocar em dados de outro usuário.
+        if (this.hasAuthenticatedCloudSession(uid)) {
           try {
-            const batch = firestoreDb.batch();
             const colRef = firestoreDb.collection('users').doc(uid).collection('banco_questoes');
             const registry = getFirestoreSyncRegistry(uid, 'questoes');
             let changedCount = 0;
+            let removedCount = 0;
+            const currentIds = new Set();
+            const operations = [];
             questionsArray.forEach(q => {
               const docId = q.id || ('q_' + Math.random().toString(36).substring(2, 9));
+              q.id = docId;
+              currentIds.add(docId);
               const docRef = colRef.doc(docId);
               const payload = {
                 id: docId,
                 pergunta: q.question || '',
-                resposta_correta: q.answer || q.referenceAnswer || '',
+                resposta_correta: q.answer || q.referenceAnswer || q.reference_answer || '',
                 distratores: q.options || q.quizOptions || [],
                 disciplina: q.subject || '',
                 materia: q.topic || q.subject || '',
@@ -1620,17 +1644,35 @@
                 srs: q.srs || null,
                 quizStats: q.quizStats || null,
                 isRedundant: !!q.isRedundant,
-                redundancyScore: q.redundancyScore || 0
+                redundancyScore: q.redundancyScore || 0,
+                origem_pergunta: q.sourceQuestionOrigin || q.origem_pergunta || '',
+                eixo_aprendizagem: q.learningAxis || q.eixo_aprendizagem || '',
+                inspiracao_material: !!(q.materialInspired || q.inspiracao_material || q.sourceQuestionOrigin || q.origem_pergunta),
+                modo_geracao: q.generationMode || q.modo_geracao || 'sections'
               };
               const fingerprint = firestoreFingerprint(payload);
               if (registry[docId] === fingerprint) return;
-              batch.set(docRef, { ...payload, atualizadoEm: new Date().toISOString() }, { merge: true });
+              operations.push({ type: 'set', ref: docRef, data: { ...payload, atualizadoEm: new Date().toISOString() } });
               registry[docId] = fingerprint;
               changedCount++;
             });
-            if (changedCount > 0) await batch.commit();
+            Object.keys(registry).forEach(docId => {
+              if (currentIds.has(docId)) return;
+              operations.push({ type: 'delete', ref: colRef.doc(docId) });
+              delete registry[docId];
+              removedCount++;
+            });
+            for (let start = 0; start < operations.length; start += 400) {
+              const batch = firestoreDb.batch();
+              operations.slice(start, start + 400).forEach(operation => {
+                if (operation.type === 'delete') batch.delete(operation.ref);
+                else batch.set(operation.ref, operation.data, { merge: true });
+              });
+              await batch.commit();
+            }
             saveFirestoreSyncRegistry(uid, 'questoes', registry);
-            console.info(`[Firestore] ${changedCount} de ${questionsArray.length} questão(ões) sincronizada(s).`);
+            if (operations.length) await this.markCloudDataRevision(uid);
+            console.info(`[Firestore] ${changedCount} de ${questionsArray.length} questão(ões) sincronizada(s); ${removedCount} removida(s).`);
           } catch (e) {
             console.warn('[Firestore] Erro ao sincronizar questões:', e);
           }
@@ -1793,9 +1835,9 @@
           }
 
           const loadedQuestions = await MedTutorLocalDB.get('questions', uid);
-          if (Array.isArray(loadedQuestions) && loadedQuestions.length > 0) {
-            sharedQuestionsBank = loadedQuestions;
-          }
+          // Uma lista vazia também é um estado válido: ignorá-la faria cards
+          // removidos reaparecerem a partir da memória da página anterior.
+          if (Array.isArray(loadedQuestions)) sharedQuestionsBank = loadedQuestions;
 
           const loadedChats = await MedTutorLocalDB.get('chats', uid);
           if (Array.isArray(loadedChats) && loadedChats.length > 0) {
@@ -1810,16 +1852,27 @@
         // Versão separada para executar uma recuperação segura única após a
         // correção que passou a preservar bancos locais e respostas parciais.
         const refreshKey = `medtutor_firestore_last_refresh_recovery_v2_${uid}`;
+        const revisionKey = this.getCloudDataRevisionKey(uid);
         const lastRefreshAt = Number(localStorage.getItem(refreshKey) || 0);
         const shouldRefreshCloud = this.hasAuthenticatedCloudSession(uid)
           && (Date.now() - lastRefreshAt >= FIRESTORE_REFRESH_INTERVAL_MS);
         if (shouldRefreshCloud) {
           try {
             const userDoc = await firestoreDb.collection('users').doc(uid).get();
+            const remoteRevision = String(userDoc.data()?.medtutor_dados_revision || '');
+            const localRevision = String(localStorage.getItem(revisionKey) || '');
+            // A abertura periódica consulta somente o perfil. As três coleções
+            // grandes são lidas apenas no primeiro acesso ou quando outra sessão
+            // efetivamente alterou os dados do estudante.
+            const requiresFullCloudRead = !localRevision || (remoteRevision && remoteRevision !== localRevision);
             if (userDoc.exists) {
               MedTutorAuthService.userProfile = userDoc.data();
               MedTutorAuthService.updateUserTopbarUI();
             }
+
+            if (!requiresFullCloudRead) {
+              console.info('[Firestore] Biblioteca local já está na revisão remota atual; leitura completa dispensada.');
+            } else {
 
             const matsSnap = await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').get();
             if (!matsSnap.empty) {
@@ -1942,7 +1995,11 @@
                   flashcardTitle: q.flashcardTitle || q.titulo_flashcard || q.flashcard?.title || '',
                   cognitiveDomain: q.cognitiveDomain || q.dominio_cognitivo || (difficultyLevel === 'iniciante' ? 'conceitual' : (difficultyLevel === 'intermediario' ? 'mecanismo' : 'aplicacao')),
                   generatorModel: q.generatorModel || q.modelo_gerador || '',
-                  requer_imagem: q.requer_imagem || false
+                  requer_imagem: q.requer_imagem || false,
+                  sourceQuestionOrigin: q.sourceQuestionOrigin || q.origem_pergunta || '',
+                  learningAxis: q.learningAxis || q.eixo_aprendizagem || '',
+                  materialInspired: !!(q.materialInspired || q.inspiracao_material || q.sourceQuestionOrigin || q.origem_pergunta),
+                  generationMode: q.generationMode || q.modo_geracao || 'sections'
                 });
               });
               if (cloudQ.length > 0) {
@@ -1950,7 +2007,14 @@
                 cloudQ.forEach(question => localById.set(question.id, { ...(localById.get(question.id) || {}), ...question }));
                 sharedQuestionsBank = [...localById.values()];
                 await MedTutorLocalDB.set('questions', uid, sharedQuestionsBank);
+              } else {
+                // O snapshot chegou com sucesso e está vazio: é uma exclusão
+                // legítima, não uma falha de rede, portanto sincroniza o vazio.
+                sharedQuestionsBank = [];
+                await MedTutorLocalDB.set('questions', uid, sharedQuestionsBank);
               }
+            }
+            try { localStorage.setItem(revisionKey, remoteRevision || 'legacy-v1'); } catch (error) {}
             }
             try { localStorage.setItem(refreshKey, String(Date.now())); } catch (error) {}
           } catch (cloudErr) {
@@ -12759,11 +12823,23 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const tripartite = item.tripartite || {
         correctReason: item.explanation || item.answer || 'Conduta fundamentada nas diretrizes clínicas de referência.',
-        distractorAnalysis: {},
+        distractorAnalysis: item.distractorAnalysis || {},
         pearl: 'A identificação semiológica precoce e a adesão aos protocolos oficiais de saúde norteiam a conduta resolutiva no SUS e ENARE.'
       };
 
       const correctLetter = String.fromCharCode(65 + item.correctIndex);
+      const savedDistractorAnalysis = tripartite.distractorAnalysis || item.distractorAnalysis || {};
+      const distractorEntries = Object.entries(savedDistractorAnalysis)
+        .filter(([dIdx, dText]) => parseInt(dIdx, 10) !== item.correctIndex && String(dText || '').trim());
+      // Decks gerados antes da análise obrigatória não podem renderizar uma
+      // caixa vazia. Eles recebem uma explicação honesta baseada no gabarito,
+      // enquanto os novos cards trazem a análise específica do Gemini.
+      const visibleDistractorEntries = distractorEntries.length
+        ? distractorEntries
+        : (Array.isArray(item.quizOptions) ? item.quizOptions : []).map((option, index) => [String(index), index === item.correctIndex
+          ? ''
+          : `Esta alternativa não corresponde ao conceito cobrado. A resposta correta é: ${item.correctAnswerText || item.answer || item.reference_answer || item.explanation || 'consulte a justificativa acima.'}`])
+          .filter(([, text]) => text);
 
       const topic = item.topic || item.disease || item.subject || 'Medicina';
       const subject = item.subject || '';
@@ -12815,8 +12891,8 @@ Retorne EXCLUSIVAMENTE um JSON:
           <!-- 2. Por que cada distrator está errado -->
           <div class="commentary-distractors">
             <div class="commentary-title">🔴 Análise Detalhada dos Distratores:</div>
-            ${Object.entries(tripartite.distractorAnalysis || {}).map(([dIdx, dText]) => {
-              if (parseInt(dIdx) === item.correctIndex) return '';
+            ${visibleDistractorEntries.map(([dIdx, dText]) => {
+              if (parseInt(dIdx, 10) === item.correctIndex) return '';
               const distLetter = String.fromCharCode(65 + parseInt(dIdx));
               return `
                 <div class="distractor-analysis-item">

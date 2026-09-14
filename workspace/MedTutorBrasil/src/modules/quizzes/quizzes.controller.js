@@ -43,13 +43,13 @@ class QuizzesController {
   }
 
   getFlashcards(req, res) {
-    try {
-      const subject = req.params.subjectId;
-      const cards = quizzesService.getFlashcards(subject);
-      return res.json({ count: cards.length, flashcards: cards });
-    } catch (err) {
-      return res.status(500).json({ error: 'Erro ao carregar flashcards', details: err.message });
-    }
+    // Os cards pertencem ao usuário autenticado e são lidos diretamente do
+    // Firestore pelo cliente. O endpoint antigo devolvia silenciosamente uma
+    // lista vazia, criando a impressão de que o estudante não tinha cards.
+    return res.status(410).json({
+      error: 'Endpoint de flashcards descontinuado',
+      details: 'Use a sincronização autenticada do banco de questões no cliente.'
+    });
   }
 
   async evaluateFlashcard(req, res) {
