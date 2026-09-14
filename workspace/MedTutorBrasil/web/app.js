@@ -688,6 +688,7 @@
         text: effectiveMd,
         pedagogicalSynthesis: m.pedagogicalSynthesis || m.sintese_pedagogica || null,
         sintese_pedagogica: m.sintese_pedagogica || m.pedagogicalSynthesis || null,
+        clinicalImages: Array.isArray(m.clinicalImages) ? m.clinicalImages : (Array.isArray(m.figuras_clinicas) ? m.figuras_clinicas : []),
         academicReport: m.academicReport || m.relatorio_academico || null,
         relatorio_academico: m.relatorio_academico || m.academicReport || null
       };
@@ -706,8 +707,16 @@
 
     function compactMaterialForFirestore(material, docId, markdown) {
       const report = material.academicReport || material.relatorio_academico || null;
-      const safeImages = (Array.isArray(material.clinicalImages) ? material.clinicalImages : []).slice(0, 30).map(image => ({
-        title: image?.title || '', source: image?.source || '', imageUrl: /^https?:\/\//.test(image?.imageUrl || '') ? image.imageUrl : ''
+      const safeImages = (Array.isArray(material.clinicalImages) ? material.clinicalImages : []).map(image => ({
+        title: image?.title || '',
+        source: image?.source || '',
+        imageUrl: /^https?:\/\//.test(image?.imageUrl || '') ? image.imageUrl : '',
+        thumbnailUrl: /^https?:\/\//.test(image?.thumbnailUrl || '') ? image.thumbnailUrl : '',
+        page: Number(image?.page) || null,
+        clinicalLabel: image?.clinicalLabel || '',
+        visualAssociation: image?.visualAssociation || '',
+        visibleStructures: Array.isArray(image?.visibleStructures) ? image.visibleStructures.slice(0, 20) : [],
+        studyQuestion: image?.studyQuestion || ''
       }));
       return {
         id: docId,
@@ -12270,7 +12279,7 @@ Retorne EXCLUSIVAMENTE um JSON:
             ${formatStudyRichText(item.question)}
           </div>
 
-          ${renderStudySupportImage(item)}
+          ${renderStudySupportImage(item, { asStimulus: true })}
 
           <div class="quiz-options-list" id="quizOptions_${item.id}" style="${isRevealed ? 'pointer-events: none;' : ''}">
             ${(item.quizOptions || []).map((opt, optIdx) => {
@@ -12502,11 +12511,72 @@ Retorne EXCLUSIVAMENTE um JSON:
       return item?.medicalImage || item?.image || (Array.isArray(item?.medicalImages) ? item.medicalImages[0] : null);
     }
 
-    function renderStudySupportImage(item) {
+    function normalizeVisualMatchText(value) {
+      return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function getVisualKeywords(value) {
+      const ignored = new Set(['para', 'com', 'uma', 'que', 'dos', 'das', 'por', 'como', 'qual', 'quais', 'esta', 'esse', 'essa', 'sobre', 'material', 'paciente', 'clinico', 'clinica', 'imagem', 'figura', 'pagina', 'resposta', 'correta']);
+      return [...new Set(normalizeVisualMatchText(value).split(' ').filter(word => word.length >= 4 && !ignored.has(word)))];
+    }
+
+    function attachMaterialImagesToStudyItems(items, preferredMaterial = null) {
+      const pool = preferredMaterial ? [preferredMaterial] : (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []);
+      let attached = 0;
+      (items || []).forEach(item => {
+        if (!item || getStudySupportImage(item)) return;
+        const itemMaterial = normalizeVisualMatchText(item.slideName || '');
+        const itemSubject = normalizeVisualMatchText(item.subject || '');
+        const materials = pool.filter(material => {
+          if (!Array.isArray(material?.clinicalImages) || !material.clinicalImages.length) return false;
+          if (preferredMaterial) return true;
+          const materialName = normalizeVisualMatchText(material.name || material.originalFileName || '');
+          const materialSubject = normalizeVisualMatchText(material.subject || '');
+          return (itemMaterial && materialName === itemMaterial) || (!itemMaterial && itemSubject && materialSubject === itemSubject);
+        });
+        const candidates = materials.flatMap(material => (material.clinicalImages || []).map(image => ({ image, material })));
+        if (!candidates.length) return;
+
+        const targetText = `${item.question || item.pergunta || ''} ${item.topic || ''} ${item.disease || ''}`;
+        const keywords = getVisualKeywords(targetText);
+        const expectedPage = Number(item.pagina_origem_pdf || item.sourcePage) || null;
+        const ranked = candidates.map(candidate => {
+          const imageText = normalizeVisualMatchText(`${candidate.image.title || ''} ${candidate.image.clinicalLabel || ''} ${candidate.image.visualAssociation || ''} ${(candidate.image.visibleStructures || []).join(' ')} ${candidate.image.studyQuestion || ''}`);
+          let score = expectedPage && Number(candidate.image.page) === expectedPage ? 100 : 0;
+          score += keywords.reduce((sum, keyword) => sum + (imageText.includes(keyword) ? 3 : 0), 0);
+          if (candidate.image.visualAssociation || (candidate.image.visibleStructures || []).length) score += 1;
+          return { ...candidate, score };
+        }).sort((a, b) => b.score - a.score);
+        const best = ranked[0];
+        // Sem referência explícita de página, só usamos a figura se houver
+        // correspondência temática suficiente; isso evita ilustrações aleatórias.
+        if (!best || (!expectedPage && best.score < 4)) return;
+
+        item.medicalImage = {
+          id: best.image.id || `material-image-${best.image.page || attached}`,
+          imageUrl: best.image.imageUrl,
+          thumbnailUrl: best.image.thumbnailUrl || best.image.imageUrl,
+          title: best.image.title || best.image.clinicalLabel || 'Figura do material enviado',
+          source: 'Material enviado pelo estudante',
+          page: best.image.page || null,
+          visibleStructures: best.image.visibleStructures || [],
+          visualAssociation: best.image.visualAssociation || ''
+        };
+        item.medicalImages = [item.medicalImage];
+        item.requer_imagem = true;
+        item.pagina_origem_pdf = item.medicalImage.page || item.pagina_origem_pdf || null;
+        item.imageOrigin = 'material_enviado';
+        attached++;
+      });
+      if (attached) console.info(`[Imagens do material] ${attached} questão(ões) receberam figura(s) do material correspondente.`);
+      return attached;
+    }
+
+    function renderStudySupportImage(item, { asStimulus = false } = {}) {
       const image = getStudySupportImage(item);
       if (!image?.imageUrl) return '';
-      const title = escapeHtml(image.title || item.topic || 'Imagem médica de apoio');
-      const source = escapeHtml(image.source || 'Base médica verificada');
+      const title = escapeHtml(asStimulus ? 'Figura do material' : (image.title || item.topic || 'Imagem médica de apoio'));
+      const source = escapeHtml(asStimulus ? 'Material enviado pelo estudante' : (image.source || 'Base médica verificada'));
       const plainText = (value, fallback) => {
         const text = String(value || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
         return escapeHtml(text ? (text.length > 220 ? `${text.slice(0, 217)}...` : text) : fallback);
@@ -12514,9 +12584,12 @@ Retorne EXCLUSIVAMENTE um JSON:
       const structure = plainText(item.topic || item.disease || item.subject, 'Tema/estrutura em estudo');
       const functionOrMechanism = plainText(item.flashcard?.back || item.reference_answer || item.explanation || item.justificativa, 'Relacione a imagem ao mecanismo descrito na questão.');
       const consequence = plainText(item.tripartite?.correctReason || item.explanation || item.justificativa, 'Explique qual alteração funcional essa estrutura pode produzir.');
+      const caption = asStimulus
+        ? 'Use a figura do material como estímulo para responder. A identificação e a explicação aparecem após a correção.'
+        : `🖼️ <strong>O que observar:</strong> ${title}. <strong>Estrutura/tema:</strong> ${structure}. <strong>Função/mecanismo:</strong> ${functionOrMechanism}. <strong>Se alterada:</strong> ${consequence}. <span style="opacity:.8">Fonte: ${source}</span>`;
       return `<figure style="margin: 12px 0 4px; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-surface);">
         <img src="${escapeHtml(image.thumbnailUrl || image.imageUrl)}" alt="${title}" loading="lazy" style="display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: 6px; background: #fff;">
-        <figcaption style="font-size: 10.5px; color: var(--text-secondary); margin-top: 6px; line-height: 1.45;">🖼️ <strong>O que observar:</strong> ${title}. <strong>Estrutura/tema:</strong> ${structure}. <strong>Função/mecanismo:</strong> ${functionOrMechanism}. <strong>Se alterada:</strong> ${consequence}. <span style="opacity:.8">Fonte: ${source}</span></figcaption>
+        <figcaption style="font-size: 10.5px; color: var(--text-secondary); margin-top: 6px; line-height: 1.45;">${caption}</figcaption>
       </figure>`;
     }
 
@@ -12670,6 +12743,9 @@ Retorne EXCLUSIVAMENTE um JSON:
         return;
       }
 
+      // Prioriza figuras extraídas do próprio PDF/slide; busca externa fica só
+      // como contingência para itens que não tenham figura correspondente.
+      attachMaterialImagesToStudyItems(generated, targetFile);
       await enrichStudyItemsWithMedicalImages(generated);
 
       // 5. Acrescenta os novos pares ao banco: nunca descarta cartões já gerados.
@@ -12787,8 +12863,8 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       // Acrescenta ao deck já existente da disciplina; as questões anteriores e
       // seus estados SRS permanecem intactos.
+      attachMaterialImagesToStudyItems(generatedForSubject);
       sharedQuestionsBank = [...generatedForSubject.reverse(), ...sharedQuestionsBank];
-
       await enrichStudyItemsWithMedicalImages(generatedForSubject);
 
       saveSharedQuestionsBank();
