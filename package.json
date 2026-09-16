@@ -2,23 +2,28 @@
   "name": "autonomous-agents",
   "version": "1.0.0",
   "description": "Scrum AI Agents Factory for Multiplatform Apps",
-  "main": "dist/index.js",
+  "main": "index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node index.js",
     "dev": "tsx index.ts",
     "open:web": "open workspace/MedTutorBrasil/web/index.html",
     "serve": "node scripts/serve.cjs",
     "web": "node scripts/serve.cjs",
-    "advisor": "tsx scripts/advisor.ts"
+    "advisor": "tsx scripts/advisor.ts",
+    "postinstall": "cd workspace/MedTutorBrasil && npm install"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^2.21.0",
-    "dotenv": "^17.4.2"
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "firebase-admin": "^14.3.0"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
