@@ -85,11 +85,17 @@ app.post('/api/diagnostics/upload', (req, res) => {
   res.status(204).end();
 });
 
-if (require.main === module) {
+function startServer() {
   const server = app.listen(PORT, () => {
     console.log(`🚀 MedTutor Brasil (Modular Monolith) ativo na porta ${PORT}`);
   });
   Object.assign(server, { requestTimeout: Number(process.env.REQUEST_TIMEOUT_MS || 30_000), headersTimeout: Number(process.env.HEADERS_TIMEOUT_MS || 35_000), keepAliveTimeout: Number(process.env.KEEP_ALIVE_TIMEOUT_MS || 5_000) });
+  return server;
 }
 
+if (require.main === module) {
+  startServer();
+}
+
+app.startServer = startServer;
 module.exports = app;
