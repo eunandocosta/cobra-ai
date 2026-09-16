@@ -6467,6 +6467,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       if (!stem || stem.length < 18) return false;
       if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem)) return false;
       if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(stem)) return false;
+      if (/\b(?:no|do|na|da|segundo|conforme|mencionad[oa]\s+no)\s+caso\s*\d*\b/i.test(stem)) return false;
+      if (/\bqual\s+(?:[eé]\s+)?(?:a\s+)?idade\s+(?:do|da|de|dos|das)?\s*paciente\b/i.test(stem)) return false;
+      if (/\bqual\s+[eé]\s+a\s+idade\b/i.test(stem)) return false;
       return true;
     }
 
@@ -6644,13 +6647,14 @@ DIRETRIZES DE FORMULAÇÃO CLÍNICA:
 2. ${styleGuidance}
 3. JAMAIS trate nomes de matérias, sistemas orgânicos ou tópicos (ex.: "Tronco Encefálico", "Neuroanatomia") como se fossem nomes de doenças.
 4. É TERMINANTEMENTE PROIBIDO usar no enunciado ou nas alternativas as palavras:
-   - "texto", "índice", "material", "slide", "apostila", "item", "seção", "mencionado", "citado", "segundo o documento", "de acordo com o texto".
-5. O candidato NÃO tem acesso à apostila durante a prova. A questão deve ser 100% autocontida e aplicável à prática médica.
-6. As 4 alternativas devem ser limpas de letras prefixadas (sem "A)", "B)"), puramente técnicas e plausíveis.
-7. Cada questão deve corresponder a EXATAMENTE um item do plano abaixo. Não crie conceitos fora dele, não repita conceito, estrutura, mecanismo, resposta correta, vinheta ou formulação.
-8. Nunca use o nome do arquivo, da aula, do slide, da disciplina ou do material como estrutura anatômica, doença, procedimento ou resposta. Use exclusivamente conceitos que apareçam no conteúdo biomédico-fonte.
-9. Copie em evidencia_fonte a evidência do item de plano utilizado; ela deve sustentar diretamente a pergunta e a resposta correta.
-10. O mesmo enunciado será mostrado no Quiz e na frente do Flashcard. Portanto, ele deve ser uma pergunta aberta e autocontida, respondível sem alternativas. É proibido escrever “assinale a alternativa”, “marque a opção”, “de acordo com as opções” ou incluir alternativas no campo pergunta.
+   - "texto", "índice", "material", "slide", "apostila", "item", "seção", "mencionado", "citado", "segundo o documento", "de acordo com o texto", "caso 1", "caso 2", "caso clínico X".
+5. É TERMINANTEMENTE PROIBIDO perguntar a idade exata, o sexo ou a profissão do paciente como se fosse decoreba (ex: NUNCA pergunte "Qual a idade do paciente?"). Coloque os dados no enunciado e pergunte sobre o raciocínio médico (diagnóstico, etiopatogenia, conduta ou exame).
+6. O candidato NÃO tem acesso à apostila durante a prova. A questão deve ser 100% autocontida e aplicável à prática médica.
+7. As 4 alternativas devem ser limpas de letras prefixadas (sem "A)", "B)"), puramente técnicas e plausíveis.
+8. Cada questão deve corresponder a EXATAMENTE um item do plano abaixo. Não crie conceitos fora dele, não repita conceito, estrutura, mecanismo, resposta correta, vinheta ou formulação.
+9. Nunca use o nome do arquivo, da aula, do slide, da disciplina ou do material como estrutura anatômica, doença, procedimento ou resposta. Use exclusivamente conceitos que apareçam no conteúdo biomédico-fonte.
+10. Copie em evidencia_fonte a evidência do item de plano utilizado; ela deve sustentar diretamente a pergunta e a resposta correta.
+11. O mesmo enunciado será mostrado no Quiz e na frente do Flashcard. Portanto, ele deve ser uma pergunta aberta e autocontida, respondível sem alternativas. É proibido escrever “assinale a alternativa”, “marque a opção”, “de acordo com as opções” ou incluir alternativas no campo pergunta.
 
 PLANO PEDAGÓGICO VERIFICADO:
 ${JSON.stringify(blueprint)}
@@ -6688,7 +6692,7 @@ ${cleanText}
     }
   };
 
-  const regexTermosProibidos = /\b(índice|sumário|texto|material|apostila|slide|item\s*\d+|conceitos?[- ]chave|mencionado|citad[oa]|no documento|segundo o)\b/i;
+  const regexTermosProibidos = /\b(índice|sumário|texto|material|apostila|slide|item\s*\d+|caso\s*\d+|conceitos?[- ]chave|mencionado|citad[oa]|no documento|segundo o|qual\s+(?:[eé]\s+)?(?:a\s+)?idade)\b/i;
 
   for (const model of models) {
     try {

@@ -131,6 +131,9 @@ function isSharedQuestionStemValid(stem) {
   if (!stem || stem.length < 18) return false;
   if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem)) return false;
   if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(stem)) return false;
+  if (/\b(?:no|do|na|da|segundo|conforme|mencionad[oa]\s+no)\s+caso\s*\d*\b/i.test(stem)) return false;
+  if (/\bqual\s+(?:[eé]\s+)?(?:a\s+)?idade\s+(?:do|da|de|dos|das)?\s*paciente\b/i.test(stem)) return false;
+  if (/\bqual\s+[eé]\s+a\s+idade\b/i.test(stem)) return false;
   return true;
 }
 
@@ -361,15 +364,17 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 5. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
 6. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
 7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado; mesmo nesse caso, mantenha uma única decisão conceitual simples.
-8. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto".
+8. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto", "caso 1", "caso 2", "caso clínico X".
 9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
-10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com as opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
+10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com os opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 11. ALTA QUALIDADE DOS DISTRATORES MÉDICOS:
     - Todas as 4 alternativas (1 correta e 3 distratores) devem pertencer rigorosamente ao mesmo universo anatomofisiológico ou clínico do tema.
     - É EXPRESSAMENTE PROIBIDO criar distratores ingênuos, caricatos ou absurdos (ex.: em questão sobre exame de líquor, NUNCA use 'eletroencefalograma' ou 'biópsia de nervo'; use alternativas e diagnósticos diferenciais reais do contexto neurológico).
     - As 4 alternativas devem ter extensão, formato e refinamento técnico homogêneos.
-12. ANCORAGEM CLÍNICA NOS CASOS DO MATERIAL:
-    - Se o material contiver relatos de pacientes ou vinhetas clínicas (ex.: idade, profissão, caso Sommelier, trauma, achados ao exame físico), formule questões contextualizadas que apliquem e discutam diretamente esses elementos clínicos.
+12. ANCORAGEM CLÍNICA NOS CASOS DO MATERIAL (REGRAS ANTI-DECOREBA):
+    - Se o material contiver relatos de pacientes ou vinhetas clínicas, descreva os achados médicos relevantes diretamente no enunciado (ex.: "Um paciente apresenta perda progressiva do campo visual bitemporal...").
+    - É EXPRESSAMENTE PROIBIDO perguntar a idade exata, o sexo, a profissão ou a numeração do caso isoladamente (ex.: NUNCA pergunte "Qual é a idade do paciente no Caso 2?", "Qual a profissão do paciente?"). A pergunta DEVE cobrar raciocínio médico (etiologia, fisiopatologia, diagnóstico diferencial, exame de escolha ou conduta).
+    - É EXPRESSAMENTE PROIBIDO citar "no Caso 1", "no Caso 2" ou "no Caso X" no enunciado ou nas alternativas. O enunciado deve ser 100% autossuficiente e independente de rótulos do documento.
     - O campo secao_origem deve ser um tema anatômico ou clínico específico (ex.: 'Pares Cranianos e Sensibilidade Lingual', 'Hemorragia Subaracnóidea'), NUNCA títulos vazios de sumário como 'Fundamentos Etiopatogênicos'.
 13. DISTRIBUIÇÃO DAS RESPOSTAS:
     - Varie a alternativa correta naturalmente entre A, B, C e D no array e no gabarito ao longo do lote gerado.
