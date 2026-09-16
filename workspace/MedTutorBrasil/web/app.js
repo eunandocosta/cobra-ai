@@ -19840,7 +19840,10 @@ Para cada material, retorne um objeto no JSON com:
     // CONTROLE DE ACORDEÃO E DETALHES DE DISCIPLINAS
     var expandedCurriculumPeriods = new Set();
 
-    function toggleCurriculumPeriod(periodKey) {
+    function toggleCurriculumPeriod(periodKey, event) {
+      if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+      }
       let resolvedKey = periodKey;
       if (universityCurriculum && Array.isArray(universityCurriculum)) {
         const found = universityCurriculum.find(p => p.id === periodKey || p.period === periodKey);
@@ -20071,7 +20074,10 @@ Para cada material, retorne um objeto no JSON com:
       if (empty) empty.style.display = 'none';
       if (headerBar) headerBar.style.display = 'flex';
       if (grid) {
-        grid.style.display = 'grid';
+        grid.style.display = 'flex';
+        grid.style.flexDirection = 'column';
+        grid.style.gap = '12px';
+        grid.style.width = '100%';
         grid.innerHTML = '';
 
         const filtered = (currentCurriculumCycleFilter === 'all')
@@ -20113,13 +20119,7 @@ Para cada material, retorne um objeto no JSON com:
           const isExpanded = expandedCurriculumPeriods.has(periodId);
           card.id = `card_${periodId}`;
           card.className = `subject-category-card ${isExpanded ? 'expanded' : 'collapsed'}`;
-          
-          if (!isExpanded) {
-            card.onclick = (e) => {
-              if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.subject-row')) return;
-              toggleCurriculumPeriod(periodId);
-            };
-          }
+          card.style.width = '100%';
           
           let cycleColor = 'var(--neon)';
           let cycleBg = 'rgba(0, 229, 255, 0.12)';
@@ -20135,7 +20135,7 @@ Para cada material, retorne um objeto no JSON com:
           const escapedPeriodId = periodId.replace(/'/g, "\\'");
 
           let headerHtml = `
-            <div class="category-header" onclick="toggleCurriculumPeriod('${escapedPeriodId}')" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; ${isExpanded ? 'border-bottom: 1px solid var(--border); padding-bottom: 10px;' : ''}" title="Clique para ${isExpanded ? 'recolher' : 'abrir'} a lista de matérias deste período">
+            <div class="category-header" onclick="toggleCurriculumPeriod('${escapedPeriodId}', event)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; ${isExpanded ? 'border-bottom: 1px solid var(--border); padding-bottom: 10px;' : ''}" title="Clique para ${isExpanded ? 'recolher' : 'abrir'} a lista de matérias deste período">
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-weight: 700; color: var(--text-primary); font-size: 13.5px;">${cat.period}</span>
                 <span style="background: ${cycleBg}; color: ${cycleColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.3px;">
