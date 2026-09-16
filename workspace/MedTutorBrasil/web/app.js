@@ -20781,10 +20781,105 @@ Para cada material, retorne um objeto no JSON com:
       }
     }
 
+    // REFLOW INTELIGENTE DE TEXTO EXTRAÍDO DE SLIDES E PDFS PARA PARÁGRAFOS ACADÊMICOS FLUIDOS
+    function reflowSlideText(text) {
+      if (!text || typeof text !== 'string') return '';
+
+      let normalized = text.replace(/\r\n/g, '\n');
+
+      // Limpeza de marcadores de cabeçalho/rodapé de página (ex: "Página 1 de 12", "Slide 1 / 25")
+      normalized = normalized.replace(/^(Página|Slide|P\.)\s*\d+(\s*(de|\/)\s*\d+)?\s*$/gim, '');
+
+      const lines = normalized.split('\n');
+      const resultLines = [];
+      let currentBlock = '';
+      let blockType = 'p';
+
+      const getLineType = (trimmed) => {
+        if (!trimmed) return 'empty';
+        if (/^#{1,6}\s+/.test(trimmed)) return 'h';
+        if (/^[-*+•]\s+/.test(trimmed)) return 'ul';
+        if (/^\d+[\.\)]\s+/.test(trimmed)) return 'ol';
+        if (/^\|\s*.*\|\s*$/.test(trimmed)) return 'raw';
+        if (/^>\s*/.test(trimmed)) return 'raw';
+        if (/^```/.test(trimmed)) return 'raw';
+        if (/^!\[.*\]\(.*\)/.test(trimmed)) return 'raw';
+        if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) return 'raw';
+
+        // Títulos curtos de slides em CAIXA ALTA ou terminados em dois-pontos
+        if (trimmed.length <= 65) {
+          if (trimmed.endsWith(':')) return 'h';
+          if (trimmed === trimmed.toUpperCase() && /[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(trimmed) && trimmed.length >= 3 && !/[.,?!]/.test(trimmed)) return 'h';
+        }
+        return 'p';
+      };
+
+      const flushBlock = () => {
+        if (currentBlock.trim()) {
+          resultLines.push(currentBlock.trim());
+          currentBlock = '';
+        }
+      };
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        const type = getLineType(trimmed);
+
+        if (type === 'empty') {
+          flushBlock();
+          resultLines.push('');
+          blockType = 'p';
+          continue;
+        }
+
+        if (type === 'h' || type === 'raw') {
+          flushBlock();
+          if (type === 'h' && !trimmed.startsWith('#')) {
+            resultLines.push(`### ${trimmed.replace(/^[:\s]+|[:\s]+$/g, '')}`);
+          } else {
+            resultLines.push(trimmed);
+          }
+          blockType = type;
+          continue;
+        }
+
+        if (type === 'ul' || type === 'ol') {
+          flushBlock();
+          currentBlock = trimmed;
+          blockType = type;
+          if (/[.!?:]\s*$/.test(trimmed)) {
+            flushBlock();
+          }
+          continue;
+        }
+
+        if (currentBlock) {
+          if (currentBlock.endsWith('-')) {
+            currentBlock = currentBlock.slice(0, -1) + trimmed;
+          } else {
+            currentBlock += ' ' + trimmed;
+          }
+          if (/[.!?:]\s*$/.test(trimmed)) {
+            flushBlock();
+          }
+        } else {
+          currentBlock = trimmed;
+          blockType = 'p';
+          if (/[.!?:]\s*$/.test(trimmed)) {
+            flushBlock();
+          }
+        }
+      }
+
+      flushBlock();
+      return resultLines.join('\n');
+    }
+
     // FORMATAÇÃO AVANÇADA DE TEXTO DA IA PARA HTML LIMPO (MARKDOWN ROBUSTO & TABELAS)
     function formatAITextToHTML(text) {
       if (!text) return '';
-      let md = text.replace(/\r\n/g, '\n');
+      let md = reflowSlideText(text).replace(/\r\n/g, '\n');
 
       // Limpeza profunda de artefatos de quebra e tags brutas da IA (<br>, <br></br>, <p>, <div>, etc.)
       md = md.replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')
@@ -21286,6 +21381,7 @@ Para cada material, retorne um objeto no JSON com:
       return typeof formatInlineMd === 'function' ? formatInlineMd(text) : escapeHtml(text);
     }
     if (typeof window !== 'undefined') {
+      window.reflowSlideText = reflowSlideText;
       window.formatInlineMd = formatInlineMd;
       window.formatAITextToHTML = formatAITextToHTML;
       window.formatStudyRichText = formatStudyRichText;
