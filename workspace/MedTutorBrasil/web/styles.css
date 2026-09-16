@@ -1180,6 +1180,62 @@
       background: var(--neon-subtle);
     }
 
+    /* Material "Banco de Questões" — borda amarelo-neon ao hover */
+    .chat-drive-vertical-item.questions-only-item:hover {
+      border-color: #ffe600 !important;
+      background: rgba(255, 230, 0, 0.04) !important;
+      box-shadow: 0 0 0 2px rgba(255, 230, 0, 0.18), 0 0 14px rgba(255, 230, 0, 0.12) !important;
+    }
+    .chat-drive-vertical-item.questions-only-item.selected {
+      border-color: #ffe600;
+      background: rgba(255, 230, 0, 0.08);
+    }
+    .questions-only-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: rgba(255, 230, 0, 0.13);
+      color: #ffe600;
+      border: 1px solid rgba(255, 230, 0, 0.38);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Nome de material clicável para edição inline */
+    .material-name-editable {
+      cursor: text;
+      border-radius: 4px;
+      padding: 1px 3px;
+      margin: 0 -3px;
+      transition: background 0.15s, outline 0.15s;
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .material-name-editable:hover {
+      background: rgba(0, 229, 255, 0.09);
+      outline: 1px dashed rgba(0, 229, 255, 0.5);
+    }
+    .material-name-input {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1.5px solid var(--neon);
+      border-radius: 5px;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 2px 8px;
+      outline: none;
+      width: 100%;
+      max-width: 340px;
+      font-family: inherit;
+      box-shadow: 0 0 6px rgba(0, 229, 255, 0.2);
+    }
+
     .disease-tag {
       font-size: 10px;
       font-weight: 700;

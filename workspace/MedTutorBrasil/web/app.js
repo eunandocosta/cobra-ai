@@ -11654,6 +11654,131 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
     window.executeValidatedGeneration = executeValidatedGeneration;
 
+    /**
+     * Persiste a renomeação de um material em memória, IndexedDB e Firestore.
+     * @param {string} materialId  ID ou nome atual do material
+     * @param {string} newName     Novo nome escolhido pelo usuário
+     */
+    async function renameMaterialInline(materialId, newName) {
+      const trimmed = (newName || '').trim();
+      if (!trimmed || trimmed.length < 2) {
+        showToast('⚠️ O nome deve ter pelo menos 2 caracteres.');
+        return false;
+      }
+      if (trimmed.length > 250) {
+        showToast('⚠️ O nome não pode ultrapassar 250 caracteres.');
+        return false;
+      }
+
+      // 1. Atualiza em memória
+      const mat = Array.isArray(chatDriveMaterials)
+        ? chatDriveMaterials.find(m => m.id === materialId || m.name === materialId || m.originalFileName === materialId)
+        : null;
+      if (mat) {
+        mat.name = trimmed;
+        mat.title = trimmed;
+        mat.topic = trimmed;
+      }
+
+      // 2. Persiste no IndexedDB
+      try {
+        const uid = MedTutorFirebaseService.getUserId?.() || '';
+        if (uid && typeof MedTutorLocalDB !== 'undefined') {
+          await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+        }
+      } catch (e) {}
+
+      // 3. Persiste no Firestore (nome + atualizadoEm)
+      if (typeof firestoreDb !== 'undefined' && firestoreDb &&
+          typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive &&
+          MedTutorFirebaseService.hasAuthenticatedCloudSession?.(MedTutorFirebaseService.getUserId?.())) {
+        try {
+          const uid = MedTutorFirebaseService.getUserId();
+          const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+          let docRef = null;
+          const directDoc = await colRef.doc(materialId).get().catch(() => null);
+          if (directDoc?.exists) {
+            docRef = directDoc.ref;
+          } else {
+            const qs = await colRef.where('nome', '==', materialId).limit(1).get().catch(() => null);
+            if (qs && !qs.empty) docRef = qs.docs[0].ref;
+          }
+          if (!docRef && mat?.id && mat.id !== materialId) {
+            const qs2 = await colRef.doc(mat.id).get().catch(() => null);
+            if (qs2?.exists) docRef = qs2.ref;
+          }
+          if (docRef) {
+            await docRef.set({ nome: trimmed, atualizadoEm: new Date().toISOString() }, { merge: true });
+            console.info('[Rename] Material renomeado no Firestore:', docRef.id, '→', trimmed);
+          }
+        } catch (err) {
+          console.warn('[Rename] Falha ao atualizar nome no Firestore:', err);
+        }
+      }
+
+      // 4. Re-renderiza as listas
+      if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
+      showToast(`✏️ Material renomeado para "${trimmed}"`);
+      return true;
+    }
+    window.renameMaterialInline = renameMaterialInline;
+
+    /**
+     * Substitui o span do nome por um input inline editável.
+     * @param {string} materialId  ID do material
+     * @param {HTMLElement} spanEl Elemento <span> clicado
+     */
+    function startMaterialRename(materialId, spanEl) {
+      if (!spanEl || spanEl.dataset.renaming === '1') return;
+      spanEl.dataset.renaming = '1';
+
+      const originalText = spanEl.textContent.trim();
+      // Remove ícone emoji do início para usar como nome puro
+      const cleanOriginal = originalText.replace(/^[\p{Emoji}\s]+/u, '').trim();
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'material-name-input';
+      input.value = cleanOriginal;
+      input.title = 'Enter para salvar • Esc para cancelar';
+      input.setAttribute('aria-label', 'Editar nome do material');
+
+      const restore = () => {
+        if (input.parentNode) {
+          input.parentNode.replaceChild(spanEl, input);
+        }
+        delete spanEl.dataset.renaming;
+      };
+
+      input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const ok = await renameMaterialInline(materialId, input.value);
+          if (!ok) input.focus();
+          // renderChatDriveVerticalList já fará o re-render
+        } else if (e.key === 'Escape') {
+          restore();
+        }
+      });
+
+      input.addEventListener('blur', async (e) => {
+        // Pequeno delay para não conflitar com Enter
+        await new Promise(r => setTimeout(r, 80));
+        if (!input.parentNode) return; // já foi removido pelo Enter
+        const newVal = input.value.trim();
+        if (newVal && newVal !== cleanOriginal) {
+          await renameMaterialInline(materialId, newVal);
+        } else {
+          restore();
+        }
+      });
+
+      spanEl.parentNode.replaceChild(input, spanEl);
+      input.focus();
+      input.select();
+    }
+    window.startMaterialRename = startMaterialRename;
+
     function confirmGenerateStudyCount() {
       const inputEl = document.getElementById('generateStudyQuestionsCountInput');
       let count = inputEl ? parseInt(inputEl.value, 10) : 5;
@@ -19834,8 +19959,15 @@ Para cada material, retorne um objeto no JSON com:
             const icon = m.pedagogicalIcon || '📄';
             const phase = m.pedagogicalPhaseName || 'Conteúdo Programático';
             const rationale = m.pedagogicalRationale || 'Etapa sequencial do roteiro de estudo';
+            const isQO = m.materialType === 'questions_only';
+            const safeMatId = (m.id || m.name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const safeSubj = subjectName.replace(/'/g, "\\'");
+            const safeName = m.name.replace(/'/g, "\\'");
+            const borderStyle = isQO
+              ? 'border: 1px solid rgba(255, 230, 0, 0.35);'
+              : 'border: 1px solid var(--border);';
             return `
-            <div class="learning-step-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; gap: 10px; flex-wrap: wrap;">
+            <div class="learning-step-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-surface); ${borderStyle} border-radius: 10px; gap: 10px; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 150px;">
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.25); color: var(--neon); font-weight: 800; font-size: 13px; flex-shrink: 0;" title="Etapa ${step} de ${total} na sequência pedagógica">
                   ${step}
@@ -19844,8 +19976,15 @@ Para cada material, retorne um objeto no JSON com:
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px;">
                     <span style="font-size: 10px; background: rgba(255, 255, 255, 0.06); color: var(--neon); padding: 1px 6px; border-radius: 4px; font-weight: 700;">${icon} ${phase}</span>
                     <span style="font-size: 10px; color: var(--text-muted);">Passo ${step} de ${total}</span>
+                    ${isQO ? `<span class="questions-only-tag">📋 Banco de Questões</span>` : ''}
                   </div>
-                  <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); word-break: break-word;">${escapeHtml(m.name)}</div>
+                  <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); word-break: break-word;">
+                    <span
+                      class="material-name-editable"
+                      title="Clique para renomear"
+                      onclick="startMaterialRename('${safeMatId}', this)"
+                    >${escapeHtml(m.name)}</span>
+                  </div>
                   <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 1px;">
                     ${escapeHtml(rationale)} ${m.sizeStr ? '• ' + m.sizeStr : ''}
                   </div>
@@ -19853,22 +19992,22 @@ Para cada material, retorne um objeto no JSON com:
               </div>
               <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                 <!-- BOTÃO DE RELATÓRIO ACADÊMICO FORMAL (ARTIGO & PROVA) -->
-                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="closeModals(); openAcademicReportForMaterial('${(m.id || m.name).replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}', '${m.name.replace(/'/g, "\\'")}')" title="Gerar e Ler Relatório exclusivo deste arquivo">
+                <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="closeModals(); openAcademicReportForMaterial('${safeMatId}', '${safeSubj}', '${safeName}')" title="Gerar e Ler Relatório exclusivo deste arquivo">
                   📄 Relatório Acadêmico
                 </button>
-                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openGenerateStudyModal('${m.name.replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Gerar Quiz e Flashcard direcionados deste slide">
-                  ⚡ Quizzes & Cards
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openGenerateStudyModal('${safeName}', '${safeSubj}')" title="Gerar Quiz e Flashcard direcionados deste slide">
+                  ⚡ Quizzes &amp; Cards
                 </button>
-                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${subjectName.replace(/'/g, "\\'")}', 'quizzes'); handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')" title="Ver Quizzes deste slide">
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${safeSubj}', 'quizzes'); handleSlideSelectChange('${safeName}')" title="Ver Quizzes deste slide">
                   📝 Quiz
                 </button>
-                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${subjectName.replace(/'/g, "\\'")}', 'flashcards'); handleSlideSelectChange('${m.name.replace(/'/g, "\\'")}')" title="Ver Flashcards deste slide">
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${safeSubj}', 'flashcards'); handleSlideSelectChange('${safeName}')" title="Ver Flashcards deste slide">
                   🗂️ Card
                 </button>
-                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openChangeMaterialDisciplineModal('${m.name.replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Mover este slide para outra disciplina da grade">
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openChangeMaterialDisciplineModal('${safeName}', '${safeSubj}')" title="Mover este slide para outra disciplina da grade">
                   🔄 Mover
                 </button>
-                <button class="btn-outline-action danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteMaterialFromSubject('${(m.id || m.name).replace(/'/g, "\\'")}', '${subjectName.replace(/'/g, "\\'")}')" title="Excluir este conteúdo da matéria">
+                <button class="btn-outline-action danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteMaterialFromSubject('${safeMatId}', '${safeSubj}')" title="Excluir este conteúdo da matéria">
                   🗑️ Excluir
                 </button>
               </div>
@@ -23441,16 +23580,51 @@ Linha 04: __________________________________________________
       // 4. Trata o salvamento ou não na seção de Materiais do Aluno
       let importedStudyMaterial = null;
       if (saveAsMaterial || generateIndividualReport || visualAssociationEnabled) {
+        // --- Feature: Sugestão de nome via IA ---
+        // Usa o clinicalSubject retornado pela IA (já normalizado) como nome base.
+        // Fallback: generateSmartMaterialTitle faz análise local do texto.
+        let cleanFileTitle = fileName.replace(/\.[^/.]+$/, '').trim();
+        cleanFileTitle = cleanFileTitle.replace(/\b(gabarito|e\.?d\.?|estudo\s*dirigido|simulado|prova|caderno|apostila|quest[oõ]es|aula|slide|modulo|capitulo)\s*\d*\b/gi, '').trim();
+        cleanFileTitle = cleanFileTitle.replace(/^[_\-\s\.:]+|[_\-\s\.:]+$/g, '').trim();
+        if (!cleanFileTitle || cleanFileTitle.length < 3) cleanFileTitle = targetSubject || 'Medicina';
+
+        const aiClinicalSubject = (analysisResult.clinicalSubject || '').trim();
+        let suggestedName;
+        if (aiClinicalSubject && aiClinicalSubject.length >= 4 && aiClinicalSubject.toLowerCase() !== (targetSubject || '').toLowerCase()) {
+          // Formato: "Insuficiência Cardíaca — Clínica Médica"
+          suggestedName = `${aiClinicalSubject} — ${targetSubject}`;
+        } else {
+          suggestedName = (typeof generateSmartMaterialTitle === 'function')
+            ? generateSmartMaterialTitle(fileName, extractedText, null, targetSubject)
+            : cleanFileTitle;
+        }
+        // Garante comprimento razoável
+        if (!suggestedName || suggestedName.trim().length < 3) suggestedName = cleanFileTitle;
+        suggestedName = suggestedName.trim().slice(0, 250);
+
+        // --- Feature: Confirmação quando a IA detecta questions_only ---
+        let resolvedMaterialType = analysisResult.detectedType === 'questions_only' ? 'questions_only' : 'text';
+        if (analysisResult.detectedType === 'questions_only') {
+          const userConfirm = window.confirm(
+            `📋 A IA identificou que este arquivo contém apenas questões/perguntas sem texto teórico de aula.\n\n` +
+            `Deseja salvá-lo como "Banco de Questões"?\n\n` +
+            `✅ OK → salvar como Banco de Questões (identificado com borda amarela)\n` +
+            `❌ Cancelar → salvar como Material de Aula normal`
+          );
+          if (!userConfirm) resolvedMaterialType = 'text';
+        }
+
         // Aluno optou por salvar na biblioteca de materiais
         const newMaterial = {
           id: 'mat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
-          name: fileName,
+          name: suggestedName,
           originalFileName: fileName,
-          title: fileName.replace(/\.[^/.]+$/, ''),
+          title: suggestedName,
           subject: targetSubject,
           disease: targetSubject,
-          topic: fileName.replace(/\.[^/.]+$/, ''),
-          tag: 'Apostila / Material Importado',
+          topic: suggestedName,
+          tag: resolvedMaterialType === 'questions_only' ? 'Banco de Questões' : 'Apostila / Material Importado',
+          materialType: resolvedMaterialType === 'questions_only' ? 'questions_only' : undefined,
           sizeStr: pendingImportStudyFile ? `${(pendingImportStudyFile.size / (1024 * 1024)).toFixed(1)} MB` : `${(extractedText.length / 1024).toFixed(1)} KB`,
           selected: true,
           readingDocText: `${extractedText}${visualMarkdown && !extractedText.includes('Associação Visual do Material') ? `\n\n${visualMarkdown}` : ''}`,
@@ -24146,32 +24320,46 @@ ${textSample}
       }
 
       chatDriveMaterials.forEach((file) => {
+        const isQuestionsOnly = file.materialType === 'questions_only';
         const item = document.createElement('div');
-        item.className = 'chat-drive-vertical-item' + (file.selected ? ' selected' : '');
+        item.className = 'chat-drive-vertical-item'
+          + (file.selected ? ' selected' : '')
+          + (isQuestionsOnly ? ' questions-only-item' : '');
         item.onclick = (e) => {
-          if (e.target.tagName.toLowerCase() !== 'input') {
+          const tag = (e.target.tagName || '').toLowerCase();
+          if (tag !== 'input' && tag !== 'button' && !e.target.closest('button') && !e.target.closest('.material-name-editable')) {
             toggleDriveFileCheck(file.id, !file.selected);
           }
         };
 
+        const fileIconHtml = file.isBook ? '📖' : (isQuestionsOnly ? '📋' : '📄');
+        const safeId = (file.id || file.name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const safeSubj = (file.subject || '').replace(/'/g, "\\'");
+
         item.innerHTML = `
-          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleDriveFileCheck('${file.id}', this.checked)">
+          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleDriveFileCheck('${safeId}', this.checked)">
           <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">
-              ${file.isBook ? '📖' : '📄'} ${file.name}
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); overflow: hidden; white-space: nowrap;" title="${escapeHtml(file.name)} — clique no nome para renomear">
+              <span
+                class="material-name-editable"
+                title="Clique para renomear"
+                onclick="event.stopPropagation(); startMaterialRename('${safeId}', this)"
+              >${fileIconHtml} ${escapeHtml(file.name)}</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px; font-size: 11px; flex-wrap: wrap;">
-              ${file.folderPath && file.folderPath !== '/' ? `<span style="background: rgba(0, 229, 255, 0.12); color: var(--neon); padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 600;">📁 ${file.folderPath}</span>` : ''}
+              ${file.folderPath && file.folderPath !== '/' ? `<span style="background: rgba(0, 229, 255, 0.12); color: var(--neon); padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 600;">📁 ${escapeHtml(file.folderPath)}</span>` : ''}
               ${file.compressionStats ? `<span style="background: rgba(0, 255, 102, 0.12); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.25); padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 700;" title="Arquivo otimizado: de ${file.compressionStats.originalSizeMB.toFixed(1)}MB para ${file.compressionStats.compressedSizeKB}KB">⚡ -${file.compressionStats.reductionPercent}% (WebP+MD)</span>` : ''}
               ${file.learningOrder ? `<span style="background: rgba(100, 108, 255, 0.15); color: #8c9eff; border: 1px solid rgba(140, 158, 255, 0.3); padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 700;" title="${escapeHtml(file.pedagogicalRationale || file.pedagogicalPhaseName || '')}">${file.pedagogicalIcon || '🎯'} Passo ${file.learningOrder} • ${escapeHtml(file.pedagogicalPhaseName || '')}</span>` : ''}
-              <span class="disease-tag">${file.disease || file.tag}</span>
-              <span style="color: var(--text-secondary);">${file.sizeStr}</span>
-              <span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• ${file.topic}</span>
+              ${isQuestionsOnly
+                ? `<span class="questions-only-tag">📋 Banco de Questões</span>`
+                : `<span class="disease-tag">${escapeHtml(file.disease || file.tag || '')}</span>`}
+              <span style="color: var(--text-secondary);">${escapeHtml(file.sizeStr || '')}</span>
+              <span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• ${escapeHtml(file.topic || '')}</span>
             </div>
           </div>
           <div style="display: flex; gap: 5px; margin-left: 6px; flex-shrink: 0;">
-            <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px; border-radius: 6px;" onclick="event.stopPropagation(); openAcademicReportForMaterial('${(file.id || file.name).replace(/'/g, "\\'")}', '${(file.subject || '').replace(/'/g, "\\'")}', '${file.name.replace(/'/g, "\\'")}')" title="Gerar relatório exclusivo deste PDF ou slide">📄 Relatório</button>
-            <button class="btn-outline-action danger" style="padding: 2px 7px; font-size: 11px; border-radius: 6px;" onclick="event.stopPropagation(); deleteMaterialFromSubject('${(file.id || file.name).replace(/'/g, "\\'")}', '${(file.subject || '').replace(/'/g, "\\'")}')" title="Excluir este conteúdo da matéria">🗑️</button>
+            <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px; border-radius: 6px;" onclick="event.stopPropagation(); openAcademicReportForMaterial('${safeId}', '${safeSubj}', '${escapeHtml(file.name).replace(/'/g, "\\'")}')" title="Gerar relatório exclusivo deste PDF ou slide">📄 Relatório</button>
+            <button class="btn-outline-action danger" style="padding: 2px 7px; font-size: 11px; border-radius: 6px;" onclick="event.stopPropagation(); deleteMaterialFromSubject('${safeId}', '${safeSubj}')" title="Excluir este conteúdo da matéria">🗑️</button>
           </div>
         `;
         container.appendChild(item);
