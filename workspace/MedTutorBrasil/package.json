@@ -4,6 +4,7 @@
   "description": "MedTutor Brasil - Plataforma de Educação Médica com Inteligência Artificial e Evidências Científicas",
   "main": "index.js",
   "scripts": {
+    "build": "npx esbuild web/app.js --minify --target=es2020 --outfile=web/app.min.js",
     "start": "node index.js",
     "test": "node scratch/test_modular_monolith.js"
   },

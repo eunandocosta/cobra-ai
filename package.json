@@ -5,14 +5,14 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "cd workspace/MedTutorBrasil && npx esbuild web/app.js --minify --target=es2020 --outfile=web/app.min.js",
     "start": "node index.js",
     "dev": "tsx index.ts",
     "open:web": "open workspace/MedTutorBrasil/web/index.html",
     "serve": "node scripts/serve.cjs",
     "web": "node scripts/serve.cjs",
     "advisor": "tsx scripts/advisor.ts",
-    "postinstall": "cd workspace/MedTutorBrasil && npm install"
+    "postinstall": "cd workspace/MedTutorBrasil && npm install && npx esbuild web/app.js --minify --target=es2020 --outfile=web/app.min.js"
   },
   "keywords": [],
   "author": "",

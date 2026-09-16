@@ -6,6 +6,7 @@ try {
   }
 }
 
+const fs = require('fs');
 const path = require('path');
 const express = require('./src/shared/express');
 const { apiRateLimit, compression, staticCacheHeaders } = require('./src/shared/production.middleware');
@@ -18,6 +19,16 @@ app.use(staticCacheHeaders);
 app.use(apiRateLimit({ windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000), maxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS || 120) }));
 app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: process.env.REQUEST_BODY_LIMIT || '2mb' }));
+
+// Servir JS minificado/ofuscado se disponível, com fallback para app.js
+app.get('/app.min.js', (req, res) => {
+  const minifiedPath = path.join(__dirname, 'web', 'app.min.js');
+  if (fs.existsSync(minifiedPath)) {
+    return res.sendFile(minifiedPath);
+  }
+  return res.sendFile(path.join(__dirname, 'web', 'app.js'));
+});
+
 app.use(express.static(path.join(__dirname, 'web')));
 
 app.use('/api/auth', require('./src/modules/auth/auth.routes'));
