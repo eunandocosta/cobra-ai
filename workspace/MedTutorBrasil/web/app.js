@@ -19837,8 +19837,14 @@ Para cada material, retorne um objeto no JSON com:
       }
     }
 
-    // CONTROLE DE ACORDEÃO E DETALHES DE DISCIPLINAS
+    // CONTROLE DE MASTER-DETAIL E DETALHES DE DISCIPLINAS
     var expandedCurriculumPeriods = new Set();
+    var selectedCurriculumPeriodId = null;
+
+    function selectCurriculumPeriod(periodId) {
+      selectedCurriculumPeriodId = periodId;
+      renderCurriculumGrid();
+    }
 
     function toggleCurriculumPeriod(periodKey, event) {
       if (event && typeof event.stopPropagation === 'function') {
@@ -19851,6 +19857,7 @@ Para cada material, retorne um objeto no JSON com:
           resolvedKey = found.id || found.period;
         }
       }
+      selectedCurriculumPeriodId = resolvedKey;
       if (expandedCurriculumPeriods.has(resolvedKey)) {
         expandedCurriculumPeriods.delete(resolvedKey);
       } else {
@@ -20074,10 +20081,7 @@ Para cada material, retorne um objeto no JSON com:
       if (empty) empty.style.display = 'none';
       if (headerBar) headerBar.style.display = 'flex';
       if (grid) {
-        grid.style.display = 'flex';
-        grid.style.flexDirection = 'column';
-        grid.style.gap = '12px';
-        grid.style.width = '100%';
+        grid.style.display = 'block';
         grid.innerHTML = '';
 
         const filtered = (currentCurriculumCycleFilter === 'all')
@@ -20103,125 +20107,171 @@ Para cada material, retorne um objeto no JSON com:
 
         const toggleAllBtn = document.getElementById('btnToggleAllCurriculum');
         if (toggleAllBtn) {
-          const isAllExpanded = filtered.length > 0 && filtered.every((p, idx) => {
-            const key = p.id || p.period || ('period_' + idx);
-            return expandedCurriculumPeriods.has(key);
-          });
-          toggleAllBtn.innerHTML = isAllExpanded 
-            ? '<svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="18 15 12 9 6 15"/></svg> Recolher Todas' 
-            : '<svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="6 9 12 15 18 9"/></svg> Expandir Todas';
+          toggleAllBtn.style.display = 'none';
         }
 
-        filtered.forEach((cat, idx) => {
-          const periodId = cat.id || cat.period || ('period_' + idx);
-          cat.id = periodId;
-          const card = document.createElement('div');
-          const isExpanded = expandedCurriculumPeriods.has(periodId);
-          card.id = `card_${periodId}`;
-          card.className = `subject-category-card ${isExpanded ? 'expanded' : 'collapsed'}`;
-          card.style.width = '100%';
-          
-          let cycleColor = 'var(--neon)';
-          let cycleBg = 'rgba(0, 229, 255, 0.12)';
-          if (cat.cycle === 'clinico') {
-            cycleColor = 'var(--neon-green, #00ff66)';
-            cycleBg = 'rgba(0, 255, 102, 0.12)';
-          } else if (cat.cycle === 'internato') {
-            cycleColor = 'var(--warning, #ffaa00)';
-            cycleBg = 'rgba(255, 170, 0, 0.14)';
-          }
+        if (!filtered || filtered.length === 0) return;
 
+        filtered.forEach((cat, idx) => {
+          if (!cat.id) cat.id = cat.period || ('period_' + idx);
+        });
+
+        if (!selectedCurriculumPeriodId || !filtered.some(p => p.id === selectedCurriculumPeriodId)) {
+          selectedCurriculumPeriodId = filtered[0]?.id || null;
+        }
+
+        const selectedCat = filtered.find(p => p.id === selectedCurriculumPeriodId) || filtered[0];
+
+        // 1. LATERAL MASTER (LISTA COMPACTA DE SEMESTRES E PERÍODOS)
+        let sidebarItemsHtml = filtered.map((cat) => {
+          const periodId = cat.id;
+          const isSelected = periodId === selectedCurriculumPeriodId;
           const subjCount = (cat.subjects || []).length;
+          
+          let activeCountInPeriod = 0;
+          (cat.subjects || []).forEach(s => {
+            const sName = typeof s === 'string' ? s : s.name;
+            if (getDisciplineMaterialsCount(sName) > 0) activeCountInPeriod++;
+          });
+
+          let cycleColor = 'var(--neon)';
+          if (cat.cycle === 'clinico') cycleColor = 'var(--neon-green, #00ff66)';
+          else if (cat.cycle === 'internato') cycleColor = 'var(--warning, #ffaa00)';
+
           const escapedPeriodId = periodId.replace(/'/g, "\\'");
 
-          let headerHtml = `
-            <div class="category-header" onclick="toggleCurriculumPeriod('${escapedPeriodId}', event)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; ${isExpanded ? 'border-bottom: 1px solid var(--border); padding-bottom: 10px;' : ''}" title="Clique para ${isExpanded ? 'recolher' : 'abrir'} a lista de matérias deste período">
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span style="font-weight: 700; color: var(--text-primary); font-size: 13.5px;">${cat.period}</span>
-                <span style="background: ${cycleBg}; color: ${cycleColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; letter-spacing: 0.3px;">
+          return `
+            <div class="curriculum-sidebar-item ${isSelected ? 'active' : ''}" onclick="selectCurriculumPeriod('${escapedPeriodId}')" title="Ver disciplinas do ${cat.period}">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span style="font-weight: 700; font-size: 13px; color: ${isSelected ? 'var(--neon)' : 'var(--text-primary)'};">
+                  ${activeCountInPeriod > 0 ? '🟢 ' : ''}${cat.period}
+                </span>
+                <span style="font-size: 10px; color: ${cycleColor}; font-weight: 600;">
                   ${cat.cycleName || 'Obrigatória'}
                 </span>
               </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">
-                  ${subjCount} ${subjCount === 1 ? 'matéria' : 'matérias'}
-                </span>
-                <span class="btn-outline-action" style="font-size: 10px; padding: 2px 8px; border-radius: 12px; color: ${isExpanded ? 'var(--text-secondary)' : 'var(--neon)'}; pointer-events: none; border-color: ${isExpanded ? 'var(--border)' : 'var(--border-accent)'};">
-                  ${isExpanded ? '▲ Recolher' : '▼ Ver Matérias'}
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 10.5px; background: rgba(255, 255, 255, 0.06); padding: 2px 7px; border-radius: 10px; color: var(--text-muted); font-weight: 600;">
+                  ${subjCount}
                 </span>
               </div>
             </div>
           `;
+        }).join('');
 
-          let subjectsListHtml = '';
-          if (isExpanded) {
-            subjectsListHtml = `
-              <div class="subject-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-                ${cat.subjects.map(s => {
-                  const sName = typeof s === 'string' ? s : s.name;
-                  const escapedName = sName.replace(/'/g, "\\'");
-                  const matCount = getDisciplineMaterialsCount(sName);
-                  const hasMaterials = matCount > 0;
-                  
-                  let matchedSubjectKey = sName;
-                  if (subjectGenerationStatus[sName]) {
-                    matchedSubjectKey = sName;
-                  } else {
-                    const sLower = sName.toLowerCase();
-                    for (const k of Object.keys(subjectGenerationStatus)) {
-                      const kLower = k.toLowerCase();
-                      if (sLower.includes(kLower) || kLower.includes(sLower) || (sLower.includes('dermatolog') && kLower.includes('sistemas 2'))) {
-                        matchedSubjectKey = k;
-                        break;
-                      }
-                    }
-                  }
-                  const statusObj = subjectGenerationStatus[matchedSubjectKey];
-                  const isPending = hasMaterials && (!statusObj || statusObj.status === 'pending');
+        const sidebarHtml = `
+          <div class="curriculum-master-sidebar">
+            <div class="curriculum-sidebar-title">Semestres & Períodos</div>
+            ${sidebarItemsHtml}
+          </div>
+        `;
 
-                  let rightTag = '';
-                  if (hasMaterials) {
-                    if (isPending) {
-                      rightTag = `
-                        <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
-                        <button class="btn-outline-action primary" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
-                        <button class="btn-outline-action" style="padding: 3px 8px; font-size: 10.5px;" onclick="synchronizeSubjectQuestions('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ler todos os arquivos enviados desta disciplina e criar os primeiros Quiz e Flashcards">🔄 Sincronizar Questões</button>
-                        <button class="btn-outline-action danger" style="padding: 3px 8px; font-size: 10.5px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
-                      `;
-                    } else {
-                      rightTag = `
-                        <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
-                        <button class="btn-outline-action primary" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ver Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
-                        <button class="btn-outline-action" style="padding: 3px 8px; font-size: 10.5px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Ver Quizzes desta disciplina">📝 Quizzes</button>
-                        <button class="btn-outline-action danger" style="padding: 3px 8px; font-size: 10.5px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
-                      `;
-                    }
-                  } else {
-                    rightTag = `
-                      <span style="font-size: 10.5px; color: var(--text-muted); background: var(--bg-card); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border);">ℹ️ Ementa</span>
-                    `;
-                  }
+        // 2. PAINEL PRINCIPAL DETAIL (MATÉRIAS E DADOS DO SEMESTRE SELECIONADO)
+        let detailHtml = '';
+        if (selectedCat) {
+          const catSubjCount = (selectedCat.subjects || []).length;
+          let activeCountInPeriod = 0;
+          (selectedCat.subjects || []).forEach(s => {
+            const sName = typeof s === 'string' ? s : s.name;
+            if (getDisciplineMaterialsCount(sName) > 0) activeCountInPeriod++;
+          });
 
-                  return `
-                    <div class="subject-row" onclick="openSubjectDetailModal('${escapedName}')" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 8px; padding: 10px 12px; border: 1px solid rgba(0, 255, 102, 0.25);' : 'background: var(--bg-surface); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border);'} cursor: pointer;" title="Clique para ver matérias específicas e detalhes de ${escapedName}">
-                      <div style="display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 140px;">
-                        <span style="font-size: 13px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; line-height: 1.4; word-break: break-word;">
-                          ${hasMaterials ? '🟢 ' : '• '}${sName}
-                        </span>
-                      </div>
-                      <div class="subject-actions-box" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: 0 1 auto;" onclick="event.stopPropagation()">
-                        ${rightTag}
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            `;
+          let cycleColor = 'var(--neon)';
+          let cycleBg = 'rgba(0, 229, 255, 0.12)';
+          if (selectedCat.cycle === 'clinico') {
+            cycleColor = 'var(--neon-green, #00ff66)';
+            cycleBg = 'rgba(0, 255, 102, 0.12)';
+          } else if (selectedCat.cycle === 'internato') {
+            cycleColor = 'var(--warning, #ffaa00)';
+            cycleBg = 'rgba(255, 170, 0, 0.14)';
           }
 
-          card.innerHTML = headerHtml + subjectsListHtml;
-          grid.appendChild(card);
-        });
+          const subjectsCardsHtml = (selectedCat.subjects || []).map(s => {
+            const sName = typeof s === 'string' ? s : s.name;
+            const escapedName = sName.replace(/'/g, "\\'");
+            const matCount = getDisciplineMaterialsCount(sName);
+            const hasMaterials = matCount > 0;
+            
+            let matchedSubjectKey = sName;
+            if (subjectGenerationStatus[sName]) {
+              matchedSubjectKey = sName;
+            } else {
+              const sLower = sName.toLowerCase();
+              for (const k of Object.keys(subjectGenerationStatus)) {
+                const kLower = k.toLowerCase();
+                if (sLower.includes(kLower) || kLower.includes(sLower) || (sLower.includes('dermatolog') && kLower.includes('sistemas 2'))) {
+                  matchedSubjectKey = k;
+                  break;
+                }
+              }
+            }
+            const statusObj = subjectGenerationStatus[matchedSubjectKey];
+            const isPending = hasMaterials && (!statusObj || statusObj.status === 'pending');
+
+            let rightTag = '';
+            if (hasMaterials) {
+              if (isPending) {
+                rightTag = `
+                  <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
+                  <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
+                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="synchronizeSubjectQuestions('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ler todos os arquivos enviados desta disciplina e criar os primeiros Quiz e Flashcards">🔄 Sincronizar Questões</button>
+                  <button class="btn-outline-action danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
+                `;
+              } else {
+                rightTag = `
+                  <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
+                  <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ver Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
+                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Ver Quizzes desta disciplina">📝 Quizzes</button>
+                  <button class="btn-outline-action danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
+                `;
+              }
+            } else {
+              rightTag = `
+                <span style="font-size: 11px; color: var(--text-muted); background: var(--bg-card); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border);">ℹ️ Ementa</span>
+              `;
+            }
+
+            return `
+              <div class="subject-row" onclick="openSubjectDetailModal('${escapedName}')" style="${hasMaterials ? 'background: rgba(0, 255, 102, 0.05); border-radius: 10px; padding: 12px 16px; border: 1px solid rgba(0, 255, 102, 0.25);' : 'background: var(--bg-surface); border-radius: 10px; padding: 12px 16px; border: 1px solid var(--border);'} cursor: pointer;" title="Clique para ver matérias específicas e detalhes de ${escapedName}">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1 1 200px; min-width: 150px;">
+                  <span style="font-size: 13.5px; color: ${hasMaterials ? '#00ff66' : 'var(--text-primary)'}; font-weight: ${hasMaterials ? '700' : '600'}; line-height: 1.4; word-break: break-word;">
+                    ${hasMaterials ? '🟢 ' : '• '}${sName}
+                  </span>
+                </div>
+                <div class="subject-actions-box" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 0 1 auto;" onclick="event.stopPropagation()">
+                  ${rightTag}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          detailHtml = `
+            <div class="curriculum-detail-main">
+              <div class="curriculum-detail-header">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px;">
+                    <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--text-primary);">${selectedCat.period}</h3>
+                    <span style="background: ${cycleBg}; color: ${cycleColor}; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px;">
+                      ${selectedCat.cycleName || 'Obrigatória'}
+                    </span>
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">
+                    ${catSubjCount} ${catSubjCount === 1 ? 'disciplina' : 'disciplinas'} neste período ${activeCountInPeriod > 0 ? `• <strong style="color: #00ff66;">${activeCountInPeriod} com aulas ativas</strong>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div class="curriculum-detail-subjects-list">
+                ${subjectsCardsHtml}
+              </div>
+            </div>
+          `;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'curriculum-master-detail-layout';
+        container.innerHTML = sidebarHtml + detailHtml;
+        grid.appendChild(container);
       }
     }
 
