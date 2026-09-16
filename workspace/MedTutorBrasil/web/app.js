@@ -20503,6 +20503,10 @@ Para cada material, retorne um objeto no JSON com:
       const titleEl = document.getElementById('chatActiveTitleDisplay');
       if (titleEl) titleEl.textContent = 'Novo Chat';
 
+      if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+        document.getElementById('chatSidebar')?.classList.add('collapsed');
+      }
+
       showToast('✨ Novo chat iniciado.');
     }
 
@@ -20510,6 +20514,9 @@ Para cada material, retorne um objeto no JSON com:
       currentChatSessionId = id;
       renderChatHistorySidebar();
       loadCurrentChatMessages();
+      if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+        document.getElementById('chatSidebar')?.classList.add('collapsed');
+      }
     }
 
     function togglePinChatSession(id) {
