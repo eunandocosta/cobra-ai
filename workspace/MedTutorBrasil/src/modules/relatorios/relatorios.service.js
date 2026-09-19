@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
 
 function getGenAI() {
@@ -8,6 +9,20 @@ function getGenAI() {
     throw new Error('GEMINI_API_KEY não configurada no ambiente.');
   }
   return new GoogleGenerativeAI(apiKey);
+}
+
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY não configurada no ambiente.');
+  return new OpenAI({ apiKey });
+}
+
+function getReportProvider() {
+  const configuredProvider = String(process.env.REPORT_AI_PROVIDER || '').trim().toLowerCase();
+  if (configuredProvider) return configuredProvider;
+  // Uma chave OpenAI configurada torna o ChatGPT o motor padrão de relatórios,
+  // inclusive no Render quando a variável de seleção não for cadastrada.
+  return process.env.OPENAI_API_KEY ? 'openai' : 'gemini';
 }
 
 class RelatoriosService {
@@ -105,19 +120,7 @@ DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
    - NUNCA invente links externos de imagem. Utilize APENAS as URLs fornecidas no catálogo.
 `;
 
-    // 3. Inicialização do modelo Gemini 3.7 Flash com raciocínio analítico
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_REASONING || "gemini-3.7-flash",
-      systemInstruction,
-      generationConfig: {
-        temperature: 0.2,
-        topP: 0.8,
-        maxOutputTokens: 65536
-      }
-    });
-
-    // 4. Montagem do prompt contextualizado
+    // 3. Montagem do prompt contextualizado
     const prompt = `
 METADADOS DO DOCUMENTO:
 - TÍTULO: ${cleanTitle}
@@ -149,8 +152,57 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
 `;
 
     try {
-      const result = await runWithAiLimit(() => model.generateContent(prompt));
-      const generatedMarkdown = result.response.text();
+      let generatedMarkdown = '';
+      let generatorEngine = 'gemini';
+      let generatorModel = process.env.MODEL_REASONING || 'gemini-3.7-flash';
+      let usage = { inputTokens: 0, outputTokens: 0 };
+
+      const generateWithGemini = async () => {
+        const genAI = getGenAI();
+        const model = genAI.getGenerativeModel({
+          model: generatorModel,
+          systemInstruction,
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 65536
+          }
+        });
+        const result = await runWithAiLimit(() => model.generateContent(prompt));
+        return result.response.text();
+      };
+
+      if (getReportProvider() === 'openai') {
+        generatorEngine = 'openai';
+        generatorModel = process.env.OPENAI_REPORT_MODEL || 'gpt-5';
+        try {
+          const openai = getOpenAI();
+          const response = await runWithAiLimit(() => openai.responses.create({
+            model: generatorModel,
+            instructions: systemInstruction,
+            input: prompt,
+            // O relatório é salvo pelo MedTutor; não é necessário manter o
+            // estado da resposta na API para continuar a conversa.
+            store: false
+          }));
+          generatedMarkdown = String(response.output_text || '').trim();
+          if (!generatedMarkdown) throw new Error('A OpenAI não retornou texto para o relatório.');
+          generatorModel = response.model || generatorModel;
+          usage = {
+            inputTokens: Number(response.usage?.input_tokens) || 0,
+            outputTokens: Number(response.usage?.output_tokens) || 0
+          };
+        } catch (openaiError) {
+          const allowGeminiFallback = String(process.env.REPORT_ALLOW_GEMINI_FALLBACK || '').toLowerCase() === 'true';
+          if (!allowGeminiFallback || !process.env.GEMINI_API_KEY) throw openaiError;
+          console.warn('[RelatoriosService] OpenAI indisponível; usando Gemini como contingência.', openaiError.message);
+          generatorEngine = 'gemini-fallback';
+          generatorModel = process.env.MODEL_REASONING || 'gemini-3.7-flash';
+          generatedMarkdown = await generateWithGemini();
+        }
+      } else {
+        generatedMarkdown = await generateWithGemini();
+      }
 
       // Monta os nomes de arquivo sanitizados para download
       const filenameBase = { title: cleanTitle, subject: cleanSubject };
@@ -167,6 +219,9 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
         author,
         institution,
         markdown: generatedMarkdown,
+        generatorEngine,
+        generatorModel,
+        usage,
         hasFigures: Array.isArray(figures) && figures.length > 0,
         filenames,
         createdAt: new Date().toISOString()

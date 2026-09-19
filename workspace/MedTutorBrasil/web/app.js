@@ -8222,13 +8222,13 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
         const apiKey = typeof getGeminiApiKey === 'function' ? getGeminiApiKey() : '';
         let aiGeneratedArticle = null;
         let pedagogicalData = null;
+        let serverGenerationAttempted = false;
 
-        // Se online e com API Key disponível, aciona os modelos Gemini com o Motor Pedagógico de Avaliação e Síntese Médica
-        // SEM RESTRIÇÃO DE TETO DE GASTOS PARA TEXTOS: priorização total de conclusão e completude 100%
-        // A chave fica somente no servidor local (.env). Prioriza o endpoint local
-        // para que o relatório use Gemini sem expor credenciais no navegador.
+        // A geração oficial é feita pelo endpoint local: a chave permanece no
+        // ambiente do servidor e o provedor é controlado por REPORT_AI_PROVIDER.
         if (!forceLocal && materialContent.trim().length >= 80) {
           try {
+            serverGenerationAttempted = true;
             const serverResponse = await fetch('/api/relatorios/gerar', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -8247,7 +8247,24 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
               if (serverReport?.markdown && serverReport.markdown.length > 200) {
                 aiGeneratedArticle = serverReport.markdown;
                 if (typeof AppExpenseTracker !== 'undefined') {
-                  AppExpenseTracker.recordAction({ actionName: `Tratado Acadêmico: ${effectiveTitle}`, model: 'Gemini via servidor local', isLocal: false });
+                  const reportEngineLabel = serverReport.generatorEngine === 'openai'
+                    ? 'OpenAI via servidor local'
+                    : serverReport.generatorEngine === 'gemini-fallback'
+                      ? 'Gemini via servidor local (contingência)'
+                      : 'Gemini via servidor local';
+                  AppExpenseTracker.recordAction({
+                    actionName: `Tratado Acadêmico: ${effectiveTitle}`,
+                    model: serverReport.generatorModel || reportEngineLabel,
+                    inputTokens: Number(serverReport.usage?.inputTokens) || 0,
+                    outputTokens: Number(serverReport.usage?.outputTokens) || 0,
+                    isLocal: false
+                  });
+                  console.info('[Relatório MedTutor]', {
+                    motor: reportEngineLabel,
+                    modelo: serverReport.generatorModel || 'não informado',
+                    entradaTokens: Number(serverReport.usage?.inputTokens) || 0,
+                    saidaTokens: Number(serverReport.usage?.outputTokens) || 0
+                  });
                 }
               }
             } else {
@@ -8258,7 +8275,9 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
           }
         }
 
-        if (!forceLocal && !aiGeneratedArticle && apiKey) {
+        // O fluxo oficial é controlado pelo servidor. Não troque para Gemini
+        // no navegador sem avisar se o endpoint de relatórios já foi acionado.
+        if (!forceLocal && !serverGenerationAttempted && !aiGeneratedArticle && apiKey) {
           let evidenceData = null;
           let literatureContextPrompt = '';
           if (typeof ScientificLiteratureService !== 'undefined') {

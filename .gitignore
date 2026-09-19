@@ -1,6 +1,14 @@
 node_modules/
 dist/
+# Arquivos locais de credenciais. O modelo público de configuração permanece
+# versionado para documentar as variáveis necessárias sem conter segredos.
 .env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+service-account*.json
 *.log
 npm-debug.log*
 .DS_Store
