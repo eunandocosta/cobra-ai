@@ -4063,6 +4063,12 @@
         background: #ffffff !important;
       }
 
+      /* Se uma tabela importada tiver somente uma célula útil, ela é texto de
+         aula, não uma grade. Evita a coluna estreita com grande área vazia. */
+      .academic-material-unpacked .doc-table td:only-child {
+        width: 100% !important;
+      }
+
       .academic-article-container .doc-table th,
       .doc-table th,
       table:not(.abnt-header-table) th {

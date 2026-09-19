@@ -671,6 +671,59 @@
         .trim();
     }
 
+    // O texto extraído de slides pode trazer metadados do arquivo como se
+    // fossem conteúdo da aula. Eles conflitam com o cabeçalho do relatório e
+    // tornam a leitura redundante. Também removemos instruções de autoria que
+    // pertencem ao gerador, nunca ao estudante que vai ler o PDF.
+    function normalizeMaterialMarkdownForReport(markdown) {
+      return removeUnresolvedImageArtifacts(markdown)
+        .replace(/^\s*>?\s*\*\*(?:Disciplina|Eixo Curricular|Título da Aula)\s*:\*\*[^\n]*(?:\n|$)/gim, '')
+        .replace(/^\s*>?\s*(?:Disciplina|Eixo Curricular|Título da Aula)\s*:\s*[^\n]*(?:\n|$)/gim, '')
+        .replace(/^\s*(?:\*{1,2}|_)?\s*Elabore\s+\d+\s+quest(?:ão|ões)\b[^\n]*(?:\*{1,2}|_)?\s*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+
+    // A fonte de verdade das imagens pode ser o material em memória, o
+    // documento retornado diretamente do Firestore ou o Markdown com links
+    // persistidos. Reunir as três fontes impede que uma atualização da tela
+    // deixe o relatório sem as figuras já armazenadas na nuvem.
+    function collectPersistedReportFigures(...sources) {
+      const figuresByUrl = new Map();
+      const addFigure = (image, index = 0) => {
+        const url = String(image?.imageUrl || image?.thumbnailUrl || image?.src || '').trim();
+        if (!/^https?:\/\//i.test(url)) return;
+        const current = figuresByUrl.get(url);
+        const next = {
+          id: image?.id || current?.id || `figura-${figuresByUrl.size + 1}`,
+          url,
+          description: String(image?.clinicalLabel || image?.title || current?.description || `Figura ${index + 1} do material`).trim(),
+          page: Number(image?.page) || current?.page || null,
+          association: String(image?.visualAssociation || current?.association || '').trim()
+        };
+        figuresByUrl.set(url, next);
+      };
+
+      sources.filter(Boolean).forEach(source => {
+        const sourceImages = [
+          ...(Array.isArray(source?.clinicalImages) ? source.clinicalImages : []),
+          ...(Array.isArray(source?.figuras_clinicas) ? source.figuras_clinicas : [])
+        ];
+        sourceImages.forEach(addFigure);
+        [source?.material_md, source?.conteudo_md, source?.markdownText, source?.text, source?.texto, source?.content]
+          .filter(value => typeof value === 'string' && value.trim())
+          .forEach(text => extractPersistedImagesFromMarkdown(text).forEach(addFigure));
+      });
+
+      return [...figuresByUrl.values()];
+    }
+
+    function removeInternalReportAuthoringInstructions(html) {
+      return String(html || '')
+        .replace(/<p\b[^>]*>\s*<em>\s*Elabore\s+\d+\s+quest(?:ão|ões)\b[\s\S]*?<\/em>\s*<\/p>/gi, '')
+        .replace(/<p\b[^>]*>\s*Elabore\s+\d+\s+quest(?:ão|ões)\b[\s\S]*?<\/p>/gi, '');
+    }
+
     function normalizeMaterial(m) {
       if (!m || typeof m !== 'object') return m;
       const effectiveName = m.name || m.nome || m.originalFileName || 'Aula Médica';
@@ -8215,15 +8268,7 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
         const effectiveSubject = subjectName || mat?.subject || mat?.disciplina || currentStudySubject || 'Clínica Médica';
         const effectiveTitle = mat?.name || mat?.nome || materialName || effectiveSubject;
         const diseaseTopic = mat?.disease || mat?.doenca || mat?.topic || mat?.materia || effectiveTitle.replace(/\.[^/.]+$/, '');
-        const reportFigures = (Array.isArray(mat?.clinicalImages) ? mat.clinicalImages : [])
-          .map((image, index) => ({
-            id: image?.id || `figura-${index + 1}`,
-            url: image?.imageUrl || image?.thumbnailUrl || image?.src || '',
-            description: image?.clinicalLabel || image?.title || `Figura ${index + 1} do material`,
-            page: Number(image?.page) || null,
-            association: image?.visualAssociation || ''
-          }))
-          .filter(figure => /^https?:\/\//i.test(figure.url));
+        let reportFigures = collectPersistedReportFigures(mat);
 
         // Só relatórios explicitamente solicitados para uma disciplina podem reunir
         // fontes. Um PDF/slide escolhido nunca pode herdar o texto de outro arquivo.
@@ -8232,11 +8277,12 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
           ? getMaterialsForSubject(effectiveSubject)
           : [];
         let materialContent = typeof validatedText === 'string' ? validatedText.trim() : '';
+        let authoritativeMaterial = null;
         if (!materialContent && typeof MedTutorFirebaseService !== 'undefined') {
-          const authoritative = isIndividualMaterialRequest
+          authoritativeMaterial = isIndividualMaterialRequest
             ? await MedTutorFirebaseService.getAuthoritativeMaterialText(materialId || mat?.id || effectiveTitle, effectiveSubject)
             : await MedTutorFirebaseService.getAuthoritativeSubjectText(effectiveSubject);
-          materialContent = String(authoritative?.text || '').trim();
+          materialContent = String(authoritativeMaterial?.text || '').trim();
         }
         if (materialContent.length < 500 || isSyntheticDriveSummary(materialContent)) {
           throw new Error('O relatório não foi emitido porque o Firestore não possui texto clínico válido e suficiente para este material. Reimporte o arquivo original ou envie um PDF com texto selecionável.');
@@ -8248,6 +8294,12 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
             return `### ${mTitle}\n\n${mText}`;
           }).join('\n\n---\n\n');
         }
+        reportFigures = collectPersistedReportFigures(mat, authoritativeMaterial?.data, { markdownText: materialContent });
+        console.info('[Relatório MedTutor] Figuras recuperadas do material', {
+          arquivo: effectiveTitle,
+          figuras: reportFigures.length,
+          fonte: authoritativeMaterial?.source || (mat ? 'memória' : 'texto validado')
+        });
 
         const sourceIdentity = [
           `ARQUIVO-FONTE EXCLUSIVO: ${effectiveTitle}`,
@@ -8527,6 +8579,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         // A figura é parte do material de estudo, não uma sugestão opcional do
         // modelo. Incluímos o anexo visual diretamente no HTML para garantir
         // que relatórios também exibam imagens quando o Gemini não as citar.
+        reportData.html = removeInternalReportAuthoringInstructions(reportData.html);
         if (reportFigures.length) {
           reportData.html = `${reportData.html}${this.renderMaterialFiguresHtml(reportFigures)}`;
           reportData.markdown = `${reportData.markdown || ''}\n\n${this.renderMaterialFiguresMarkdown(reportFigures)}`;
@@ -8586,7 +8639,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         else if (isPed) guidelinesOrg = 'Sociedade Brasileira de Pediatria (SBP)';
 
         // Limpeza rigorosa de artefatos de quebra e cabeçalhos redundantes gerados pela IA no início do texto
-        let cleanMd = removeUnresolvedImageArtifacts(markdownText)
+        let cleanMd = normalizeMaterialMarkdownForReport(markdownText)
           .replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')
           .replace(/<\/?br\s*[/]?>/gi, '\n')
           .replace(/<p\s*[/]?>/gi, '\n')
@@ -8746,7 +8799,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             <div class="academic-section">
               <h2>Explicação Didática Aprofundada & Desdobramento dos Conteúdos da Aula</h2>
               <div class="academic-material-unpacked" style="background: rgba(0, 229, 255, 0.03); border-left: 4px solid var(--neon-cyan, #00e5ff); padding: 18px 24px; border-radius: 0 10px 10px 0; margin-bottom: 24px; font-size: 14px; line-height: 1.75; color: #1e293b;">
-                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(removeUnresolvedImageArtifacts(materialContent)) : escapeHtml(removeUnresolvedImageArtifacts(materialContent)).replace(/\n/g, '<br>')}
+                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(normalizeMaterialMarkdownForReport(materialContent)) : escapeHtml(normalizeMaterialMarkdownForReport(materialContent)).replace(/\n/g, '<br>')}
               </div>
             </div>
           `
@@ -10031,7 +10084,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             <div class="academic-section">
               <h2>2. Explicação Didática Aprofundada & Desdobramento dos Conteúdos da Aula</h2>
               <div class="academic-material-unpacked" style="background: rgba(0, 229, 255, 0.03); border-left: 4px solid var(--neon-cyan, #00e5ff); padding: 18px 24px; border-radius: 0 10px 10px 0; margin-bottom: 24px; font-size: 14px; line-height: 1.75; color: #1e293b;">
-                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(removeUnresolvedImageArtifacts(materialContent)) : escapeHtml(removeUnresolvedImageArtifacts(materialContent)).replace(/\n/g, '<br>')}
+                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(normalizeMaterialMarkdownForReport(materialContent)) : escapeHtml(normalizeMaterialMarkdownForReport(materialContent)).replace(/\n/g, '<br>')}
               </div>
             </div>
 
@@ -21183,6 +21236,15 @@ Para cada material, retorne um objeto no JSON com:
           if (rows.length >= 2) {
             if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
             const columnCount = Math.max(...rows.map(row => row.length));
+            const isConsistentTable = columnCount >= 2 && rows.every(row => row.length === columnCount && row.filter(Boolean).length >= 2);
+            if (!isConsistentTable) {
+              // Linhas com barras isoladas surgem frequentemente na extração de
+              // PDF/PPTX. Não as trate como tabela: ela cria colunas vazias e
+              // uma faixa estreita ilegível no PDF.
+              html += rows.map(row => `<p class="gemini-p">${formatInlineMd(row.filter(Boolean).join(' • '))}</p>`).join('');
+              i = cursor;
+              continue;
+            }
             const rowsHtml = rows.map(row => {
               const normalized = [...row];
               while (normalized.length < columnCount) normalized.push('');
