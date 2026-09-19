@@ -32,6 +32,28 @@ function getReportEngineLabel(provider, model) {
   return `Gemini ${safeModel}`;
 }
 
+function getGeminiReportCandidateModels() {
+  // Configurações antigas podem apontar para modelos removidos. Mantemos os
+  // valores do ambiente como prioridade, mas sempre oferecemos alternativas
+  // estáveis para que a contingência não morra em um único 404.
+  return [...new Set([
+    'gemini-3.7-flash',
+    process.env.REPORT_GEMINI_MODEL,
+    process.env.MODEL_REASONING,
+    process.env.MODEL_BALANCED,
+    process.env.MODEL_FAST,
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
+  ].map(model => String(model || '').trim()).filter(Boolean))];
+}
+
+function canTryNextGeminiModel(error) {
+  const status = Number(error?.status || error?.statusCode || 0);
+  const message = String(error?.message || '').toLowerCase();
+  return status === 404 || /model(?:s)?\/.+not found|model.+not found|not supported for generatecontent|unsupported model/.test(message);
+}
+
 class RelatoriosService {
   /**
    * @param {Object} options
@@ -179,22 +201,39 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
     try {
       let generatedMarkdown = '';
       let generatorEngine = 'gemini';
-      let generatorModel = process.env.MODEL_REASONING || 'gemini-3.7-flash';
+      let generatorModel = getGeminiReportCandidateModels()[0] || 'gemini-2.5-flash';
       let usage = { inputTokens: 0, outputTokens: 0 };
 
       const generateWithGemini = async () => {
         const genAI = getGenAI();
-        const model = genAI.getGenerativeModel({
-          model: generatorModel,
-          systemInstruction,
-          generationConfig: {
-            temperature: 0.2,
-            topP: 0.8,
-            maxOutputTokens: 65536
+        const candidates = getGeminiReportCandidateModels();
+        let lastError = null;
+        for (let index = 0; index < candidates.length; index += 1) {
+          const candidate = candidates[index];
+          try {
+            generatorModel = candidate;
+            const model = genAI.getGenerativeModel({
+              model: candidate,
+              systemInstruction,
+              generationConfig: {
+                temperature: 0.2,
+                topP: 0.8,
+                maxOutputTokens: 65536
+              }
+            });
+            const result = await runWithAiLimit(() => model.generateContent(prompt));
+            return result.response.text();
+          } catch (geminiModelError) {
+            lastError = geminiModelError;
+            const hasNext = index < candidates.length - 1;
+            if (!hasNext || !canTryNextGeminiModel(geminiModelError)) throw geminiModelError;
+            console.warn(`⚠️ [Relatórios] Modelo Gemini "${candidate}" indisponível; tentando "${candidates[index + 1]}".`, {
+              code: geminiModelError?.code || geminiModelError?.type || 'gemini-model-unavailable',
+              status: geminiModelError?.status || geminiModelError?.statusCode || null
+            });
           }
-        });
-        const result = await runWithAiLimit(() => model.generateContent(prompt));
-        return result.response.text();
+        }
+        throw lastError || new Error('Nenhum modelo Gemini compatível está disponível para o relatório.');
       };
 
       if (requestedProvider === 'openai') {
@@ -350,3 +389,4 @@ module.exports = relatoriosServiceInstance;
 module.exports.RelatoriosService = RelatoriosService;
 module.exports.default = relatoriosServiceInstance;
 module.exports.getReportEngineLabel = getReportEngineLabel;
+module.exports.getGeminiReportCandidateModels = getGeminiReportCandidateModels;

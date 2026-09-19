@@ -4645,8 +4645,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     function showToast(msg) {
       const t = document.getElementById('toast');
       document.getElementById('toastMsg').textContent = msg;
+      t.classList.remove('is-leaving');
       t.classList.add('visible');
-      setTimeout(() => t.classList.remove('visible'), 3200);
+      setTimeout(() => {
+        t.classList.add('is-leaving');
+        setTimeout(() => t.classList.remove('visible', 'is-leaving'), 180);
+      }, 3200);
     }
 
     // Feedback único para chamadas feitas pelo estudante. O diagnóstico guarda
@@ -4679,6 +4683,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const supportBtn = document.getElementById('requestFeedbackSupport');
         if (!icon || !titleEl || !messageEl || !supportBtn) return;
         window.clearTimeout(this.hideTimer);
+        panel.classList.remove('is-leaving');
         panel.classList.toggle('is-error', state === 'error');
         panel.classList.toggle('is-success', state === 'success');
         panel.classList.add('visible');
@@ -4733,7 +4738,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
       dismiss() {
         const panel = document.getElementById('requestFeedback');
-        if (panel) panel.classList.remove('visible', 'is-error', 'is-success');
+        if (!panel || !panel.classList.contains('visible')) return;
+        panel.classList.add('is-leaving');
+        window.setTimeout(() => panel.classList.remove('visible', 'is-error', 'is-success', 'is-leaving'), 220);
       },
 
       getSupportReport(studentMessage = '') {
