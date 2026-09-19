@@ -8342,12 +8342,24 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
         let aiGeneratedArticle = null;
         let pedagogicalData = null;
         let serverGenerationAttempted = false;
+        const formatReportEngineLabel = (provider, model) => {
+          const safeModel = String(model || 'modelo não informado').trim();
+          if (provider === 'openai') return `ChatGPT ${safeModel}`;
+          if (provider === 'gemini-fallback') return `Gemini ${safeModel} (contingência)`;
+          return `Gemini ${safeModel}`;
+        };
 
         // A geração oficial é feita pelo endpoint local: a chave permanece no
         // ambiente do servidor e o provedor é controlado por REPORT_AI_PROVIDER.
         if (!forceLocal && materialContent.trim().length >= 80) {
           try {
             serverGenerationAttempted = true;
+            console.info('[Relatório MedTutor] Solicitando geração ao motor configurado no servidor...', {
+              arquivo: effectiveTitle,
+              disciplina: effectiveSubject,
+              caracteresFonte: materialContent.length,
+              figuras: reportFigures.length
+            });
             const serverResponse = await fetch('/api/relatorios/gerar', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -8365,12 +8377,15 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
               const serverReport = await serverResponse.json();
               if (serverReport?.markdown && serverReport.markdown.length > 200) {
                 aiGeneratedArticle = serverReport.markdown;
+                const reportEngineLabel = formatReportEngineLabel(serverReport.generatorEngine, serverReport.generatorModel);
+                console.info(`✅ [Relatório MedTutor] Relatório gerado com ${reportEngineLabel} com sucesso.`, {
+                  arquivo: effectiveTitle,
+                  motor: serverReport.generatorEngine || 'não informado',
+                  modelo: serverReport.generatorModel || 'não informado',
+                  entradaTokens: Number(serverReport.usage?.inputTokens) || 0,
+                  saidaTokens: Number(serverReport.usage?.outputTokens) || 0
+                });
                 if (typeof AppExpenseTracker !== 'undefined') {
-                  const reportEngineLabel = serverReport.generatorEngine === 'openai'
-                    ? 'OpenAI via servidor local'
-                    : serverReport.generatorEngine === 'gemini-fallback'
-                      ? 'Gemini via servidor local (contingência)'
-                      : 'Gemini via servidor local';
                   AppExpenseTracker.recordAction({
                     actionName: `Tratado Acadêmico: ${effectiveTitle}`,
                     model: serverReport.generatorModel || reportEngineLabel,
@@ -8387,10 +8402,23 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
                 }
               }
             } else {
-              console.warn('[AcademicReportAgent] Backend de relatórios respondeu', serverResponse.status);
+              const failure = await serverResponse.json().catch(() => ({}));
+              const diagnostic = {
+                status: serverResponse.status,
+                provider: failure?.provider || 'não informado',
+                model: failure?.model || 'não informado',
+                code: failure?.code || 'report-generation-failed',
+                details: failure?.details || failure?.error || 'O servidor não informou o motivo.'
+              };
+              console.error(`❌ [Relatório MedTutor] Relatório gerado com ${formatReportEngineLabel(diagnostic.provider, diagnostic.model)} falhou.`, diagnostic);
+              throw new Error(`O motor ${diagnostic.provider} (${diagnostic.model}) não concluiu o relatório: ${diagnostic.details}`);
             }
           } catch (serverError) {
             console.warn('[AcademicReportAgent] Backend de relatórios indisponível:', serverError);
+            // O relatório local contém modelos estáticos e não deve substituir
+            // silenciosamente uma falha da IA oficial; isso mascara o erro e
+            // recria seções genéricas que não pertencem ao material enviado.
+            throw serverError;
           }
         }
 
@@ -21287,7 +21315,13 @@ Para cada material, retorne um objeto no JSON com:
               rowCells = [...rowCells.slice(0, headerCells.length - 1), rowCells.slice(headerCells.length - 1).join(' | ')];
             }
             while (rowCells.length < headerCells.length) rowCells.push('');
-            rowsHtml += '<tr>' + rowCells.map(c => '<td>' + formatInlineMd(c) + '</td>').join('') + '</tr>';
+            const populatedCells = rowCells.filter(cell => cell.trim());
+            // Extrações de slides frequentemente preservam o cabeçalho da
+            // tabela, mas quebram o conteúdo em uma só célula. Em vez de
+            // deixar as demais colunas vazias, ocupa a linha inteira.
+            rowsHtml += populatedCells.length < Math.min(2, headerCells.length)
+              ? `<tr><td class="doc-table-full-row" colspan="${headerCells.length}">${formatInlineMd(populatedCells.join(' • '))}</td></tr>`
+              : '<tr>' + rowCells.map(c => '<td>' + formatInlineMd(c) + '</td>').join('') + '</tr>';
             i++;
           }
           html += `

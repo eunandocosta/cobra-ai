@@ -11,7 +11,20 @@ class RelatoriosController {
       const report = await relatoriosService.generateReport(payload);
       return res.json(report);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao gerar relatório', details: err.message });
+      const upstreamStatus = Number(err?.status || err?.statusCode || 0);
+      const status = upstreamStatus >= 400 && upstreamStatus < 600 ? 502 : 500;
+      const diagnostic = {
+        provider: err?.provider || String(process.env.REPORT_AI_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'gemini')).toLowerCase(),
+        model: err?.model || (process.env.OPENAI_REPORT_MODEL || process.env.MODEL_REASONING || 'não informado'),
+        code: String(err?.code || err?.type || 'report-generation-failed'),
+        upstreamStatus: upstreamStatus || null
+      };
+      console.error('❌ [RelatoriosController] Falha ao gerar relatório:', { ...diagnostic, message: err?.message });
+      return res.status(status).json({
+        error: 'Erro ao gerar relatório',
+        details: err?.message || 'O provedor de IA não concluiu a geração.',
+        ...diagnostic
+      });
     }
   }
 

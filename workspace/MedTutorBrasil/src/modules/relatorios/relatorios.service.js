@@ -25,6 +25,13 @@ function getReportProvider() {
   return process.env.OPENAI_API_KEY ? 'openai' : 'gemini';
 }
 
+function getReportEngineLabel(provider, model) {
+  const safeModel = String(model || 'modelo não informado').trim();
+  if (provider === 'openai') return `ChatGPT ${safeModel}`;
+  if (provider === 'gemini-fallback') return `Gemini ${safeModel} (contingência)`;
+  return `Gemini ${safeModel}`;
+}
+
 class RelatoriosService {
   /**
    * @param {Object} options
@@ -85,6 +92,24 @@ class RelatoriosService {
     const cleanSubject = (subject || 'Clínica Médica').trim();
     const author = (studentName || 'Estudante de Medicina').trim();
     const institution = (medicalSchool || 'Faculdade de Medicina').trim();
+    const requestedProvider = getReportProvider();
+    if (!['openai', 'gemini'].includes(requestedProvider)) {
+      const configError = new Error(`REPORT_AI_PROVIDER inválido: "${requestedProvider}". Use "openai" ou "gemini".`);
+      configError.code = 'invalid-report-provider';
+      configError.provider = requestedProvider;
+      throw configError;
+    }
+    const requestedModel = requestedProvider === 'openai'
+      ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5')
+      : (process.env.MODEL_REASONING || 'gemini-3.7-flash');
+    console.info(`🧠 [Relatórios] Utilizando ${getReportEngineLabel(requestedProvider, requestedModel)} para gerar este relatório.`, {
+      arquivo: cleanTitle,
+      disciplina: cleanSubject,
+      provider: requestedProvider,
+      model: requestedModel,
+      caracteresFonte: content.length,
+      figuras: Array.isArray(figures) ? figures.length : 0
+    });
 
     // 1. Constrói o catálogo de figuras autorizadas para ilustração
     let figuresCatalogText = 'Nenhuma figura recortada disponível no material.';
@@ -172,7 +197,7 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
         return result.response.text();
       };
 
-      if (getReportProvider() === 'openai') {
+      if (requestedProvider === 'openai') {
         generatorEngine = 'openai';
         generatorModel = process.env.OPENAI_REPORT_MODEL || 'gpt-5';
         try {
@@ -231,11 +256,33 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
         await this.repository.save(reportData);
       }
 
+      console.info(`✅ [Relatórios] Relatório gerado com ${getReportEngineLabel(generatorEngine, generatorModel)} com sucesso.`, {
+        arquivo: cleanTitle,
+        provider: generatorEngine,
+        model: generatorModel,
+        caracteresGerados: generatedMarkdown.length,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens
+      });
+
       return reportData;
 
     } catch (error) {
-      console.error('❌ [RelatoriosService] Falha na geração do tratado acadêmico:', error);
-      throw new Error(`Erro ao gerar o relatório acadêmico via IA: ${error.message}`);
+      console.error(`❌ [Relatórios] Relatório gerado com ${getReportEngineLabel(requestedProvider, requestedProvider === 'openai' ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5') : (process.env.MODEL_REASONING || 'gemini-3.7-flash'))} falhou.`, {
+        arquivo: cleanTitle,
+        provider: requestedProvider,
+        code: error?.code || error?.type || 'report-generation-failed',
+        status: error?.status || error?.statusCode || null,
+        motivo: error?.message || 'erro não informado'
+      });
+      const reportError = new Error(`Erro ao gerar o relatório acadêmico via IA: ${error.message}`);
+      reportError.code = error?.code || error?.type || 'report-generation-failed';
+      reportError.status = Number(error?.status || error?.statusCode || 0) || undefined;
+      reportError.provider = requestedProvider;
+      reportError.model = requestedProvider === 'openai'
+        ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5')
+        : (process.env.MODEL_REASONING || 'gemini-3.7-flash');
+      throw reportError;
     }
   }
 
@@ -291,3 +338,4 @@ const relatoriosServiceInstance = new RelatoriosService();
 module.exports = relatoriosServiceInstance;
 module.exports.RelatoriosService = RelatoriosService;
 module.exports.default = relatoriosServiceInstance;
+module.exports.getReportEngineLabel = getReportEngineLabel;

@@ -4069,6 +4069,11 @@
         width: 100% !important;
       }
 
+      .academic-material-unpacked .doc-table .doc-table-full-row {
+        width: 100% !important;
+        text-align: left !important;
+      }
+
       .academic-article-container .doc-table th,
       .doc-table th,
       table:not(.abnt-header-table) th {
