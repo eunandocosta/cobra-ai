@@ -4649,6 +4649,167 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       setTimeout(() => t.classList.remove('visible'), 3200);
     }
 
+    // Feedback único para chamadas feitas pelo estudante. O diagnóstico guarda
+    // somente metadados técnicos (rota, status e horário), nunca conteúdo de
+    // aula, respostas, e-mail ou chaves de API.
+    const AppRequestFeedback = {
+      active: 0,
+      sequence: 0,
+      hideTimer: null,
+      last: null,
+
+      describePath(pathname) {
+        const paths = {
+          '/api/relatorios/gerar': 'Gerando relatório',
+          '/api/quizzes/gerar': 'Gerando questões',
+          '/api/chat/mensagem': 'Gerando resposta do chat',
+          '/api/chat/evidencias': 'Consultando evidências científicas',
+          '/api/ementas/classificar-material': 'Analisando e classificando material',
+          '/api/drive': 'Processando material do Drive'
+        };
+        return paths[pathname] || 'Processando solicitação';
+      },
+
+      render({ state = 'working', title, message, showSupport = false }) {
+        const panel = document.getElementById('requestFeedback');
+        if (!panel) return;
+        const icon = document.getElementById('requestFeedbackIcon');
+        const titleEl = document.getElementById('requestFeedbackTitle');
+        const messageEl = document.getElementById('requestFeedbackMessage');
+        const supportBtn = document.getElementById('requestFeedbackSupport');
+        if (!icon || !titleEl || !messageEl || !supportBtn) return;
+        window.clearTimeout(this.hideTimer);
+        panel.classList.toggle('is-error', state === 'error');
+        panel.classList.toggle('is-success', state === 'success');
+        panel.classList.add('visible');
+        icon.textContent = state === 'error' ? '⚠️' : state === 'success' ? '✓' : '⏳';
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        supportBtn.hidden = !showSupport;
+        if (state === 'success') this.hideTimer = window.setTimeout(() => this.dismiss(), 3200);
+      },
+
+      start(url, method) {
+        const requestId = `REQ-${Date.now().toString(36).toUpperCase()}-${(++this.sequence).toString().padStart(2, '0')}`;
+        this.active += 1;
+        const route = this.describePath(url.pathname);
+        this.last = { requestId, route, endpoint: url.pathname, method, status: 'em andamento', at: new Date().toISOString(), error: '' };
+        this.render({ state: 'working', title: route, message: `Solicitação ${requestId} em andamento.` });
+        return requestId;
+      },
+
+      finish(requestId, url, method, response) {
+        this.active = Math.max(0, this.active - 1);
+        const ok = Boolean(response?.ok);
+        const status = Number(response?.status) || 0;
+        this.last = {
+          requestId,
+          route: this.describePath(url.pathname),
+          endpoint: url.pathname,
+          method,
+          status: ok ? `concluída (HTTP ${status})` : `falhou (HTTP ${status || 'sem resposta'})`,
+          at: new Date().toISOString(),
+          error: ok ? '' : `HTTP ${status || 'sem resposta'}`
+        };
+        if (this.active > 0) return;
+        this.render(ok
+          ? { state: 'success', title: 'Solicitação concluída', message: `${this.last.route} finalizada com sucesso.` }
+          : { state: 'error', title: 'Não foi possível concluir a solicitação', message: `${this.last.route} retornou HTTP ${status || 'sem resposta'}.`, showSupport: true });
+      },
+
+      fail(requestId, url, method, error) {
+        this.active = Math.max(0, this.active - 1);
+        this.last = {
+          requestId,
+          route: this.describePath(url.pathname),
+          endpoint: url.pathname,
+          method,
+          status: 'falhou sem resposta do servidor',
+          at: new Date().toISOString(),
+          error: String(error?.message || error || 'Erro de rede').slice(0, 400)
+        };
+        if (this.active === 0) this.render({ state: 'error', title: 'Falha de conexão', message: `${this.last.route} não recebeu resposta do servidor.`, showSupport: true });
+      },
+
+      dismiss() {
+        const panel = document.getElementById('requestFeedback');
+        if (panel) panel.classList.remove('visible', 'is-error', 'is-success');
+      },
+
+      getSupportReport(studentMessage = '') {
+        const last = this.last;
+        return [
+          'RELATÓRIO DE SUPORTE — MedTutor Brasil',
+          `Horário: ${new Date().toISOString()}`,
+          `Tela: ${currentTab || 'não informada'}`,
+          `Descrição do estudante: ${String(studentMessage || 'não informada').trim() || 'não informada'}`,
+          '',
+          'ÚLTIMA SOLICITAÇÃO TÉCNICA:',
+          last ? `Código: ${last.requestId}\nAção: ${last.route}\nRota: ${last.method} ${last.endpoint}\nEstado: ${last.status}\nHorário: ${last.at}\nErro: ${last.error || 'nenhum'}` : 'Nenhuma solicitação de API registrada nesta sessão.',
+          '',
+          'Privacidade: este relatório não contém conteúdo de aula, respostas do chat ou chaves de API.'
+        ].join('\n');
+      }
+    };
+
+    function dismissRequestFeedback() {
+      AppRequestFeedback.dismiss();
+    }
+
+    function openSupportModal() {
+      const modal = document.getElementById('supportModal');
+      const diagnostic = document.getElementById('supportDiagnostic');
+      if (!modal || !diagnostic) return;
+      diagnostic.textContent = AppRequestFeedback.getSupportReport(document.getElementById('supportMessage')?.value || '');
+      modal.classList.add('active');
+    }
+
+    async function copySupportReport() {
+      const message = document.getElementById('supportMessage')?.value || '';
+      const report = AppRequestFeedback.getSupportReport(message);
+      const diagnostic = document.getElementById('supportDiagnostic');
+      if (diagnostic) diagnostic.textContent = report;
+      try {
+        await navigator.clipboard.writeText(report);
+        showToast('✅ Relatório técnico copiado. Envie-o para o suporte do MedTutor.');
+      } catch (_) {
+        const fallback = document.createElement('textarea');
+        fallback.value = report;
+        fallback.style.position = 'fixed';
+        fallback.style.opacity = '0';
+        document.body.appendChild(fallback);
+        fallback.select();
+        document.execCommand('copy');
+        fallback.remove();
+        showToast('✅ Relatório técnico copiado. Envie-o para o suporte do MedTutor.');
+      }
+    }
+
+    function installRequestFeedbackMonitor() {
+      if (window.__medTutorRequestFeedbackInstalled || typeof window.fetch !== 'function') return;
+      window.__medTutorRequestFeedbackInstalled = true;
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = async (input, init = {}) => {
+        const rawUrl = typeof input === 'string' ? input : input?.url;
+        let url;
+        try { url = new URL(rawUrl, window.location.origin); } catch (_) { return nativeFetch(input, init); }
+        const isAppApi = url.origin === window.location.origin && url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/diagnostics/');
+        if (!isAppApi) return nativeFetch(input, init);
+        const method = String(init?.method || input?.method || 'GET').toUpperCase();
+        const requestId = AppRequestFeedback.start(url, method);
+        try {
+          const response = await nativeFetch(input, init);
+          AppRequestFeedback.finish(requestId, url, method, response);
+          return response;
+        } catch (error) {
+          AppRequestFeedback.fail(requestId, url, method, error);
+          throw error;
+        }
+      };
+    }
+
+    installRequestFeedbackMonitor();
+
     // 4. Algoritmo Matemático Local de Redundância (Sem IA - Custo R$ 0,00)
     const PT_STOPWORDS = new Set([
       'a', 'o', 'as', 'os', 'um', 'uma', 'uns', 'umas',

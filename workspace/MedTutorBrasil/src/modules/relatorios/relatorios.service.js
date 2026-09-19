@@ -218,12 +218,23 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
             outputTokens: Number(response.usage?.output_tokens) || 0
           };
         } catch (openaiError) {
-          const allowGeminiFallback = String(process.env.REPORT_ALLOW_GEMINI_FALLBACK || '').toLowerCase() === 'true';
-          if (!allowGeminiFallback || !process.env.GEMINI_API_KEY) throw openaiError;
-          console.warn('[RelatoriosService] OpenAI indisponível; usando Gemini como contingência.', openaiError.message);
+          if (!process.env.GEMINI_API_KEY) throw openaiError;
+          console.warn(`⚠️ [Relatórios] ${getReportEngineLabel('openai', generatorModel)} falhou; utilizando Gemini como contingência.`, {
+            arquivo: cleanTitle,
+            code: openaiError?.code || openaiError?.type || 'openai-failed',
+            status: openaiError?.status || openaiError?.statusCode || null,
+            motivo: openaiError?.message || 'erro não informado'
+          });
           generatorEngine = 'gemini-fallback';
           generatorModel = process.env.MODEL_REASONING || 'gemini-3.7-flash';
-          generatedMarkdown = await generateWithGemini();
+          try {
+            generatedMarkdown = await generateWithGemini();
+          } catch (geminiError) {
+            const fallbackError = new Error(`ChatGPT falhou (${openaiError?.message || 'erro não informado'}) e o Gemini de contingência também falhou (${geminiError?.message || 'erro não informado'}).`);
+            fallbackError.code = geminiError?.code || geminiError?.type || 'gemini-fallback-failed';
+            fallbackError.status = geminiError?.status || geminiError?.statusCode;
+            throw fallbackError;
+          }
         }
       } else {
         generatedMarkdown = await generateWithGemini();

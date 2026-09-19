@@ -100,6 +100,10 @@
           <button class="btn-help-icon" onclick="openCurrentTabHelp()" title="Ajuda sobre esta tela">
             ?
           </button>
+          <button class="btn-outline-action support-topbar-btn" onclick="openSupportModal()" title="Abrir suporte e copiar diagnóstico da última solicitação">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v4a3 3 0 0 1-3 3h-2l-3 3v-3H9a3 3 0 0 1-3-3z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
+            <span>Suporte</span>
+          </button>
           <button class="btn-outline-action" onclick="toggleTheme()" title="Alternar Dia/Noite">
             <svg class="icon" id="themeIcon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             <span id="themeLabel">Noite</span>
@@ -843,6 +847,30 @@
         <button class="btn-outline-action primary" onclick="closeModals()">
           Entendi
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       SUPORTE: relatório técnico sem conteúdo médico ou chaves
+       ========================================================= -->
+  <div class="modal-overlay" id="supportModal" onclick="closeModals(event)">
+    <div class="modal-window support-modal-window" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="support-modal-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v4a3 3 0 0 1-3 3h-2l-3 3v-3H9a3 3 0 0 1-3-3z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg></div>
+          <h2>Suporte MedTutor</h2>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <p class="support-modal-copy">Descreva o que aconteceu. O relatório técnico abaixo não inclui textos de aulas, respostas nem chaves de IA.</p>
+      <label class="support-modal-label" for="supportMessage">O que você tentou fazer?</label>
+      <textarea id="supportMessage" rows="4" maxlength="3000" placeholder="Ex.: tentei gerar o relatório da aula X e a solicitação falhou."></textarea>
+      <label class="support-modal-label" for="supportDiagnostic">Diagnóstico técnico</label>
+      <pre id="supportDiagnostic" class="support-diagnostic" aria-live="polite">Nenhuma solicitação registrada nesta sessão.</pre>
+      <div class="support-modal-actions">
+        <button class="btn-outline-action" type="button" onclick="closeModals()">Fechar</button>
+        <button class="btn-outline-action primary" type="button" onclick="copySupportReport()"><svg class="icon" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg> Copiar para suporte</button>
       </div>
     </div>
   </div>
@@ -2322,6 +2350,16 @@
     <span id="toastMsg">Mensagem</span>
   </div>
 
+  <div id="requestFeedback" class="request-feedback" aria-live="polite" aria-atomic="true">
+    <div class="request-feedback-icon" id="requestFeedbackIcon">⏳</div>
+    <div class="request-feedback-content">
+      <strong id="requestFeedbackTitle">Solicitação em andamento</strong>
+      <span id="requestFeedbackMessage">Aguarde enquanto o MedTutor processa sua solicitação.</span>
+    </div>
+    <button id="requestFeedbackSupport" class="request-feedback-support" type="button" onclick="openSupportModal()" hidden>Suporte</button>
+    <button class="request-feedback-close" type="button" onclick="dismissRequestFeedback()" aria-label="Fechar aviso">×</button>
+  </div>
+
   <!-- =========================================================
        MODAL DE CONFIRMAÇÃO & STEPPER ANIMADO DE UPLOAD
        ========================================================= -->
@@ -2692,7 +2730,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260919-relatorio-motor-v1"></script>
+  <script defer src="/app.min.js?v=20260919-suporte-feedback-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
