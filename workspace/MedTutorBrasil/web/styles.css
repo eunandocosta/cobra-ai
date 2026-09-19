@@ -3902,7 +3902,9 @@
 
       .academic-section {
         margin-bottom: 14pt !important;
-        page-break-inside: avoid !important;
+        /* Seções extensas precisam continuar na página seguinte; impedir a
+           quebra aqui criava páginas quase vazias na exportação. */
+        page-break-inside: auto !important;
       }
 
       .academic-section h2, .academic-article-container .gemini-h2 {
@@ -3951,8 +3953,31 @@
         font-size: 11pt !important;
         line-height: 1.5 !important;
         margin-bottom: 7pt !important;
-        text-align: justify !important;
-        text-indent: 1.25cm !important;
+        text-align: left !important;
+        text-indent: 0 !important;
+        hyphens: none !important;
+        overflow-wrap: normal !important;
+      }
+
+      /* Texto extraído de slides frequentemente chega como blockquote. No
+         relatório ele é conteúdo principal, não citação longa: use toda a
+         largura disponível e elimine a faixa/coluna estreita. */
+      .academic-material-unpacked {
+        background: transparent !important;
+        border-left: 0 !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin-bottom: 12pt !important;
+      }
+
+      .academic-material-unpacked blockquote,
+      .academic-material-unpacked .gemini-quote {
+        margin: 0 0 7pt 0 !important;
+        padding: 0 !important;
+        border-left: 0 !important;
+        font-size: 11pt !important;
+        line-height: 1.5 !important;
+        text-align: left !important;
       }
 
       /* RESET EXPLÍCITO DE TEXT-INDENT EM ELEMENTOS ESTRUTURAIS NA IMPRESSÃO */
@@ -4117,7 +4142,9 @@
         border-left: 3pt solid #0284c7 !important;
         padding: 8pt 10pt !important;
         margin: 10pt 0 14pt 0 !important;
-        page-break-inside: avoid !important;
+        /* Checkpoints podem ocupar várias páginas; manter o cartão inteiro
+           indivisível provocava espaços em branco desnecessários. */
+        page-break-inside: auto !important;
       }
 
       .checkpoint-box-header {
@@ -4311,6 +4338,31 @@
         margin-top: 6pt !important;
         text-align: justify !important;
         text-indent: 0 !important;
+      }
+
+      .material-original-figure {
+        margin: 12pt 0 !important;
+        padding: 8pt !important;
+        border: 0.75pt solid #cbd5e1 !important;
+        background: #f8fafc !important;
+        text-align: center !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      .material-original-figure img {
+        display: block !important;
+        max-width: 100% !important;
+        max-height: 9cm !important;
+        margin: 0 auto !important;
+        object-fit: contain !important;
+      }
+
+      .material-original-figure figcaption {
+        margin-top: 6pt !important;
+        font-size: 8.5pt !important;
+        line-height: 1.35 !important;
+        text-align: left !important;
       }
 
       .report-figures-section {

@@ -660,6 +660,17 @@
       return references;
     }
 
+    // Nomes internos deixados por extratores (como "preencoded.png") não são
+    // conteúdo de estudo nem figuras renderizáveis. Eles devem desaparecer do
+    // relatório até que exista uma URL HTTP(S) persistida para a imagem.
+    function removeUnresolvedImageArtifacts(markdown) {
+      return String(markdown || '')
+        .replace(/^\s*(?:[-*]\s*)?(?:preencoded|placeholder|image|imagem|figura)[\w.-]*\.(?:png|jpe?g|webp|gif|svg)\s*$/gim, '')
+        .replace(/^\s*!\[[^\]]*\]\((?!https?:\/\/)[^)]+\)\s*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+
     function normalizeMaterial(m) {
       if (!m || typeof m !== 'object') return m;
       const effectiveName = m.name || m.nome || m.originalFileName || 'Aula Médica';
@@ -4376,14 +4387,70 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       }).catch(error => console.warn('[Upload MedTutor] Não foi possível enviar o diagnóstico ao terminal:', error));
     }
 
-    async function classifyMaterialWithServerGemini(text, fileName, subjectName) {
-      const response = await fetch('/api/imagens/analisar-mapeamento-material', {
+    async function isServerGeminiAvailable() {
+      if (window.__MEDTUTOR_BACKEND_GEMINI_CONFIGURED === true) return true;
+      try {
+        const response = await fetch('/api/config');
+        const config = response.ok ? await response.json() : null;
+        const available = Boolean(config?.geminiConfigured);
+        if (available) window.__MEDTUTOR_BACKEND_GEMINI_CONFIGURED = true;
+        return available;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function getMaterialClassificationCatalog(targetSemester) {
+      let disciplines = typeof getOfficialCurriculumDisciplineList === 'function'
+        ? getOfficialCurriculumDisciplineList()
+        : [];
+      if (targetSemester) {
+        const filtered = disciplines.filter(item => matchPeriodSemester(item.period || item.fullPeriod, targetSemester));
+        if (filtered.length) disciplines = filtered;
+      }
+      return disciplines.map(item => ({
+        name: item.name,
+        period: item.period || item.fullPeriod || '',
+        cycleName: item.cycleName || item.cycle || '',
+        description: item.description || '',
+        topics: Array.isArray(item.topics) ? item.topics : []
+      }));
+    }
+
+    async function classifyMaterialWithServerGemini(text, fileName, targetSemester) {
+      const catalog = getMaterialClassificationCatalog(targetSemester);
+      if (!catalog.length) throw new Error('Não há uma grade curricular disponível para validar a disciplina do material.');
+      const response = await fetch('/api/ementas/classificar-material', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: String(text || '').slice(0, 100000), fileName, subject: subjectName || '' })
+        body: JSON.stringify({
+          content: String(text || '').slice(0, 60000),
+          materialName: String(fileName || 'Material de Aula').slice(0, 250),
+          curriculum: catalog,
+          targetSemester: targetSemester || ''
+        })
       });
-      if (!response.ok) throw new Error(`Servidor Gemini respondeu ${response.status}`);
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null);
+        throw new Error(detail?.details || detail?.error || `Servidor Gemini respondeu ${response.status}`);
+      }
       const payload = await response.json();
-      return payload?.mapping || null;
+      const matched = catalog.find(item => item.name === payload?.targetSubject);
+      if (!payload?.success || !matched) throw new Error('O servidor não retornou uma disciplina válida da grade oficial.');
+      return {
+        matchedSubject: matched.name,
+        period: matched.period || 'Período Curricular',
+        cycle: matched.cycleName || 'clinico',
+        cycleName: matched.cycleName || 'Ciclo Curricular',
+        fullName: `${matched.period || 'Período'} - ${matched.name}`,
+        suggestedTitle: payload.refinedTitle || '',
+        diseaseTopic: payload.diseaseTopic || '',
+        justification: payload.justification || 'Mapeamento validado pelo Gemini contra a grade oficial.',
+        confidencePercent: Number(payload.confidencePercent) || 0,
+        pedagogicalPhase: Number(payload.pedagogicalPhase) || 5,
+        isGeminiClassified: true,
+        classificationEngine: payload.engine || 'gemini-server',
+        classificationModel: payload.model || ''
+      };
     }
 
       /**
@@ -8494,7 +8561,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 <p>Imagens extraídas do arquivo enviado pelo estudante e preservadas como apoio visual deste relatório.</p>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
                   ${figures.map((figure, index) => `<figure style="margin:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; break-inside:avoid;">
-                    <img src="${escapeHtml(figure.url)}" alt="${escapeHtml(figure.description)}" loading="lazy" style="display:block; width:100%; max-height:360px; object-fit:contain; background:#fff; border-radius:5px;">
+                    <img src="${escapeHtml(figure.url)}" alt="${escapeHtml(figure.description)}" loading="eager" decoding="async" style="display:block; width:100%; max-height:360px; object-fit:contain; background:#fff; border-radius:5px;">
                     <figcaption style="margin-top:8px; color:#1e293b; font-size:10.5pt; line-height:1.45;"><strong>Figura ${index + 1}${figure.page ? ` — página ${figure.page}` : ''}.</strong> ${escapeHtml(figure.description)}${figure.association ? `<br><span style="color:#475569;">${escapeHtml(figure.association)}</span>` : ''}</figcaption>
                   </figure>`).join('')}
                 </div>
@@ -8519,7 +8586,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         else if (isPed) guidelinesOrg = 'Sociedade Brasileira de Pediatria (SBP)';
 
         // Limpeza rigorosa de artefatos de quebra e cabeçalhos redundantes gerados pela IA no início do texto
-        let cleanMd = markdownText
+        let cleanMd = removeUnresolvedImageArtifacts(markdownText)
           .replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')
           .replace(/<\/?br\s*[/]?>/gi, '\n')
           .replace(/<p\s*[/]?>/gi, '\n')
@@ -8679,7 +8746,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             <div class="academic-section">
               <h2>Explicação Didática Aprofundada & Desdobramento dos Conteúdos da Aula</h2>
               <div class="academic-material-unpacked" style="background: rgba(0, 229, 255, 0.03); border-left: 4px solid var(--neon-cyan, #00e5ff); padding: 18px 24px; border-radius: 0 10px 10px 0; margin-bottom: 24px; font-size: 14px; line-height: 1.75; color: #1e293b;">
-                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(materialContent) : materialContent.replace(/\n/g, '<br>')}
+                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(removeUnresolvedImageArtifacts(materialContent)) : escapeHtml(removeUnresolvedImageArtifacts(materialContent)).replace(/\n/g, '<br>')}
               </div>
             </div>
           `
@@ -9964,7 +10031,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             <div class="academic-section">
               <h2>2. Explicação Didática Aprofundada & Desdobramento dos Conteúdos da Aula</h2>
               <div class="academic-material-unpacked" style="background: rgba(0, 229, 255, 0.03); border-left: 4px solid var(--neon-cyan, #00e5ff); padding: 18px 24px; border-radius: 0 10px 10px 0; margin-bottom: 24px; font-size: 14px; line-height: 1.75; color: #1e293b;">
-                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(materialContent) : materialContent.replace(/\n/g, '<br>')}
+                ${(typeof formatAITextToHTML === 'function') ? formatAITextToHTML(removeUnresolvedImageArtifacts(materialContent)) : escapeHtml(removeUnresolvedImageArtifacts(materialContent)).replace(/\n/g, '<br>')}
               </div>
             </div>
 
@@ -10745,7 +10812,19 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       await openAcademicReportForMaterial(mat?.id || subjectName, subjectName, mat?.name || subjectName);
     }
 
-    function printAcademicReport() {
+    async function printAcademicReport() {
+      const container = document.getElementById('readerModalContent');
+      const images = container ? [...container.querySelectorAll('img[src]')] : [];
+      // Safari pode abrir o diálogo de impressão antes de imagens lazy/remotas
+      // terminarem. Aguarde cada figura, com teto para não travar o aluno.
+      const waitForImage = image => image.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener('error', resolve, { once: true });
+            window.setTimeout(resolve, 4000);
+          });
+      await Promise.all(images.map(waitForImage));
       window.print();
     }
 
@@ -11354,8 +11433,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     function saveChatDriveMaterials() {
+      let cloudSave = Promise.resolve();
       if (typeof MedTutorFirebaseService !== 'undefined') {
-        MedTutorFirebaseService.saveAllMaterials(chatDriveMaterials);
+        cloudSave = MedTutorFirebaseService.saveAllMaterials(chatDriveMaterials);
       }
       try {
         const safeSummary = chatDriveMaterials.map(m => ({
@@ -11372,6 +11452,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         }));
         localStorage.setItem('medtutor_chat_materials_summary', JSON.stringify(safeSummary));
       } catch (e) {}
+      return cloudSave;
     }
 
     function loadSharedQuestionsBank() {
@@ -15161,25 +15242,20 @@ DIRETRIZES CIRÚRGICAS:
           let analysis = null;
           let suggestedTitle = item.suggestedTitle || '';
 
-          if (apiKey) {
+          if (serverGeminiAvailable && String(item.text || '').trim().length >= 40) {
+            try {
+              analysis = await classifyMaterialWithServerGemini(item.text, item.fileName, targetSemester);
+            } catch (err) {
+              console.warn('Falha no Gemini do servidor durante mapeamento:', err);
+              analysis = null;
+            }
+          }
+          if (!analysis && apiKey) {
             try {
               analysis = await classifyAndMapMaterialWithGemini(item.text || '', item.fileName || '', null, apiKey, targetSemester);
             } catch (err) {
               console.warn('Falha na IA no pré-carregamento do item ' + item.fileName + ':', err);
               analysis = null;
-            }
-          } else if (serverGeminiAvailable && String(item.text || '').trim().length >= 40) {
-            try {
-              const mapping = await classifyMaterialWithServerGemini(item.text, item.fileName, item.defaultSubject || '');
-              analysis = classifyMedicalDocumentSemantically(item.text || '', item.fileName || '', null, targetSemester);
-              if (mapping) {
-                analysis.isGeminiClassified = true;
-                analysis.suggestedTitle = mapping.suggestedTitle || analysis.suggestedTitle;
-                analysis.diseaseTopic = mapping.diseaseTopic || analysis.diseaseTopic;
-                analysis.justification = mapping.justification || analysis.justification;
-              }
-            } catch (err) {
-              console.warn('Falha no Gemini do servidor durante mapeamento:', err);
             }
           }
 
@@ -15346,7 +15422,16 @@ DIRETRIZES CIRÚRGICAS:
 
       if (!analysis) {
         const apiKey = getGeminiApiKey();
-        if (apiKey) {
+        const serverGeminiAvailable = await isServerGeminiAvailable();
+        if (serverGeminiAvailable && String(material.text || '').trim().length >= 40) {
+          try {
+            analysis = await classifyMaterialWithServerGemini(material.text, material.fileName, targetSemester);
+          } catch (e) {
+            console.warn('Falha no mapeamento do servidor Gemini, recorrendo ao próximo motor:', e);
+            analysis = null;
+          }
+        }
+        if (!analysis && apiKey) {
           try {
             analysis = await classifyAndMapMaterialWithGemini(material.text || '', material.fileName || '', null, apiKey, targetSemester);
           } catch (e) {
@@ -21028,7 +21113,7 @@ Para cada material, retorne um objeto no JSON com:
           if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
           const alt = escapeHtml(markdownImage[1] || 'Figura do material');
           const url = escapeHtml(markdownImage[2]);
-          html += `<figure class="material-original-figure"><img src="${url}" alt="${alt}" loading="lazy"><figcaption>${alt}</figcaption></figure>`;
+          html += `<figure class="material-original-figure"><img src="${url}" alt="${alt}" loading="eager" decoding="async"><figcaption>${alt}</figcaption></figure>`;
           i++;
           continue;
         }
@@ -23639,6 +23724,7 @@ Linha 04: __________________________________________________
       const select = document.getElementById('importStudySubjectSelect');
       const customInput = document.getElementById('importStudyCustomSubjectInput');
       let targetSubject = select ? select.value : '';
+      const isCustomSubject = targetSubject === '__new__';
 
       if (targetSubject === '__new__') {
         targetSubject = customInput ? customInput.value.trim() : '';
@@ -23706,6 +23792,27 @@ Linha 04: __________________________________________________
         console.error('Erro na extração de texto:', err);
       }
 
+      // O mesmo classificador do upload em lote decide título, tema e destino.
+      // Uma disciplina digitada manualmente pelo estudante permanece soberana.
+      let materialClassification = null;
+      const needsMaterialIdentity = saveAsMaterial || generateIndividualReport || visualAssociationEnabled;
+      if (needsMaterialIdentity && String(extractedText || '').trim().length >= 40 && await isServerGeminiAvailable()) {
+        try {
+          if (progStatus) progStatus.textContent = '2. Identificando título e disciplina com Gemini...';
+          if (progDetail) progDetail.textContent = 'Confrontando o conteúdo com a grade curricular oficial do estudante...';
+          materialClassification = await classifyMaterialWithServerGemini(
+            extractedText,
+            fileName,
+            window.activeBatchTargetSemester || ''
+          );
+          if (!isCustomSubject && materialClassification?.matchedSubject) {
+            targetSubject = materialClassification.matchedSubject;
+          }
+        } catch (classificationError) {
+          console.warn('[Importador IA] Não foi possível validar título e disciplina no servidor:', classificationError);
+        }
+      }
+
       let visualAssociations = [];
       const isVisualFile = !isTextTab && /(?:\.pdf|\.pptx?)$/i.test(fileName);
       if (visualAssociationEnabled && isVisualFile && pendingImportStudyFile) {
@@ -23764,9 +23871,11 @@ Linha 04: __________________________________________________
         cleanFileTitle = cleanFileTitle.replace(/^[_\-\s\.:]+|[_\-\s\.:]+$/g, '').trim();
         if (!cleanFileTitle || cleanFileTitle.length < 3) cleanFileTitle = targetSubject || 'Medicina';
 
-        const aiClinicalSubject = (analysisResult.clinicalSubject || '').trim();
+        const aiClinicalSubject = (materialClassification?.diseaseTopic || analysisResult.clinicalSubject || '').trim();
         let suggestedName;
-        if (aiClinicalSubject && aiClinicalSubject.length >= 4 && aiClinicalSubject.toLowerCase() !== (targetSubject || '').toLowerCase()) {
+        if (materialClassification?.suggestedTitle && materialClassification.suggestedTitle.trim().length >= 3) {
+          suggestedName = materialClassification.suggestedTitle;
+        } else if (aiClinicalSubject && aiClinicalSubject.length >= 4 && aiClinicalSubject.toLowerCase() !== (targetSubject || '').toLowerCase()) {
           // Formato: "Insuficiência Cardíaca — Clínica Médica"
           suggestedName = `${aiClinicalSubject} — ${targetSubject}`;
         } else {
@@ -23797,8 +23906,11 @@ Linha 04: __________________________________________________
           originalFileName: fileName,
           title: suggestedName,
           subject: targetSubject,
-          disease: targetSubject,
+          disease: aiClinicalSubject || targetSubject,
           topic: suggestedName,
+          allocationConfidence: materialClassification?.confidencePercent || null,
+          allocationJustification: materialClassification?.justification || '',
+          allocationEngine: materialClassification?.classificationEngine || 'motor-local',
           tag: resolvedMaterialType === 'questions_only' ? 'Banco de Questões' : 'Apostila / Material Importado',
           materialType: resolvedMaterialType === 'questions_only' ? 'questions_only' : undefined,
           sizeStr: pendingImportStudyFile ? `${(pendingImportStudyFile.size / (1024 * 1024)).toFixed(1)} MB` : `${(extractedText.length / 1024).toFixed(1)} KB`,
@@ -23823,15 +23935,19 @@ Linha 04: __________________________________________________
           if (typeof sortChatDriveMaterialsInLearningOrder === 'function') {
             sortChatDriveMaterialsInLearningOrder();
           }
-          saveChatDriveMaterials();
+          await saveChatDriveMaterials();
           if (pendingImportStudyFile) {
             reportUploadDiagnostic(newMaterial, 'iniciando');
-            attachOriginalDocumentImages(newMaterial, pendingImportStudyFile, visualAssociations)
-              .then(() => reportUploadDiagnostic(newMaterial, 'sucesso'))
-              .catch(error => {
-                console.warn('[Imagens do material] Falha ao anexar imagens da importação:', error);
-                reportUploadDiagnostic(newMaterial, 'parcial');
-              });
+            try {
+              // Aguarda a persistência das URLs antes de liberar relatório,
+              // quiz ou flashcard vinculados a este material.
+              await attachOriginalDocumentImages(newMaterial, pendingImportStudyFile, visualAssociations);
+              await saveChatDriveMaterials();
+              reportUploadDiagnostic(newMaterial, newMaterial.imagePersistenceError ? 'parcial' : 'sucesso');
+            } catch (error) {
+              console.warn('[Imagens do material] Falha ao anexar imagens da importação:', error);
+              reportUploadDiagnostic(newMaterial, 'parcial');
+            }
           } else {
             reportUploadDiagnostic(newMaterial, 'sucesso');
           }

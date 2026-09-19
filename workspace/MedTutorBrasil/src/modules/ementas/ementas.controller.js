@@ -28,9 +28,14 @@ class EmentasController {
 
   async classifyMaterial(req, res) {
     try {
-      const { content, materialName } = req.body || {};
-      const classification = await ementasService.classifyMaterialSemantically(content, materialName);
-      return res.json({ success: true, ...classification });
+      const { content, materialName, curriculum, targetSemester } = req.body || {};
+      const classification = await ementasService.classifyMaterialSemantically(content, materialName, curriculum, targetSemester);
+      return res.json({
+        success: true,
+        engine: 'gemini-server',
+        model: process.env.MODEL_BALANCED || 'gemini-3.5-flash',
+        ...classification
+      });
     } catch (err) {
       return res.status(500).json({ error: 'Erro ao classificar material', details: err.message });
     }

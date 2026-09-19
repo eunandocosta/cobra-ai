@@ -66,14 +66,26 @@ const materialClassificationSchema = {
     },
     targetSubject: {
       type: SchemaType.STRING,
-      description: "Disciplina da matriz do estudante que melhor acolhe este material"
+      description: "Disciplina da matriz do estudante que melhor acolhe este material, exatamente como consta no catálogo recebido"
+    },
+    refinedTitle: {
+      type: SchemaType.STRING,
+      description: "Título curto, específico e fiel ao conteúdo real do material, sem nome de arquivo, extensão ou metadados administrativos"
+    },
+    diseaseTopic: {
+      type: SchemaType.STRING,
+      description: "Tema biomédico central do material; pode ser conceito, estrutura, processo ou doença"
+    },
+    confidencePercent: {
+      type: SchemaType.INTEGER,
+      description: "Confiança da classificação entre 0 e 100"
     },
     justification: {
       type: SchemaType.STRING,
       description: "Justificativa clínica da alocação"
     }
   },
-  required: ["pedagogicalPhase", "targetSubject"]
+  required: ["pedagogicalPhase", "targetSubject", "refinedTitle", "diseaseTopic", "justification", "confidencePercent"]
 };
 
 const SYSTEM_CURRICULUM_PROMPT = `
@@ -166,18 +178,42 @@ class EmentasService {
     };
   }
 
-  async classifyMaterialSemantically(materialContent, materialName) {
-    if (this.currentCurriculum.length === 0) {
+  async classifyMaterialSemantically(materialContent, materialName, suppliedCurriculum = [], targetSemester = '') {
+    const sourceCurriculum = Array.isArray(suppliedCurriculum) && suppliedCurriculum.length
+      ? suppliedCurriculum
+      : this.currentCurriculum;
+    if (sourceCurriculum.length === 0) {
       throw new Error('Importe a ementa oficial antes de classificar materiais.');
     }
 
-    const flatSubjects = [];
-    this.currentCurriculum.forEach(p => {
+    const normalizedSubjects = [];
+    sourceCurriculum.forEach(p => {
+      if (p?.name && !Array.isArray(p?.subjects)) {
+        normalizedSubjects.push({
+          name: String(p.name).trim(),
+          period: String(p.period || p.fullPeriod || '').trim(),
+          cycleName: String(p.cycleName || p.cycle || '').trim(),
+          description: String(p.description || '').trim()
+        });
+        return;
+      }
       p.subjects.forEach(s => {
         const name = typeof s === 'string' ? s : s.name;
-        if (name) flatSubjects.push(`[${p.period}] ${name}`);
+        if (name) normalizedSubjects.push({
+          name: String(name).trim(),
+          period: String(p.period || '').trim(),
+          cycleName: String(p.cycleName || p.cycle || '').trim(),
+          description: String(typeof s === 'object' ? s.description || '' : '').trim()
+        });
       });
     });
+    const semester = String(targetSemester || '').trim().toLowerCase();
+    const eligibleSubjects = semester
+      ? normalizedSubjects.filter(subject => String(subject.period || '').toLowerCase().includes(semester))
+      : normalizedSubjects;
+    const candidates = eligibleSubjects.length ? eligibleSubjects : normalizedSubjects;
+    if (!candidates.length) throw new Error('A grade curricular não possui disciplinas válidas para classificar o material.');
+    const flatSubjects = candidates.map(subject => `[${subject.period || 'Período não informado'}] ${subject.name}${subject.description ? ` — ${subject.description}` : ''}`);
 
     const genAI = this._getGenAI();
     const model = genAI.getGenerativeModel({
@@ -203,17 +239,40 @@ ESCALA PEDAGÓGICA (1 a 9):
 8: Casos Clínicos & Emergências
 9: Tratados & Revisões Gerais
 
-MATRIZ DO ESTUDANTE:
+MATRIZ DO ESTUDANTE (CATÁLOGO FECHADO):
 ${JSON.stringify(flatSubjects, null, 2)}
 
 TRECHO DO ARQUIVO:
 """
-${(materialContent || materialName).slice(0, 4000)}
+${(materialContent || materialName).slice(0, 60000)}
 """
+
+REGRAS ABSOLUTAS:
+- targetSubject deve ser EXATAMENTE um dos nomes do catálogo fechado.
+- refinedTitle descreve o assunto realmente ensinado, não o nome do arquivo, a disciplina, professor, data, "aula" ou "slide".
+- Se o material for visual ou curto, seja conservador e use apenas evidências disponíveis.
 `;
 
     const res = await runWithAiLimit(() => model.generateContent(prompt));
-    return JSON.parse(res.response.text());
+    const parsed = JSON.parse(res.response.text());
+    const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const rawTarget = normalize(parsed.targetSubject);
+    const matchedSubject = candidates.find(subject => normalize(subject.name) === rawTarget)
+      || candidates.find(subject => rawTarget.includes(normalize(subject.name)) || normalize(subject.name).includes(rawTarget));
+    if (!matchedSubject) {
+      throw new Error('A IA retornou uma disciplina fora da grade curricular autorizada.');
+    }
+
+    return {
+      pedagogicalPhase: Math.min(9, Math.max(1, Number(parsed.pedagogicalPhase) || 5)),
+      targetSubject: matchedSubject.name,
+      period: matchedSubject.period,
+      cycleName: matchedSubject.cycleName,
+      refinedTitle: String(parsed.refinedTitle || '').trim().slice(0, 220),
+      diseaseTopic: String(parsed.diseaseTopic || '').trim().slice(0, 220),
+      justification: String(parsed.justification || '').trim().slice(0, 1000),
+      confidencePercent: Math.min(99, Math.max(0, Number(parsed.confidencePercent) || 0))
+    };
   }
 
   async getCurriculum() {
