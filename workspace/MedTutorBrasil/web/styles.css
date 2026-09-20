@@ -3731,6 +3731,18 @@
        FOLHA DE ESTILOS DE IMPRESSÃO A4 (ISOLAMENTO TOTAL, ARIAL & ALTO CONTRASTE)
        ========================================================================= */
     @media print {
+      /* Safari calcula certos elementos com width:100% a partir da folha
+         inteira, mas aplica a margem do @page depois. Sem border-box, as
+         bordas e os paddings passam da área imprimível e o fim das linhas é
+         cortado. Este escopo cria uma área A4 real para todo o relatório. */
+      #readerModal,
+      #readerModal *,
+      #readerModal *::before,
+      #readerModal *::after {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+      }
+
       html, body {
         background: #ffffff !important;
         color: #111827 !important;
@@ -3813,6 +3825,8 @@
       #readerModalContent {
         overflow: visible !important;
         padding: 0 !important;
+        width: auto !important;
+        max-width: 100% !important;
         color: #111827 !important;
         font-size: 11pt !important;
         line-height: 1.5 !important;
@@ -3826,8 +3840,23 @@
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
+        width: auto !important;
         font-size: 11pt !important;
         line-height: 1.5 !important;
+        max-width: 100% !important;
+      }
+
+      .academic-body-content,
+      .academic-checkpoint-box,
+      .checkpoint-box-body,
+      .checkpoint-recall-part,
+      .tdah-fixation-container,
+      .tdah-stage-card,
+      .academic-case-box,
+      .doc-pearl-box,
+      .doc-warning-box,
+      .doc-note-box {
+        width: auto !important;
         max-width: 100% !important;
       }
 
@@ -3981,7 +4010,8 @@
         text-align: left !important;
         text-indent: 0 !important;
         hyphens: none !important;
-        overflow-wrap: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
       }
 
       /* Texto extraído de slides frequentemente chega como blockquote. No
@@ -4067,8 +4097,9 @@
       }
 
       .doc-table-wrapper {
-        overflow: visible !important;
+        overflow: hidden !important;
         width: 100% !important;
+        max-width: 100% !important;
         margin: 6pt 0 10pt 0 !important;
         border: 0.5pt solid #cbd5e1 !important;
         box-shadow: none !important;
@@ -4080,7 +4111,8 @@
       table:not(.abnt-header-table) {
         width: 100% !important;
         border-collapse: collapse !important;
-        table-layout: auto !important;
+        table-layout: fixed !important;
+        max-width: 100% !important;
         margin: 0 !important;
         font-size: 8pt !important;
         line-height: 1.25 !important;
@@ -4124,7 +4156,7 @@
         vertical-align: top !important;
         text-indent: 0 !important;
         word-break: normal !important;
-        overflow-wrap: break-word !important;
+        overflow-wrap: anywhere !important;
       }
 
       .academic-article-container .doc-table tr:nth-child(even) td,
@@ -4428,7 +4460,7 @@
 
       @page {
         size: A4 portrait;
-        margin: 12mm 12mm 12mm 12mm; /* Margens simétricas, equilibradas e proporcionais para impressão */
+        margin: 15mm 15mm 15mm 15mm; /* Área segura real para Safari e impressoras domésticas */
       }
     }
 
