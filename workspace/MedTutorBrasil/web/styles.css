@@ -1306,6 +1306,13 @@
       display: flex;
     }
 
+    /* Menu de opções dos módulos de estudo: elevado acima da navegação lateral. */
+    .dropdown-menu-list.study-more-menu-floating {
+      position: fixed !important;
+      z-index: 20050 !important;
+      max-height: min(320px, calc(100vh - 24px));
+    }
+
     .dropdown-menu-item {
       padding: 8px 12px;
       border-radius: 8px;

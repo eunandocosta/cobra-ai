@@ -1520,6 +1520,24 @@
               ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t) && !isSyntheticDriveSummary(t)).map(t => t.trim());
               candidates.sort((a, b) => b.length - a.length);
 
+              // Um nome de arquivo pode se repetir em disciplinas diferentes.
+              // Nunca use o texto de um documento homônimo se a disciplina
+              // persistida divergir daquela que o aluno selecionou.
+              const storedSubject = String(data.disciplina || data.subject || '').trim();
+              if (subjectName && storedSubject &&
+                  normalizeStudyComparisonText(storedSubject) !== normalizeStudyComparisonText(subjectName)) {
+                console.error('[Firestore] Material recusado por divergência de disciplina.', {
+                  materialId: doc.id,
+                  solicitado: subjectName,
+                  armazenado: storedSubject
+                });
+                return {
+                  text: '', source: 'subject_mismatch', docId: doc.id,
+                  materialName: data.nome || data.name || materialIdOrName,
+                  subject: storedSubject, data
+                };
+              }
+
               if (candidates.length > 0) {
                 return {
                   text: candidates[0],
@@ -7724,11 +7742,60 @@ ${cleanText}
     }
 
     // CONTROLE DE DROPDOWN DE MAIS OPÇÕES (FLASHCARDS E QUIZZES)
-    function toggleStudyMoreOptions(tab) {
+    function closeStudyMoreOptions(tab) {
+      const tabs = tab ? [tab] : ['fc', 'qz'];
+      tabs.forEach((currentTab) => {
+        const menu = document.getElementById(currentTab === 'fc' ? 'fcStudyMoreMenu' : 'qzStudyMoreMenu');
+        const trigger = document.getElementById(currentTab === 'fc' ? 'fcStudyMoreButton' : 'qzStudyMoreButton');
+        if (!menu) return;
+
+        menu.classList.remove('visible', 'study-more-menu-floating');
+        if (menu.dataset.portaled === 'true' && trigger?.parentElement && menu.parentElement === document.body) {
+          trigger.parentElement.appendChild(menu);
+        }
+        delete menu.dataset.portaled;
+        menu.style.removeProperty('top');
+        menu.style.removeProperty('left');
+        menu.style.removeProperty('right');
+        menu.style.removeProperty('max-width');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function toggleStudyMoreOptions(tab, event) {
+      event?.preventDefault();
+      event?.stopPropagation();
       const menuId = tab === 'fc' ? 'fcStudyMoreMenu' : 'qzStudyMoreMenu';
+      const triggerId = tab === 'fc' ? 'fcStudyMoreButton' : 'qzStudyMoreButton';
       const menu = document.getElementById(menuId);
-      if (!menu) return;
-      menu.classList.toggle('visible');
+      const trigger = document.getElementById(triggerId);
+      if (!menu || !trigger) return;
+
+      const wasOpen = menu.classList.contains('visible');
+      closeStudyMoreOptions();
+      if (wasOpen) return;
+
+      // Em desktop o menu é movido temporariamente para o body. Assim ele não é
+      // recortado pelo cabeçalho nem fica atrás da barra lateral em telas estreitas.
+      if (window.innerWidth > 768) {
+        document.body.appendChild(menu);
+        menu.dataset.portaled = 'true';
+        menu.classList.add('visible', 'study-more-menu-floating');
+        const rect = trigger.getBoundingClientRect();
+        const maxWidth = Math.min(340, Math.max(220, window.innerWidth - 24));
+        menu.style.maxWidth = `${maxWidth}px`;
+        const menuWidth = menu.offsetWidth;
+        const menuHeight = menu.offsetHeight;
+        const left = Math.max(12, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12));
+        const top = (rect.bottom + menuHeight + 10 <= window.innerHeight)
+          ? rect.bottom + 8
+          : Math.max(12, rect.top - menuHeight - 8);
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+      } else {
+        menu.classList.add('visible');
+      }
+      trigger.setAttribute('aria-expanded', 'true');
     }
 
     // MODAL E LÓGICA DE TROCA DE DISCIPLINA DE MATÉRIA / SLIDE
@@ -11802,7 +11869,6 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     let pendingValidatedStudyContext = null;
 
     async function openMaterialTextValidationModal(materialName, subjectName, count = 5, config = {}) {
-      const targetSubj = subjectName || currentStudySubject || 'Clínica Médica';
       const qCount = Math.max(1, Math.min(30, count || 5));
       const targetMat = materialName || '';
       const selectedMaterial = targetMat && Array.isArray(chatDriveMaterials)
@@ -11811,6 +11877,19 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           normalizeStudyComparisonText(m.name || '') === normalizeStudyComparisonText(targetMat)
         )
         : null;
+      // A disciplina registrada no próprio material vence a da aba aberta.
+      // Sem isso, a última matéria estudada pode contaminar um novo arquivo.
+      const storedSubject = String(selectedMaterial?.subject || selectedMaterial?.disciplina || '').trim();
+      const requestedSubject = String(subjectName || '').trim();
+      const targetSubj = storedSubject || requestedSubject || currentStudySubject || 'Clínica Médica';
+      if (storedSubject && requestedSubject &&
+          normalizeStudyComparisonText(storedSubject) !== normalizeStudyComparisonText(requestedSubject)) {
+        console.warn('[Validação] Disciplina da chamada divergia do material; usando a disciplina persistida.', {
+          material: selectedMaterial?.id || targetMat,
+          solicitada: requestedSubject,
+          persistida: storedSubject
+        });
+      }
       // Relatórios já chegavam pelo ID do documento. Flashcards e quizzes antes
       // usavam apenas o nome exibido, que pode divergir do ID do Firestore.
       const firestoreMaterialId = selectedMaterial?.id || targetMat;
@@ -13192,8 +13271,8 @@ Retorne EXCLUSIVAMENTE um JSON:
               <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleStarQuizItem('${item.id}')">
                 ${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}
               </button>
-              <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')" title="Remove a pergunta também dos Flashcards e das filas de revisão">
-                🗑️ Eliminar pergunta
+              <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')" title="Remove somente esta questão do banco compartilhado com os Flashcards">
+                🗑️ Excluir este quiz
               </button>
             </div>
           </div>
@@ -13629,19 +13708,18 @@ Retorne EXCLUSIVAMENTE um JSON:
       let targetFile = materials.find(m => m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
         [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName));
 
-      // Se não encontrou na disciplina selecionada, busca em TODAS as disciplinas de chatDriveMaterials
-      if (!targetFile && Array.isArray(chatDriveMaterials)) {
-        targetFile = chatDriveMaterials.find(m =>
-          m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
-          [m.name, m.id, m.originalFileName].some(value => normalizeStudyComparisonText(value) === normalizedMaterialName)
-        );
-      }
-
       if (!targetFile) {
+        // Não procure em outras disciplinas: "Aula 1" e "Revisão" são nomes
+        // comuns e podem puxar conteúdo de Neuroanatomia para Dermatologia.
+        console.warn('[Estudo] Material ausente na disciplina selecionada; busca cruzada bloqueada.', {
+          material: materialName,
+          disciplina: targetSubj
+        });
         targetFile = {
           name: materialName,
           disease: materialName,
-          topic: materialName
+          topic: materialName,
+          subject: targetSubj
         };
       }
 
@@ -15095,6 +15173,31 @@ DIRETRIZES CIRÚRGICAS:
       return refineAcademicMaterialTitle(rawTitle, fileName, text, diseaseTopic, matchedSubject);
     }
 
+    // A IA pode repetir o nome do PDF/slide em "refinedTitle". Quando esse
+    // nome é genérico, ele não identifica a aula e não deve sobreviver ao
+    // processamento. Priorizamos o conteúdo e o tema efetivamente detectado.
+    function resolveProcessedMaterialTitle(fileName, text, diseaseTopic, matchedSubject, aiSuggestedTitle = '') {
+      const normalizeTitle = value => String(value || '')
+        .replace(/\.(?:pdf|pptx?|docx?|txt)$/i, '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const sourceTitle = normalizeTitle(fileName);
+      const isGenericSourceTitle = /^(?:(?:aula|slide|revisao|resumo|material|documento|arquivo|apresentacao|teste|sem titulo)(?:\s+\d+)*|\d+)$/i.test(sourceTitle);
+      const isValid = candidate => {
+        const normalized = normalizeTitle(candidate);
+        if (normalized.length < 5 || normalized.length > 115) return false;
+        if (/^(?:material|documento|arquivo|aula|slide|conteudo|resumo)(?:\s+(?:de\s+)?(?:aula|estudo))?$/i.test(normalized)) return false;
+        return !(isGenericSourceTitle && normalized === sourceTitle);
+      };
+
+      const inferred = generateSmartMaterialTitle(fileName, text, diseaseTopic, matchedSubject);
+      const directTopic = String(diseaseTopic || '').trim();
+      const subjectLabel = String(matchedSubject || '').replace(/^\d+[ºo]?\s*per[ií]odo\s*[-–]\s*/i, '').trim();
+      const chosen = [aiSuggestedTitle, inferred, directTopic].find(isValid);
+      if (chosen) return String(chosen).trim().slice(0, 250);
+      return subjectLabel ? `${subjectLabel}: Conteúdo de Estudo` : 'Conteúdo de Estudo';
+    }
+
     // 6.2.2 Gerador do Índice Descritivo do Material Analisado
     function generateDescriptiveIndexForMaterial(text, fileName, diseaseTopic, matchedSubject) {
       const fText = (text || '').normalize('NFC');
@@ -15522,23 +15625,22 @@ DIRETRIZES CIRÚRGICAS:
           if (!analysis) {
             analysis = classifyMedicalDocumentSemantically(item.text || '', item.fileName || '', null, targetSemester);
             if (!suggestedTitle) {
-              suggestedTitle = generateSmartMaterialTitle(
-                item.fileName,
-                item.text,
-                item.disease || analysis.diseaseTopic,
-                analysis.fullName
+              suggestedTitle = resolveProcessedMaterialTitle(
+                item.fileName, item.text, item.disease || analysis.diseaseTopic, analysis.fullName
               );
             }
           } else {
             if (!suggestedTitle) {
-              suggestedTitle = analysis.suggestedTitle || analysis.refinedTitle || generateSmartMaterialTitle(
-                item.fileName,
-                item.text,
-                analysis.diseaseTopic,
-                analysis.fullName
+              suggestedTitle = resolveProcessedMaterialTitle(
+                item.fileName, item.text, analysis.diseaseTopic, analysis.fullName,
+                analysis.suggestedTitle || analysis.refinedTitle || suggestedTitle
               );
             }
           }
+
+          suggestedTitle = resolveProcessedMaterialTitle(
+            item.fileName, item.text, item.disease || analysis.diseaseTopic, analysis.fullName, suggestedTitle
+          );
 
           const descIndex = generateDescriptiveIndexForMaterial(
             item.text || '',
@@ -15701,23 +15803,22 @@ DIRETRIZES CIRÚRGICAS:
         }
         if (!analysis) {
           analysis = classifyMedicalDocumentSemantically(material.text || '', material.fileName || '', null, targetSemester);
-          suggestedTitle = generateSmartMaterialTitle(
-            material.fileName,
-            material.text,
-            material.disease || analysis.diseaseTopic,
-            analysis.fullName
+          suggestedTitle = resolveProcessedMaterialTitle(
+            material.fileName, material.text, material.disease || analysis.diseaseTopic, analysis.fullName
           );
         } else {
-          suggestedTitle = analysis.suggestedTitle || generateSmartMaterialTitle(
-            material.fileName,
-            material.text,
-            analysis.diseaseTopic,
-            analysis.fullName
+          suggestedTitle = resolveProcessedMaterialTitle(
+            material.fileName, material.text, analysis.diseaseTopic, analysis.fullName,
+            analysis.suggestedTitle || suggestedTitle
           );
         }
         material.preloadedAnalysis = analysis;
         material.suggestedTitle = suggestedTitle;
       }
+
+      suggestedTitle = resolveProcessedMaterialTitle(
+        material.fileName, material.text, material.disease || analysis.diseaseTopic, analysis.fullName, suggestedTitle
+      );
 
       currentConfirmCandidate = analysis;
       material.suggestedTitle = suggestedTitle;
@@ -24208,13 +24309,15 @@ Linha 04: __________________________________________________
         const aiClinicalSubject = (materialClassification?.diseaseTopic || analysisResult.clinicalSubject || '').trim();
         let suggestedName;
         if (materialClassification?.suggestedTitle && materialClassification.suggestedTitle.trim().length >= 3) {
-          suggestedName = materialClassification.suggestedTitle;
+          suggestedName = resolveProcessedMaterialTitle(
+            fileName, extractedText, aiClinicalSubject, targetSubject, materialClassification.suggestedTitle
+          );
         } else if (aiClinicalSubject && aiClinicalSubject.length >= 4 && aiClinicalSubject.toLowerCase() !== (targetSubject || '').toLowerCase()) {
           // Formato: "Insuficiência Cardíaca — Clínica Médica"
           suggestedName = `${aiClinicalSubject} — ${targetSubject}`;
         } else {
-          suggestedName = (typeof generateSmartMaterialTitle === 'function')
-            ? generateSmartMaterialTitle(fileName, extractedText, null, targetSubject)
+          suggestedName = (typeof resolveProcessedMaterialTitle === 'function')
+            ? resolveProcessedMaterialTitle(fileName, extractedText, aiClinicalSubject, targetSubject)
             : cleanFileTitle;
         }
         // Garante comprimento razoável
@@ -25325,15 +25428,15 @@ ${textSample}
         const fcMenu = document.getElementById('fcSubjectDropdownMenu');
         if (fcMenu) fcMenu.classList.remove('visible');
       }
-      if (!e.target.closest('#fcStudyMoreMenu') && !e.target.closest('[onclick*="toggleStudyMoreOptions(\'fc\')"]')) {
-        const m = document.getElementById('fcStudyMoreMenu');
-        if (m) m.classList.remove('visible');
+      if (!e.target.closest('#fcStudyMoreMenu') && !e.target.closest('[data-study-more-trigger="fc"]')) {
+        closeStudyMoreOptions('fc');
       }
-      if (!e.target.closest('#qzStudyMoreMenu') && !e.target.closest('[onclick*="toggleStudyMoreOptions(\'qz\')"]')) {
-        const m = document.getElementById('qzStudyMoreMenu');
-        if (m) m.classList.remove('visible');
+      if (!e.target.closest('#qzStudyMoreMenu') && !e.target.closest('[data-study-more-trigger="qz"]')) {
+        closeStudyMoreOptions('qz');
       }
     });
+
+    window.addEventListener('resize', () => closeStudyMoreOptions());
 
     // GERAÇÃO DO MATERIAL COMPLETO DE ESTUDO PARA LEITURA
     function requestReadingMaterialProduction(includeUserBubble = true) {

@@ -355,7 +355,7 @@
  
                  <!-- Menu Dropdown de Mais Opções -->
                  <div class="dropdown-filter-container">
-                   <button class="btn-outline-action" onclick="toggleStudyMoreOptions('fc')" title="Mais ações e ferramentas da disciplina">
+                   <button class="btn-outline-action" id="fcStudyMoreButton" data-study-more-trigger="fc" onclick="toggleStudyMoreOptions('fc', event)" title="Mais ações e ferramentas da disciplina" aria-haspopup="menu" aria-controls="fcStudyMoreMenu" aria-expanded="false">
                      ⋮ Opções ▾
                    </button>
                    <div class="dropdown-menu-list" id="fcStudyMoreMenu" style="right: 0; left: auto; min-width: 220px;">
@@ -364,6 +364,9 @@
                      </div>
                      <div class="dropdown-item" onclick="auditCurrentSubjectRedundancy()">
                        🛡️ Auditoria de Redundância
+                     </div>
+                     <div class="dropdown-item danger" onclick="confirmDeleteCurrentCard()">
+                       🗑️ Excluir este flashcard
                      </div>
                      <div class="dropdown-item danger" onclick="deleteSubjectAllMaterials(currentStudySubject)">
                        🗑️ Excluir Conteúdos da Matéria
@@ -595,7 +598,7 @@
 
                 <!-- Menu Dropdown de Mais Opções -->
                 <div class="dropdown-filter-container">
-                  <button class="btn-outline-action" onclick="toggleStudyMoreOptions('qz')" title="Mais ações e ferramentas da disciplina">
+                  <button class="btn-outline-action" id="qzStudyMoreButton" data-study-more-trigger="qz" onclick="toggleStudyMoreOptions('qz', event)" title="Mais ações e ferramentas da disciplina" aria-haspopup="menu" aria-controls="qzStudyMoreMenu" aria-expanded="false">
                     ⋮ Opções ▾
                   </button>
                   <div class="dropdown-menu-list" id="qzStudyMoreMenu" style="right: 0; left: auto; min-width: 230px;">
@@ -2730,7 +2733,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260919-relatorio-a4-seguro-v1"></script>
+  <script defer src="/app.min.js?v=20260920-opcoes-quiz-flashcards-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
