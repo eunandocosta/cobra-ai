@@ -157,8 +157,10 @@ DIRETRIZES FUNDAMENTAIS DE CONTEÚDO:
 
 DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
 1. PROIBIÇÃO ABSOLUTA DE DIAGRAMAS EM TEXTO OU ASCII:
-   - É ESTRITAMENTE PROIBIDO desenhar esquemas usando setas de texto ("--->"), caixas de caracteres ASCII ou fluxogramas Mermaid improvisados.
-   - Para sínteses visuais e diagnósticos diferenciais, use EXCLUSIVAMENTE Tabelas Markdown com cabeçalhos bem delineados (| Parâmetro | Achado | Conduta |).
+   - É ESTRITAMENTE PROIBIDO desenhar esquemas usando setas de texto ("--->"), sinais de igual repetidos, colchetes, caixas de caracteres ASCII, barras verticais decorativas ou fluxogramas Mermaid improvisados.
+   - Nunca escreva linhas como "+-----+", "| texto |", "[estrutura] =====>" ou qualquer quadro feito com caracteres.
+   - Para comparação, use EXCLUSIVAMENTE tabelas Markdown válidas com cabeçalho e linha separadora (| Parâmetro | Achado |; | --- | --- |).
+   - Para organização espacial ou sequência causal, use uma lista numerada curta, com uma ideia por item, e explique a relação em frase completa. Não tente desenhar um diagrama em texto.
 2. INTEGRAÇÃO DE ILUSTRAÇÕES MÉDICAS:
    - Você tem acesso a um catálogo de figuras do material.
    - Quando explicar um corte anatômico, ECG, radiografia ou mecanismo correspondente a uma dessas figuras, insira-a imediatamente após o parágrafo explicativo:
@@ -196,6 +198,15 @@ Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o tít
 ## 6. Aplicação clínica, semiologia e diagnóstico diferencial
 ## 7. Conduta e farmacologia aplicada (PCDT / SUS), apenas quando pertinentes
 ## 8. Caso clínico comentado e pérolas de prova
+
+REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
+- Crie pelo menos 3 blocos e no máximo 5 blocos de recuperação ativa, cobrindo os conceitos mais centrais das seções 1 a 4.
+- Use exatamente o formato abaixo em cada bloco, para que o relatório fique legível e útil para estudo:
+  ### Bloco N: título curto do conceito
+  **Pergunta de recordação:** pergunta objetiva, sem a resposta no enunciado.
+  **Pergunta de comparação/consequência:** pergunta que exige diferenciar, relacionar causa e efeito ou prever uma consequência.
+  **Resposta comentada:** resposta concisa para as duas perguntas, explicando o raciocínio.
+- Não substitua esses blocos por texto corrido, listas de objetivos, "checkpoints" genéricos ou questões de múltipla escolha.
 `;
 
     try {

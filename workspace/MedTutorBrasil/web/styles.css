@@ -3439,6 +3439,31 @@
       margin-bottom: 4pt;
     }
 
+    .checkpoint-recall-part {
+      margin: 8pt 0;
+      padding: 8pt 10pt;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      text-indent: 0 !important;
+    }
+
+    .checkpoint-recall-label {
+      display: block;
+      margin-bottom: 3pt;
+      font-size: 8.5pt;
+      font-weight: 800;
+      letter-spacing: .35px;
+      text-transform: uppercase;
+    }
+
+    .checkpoint-recall-text { color: #1e293b; font-weight: 500; }
+    .checkpoint-recall-question { background: #eff6ff; border-left: 3px solid #2563eb; }
+    .checkpoint-recall-question .checkpoint-recall-label { color: #1d4ed8; }
+    .checkpoint-recall-comparison { background: #f5f3ff; border-left: 3px solid #7c3aed; }
+    .checkpoint-recall-comparison .checkpoint-recall-label { color: #6d28d9; }
+    .checkpoint-recall-answer { background: #f0fdf4; border-left: 3px solid #16a34a; }
+    .checkpoint-recall-answer .checkpoint-recall-label { color: #15803d; }
+
     .checkpoint-gabarito-box {
       background: #f0fdf4;
       border: 1px solid #bbf7d0;
@@ -4196,6 +4221,20 @@
         margin-top: 4pt !important;
         font-size: 8.5pt !important;
       }
+
+      .checkpoint-recall-part {
+        background: #ffffff !important;
+        color: #111827 !important;
+        border: 0.5pt solid #cbd5e1 !important;
+        padding: 5pt 7pt !important;
+        margin: 5pt 0 !important;
+        page-break-inside: avoid !important;
+      }
+
+      .checkpoint-recall-question { border-left: 2.5pt solid #2563eb !important; }
+      .checkpoint-recall-comparison { border-left: 2.5pt solid #7c3aed !important; }
+      .checkpoint-recall-answer { border-left: 2.5pt solid #16a34a !important; }
+      .checkpoint-recall-label { font-size: 7.5pt !important; }
 
       .pubmed-badge-link,
       .scielo-badge-link,

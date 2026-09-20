@@ -8848,11 +8848,22 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         // Formata o markdown com parser completo de tabelas e títulos
         let bodyHtml = (typeof formatAITextToHTML === 'function') ? formatAITextToHTML(cleanMd) : cleanMd;
 
-        // Formatação refinada dos Blocos de Recuperação Ativa e Checkpoints Intercalados
+        // Formatação refinada dos Blocos de Recuperação Ativa e Checkpoints Intercalados.
+        // O gerador usa tanto "Bloco de Recuperação Ativa" quanto "Bloco 1".
+        // Ambos devem se tornar cartões de estudo, e não parágrafos indistintos.
         bodyHtml = bodyHtml.replace(
-          /<h([34]) class="gemini-h\1">([\s\S]*?(?:Bloco de Recuperação Ativa|Checkpoint)[\s\S]*?)<\/h\1>([\s\S]*?)(?=(?:<h2 class="gemini-h2"|<h[34] class="gemini-h[34]">[\s\S]*?(?:Bloco de Recuperação Ativa|Checkpoint)|$))/gi,
+          /<h([34]) class="gemini-h\1">([\s\S]*?(?:Bloco(?:\s+de\s+Recuperação\s+Ativa|\s+\d+)|Checkpoint)[\s\S]*?)<\/h\1>([\s\S]*?)(?=(?:<h2 class="gemini-h2"|<h[34] class="gemini-h[34]">[\s\S]*?(?:Bloco(?:\s+de\s+Recuperação\s+Ativa|\s+\d+)|Checkpoint)|$))/gi,
           (match, hLevel, title, content) => {
             let processedContent = content;
+
+            const makeRecallPart = (className, label, details) => `<div class="checkpoint-recall-part ${className}"><span class="checkpoint-recall-label">${label}</span><div class="checkpoint-recall-text">${details.trim()}</div></div>`;
+            processedContent = processedContent
+              .replace(/<p[^>]*>\s*(?:<strong>)?Pergunta\s+de\s+Recordação:?\s*(?:<\/strong>)?([\s\S]*?)<\/p>/gi,
+                (m, details) => makeRecallPart('checkpoint-recall-question', 'Recordação', details))
+              .replace(/<p[^>]*>\s*(?:<strong>)?Pergunta\s+de\s+Comparação\s*\/\s*Consequência:?\s*(?:<\/strong>)?([\s\S]*?)<\/p>/gi,
+                (m, details) => makeRecallPart('checkpoint-recall-comparison', 'Comparação e consequência', details))
+              .replace(/<p[^>]*>\s*(?:<strong>)?Resposta\s+Comentada:?\s*(?:<\/strong>)?([\s\S]*?)<\/p>/gi,
+                (m, details) => makeRecallPart('checkpoint-recall-answer', 'Resposta comentada', details));
 
             // Destaque estruturado do Gabarito Comentado (quando presente no bloco)
             processedContent = processedContent.replace(
@@ -21279,10 +21290,69 @@ Para cada material, retorne um objeto no JSON com:
       return resultLines.join('\n');
     }
 
+    // Modelos de IA ocasionalmente ignoram a instrução editorial e devolvem
+    // pseudo-diagramas de terminal. Eles ficam particularmente ruins ao
+    // exportar para PDF. Convertemos esse conteúdo em uma sequência de ideias
+    // legível, preservando o texto clínico sem manter bordas ou setas falsas.
+    function normalizeAsciiDiagramsForReading(markdown) {
+      const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+      const output = [];
+      let diagramParts = [];
+      let inBox = false;
+
+      const isBorder = line => /^\s*\+(?:[+=-]+\+)+\s*$/.test(line);
+      const isPipeBoxRow = line => /^\s*\|.*\|\s*$/.test(line) && !/^\s*\|\s*:?-{3,}/.test(line);
+      const isInlineDiagram = line => /(?:\[[^\]]{2,}\]\s*(?:={3,}|-{3,}|>{2,})|(?:={4,}|-{4,})\s*\[[^\]]{2,}\])/.test(line);
+      const cleanPart = line => String(line || '')
+        .replace(/^\s*#{1,6}\s*/, '')
+        .replace(/^\s*\|\s*|\s*\|\s*$/g, '')
+        .replace(/\[[^\]]*\]/g, match => match.slice(1, -1))
+        .replace(/[═=]{3,}|-{4,}|>{2,}|[│┌┐└┘├┤┬┴]/g, ' ')
+        .replace(/\s*\|\s*/g, ' — ')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/^[-•:;\s]+|[-•:;\s]+$/g, '')
+        .trim();
+      const flush = () => {
+        const distinct = [...new Set(diagramParts.map(cleanPart).filter(part => part.length > 1))];
+        if (distinct.length) {
+          output.push('### Organização do conceito');
+          distinct.forEach(part => output.push(`- ${part}`));
+          output.push('');
+        }
+        diagramParts = [];
+        inBox = false;
+      };
+
+      for (const line of lines) {
+        if (isBorder(line)) {
+          if (inBox) flush();
+          else inBox = true;
+          continue;
+        }
+        if (inBox) {
+          if (isPipeBoxRow(line) || line.trim()) {
+            diagramParts.push(line);
+            continue;
+          }
+          flush();
+          output.push(line);
+          continue;
+        }
+        if (isInlineDiagram(line)) {
+          diagramParts.push(line);
+          flush();
+          continue;
+        }
+        output.push(line);
+      }
+      if (inBox || diagramParts.length) flush();
+      return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
     // FORMATAÇÃO AVANÇADA DE TEXTO DA IA PARA HTML LIMPO (MARKDOWN ROBUSTO & TABELAS)
     function formatAITextToHTML(text) {
       if (!text) return '';
-      let md = reflowSlideText(text).replace(/\r\n/g, '\n');
+      let md = normalizeAsciiDiagramsForReading(reflowSlideText(text)).replace(/\r\n/g, '\n');
 
       // Limpeza profunda de artefatos de quebra e tags brutas da IA (<br>, <br></br>, <p>, <div>, etc.)
       md = md.replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')
