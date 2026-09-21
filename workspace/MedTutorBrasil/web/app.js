@@ -16881,7 +16881,9 @@ DIRETRIZES CIRÚRGICAS:
         topic: `${finalSubject}: ${finalDisease}`,
         subject: finalSubject,
         minutes: 30,
-        status: 'scheduled'
+        status: 'scheduled',
+        slideName: newMaterial.name,
+        disease: finalDisease
       });
 
       renderSharedStudyItems();
@@ -21275,10 +21277,115 @@ Para cada material, retorne um objeto no JSON com:
 
     // 9. SCE & WAZE DA MEDICINA (ROTEIRO DINÂMICO & RECÁLCULO)
     let studyRouteSchedule = [
-      { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled' },
-      { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' },
-      { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed' }
+      { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled', slideName: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf', disease: 'Semiologia das Lesões Elementares Cutâneas' },
+      { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled', slideName: 'Psoríase, liquen plano.pdf', disease: 'Psoríase Vulgar & Koebner' },
+      { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed', slideName: 'Dermatite Seborreica, Dermatite Atópica, Dermatite de Contato Alérgica...pdf', disease: 'Dermatite Atópica & Eczemas' }
     ];
+
+    function resolveScheduleTargetSubject(subjectHint) {
+      if (!subjectHint) return currentStudySubject || (typeof getAvailableStudySubjects === 'function' ? getAvailableStudySubjects()[0] : '') || '';
+      const available = typeof getAvailableStudySubjects === 'function' ? getAvailableStudySubjects() : [];
+      if (available.includes(subjectHint)) return subjectHint;
+
+      const hintLower = subjectHint.toLowerCase().trim();
+      const exact = available.find(s => s.toLowerCase().trim() === hintLower);
+      if (exact) return exact;
+
+      const partial = available.find(s => {
+        const sLower = s.toLowerCase();
+        return sLower.includes(hintLower) || hintLower.includes(sLower);
+      });
+      if (partial) return partial;
+
+      const hintTokens = hintLower.split(/[\s,()\-]+/).filter(t => t.length > 2);
+      if (hintTokens.length > 0) {
+        const tokenMatch = available.find(s => {
+          const sLower = s.toLowerCase();
+          return hintTokens.some(token => sLower.includes(token));
+        });
+        if (tokenMatch) return tokenMatch;
+      }
+
+      return available[0] || subjectHint;
+    }
+
+    function openScheduleQuestions(taskIndex) {
+      const task = studyRouteSchedule && studyRouteSchedule[taskIndex];
+      if (!task) return;
+
+      const targetSubject = resolveScheduleTargetSubject(task.subject);
+      selectStudySubject(targetSubject);
+
+      let targetSlide = task.slideName || null;
+      let targetDisease = task.disease || null;
+
+      // Se não houver slideName explícito, tenta localizar pelo nome dos materiais da matéria
+      if (!targetSlide && typeof getMaterialsForSubject === 'function') {
+        const materials = getMaterialsForSubject(targetSubject);
+        if (materials && materials.length > 0) {
+          const topicLower = (task.topic || '').toLowerCase();
+          const words = topicLower.split(/[:,\s\-()]+/).filter(w => w.length > 3);
+          const matchedMat = materials.find(m => {
+            const mName = (m.name || '').toLowerCase();
+            const mSubj = (m.clinicalSubject || '').toLowerCase();
+            return words.some(w => mName.includes(w) || mSubj.includes(w));
+          });
+          if (matchedMat) {
+            targetSlide = matchedMat.name;
+          }
+        }
+      }
+
+      // Se ainda não achou slide, tenta localizar através do banco de questões
+      if (!targetSlide && Array.isArray(sharedQuestionsBank)) {
+        const topicLower = (task.topic || '').toLowerCase();
+        const words = topicLower.split(/[:,\s\-()]+/).filter(w => w.length > 3);
+        const matchedQ = sharedQuestionsBank.find(q => {
+          const qSubj = (q.subject || '').toLowerCase();
+          if (!qSubj.includes(targetSubject.toLowerCase()) && !targetSubject.toLowerCase().includes(qSubj)) return false;
+          const qDisease = (q.disease || '').toLowerCase();
+          const qTopic = (q.topic || '').toLowerCase();
+          return words.some(w => qDisease.includes(w) || qTopic.includes(w));
+        });
+        if (matchedQ) {
+          if (matchedQ.slideName) targetSlide = matchedQ.slideName;
+          if (!targetDisease && matchedQ.disease) targetDisease = matchedQ.disease;
+        }
+      }
+
+      // Aplica filtro de slide se encontrado
+      if (targetSlide) {
+        handleSlideSelectChange(targetSlide);
+      } else if (targetDisease) {
+        currentDiseaseFilter = targetDisease;
+        const diseaseSelect = document.getElementById('filterDisease');
+        if (diseaseSelect) diseaseSelect.value = targetDisease;
+        renderSharedStudyItems();
+        saveStudyNavigationState();
+      }
+
+      // Se o filtro de slide for tão restrito que não retorne nenhuma questão, abre a matéria completa
+      const filtered = typeof getFilteredQuestions === 'function' ? getFilteredQuestions() : [];
+      if (filtered.length === 0 && targetSlide) {
+        handleSlideSelectChange('all');
+      }
+
+      navigateTab('quizzes');
+
+      setTimeout(() => {
+        const deck = document.getElementById('quizDeck') || document.getElementById('tab-quizzes');
+        if (deck) {
+          deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+
+      showToast(`🧭 Waze da Medicina: Abrindo questões de "${task.topic}" (${targetSubject})`);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.resolveScheduleTargetSubject = resolveScheduleTargetSubject;
+      window.openScheduleQuestions = openScheduleQuestions;
+    }
 
     function renderSceTimeline() {
       const container = document.getElementById('timelineSchedule');
@@ -21306,10 +21413,20 @@ Para cada material, retorne um objeto no JSON com:
         if (statusLabel) statusLabel.textContent = 'Rota Otimizada • Em Dia';
       }
 
-      studyRouteSchedule.forEach(task => {
+      studyRouteSchedule.forEach((task, idx) => {
         const card = document.createElement('div');
         card.className = `timeline-day-card ${task.status === 'delayed' ? 'delayed-day' : ''} ${task.date === 'Hoje' ? 'active-day' : ''}`;
-        
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.title = `Clique para abrir as questões de: ${task.topic}`;
+        card.onclick = () => openScheduleQuestions(idx);
+        card.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openScheduleQuestions(idx);
+          }
+        };
+
         let statusBadge = '';
         if (task.status === 'completed') statusBadge = '<span style="color: var(--neon); font-size: 11px;">✓ Feito</span>';
         else if (task.status === 'delayed') statusBadge = '<span style="color: var(--danger); font-size: 11px; font-weight: 700;">✕ Atrasado</span>';
@@ -21323,7 +21440,12 @@ Para cada material, retorne um objeto no JSON com:
           <div class="day-topic">${task.topic}</div>
           <div class="day-meta">
             <span>${task.subject}</span>
-            <span>${task.minutes} min</span>
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <span>${task.minutes} min</span>
+              <span style="color: var(--neon); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
+                📝 Questões →
+              </span>
+            </span>
           </div>
         `;
         container.appendChild(card);
@@ -21439,14 +21561,18 @@ Para cada material, retorne um objeto no JSON com:
           retentionText = `Retenção: Não iniciada`;
         }
 
+        const safeItemName = (item.name || '').replace(/'/g, "\\'");
         return `
-          <div class="sce-subject-bar">
+          <div class="sce-subject-bar" onclick="openSubjectInTab('${safeItemName}', 'quizzes')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openSubjectInTab('${safeItemName}', 'quizzes');}" title="Clique para praticar questões de ${item.name}" role="button" tabindex="0">
             <div class="bar-labels">
               <span>
                 ${item.name} 
                 <span style="color: var(--text-muted); font-size: 11px;">(${item.count} itens • ${item.diseases.size} afecções${diseaseListStr ? ': ' + diseaseListStr : ''})</span>
               </span>
-              <span style="color: var(--neon);">${mastery}% Maestria • ${retentionText}</span>
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--neon);">${mastery}% Maestria • ${retentionText}</span>
+                <span style="color: var(--neon); font-size: 11px; font-weight: 600;">📝 Praticar →</span>
+              </span>
             </div>
             <div class="bar-track">
               <div class="bar-fill" style="width: ${mastery}%;"></div>
@@ -26269,9 +26395,9 @@ ${textSample}
       chatDriveMaterials = JSON.parse(JSON.stringify(DEFAULT_DRIVE_FOLDER_FILES));
       sharedQuestionsBank = JSON.parse(JSON.stringify(INITIAL_DEMO_QUESTIONS));
       studyRouteSchedule = [
-        { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled' },
-        { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled' },
-        { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed' }
+        { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled', slideName: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf', disease: 'Semiologia das Lesões Elementares Cutâneas' },
+        { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled', slideName: 'Psoríase, liquen plano.pdf', disease: 'Psoríase Vulgar & Koebner' },
+        { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed', slideName: 'Dermatite Seborreica, Dermatite Atópica, Dermatite de Contato Alérgica...pdf', disease: 'Dermatite Atópica & Eczemas' }
       ];
       universityCurriculum = [];
       currentStudySubject = 'Integração de Sistemas Humanos 2 (Dermatologia)';

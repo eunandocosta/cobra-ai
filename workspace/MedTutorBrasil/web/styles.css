@@ -5020,6 +5020,19 @@
       flex-direction: column;
       gap: 8px;
       transition: all 0.2s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .timeline-day-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--neon);
+      box-shadow: 0 4px 16px rgba(0, 229, 255, 0.18);
+    }
+
+    .timeline-day-card:focus-visible {
+      outline: 2px solid var(--neon);
+      outline-offset: 2px;
     }
 
     .timeline-day-card.active-day {
@@ -5058,8 +5071,9 @@
     .sce-chart-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
       margin-bottom: 24px;
     }
 
@@ -5075,6 +5089,20 @@
       flex-direction: column;
       gap: 6px;
       margin-bottom: 16px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .sce-subject-bar:hover {
+      background: rgba(0, 229, 255, 0.06);
+      transform: translateX(4px);
+    }
+
+    .sce-subject-bar:focus-visible {
+      outline: 2px solid var(--neon);
+      outline-offset: 2px;
     }
 
     .bar-labels {
