@@ -63,6 +63,21 @@
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
+    /* Rotas públicas não montam o shell do aplicativo atrás do login. */
+    body.route-login {
+      background: #07100c;
+      display: block;
+      overflow: hidden;
+    }
+
+    body.route-login .app-root {
+      display: none;
+    }
+
+    body.route-app .app-root {
+      display: flex;
+    }
+
     /* Ícones minimalistas com contorno (outline) */
     .icon {
       width: 20px;

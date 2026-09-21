@@ -222,6 +222,9 @@
       },
 
       init() {
+        // Até o Firebase confirmar a sessão, a rota pública é sempre /login.
+        // Isso evita que o shell de estudo apareça durante a hidratação.
+        setRoutePresentation('login');
         // Carrega dados locais persistidos do usuário
         try {
           // A identidade nunca é restaurada visualmente do localStorage.
@@ -295,6 +298,7 @@
                   localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                   showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
                   this.setAuthScreenState('hidden');
+                  applyRouteFromLocation({ replace: true });
                   this.updateUserTopbarUI();
                   this.refreshCloudDataInBackground(user.uid);
                 }
@@ -320,6 +324,7 @@
                 // do Firestore em backoff, aguardar todo o conteúdo aqui poderia
                 // deixar a tela de entrada presa indefinidamente.
                 this.setAuthScreenState('hidden');
+                applyRouteFromLocation({ replace: true });
                 this.updateUserTopbarUI();
                 this.refreshCloudDataInBackground(user.uid);
                 if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
@@ -335,6 +340,8 @@
                 localStorage.removeItem('medtutor_auth_user');
                 this.updateUserTopbarUI();
                 this.updateFirebaseConfigModalUI();
+                setAppRoute('/login', { replace: true });
+                setRoutePresentation('login');
                 this.setAuthScreenState('login');
               }
             });
@@ -503,23 +510,8 @@
             return false;
           }
         }
-        // Fallback local se Firebase não configurado
-        this.currentUser = {
-          uid: 'local_email_' + Math.random().toString(36).substring(2, 9),
-          email: email,
-          displayName: email.split('@')[0]
-        };
-        this.authMode = 'guest';
-        localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-        showToast('✓ Acesso local concedido!');
-        this.setAuthScreenState('hidden');
-        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
-          setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
-        } else if (!this.userProfile) {
-          openMedicalOnboardingModal(false);
-        }
-        this.updateUserTopbarUI();
-        return true;
+        showAuthError('O serviço de autenticação não está disponível. Recarregue a página e tente novamente.');
+        return false;
       },
 
       async signUpWithEmailPassword(email, password) {
@@ -546,22 +538,8 @@
             return false;
           }
         }
-        // Fallback local
-        this.currentUser = {
-          uid: 'local_user_' + Date.now(),
-          email: email,
-          displayName: ''
-        };
-        this.authMode = 'guest';
-        localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-        showToast('🎉 Conta local registrada!');
-        this.setAuthScreenState('hidden');
-        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
-          setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
-        } else {
-          openMedicalOnboardingModal(false);
-        }
-        return true;
+        showAuthError('O serviço de autenticação não está disponível. Recarregue a página e tente novamente.');
+        return false;
       },
 
       async signOut() {
@@ -2437,6 +2415,60 @@
 
     // 2. Navegação entre Abas
     let currentTab = 'chat';
+    const APP_ROUTE_BY_TAB = {
+      chat: '/chat-ia',
+      flashcards: '/flashcards',
+      quizzes: '/quizzes',
+      curriculum: '/materias',
+      sce: '/sce',
+      challenges: '/desafios'
+    };
+    const APP_TAB_BY_ROUTE = Object.fromEntries(Object.entries(APP_ROUTE_BY_TAB).map(([tab, route]) => [route, tab]));
+    let pendingRoutePath = (typeof window !== 'undefined' && window.location.pathname) || '/login';
+
+    function setRoutePresentation(routeName) {
+      if (typeof document === 'undefined') return;
+      document.body.classList.remove('route-login', 'route-app');
+      document.body.classList.add(routeName === 'login' ? 'route-login' : 'route-app');
+      document.body.dataset.route = routeName;
+    }
+
+    function setAppRoute(path, { replace = false } = {}) {
+      const normalized = path && path.startsWith('/') ? path : '/chat-ia';
+      if (typeof window !== 'undefined' && window.location.pathname !== normalized) {
+        const method = replace ? 'replaceState' : 'pushState';
+        window.history[method]({ medtutorRoute: normalized }, '', normalized);
+      }
+      pendingRoutePath = normalized;
+    }
+
+    function applyRouteFromLocation({ replace = false, forceDefault = false } = {}) {
+      const currentPath = (typeof window !== 'undefined' && window.location.pathname) || '/login';
+      const requestedTab = APP_TAB_BY_ROUTE[currentPath];
+      const savedTab = (() => {
+        try { return JSON.parse(localStorage.getItem(STUDY_NAVIGATION_STORAGE_KEY) || 'null')?.tabId; } catch (e) { return null; }
+      })();
+      const tabId = requestedTab || (!forceDefault && APP_TAB_BY_ROUTE[pendingRoutePath]) || savedTab || 'chat';
+      const route = APP_ROUTE_BY_TAB[tabId] || APP_ROUTE_BY_TAB.chat;
+      setAppRoute(route, { replace });
+      setRoutePresentation('app');
+      navigateTab(tabId, null, { preserveStudyContext: true, skipNavigationCache: true, skipRoute: true });
+    }
+
+    function handleAppRouteChange() {
+      if (!MedTutorAuthService?.currentUser) {
+        pendingRoutePath = window.location.pathname || '/login';
+        setRoutePresentation('login');
+        return;
+      }
+      applyRouteFromLocation({ replace: true });
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', handleAppRouteChange);
+      setRoutePresentation('login');
+    }
+
     const viewTitles = {
       chat: 'Chat Científico & Revisão',
       flashcards: 'Flashcards de Repetição Espaçada',
@@ -2503,6 +2535,10 @@
           currentCardIndex = 0;
         }
         renderSharedStudyItems();
+      }
+      if (!options.skipRoute && APP_ROUTE_BY_TAB[tabId]) {
+        setAppRoute(APP_ROUTE_BY_TAB[tabId]);
+        setRoutePresentation('app');
       }
       if (!options.skipNavigationCache && typeof saveStudyNavigationState === 'function') saveStudyNavigationState();
     }

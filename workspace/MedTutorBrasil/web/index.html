@@ -25,9 +25,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260919-relatorio-a4-seguro-v1">
+  <link rel="stylesheet" href="/styles.css?v=20260921-rotas-login-v1">
 </head>
-<body>
+<body class="route-login" data-route="login">
 
   <div class="pwa-boot-splash" id="pwaBootSplash" aria-hidden="true">
     <div class="pwa-boot-mark">+</div>
@@ -3300,7 +3300,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260921-auth-isolamento-v4"></script>
+  <script defer src="/app.min.js?v=20260921-rotas-login-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
