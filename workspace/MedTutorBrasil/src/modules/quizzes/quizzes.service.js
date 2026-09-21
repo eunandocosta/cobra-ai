@@ -201,9 +201,9 @@ function splitMaterialIntoQuestionSections(value) {
   return sections.length ? sections : [{ id: 'secao-1', label: 'Conteúdo do material', content: text }];
 }
 
-function buildSectionQuestionPlan(sections, total) {
+function buildSectionQuestionPlan(sections, total, offset = 0) {
   if (!sections.length) return [];
-  return Array.from({ length: total }, (_, index) => sections[index % sections.length]);
+  return Array.from({ length: total }, (_, index) => sections[(index + offset) % sections.length]);
 }
 
 function classifyLearningAxis(excerpt) {
@@ -407,7 +407,11 @@ class QuizzesService {
     const requestedDifficulty = ['iniciante', 'intermediario', 'avancado'].includes(payload.difficulty)
       ? payload.difficulty
       : 'balanced';
-    const generationMode = payload.generationMode === 'curated' ? 'curated' : 'sections';
+    const generationMode = ['curated', 'science_based'].includes(payload.generationMode) ? payload.generationMode : 'sections';
+    const sourcePrioritizedMode = ['curated', 'science_based'].includes(generationMode);
+    const sectionOffset = Number.isSafeInteger(Number(payload.sectionOffset)) && Number(payload.sectionOffset) >= 0
+      ? Number(payload.sectionOffset)
+      : 0;
     const customInstructions = typeof payload.customInstructions === 'string' ? payload.customInstructions.trim() : '';
     const previousQuestions = Array.isArray(payload.previousQuestions) ? payload.previousQuestions.slice(0, 40) : [];
     const previousQuestionAnswers = Array.isArray(payload.previousQuestionAnswers)
@@ -429,7 +433,11 @@ class QuizzesService {
       ? providedSourceQuestions
       : extractAuthoredQuestionsFromMaterial(materialText);
 
-    console.log("➡️ [Quiz Engine] Iniciando geração por seções...");
+    console.log(generationMode === 'science_based'
+      ? "➡️ [Quiz Engine] Iniciando geração Science Based..."
+      : generationMode === 'curated'
+        ? "➡️ [Quiz Engine] Iniciando geração por curadoria integral..."
+        : "➡️ [Quiz Engine] Iniciando geração por seções...");
     console.log("📄 [Quiz Engine] Tamanho do texto recebido:", materialText ? materialText.length : 0);
     if (materialText) {
       console.log("🔍 [Quiz Engine] Início do texto recebido:", materialText.slice(0, 150).replace(/\s+/g, ' '));
@@ -442,19 +450,19 @@ class QuizzesService {
     if (!materialText || materialText.trim().length < 20) {
       throw new Error("O texto fornecido para a IA está vazio ou é excessivamente curto.");
     }
-    const requestedTotal = Math.min(Math.max(Number(quantidade) || 5, 1), 30);
+    const parsedTotal = Number(quantidade);
+    const requestedTotal = Number.isSafeInteger(parsedTotal) && parsedTotal > 0 ? parsedTotal : 5;
     const authoredQuestionsMissingFromDeck = authoredSourceQuestions.filter(sourceQuestion => !previousQuestions.some(existingQuestion =>
       areQuestionsTooSimilar(sourceQuestion, existingQuestion)
     ));
-    // No modo de curadoria, exercícios encontrados no próprio documento têm
-    // prioridade real. Se forem mais numerosos que o total escolhido, o lote
-    // cresce até acomodá-los (respeitando o teto seguro de 30).
-    const totalQuestoes = generationMode === 'curated'
-      ? Math.min(30, Math.max(requestedTotal, authoredQuestionsMissingFromDeck.length))
+    // Nos modos que varrem o material integralmente, questões autorais que ainda
+    // não estejam no deck têm prioridade, mesmo que superem o lote solicitado.
+    const totalQuestoes = sourcePrioritizedMode
+      ? Math.max(requestedTotal, authoredQuestionsMissingFromDeck.length)
       : requestedTotal;
     const difficultyPlan = buildDifficultyPlan(totalQuestoes, requestedDifficulty);
     const materialSections = splitMaterialIntoQuestionSections(materialText);
-    const sectionPlan = buildSectionQuestionPlan(materialSections, totalQuestoes);
+    const sectionPlan = buildSectionQuestionPlan(materialSections, totalQuestoes, sectionOffset);
     const uniquePlannedSections = [...new Map(sectionPlan.map(section => [section.id, section])).values()];
     const sectionPlanInstructions = sectionPlan.map((section, index) =>
       `Questão ${index + 1}: ${section.label} (${section.id})`
@@ -462,7 +470,7 @@ class QuizzesService {
     const sectionedMaterialText = uniquePlannedSections.map(section =>
       `--- ${section.id}: ${section.label} ---\n${section.content}\n--- FIM ${section.id} ---`
     ).join('\n\n');
-    const curatedCandidates = generationMode === 'curated'
+    const curatedCandidates = sourcePrioritizedMode
       ? collectCuratedMaterialExcerpts(materialText, 60)
       : [];
     const curatedAxisPlan = generationMode === 'curated'
@@ -472,13 +480,17 @@ class QuizzesService {
       `--- TRECHO ${index + 1} • ${candidate.label} • eixo sugerido: ${candidate.axis} ---\n${candidate.excerpt}\n--- FIM TRECHO ${index + 1} ---`
     ).join('\n\n');
     console.log("🧩 [Quiz Engine] Seções/páginas identificadas:", materialSections.length);
-    console.log("🔁 [Quiz Engine] Plano de cobertura:", `${sectionPlan.length} questão(ões) em ciclo por seção/página.`);
-    if (generationMode === 'curated') {
-      console.log("🧠 [Quiz Engine] Curadoria integral ativada:", {
+    if (generationMode === 'sections') {
+      console.log("🔁 [Quiz Engine] Plano de cobertura:", `${sectionPlan.length} questão(ões) em ciclo por seção/página, iniciando na posição ${sectionOffset + 1}.`);
+    }
+    if (sourcePrioritizedMode) {
+      console.log(generationMode === 'science_based' ? "🧪 [Quiz Engine] Science Based ativado:" : "🧠 [Quiz Engine] Curadoria integral ativada:", {
         trechosColetados: curatedCandidates.length,
-        base: curatedAxisPlan.base,
-        reconhecimento: curatedAxisPlan.reconhecimento,
-        tratamento: curatedAxisPlan.tratamento
+        ...(curatedAxisPlan ? {
+          base: curatedAxisPlan.base,
+          reconhecimento: curatedAxisPlan.reconhecimento,
+          tratamento: curatedAxisPlan.tratamento
+        } : { progressao: 'fundamentos → relações/mecanismos → reconhecimento/aplicação' })
       });
     }
 
@@ -515,9 +527,21 @@ QUESTÕES AUTORAIS DA FONTE:
 Cada questão autoral abaixo ainda não existe semanticamente no deck e, portanto, é prioritária. Reescreva-a como pergunta aberta e autocontida; se ela cobrar dois ou mais conceitos independentes, divida-a em mais de uma questão atômica. Marque origem_pergunta como "reaproveitada_da_fonte". Não deixe nenhuma de fora, salvo se sua informação já estiver coberta por outra pergunta do mesmo lote.
 ` : '';
 
+    const scienceBasedInstructions = generationMode === 'science_based' ? `
+MODO SCIENCE BASED ATIVO:
+O texto integral foi varrido e os trechos abaixo foram amostrados ao longo das seções/páginas. Construa questões para recuperação ativa e aprendizagem duradoura em uma progressão coerente, sem impor proporções numéricas fixas:
+1. Comece pelos conhecimentos prévios necessários: estruturas, localização, componentes, definições e funções explicitamente ensinados.
+2. Avance para relações explicativas do próprio texto: estrutura-função, causa-efeito, mecanismos e comparações que conectem os fundamentos.
+3. Depois use reconhecimento ou aplicação em contexto somente quando os achados, exemplos ou casos estiverem descritos na fonte; não eleve a dificuldade só por adicionar uma vinheta.
+4. Inclua tratamento, exames ou procedimentos apenas quando estiverem explicitamente ensinados e após cobrir fundamentos e mecanismos necessários.
+Escolha um objetivo de aprendizagem por questão, cubra primeiro os objetivos centrais e pré-requisitos, distribua as questões entre temas distintos e aumente a complexidade gradualmente. Não force questões repetidas para preencher a quantidade pedida: retorne apenas questões sustentadas por conceitos distintos da fonte. Priorize questões autorais da fonte que ainda não estejam no deck e preserve sua intenção, marcando origem_pergunta como "reaproveitada_da_fonte".
+` : '';
+
     const coverageInstructions = generationMode === 'curated'
       ? 'Selecione os trechos de maior valor pedagógico entre os candidatos curados; não concentre o lote em um único tema e respeite estritamente a distribuição de eixos abaixo.'
-      : `PLANO OBRIGATÓRIO DE COBERTURA:\n${sectionPlanInstructions}\nProduza exatamente uma questão para cada linha acima, na mesma ordem. Depois de cobrir cada seção/página disponível, retorne à primeira seção e use outro conceito explícito dela. Não concentre questões em uma única seção.`;
+      : generationMode === 'science_based'
+        ? 'Analise os objetivos dos trechos candidatos em conjunto, escolha conceitos diferentes e siga a progressão de aprendizagem Science Based. Evite cobrar repetidamente o mesmo fato com outra redação.'
+        : `PLANO OBRIGATÓRIO DE COBERTURA:\n${sectionPlanInstructions}\nProduza exatamente uma questão para cada linha acima, na mesma ordem. Depois de cobrir cada seção/página disponível, retorne à primeira seção e use outro conceito explícito dela. Não concentre questões em uma única seção.`;
 
     const prompt = `
 Crie ${totalQuestoes} questões de avaliação formativa a partir das seções/páginas do conteúdo médico abaixo.
@@ -525,6 +549,8 @@ Crie ${totalQuestoes} questões de avaliação formativa a partir das seções/p
 ${coverageInstructions}
 
 ${curatedModeInstructions}
+
+${scienceBasedInstructions}
 
 METODOLOGIA OBRIGATÓRIA:
 1. Ignore cabeçalhos institucionais, sumários, numeração de páginas/slides, nomes de docentes ou títulos vazios.
@@ -546,7 +572,7 @@ ${customInstructions}
 ` : ''}
 
 ${authoredSourceQuestions.length ? `--- QUESTÕES AUTORAIS DO PROFESSOR NO MATERIAL ---
-${(generationMode === 'curated' ? authoredQuestionsMissingFromDeck : authoredSourceQuestions).map((question, index) => `${index + 1}. ${question}`).join('\n')}
+${(sourcePrioritizedMode ? authoredQuestionsMissingFromDeck : authoredSourceQuestions).map((question, index) => `${index + 1}. ${question}`).join('\n')}
 (Priorize o objetivo didático dessas questões, sem usar comandos de múltipla escolha no enunciado)
 --- FIM DAS QUESTÕES AUTORAIS ---
 ` : ''}
@@ -558,8 +584,8 @@ ${disciplineQuestionBank.map((question, index) => `${index + 1}. ${question}`).j
 --- FIM DO BANCO DE ESTILO ---
 ` : ''}
 
---- ${generationMode === 'curated' ? 'TRECHOS CANDIDATOS DA CURADORIA INTEGRAL' : 'CONTEÚDO MÉDICO ORGANIZADO POR SEÇÕES/PÁGINAS'} ---
-${generationMode === 'curated' ? curatedMaterialText : sectionedMaterialText}
+--- ${sourcePrioritizedMode ? 'TRECHOS CANDIDATOS DA LEITURA INTEGRAL' : 'CONTEÚDO MÉDICO ORGANIZADO POR SEÇÕES/PÁGINAS'} ---
+${sourcePrioritizedMode ? curatedMaterialText : sectionedMaterialText}
 --- FIM DO CONTEÚDO ---
 
 ${previousQuestions.length ? `--- QUESTÕES JÁ EXISTENTES NO DECK DO ALUNO (PULE ESTAS E SEUS CONCEITOS) ---
@@ -666,7 +692,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           // inspirada numa pergunta autoral; a simples presença de exercícios
           // no PDF não marca todo o lote como se viesse deles.
           sourceQuestionOrigin: q.origem_pergunta || 'nova_a_partir_da_fonte',
-          learningAxis: ['base', 'reconhecimento', 'tratamento'].includes(q.eixo_aprendizagem) ? q.eixo_aprendizagem : (generationMode === 'curated' ? 'base' : ''),
+          learningAxis: ['base', 'reconhecimento', 'tratamento'].includes(q.eixo_aprendizagem) ? q.eixo_aprendizagem : (sourcePrioritizedMode ? 'base' : ''),
           generationMode,
           topic: cleanTopic,
           disease: cleanDisease,

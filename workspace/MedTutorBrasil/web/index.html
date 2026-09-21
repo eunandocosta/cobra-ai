@@ -332,7 +332,7 @@
 
               <div class="study-buttons-group">
                 <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" title="Gerar Flashcards e Quizzes sob demanda (1 a 30 questões)" style="font-weight: 700;">
-                  ⚡ Gerar Estudo (1-30)
+                  ⚡ Gerar Estudo
                 </button>
 
                 <button class="btn-outline-action" id="fcUploadMaterialBtn" onclick="openImportStudyMaterialModal('flashcards')" title="Fazer upload de apostila ou material didático para transformar em Flashcards e Quizzes com IA" style="font-weight: 700; border-color: rgba(0, 229, 255, 0.45); color: var(--neon);">
@@ -389,7 +389,7 @@
                Os materiais desta disciplina estão prontos. Clique abaixo para gerar seus Flashcards e Quizzes sob demanda.
              </p>
              <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="padding: 8px 20px; font-size: 12.5px; font-weight: 700; display: inline-flex; margin: 0 auto;">
-               ⚡ Gerar Questões desta Disciplina (1-30)
+               ⚡ Gerar Questões desta Disciplina
              </button>
            </div>
  
@@ -570,7 +570,7 @@
 
               <div class="study-buttons-group">
                 <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" title="Gerar Flashcards e Quizzes sob demanda (1 a 30 questões)" style="font-weight: 700;">
-                  ⚡ Gerar Estudo (1-30)
+                  ⚡ Gerar Estudo
                 </button>
 
                 <button class="btn-outline-action" id="qzUploadMaterialBtn" onclick="openImportStudyMaterialModal('quizzes')" title="Fazer upload de apostila ou material didático para transformar em Quizzes e Flashcards com IA" style="font-weight: 700; border-color: rgba(0, 229, 255, 0.45); color: var(--neon);">
@@ -638,7 +638,7 @@
               Os materiais desta disciplina estão prontos. Clique abaixo para gerar os Quizzes sob demanda com a IA.
             </p>
             <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" style="padding: 8px 20px; font-size: 12.5px; font-weight: 700; display: inline-flex; margin: 0 auto;">
-              ⚡ Gerar Quizzes desta Disciplina (1-30)
+              ⚡ Gerar Quizzes desta Disciplina
             </button>
           </div>
 
@@ -1588,15 +1588,15 @@
 
       <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
         <label for="generateStudyQuestionsCountInput" style="display: block; font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
-          Quantas questões você deseja gerar? (Máximo: 30)
+          Quantas questões você deseja gerar?
         </label>
         <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 14px;">
-          <input type="number" id="generateStudyQuestionsCountInput" min="1" max="30" value="5" class="written-textarea" style="width: 85px; height: 40px; font-size: 18px; font-weight: 700; text-align: center; padding: 4px;" oninput="validateGenerateStudyCount(this)">
+          <input type="number" id="generateStudyQuestionsCountInput" min="1" step="1" value="5" class="written-textarea" style="width: 110px; height: 40px; font-size: 18px; font-weight: 700; text-align: center; padding: 4px;" oninput="validateGenerateStudyCount(this)">
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
             <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(5)" style="padding: 4px 9px; font-size: 11px;">5 itens</button>
             <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(10)" style="padding: 4px 9px; font-size: 11px;">10 itens</button>
             <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(15)" style="padding: 4px 9px; font-size: 11px;">15 itens</button>
-            <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(30)" style="padding: 4px 9px; font-size: 11px;">30 itens</button>
+            <button type="button" class="btn-outline-action" onclick="setGenerateStudyCount(50)" style="padding: 4px 9px; font-size: 11px;">50 itens</button>
           </div>
         </div>
 
@@ -1632,8 +1632,9 @@
           <select id="generateStudyModeSelect" class="study-nav-select" style="width: 100%; font-size: 12px; padding: 7px 10px; height: 38px;">
             <option value="sections" selected>📄 Cobertura por seções/páginas</option>
             <option value="curated">🧠 Curadoria integral do arquivo (base 50% • reconhecimento 30% • tratamento 20% se houver)</option>
+            <option value="science_based">🧪 Science Based (progressão de aprendizagem baseada em evidências)</option>
           </select>
-          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.35;">No modo Curadoria, o arquivo inteiro é varrido, até 60 trechos relevantes são comparados e as questões autorais do material têm prioridade quando ainda não estiverem no deck.</div>
+          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.35;">Curadoria usa eixos de conteúdo com proporções orientativas. Science Based organiza objetivos únicos em progressão — fundamentos, relações e aplicação — e só cobra tratamento quando estiver sustentado pelo arquivo. A geração ocorre em lotes; se não houver conceitos distintos suficientes, o sistema encerra sem repetir perguntas.</div>
         </div>
 
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-primary); margin: 2px 0 9px;">
@@ -2733,7 +2734,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260920-opcoes-quiz-flashcards-v1"></script>
+  <script defer src="/app.min.js?v=20260921-science-based-sem-limite-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

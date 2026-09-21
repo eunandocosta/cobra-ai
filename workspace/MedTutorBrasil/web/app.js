@@ -6534,7 +6534,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     // Captura exercícios que já existem no PDF/slide antes do planejamento. A lista
     // acompanha cada trecho enviado ao servidor, assim o Gemini consegue reproduzir
     // o recorte e a linguagem do professor mesmo quando a geração é feita em série.
-    function extractAuthoredQuestionsFromMaterial(materialText, limit = 12) {
+    function extractAuthoredQuestionsFromMaterial(materialText, limit = Number.POSITIVE_INFINITY) {
       const lines = String(materialText || '').replace(/\r/g, '').split('\n')
         .map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
       const questions = [];
@@ -6806,9 +6806,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             difficulty: requestedDifficulty,
             previousQuestions,
             previousQuestionAnswers,
-            sourceQuestions: authoredSourceQuestions,
+            sourceQuestions: ['curated', 'science_based'].includes(config.generationMode)
+              ? authoredSourceQuestions.filter(sourceQuestion => !(config.acceptedStudyItems || []).some(existing =>
+                calculateLocalSimilarity(sourceQuestion, existing?.question || existing?.pergunta || existing?.flashcard?.front || '') >= 0.72
+              )).slice(0, count)
+              : authoredSourceQuestions.slice(0, 12),
             disciplineQuestionBank,
-            generationMode: config.generationMode === 'curated' ? 'curated' : 'sections',
+            generationMode: ['curated', 'science_based'].includes(config.generationMode) ? config.generationMode : 'sections',
+            sectionOffset: Number.isSafeInteger(Number(config.sectionOffset)) && Number(config.sectionOffset) >= 0 ? Number(config.sectionOffset) : 0,
             targetConcept: config.targetConcept || '',
             focusExcerpt: config.focusExcerpt || '',
             customInstructions: config.customInstructions || ''
@@ -7157,9 +7162,16 @@ ${cleanText}
   return null;
 }
 
+    function normalizeStudyQuestionCount(count, fallback = 5) {
+      const value = Number(count);
+      return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+    }
+
     async function generateStudyItemsSequentially(materialText, metadata, config = {}, count = 5, existingItems = []) {
       const accepted = [];
-      const total = Math.max(1, Math.min(30, count || 5));
+      const total = normalizeStudyQuestionCount(count);
+      const batchSize = 10;
+      let consecutiveEmptyBatches = 0;
       const authoredSourceQuestions = extractAuthoredQuestionsFromMaterial(materialText);
       let disciplineQuestionBank = [];
       try {
@@ -7178,20 +7190,39 @@ ${cleanText}
       setStudyGenerationProgress({
         current: 1,
         total,
-        detail: 'Lendo material por seções e gerando escada de questões (iniciante, intermediária e avançada)…'
+        detail: config.generationMode === 'science_based'
+          ? 'Mapeando objetivos distintos e preparando a progressão de aprendizagem…'
+          : 'Lendo o material e preparando questões por seções…'
       });
 
       try {
-        // Solicita a geração estruturada por seções diretamente ao backend Gemini
-        const generated = await generateQuestionsWithGemini(materialText, metadata, {
-          ...config,
-          sourceQuestions: authoredSourceQuestions,
-          disciplineQuestionBank,
-          acceptedStudyItems: existingItems
-        }, total);
+        while (accepted.length < total) {
+          const needed = Math.min(batchSize, total - accepted.length);
+          setStudyGenerationProgress({
+            current: accepted.length + 1,
+            total,
+            detail: `Gerando lote ${Math.floor(accepted.length / batchSize) + 1}; ${accepted.length} de ${total} questões válidas até agora…`
+          });
+          const generated = await generateQuestionsWithGemini(materialText, metadata, {
+            ...config,
+            sectionOffset: normalizeStudyQuestionCount(config.sectionOffset, 0) + accepted.length,
+            sourceQuestions: ['curated', 'science_based'].includes(config.generationMode)
+              ? authoredSourceQuestions.filter(sourceQuestion => ![...existingItems, ...accepted].some(existing =>
+                calculateLocalSimilarity(sourceQuestion, existing?.question || existing?.pergunta || existing?.flashcard?.front || '') >= 0.72
+              )).slice(0, needed)
+              : authoredSourceQuestions.slice(0, 12),
+            disciplineQuestionBank,
+            acceptedStudyItems: [...existingItems, ...accepted]
+          }, needed);
 
-        if (Array.isArray(generated) && generated.length > 0) {
-          const unique = filterUniqueStudyItems(generated, existingItems);
+          if (!Array.isArray(generated) || generated.length === 0) break;
+          const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
+          if (unique.length === 0) {
+            consecutiveEmptyBatches++;
+            if (consecutiveEmptyBatches >= 2) break;
+            continue;
+          }
+          consecutiveEmptyBatches = 0;
           for (const item of unique) {
             if (accepted.length >= total) break;
             const acceptedItem = applyMaterialBasedStudyItem(item, item.difficultyLevel || config.difficulty);
@@ -7199,38 +7230,17 @@ ${cleanText}
             setStudyGenerationProgress({
               current: accepted.length,
               total,
-              detail: `Adicionada questão (${acceptedItem.difficultyLevel}): "${(acceptedItem.question || '').slice(0, 50)}…"`
+              detail: `Questão ${accepted.length} de ${total} validada (${acceptedItem.difficultyLevel}).`
             });
           }
         }
 
-        // Se o lote inicial ainda não tiver preenchido o total e restarem itens pendentes,
-        // realiza uma rodada de complemento informando as aceitas para evitar qualquer redundância
-        if (accepted.length < total) {
-          const needed = total - accepted.length;
-          setStudyGenerationProgress({
-            current: accepted.length + 1,
-            total,
-            detail: `Explorando seções adicionais para complementar ${needed} questão(ões)…`
-          });
-          const supplement = await generateQuestionsWithGemini(materialText, metadata, {
-            ...config,
-            sourceQuestions: authoredSourceQuestions,
-            disciplineQuestionBank,
-            acceptedStudyItems: [...existingItems, ...accepted]
-          }, needed);
-
-          if (Array.isArray(supplement) && supplement.length > 0) {
-            const uniqueSupplement = filterUniqueStudyItems(supplement, [...existingItems, ...accepted]);
-            for (const item of uniqueSupplement) {
-              if (accepted.length >= total) break;
-              const acceptedItem = applyMaterialBasedStudyItem(item, item.difficultyLevel || config.difficulty);
-              accepted.push(acceptedItem);
-            }
-          }
-        }
-
-        logQuizGenerationDebug('section_based_generation_finished', { requestedItems: total, acceptedItems: accepted.length });
+        logQuizGenerationDebug('study_generation_finished', {
+          requestedItems: total,
+          acceptedItems: accepted.length,
+          generationMode: config.generationMode || 'sections',
+          stoppedForNoUniqueContent: accepted.length < total
+        });
         return accepted;
       } finally {
         setStudyGenerationProgress({ done: true });
@@ -11630,7 +11640,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
               📖 Abrir no Modo Leitura Focada
             </button>
             <button class="btn-outline-action" onclick="openGenerateStudyModal('${(matList[0]?.name || '').replace(/'/g, "\\'")}', '${subj.replace(/'/g, "\\'")}')" title="Gerar novos Flashcards e Quizzes a partir desta aula">
-              ⚡ + Gerar Estudo (1-30)
+              ⚡ + Gerar Estudo
             </button>
             <button class="btn-outline-action" onclick="copyReadingDocText(this)" title="Copiar texto formatado da apostila">
               📋 Copiar Apostila
@@ -11729,14 +11739,17 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     function setGenerateStudyCount(n) {
       const inputEl = document.getElementById('generateStudyQuestionsCountInput');
-      if (inputEl) inputEl.value = Math.max(1, Math.min(30, parseInt(n, 10) || 5));
+      if (inputEl) inputEl.value = Math.max(1, Math.floor(Number(n) || 5));
     }
 
     function validateGenerateStudyCount(input) {
-      let val = parseInt(input.value, 10);
-      if (isNaN(val)) return;
-      if (val < 1) input.value = '1';
-      if (val > 30) input.value = '30';
+      if (!String(input.value || '').trim()) {
+        input.setCustomValidity('');
+        return;
+      }
+      const val = Number(input.value);
+      if (!Number.isFinite(val)) return;
+      input.setCustomValidity(Number.isSafeInteger(val) && val > 0 ? '' : 'Informe uma quantidade inteira positiva e válida.');
     }
 
     function toggleGenerateStudyCustomInstructions() {
@@ -11869,7 +11882,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     let pendingValidatedStudyContext = null;
 
     async function openMaterialTextValidationModal(materialName, subjectName, count = 5, config = {}) {
-      const qCount = Math.max(1, Math.min(30, count || 5));
+      const qCount = normalizeStudyQuestionCount(count);
       const targetMat = materialName || '';
       const selectedMaterial = targetMat && Array.isArray(chatDriveMaterials)
         ? chatDriveMaterials.find(m =>
@@ -12224,13 +12237,18 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     function confirmGenerateStudyCount() {
       const inputEl = document.getElementById('generateStudyQuestionsCountInput');
-      let count = inputEl ? parseInt(inputEl.value, 10) : 5;
-      if (isNaN(count) || count < 1) count = 1;
-      if (count > 30) count = 30;
+      const countValue = inputEl ? Number(inputEl.value) : 5;
+      if (!Number.isSafeInteger(countValue) || countValue < 1) {
+        inputEl?.setCustomValidity('Informe uma quantidade inteira positiva e válida.');
+        inputEl?.reportValidity();
+        return;
+      }
+      const count = countValue;
 
       const examStyle = document.getElementById('generateStudyExamStyleSelect')?.value || 'bloom';
       const difficulty = document.getElementById('generateStudyDifficultySelect')?.value || 'balanced';
-      const generationMode = document.getElementById('generateStudyModeSelect')?.value === 'curated' ? 'curated' : 'sections';
+      const selectedGenerationMode = document.getElementById('generateStudyModeSelect')?.value;
+      const generationMode = ['curated', 'science_based'].includes(selectedGenerationMode) ? selectedGenerationMode : 'sections';
       const customInstructionsEnabled = document.getElementById('generateStudyCustomInstructionsEnabled')?.checked;
       const customInstructions = customInstructionsEnabled
         ? (document.getElementById('generateStudyCustomInstructionsInput')?.value || '').trim()
@@ -13702,7 +13720,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         return openMaterialTextValidationModal(materialName, targetSubj, count, config);
       }
 
-      const qCount = Math.max(1, Math.min(30, count || 5));
+      const qCount = normalizeStudyQuestionCount(count);
       const materials = getMaterialsForSubject(targetSubj);
       const normalizedMaterialName = normalizeStudyComparisonText(materialName);
       let targetFile = materials.find(m => m.name === materialName || m.id === materialName || m.originalFileName === materialName ||
@@ -13819,7 +13837,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         return openMaterialTextValidationModal('', targetSubj, count, config);
       }
 
-      const qCount = Math.max(1, Math.min(30, count || 5));
+      const qCount = normalizeStudyQuestionCount(count);
       const materials = getMaterialsForSubject(targetSubj);
       const existingQuestionsForSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj);
       const generatedForSubject = [];
@@ -13853,32 +13871,29 @@ Retorne EXCLUSIVAMENTE um JSON:
           totalCreated++;
         });
       } else if (materials.length > 0) {
-        const perMat = Math.max(1, Math.floor(qCount / materials.length));
-        for (let mIdx = 0; mIdx < materials.length; mIdx++) {
-          if (totalCreated >= qCount) break;
-          const m = materials[mIdx];
-          const toGen = Math.max(1, Math.min(perMat, qCount - totalCreated));
-          createdForMat = [];
-          let slideText = getMaterialStudyText(m);
+        const materialsWithText = materials.map(material => {
+          let slideText = getMaterialStudyText(material);
           if ((!slideText || slideText.length < 500) && Array.isArray(chatDriveMaterials)) {
-            const found = chatDriveMaterials.find(item => item.id === m.id || item.name === m.name);
-            if (found) {
-              const altText = getMaterialStudyText(found);
-              if (altText && altText.length > (slideText || '').length) {
-                slideText = altText;
-              }
-            }
+            const found = chatDriveMaterials.find(item => item.id === material.id || item.name === material.name);
+            const altText = found ? getMaterialStudyText(found) : '';
+            if (altText.length > slideText.length) slideText = altText;
           }
+          return { material, slideText };
+        }).filter(entry => entry.slideText.length >= 30);
 
-          if (slideText.length >= 30) {
-            createdForMat = await generateStudyItemsSequentially(
-              slideText,
-              { materialName: m.name, subjectName: targetSubj, disease: m.disease || m.name },
-              config,
-              toGen,
-              [...existingQuestionsForSubject, ...generatedForSubject]
-            );
-          }
+        for (let mIdx = 0; mIdx < materialsWithText.length; mIdx++) {
+          if (totalCreated >= qCount) break;
+          const { material: m, slideText } = materialsWithText[mIdx];
+          const remainingFiles = materialsWithText.length - mIdx;
+          const toGen = Math.max(1, Math.ceil((qCount - totalCreated) / remainingFiles));
+          createdForMat = [];
+          createdForMat = await generateStudyItemsSequentially(
+            slideText,
+            { materialName: m.name, subjectName: targetSubj, disease: m.disease || m.name },
+            config,
+            toGen,
+            [...existingQuestionsForSubject, ...generatedForSubject]
+          );
 
           if (!createdForMat || createdForMat.length === 0) {
             createdForMat = generateLocalMedCopilotQuestions(m.name, targetSubj, toGen, config, slideText);
@@ -13942,7 +13957,9 @@ Retorne EXCLUSIVAMENTE um JSON:
       updateSubjectFilterMenus();
 
       const totalInSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj).length;
-      showToast(`⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • total: ${totalInSubject}.`);
+      showToast(totalCreated < qCount
+        ? `⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • não encontrei mais conceitos distintos no material para completar as ${qCount} solicitadas. Total da matéria: ${totalInSubject}.`
+        : `⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • total: ${totalInSubject}.`);
       setStudyGenerationProgress({ done: true });
     }
 
@@ -13964,7 +13981,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       const previousCount = sharedQuestionsBank.filter(question => question.subject === targetSubject).length;
       // Uma questão inicial por arquivo (até o limite seguro da interface),
       // enquanto o banco didático já varre todos os arquivos da disciplina.
-      const amount = Math.min(30, Math.max(5, materials.length));
+      const amount = Math.max(5, materials.length);
       try {
         await MedTutorFirebaseService.rebuildDisciplineQuestionBanks(materials);
         await generateUnifiedStudyForSubject(targetSubject, amount, { difficulty: 'balanced' }, '__bypass__');
