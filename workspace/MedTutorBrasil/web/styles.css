@@ -7004,3 +7004,629 @@
         bottom: calc(24px + env(safe-area-inset-bottom));
       }
     }
+
+    /* =========================================================
+       ESTILOS DA ABA DE DESAFIOS CLÍNICOS & BANCO DA FACULDADE
+       ========================================================= */
+    .challenges-subnav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 0 16px 0;
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+
+    .challenges-subnav-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .challenges-subnav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .challenges-subnav-btn:hover {
+      border-color: var(--neon);
+      color: var(--text-primary);
+    }
+
+    .challenges-subnav-btn.active {
+      background: rgba(0, 229, 255, 0.12);
+      border-color: var(--neon);
+      color: var(--neon);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.18);
+    }
+
+    .subnav-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      font-size: 10.5px;
+      font-weight: 800;
+      border-radius: 9px;
+      background: var(--neon);
+      color: #000000;
+    }
+
+    .challenge-subpanel {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .challenge-create-header {
+      margin-bottom: 6px;
+    }
+
+    .challenge-create-intro h2 {
+      font-size: 18px;
+      font-weight: 800;
+      margin: 0 0 4px 0;
+    }
+
+    .challenge-create-intro p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .challenge-form-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .challenge-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 768px) {
+      .challenge-form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .classmate-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .classmate-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .classmate-chip:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+      background: rgba(0, 229, 255, 0.08);
+    }
+
+    .challenge-questions-selection-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .selection-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .eligible-questions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .eligible-question-item,
+    .eligible-q-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .eligible-question-item:hover,
+    .eligible-q-item:hover {
+      border-color: var(--neon);
+      background: rgba(0, 229, 255, 0.03);
+    }
+
+    .eligible-question-item.selected,
+    .eligible-q-item.selected {
+      border-color: var(--neon);
+      background: rgba(0, 229, 255, 0.08);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.15);
+    }
+
+    .eligible-question-item input[type="checkbox"] {
+      margin-top: 3px;
+      width: 17px;
+      height: 17px;
+      cursor: pointer;
+      accent-color: var(--neon);
+    }
+
+    .eligible-question-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .eligible-question-topic {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .eligible-question-stem {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .eligible-question-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 11px;
+    }
+
+    .challenge-create-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .selected-counter {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .selected-counter span {
+      color: var(--neon);
+      font-weight: 800;
+    }
+
+    /* Cards de Desafio (Inbox & Outbox) */
+    .challenges-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .challenge-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .challenge-card:hover {
+      border-color: var(--neon);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .challenge-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .challenge-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .challenge-card-subtitle {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .challenge-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .challenge-status-badge.pending {
+      background: rgba(255, 170, 0, 0.12);
+      color: #ffaa00;
+      border: 1px solid rgba(255, 170, 0, 0.3);
+    }
+
+    .challenge-status-badge.completed {
+      background: rgba(0, 255, 102, 0.12);
+      color: #00ff66;
+      border: 1px solid rgba(0, 255, 102, 0.3);
+    }
+
+    /* Banco Comunitário da Faculdade */
+    .bank-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 640px) {
+      .bank-stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bank-stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: center;
+      text-align: center;
+    }
+
+    .bank-stat-card.positive {
+      border-color: rgba(0, 255, 102, 0.3);
+      background: rgba(0, 255, 102, 0.04);
+    }
+
+    .bank-stat-card.negative {
+      border-color: rgba(255, 68, 68, 0.3);
+      background: rgba(255, 68, 68, 0.04);
+    }
+
+    .stat-num {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .bank-stat-card.positive .stat-num {
+      color: #00ff66;
+    }
+
+    .bank-stat-card.negative .stat-num {
+      color: #ff5555;
+    }
+
+    .stat-lbl {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .community-questions-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .community-question-card,
+    .community-q-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .community-question-card:hover,
+    .community-q-card:hover {
+      border-color: var(--neon);
+    }
+
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .score-pill.positive,
+    .score-pill.score-positive {
+      background: rgba(0, 255, 102, 0.12);
+      color: #00ff66;
+      border: 1px solid rgba(0, 255, 102, 0.35);
+    }
+
+    .score-pill.negative,
+    .score-pill.score-negative {
+      background: rgba(255, 68, 68, 0.12);
+      color: #ff5555;
+      border: 1px solid rgba(255, 68, 68, 0.35);
+    }
+
+    .score-pill.neutral,
+    .score-pill.score-neutral {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    /* Modal do Executor de Desafio */
+    .challenge-player-modal {
+      max-width: 680px;
+      width: 95vw;
+      max-height: 94vh;
+      overflow-y: auto;
+    }
+
+    .challenge-player-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--neon);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .challenge-player-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-surface);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 10px 0 6px 0;
+    }
+
+    .challenge-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--neon), #00ff66);
+      transition: width 0.3s ease;
+    }
+
+    .challenge-player-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .challenge-card-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .challenge-card-topic {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--neon);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .challenge-question-content {
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .challenge-answer-box {
+      background: rgba(0, 255, 102, 0.08);
+      border-left: 3px solid #00ff66;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 8px;
+    }
+
+    .challenge-answer-box .answer-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #00ff66;
+      margin-bottom: 4px;
+    }
+
+    .challenge-answer-box .answer-text {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text-primary);
+    }
+
+    .challenge-explanation-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: var(--text-secondary);
+    }
+
+    .challenge-explanation-box .explanation-title {
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    /* Área de Votação por Polegares */
+    .challenge-card-voting-area {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .voting-prompt-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .voting-buttons-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .thumb-vote-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: var(--bg-surface);
+      border: 2px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-primary);
+    }
+
+    .thumb-vote-btn .thumb-icon {
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .thumb-vote-btn .thumb-label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+    }
+
+    .thumb-vote-btn .thumb-label strong {
+      font-size: 13px;
+    }
+
+    .thumb-vote-btn .thumb-label small {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .thumb-vote-btn.thumb-positive:hover {
+      border-color: #00ff66;
+      background: rgba(0, 255, 102, 0.08);
+      box-shadow: 0 0 16px rgba(0, 255, 102, 0.2);
+    }
+
+    .thumb-vote-btn.thumb-positive:hover .thumb-label small {
+      color: #00ff66;
+    }
+
+    .thumb-vote-btn.thumb-negative:hover {
+      border-color: #ff4444;
+      background: rgba(255, 68, 68, 0.08);
+      box-shadow: 0 0 16px rgba(255, 68, 68, 0.2);
+    }
+
+    .thumb-vote-btn.thumb-negative:hover .thumb-label small {
+      color: #ff5555;
+    }
+
+    .challenge-finish-screen {
+      text-align: center;
+      padding: 24px 12px;
+    }
+
+    .finish-badge {
+      font-size: 52px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .finish-summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+      max-height: 240px;
+      overflow-y: auto;
+      margin: 12px 0;
+    }

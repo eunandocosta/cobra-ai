@@ -227,6 +227,31 @@ service cloud.firestore {
       }
     }
 
+    // 7. Instituições e Ementas Canônicas
+    match /instituicoes/{institutionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+
+      match /disciplinas/{disciplineId}/questoes_comunitarias/{questionId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+      }
+    }
+
+    // 8. Banco Comunitário de Questões da Instituição por Disciplina
+    match /questoes_instituicao/{questionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+    }
+
+    // 9. Desafios Clínicos entre Estudantes
+    match /desafios/{desafioId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && uidUnchanged();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (resource.data.challengerUid == request.auth.uid || resource.data.uid == request.auth.uid);
+    }
+
     // Bloqueio Global por Padrão (Default Deny)
     match /{document=**} {
       allow read, write: if false;

@@ -23,6 +23,9 @@
     let supabaseStorageInitPromise = null;
     let disciplineQuestionBankCache = {};
 
+    // Ementa Canônica Oficial da Faculdade Universo (14 períodos, 104 matérias médicas)
+    var CANONICAL_UNIVERSO_CURRICULUM = [{"id":"period_1__semestre","period":"1º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_i","name":"AC Atividades Complementares I","topics":["AC Atividades Complementares I"],"masteryXp":0,"studiedCount":0},{"id":"m001_habilidades_e_atitudes_profissionais_i","name":"M001 Habilidades e Atitudes Profissionais I","topics":["M001 Habilidades e Atitudes Profissionais I"],"masteryXp":0,"studiedCount":0},{"id":"m002_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_i","name":"M002 Ações Integrais em Saúde: Ensino, Serviço e Comunidade I","topics":["M002 Ações Integrais em Saúde: Ensino, Serviço e Comunidade I"],"masteryXp":0,"studiedCount":0},{"id":"m003_bases_moleculares_dos_seres_vivos","name":"M003 Bases Moleculares dos Seres Vivos","topics":["M003 Bases Moleculares dos Seres Vivos"],"masteryXp":0,"studiedCount":0},{"id":"m004_biologia_do_desenvolvimento","name":"M004 Biologia do Desenvolvimento","topics":["M004 Biologia do Desenvolvimento"],"masteryXp":0,"studiedCount":0},{"id":"m005_integra__o_de_sistemas_humanos_i__sistema_musculoesquel_tico_","name":"M005 Integração de Sistemas Humanos I (Sistema Musculoesquelético)","topics":["M005 Integração de Sistemas Humanos I (Sistema Musculoesquelético)"],"masteryXp":0,"studiedCount":0},{"id":"m006_forma__o_cidad__i__bio_tica__deontologia_e_direitos_humanos_","name":"M006 Formação Cidadã I (Bioética, Deontologia e Direitos Humanos)","topics":["M006 Formação Cidadã I (Bioética, Deontologia e Direitos Humanos)"],"masteryXp":0,"studiedCount":0},{"id":"m043_atividades_curriculares_de_extens_o_i","name":"M043 Atividades Curriculares de Extensão I","topics":["M043 Atividades Curriculares de Extensão I"],"masteryXp":0,"studiedCount":0}]},{"id":"period_2__semestre","period":"2º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_ii","name":"AC Atividades Complementares II","topics":["AC Atividades Complementares II"],"masteryXp":0,"studiedCount":0},{"id":"m007_habilidades_e_atitudes_profissionais_ii","name":"M007 Habilidades e Atitudes Profissionais II","topics":["M007 Habilidades e Atitudes Profissionais II"],"masteryXp":0,"studiedCount":0},{"id":"m008_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_ii","name":"M008 Ações Integrais em Saúde: Ensino, Serviço e Comunidade II","topics":["M008 Ações Integrais em Saúde: Ensino, Serviço e Comunidade II"],"masteryXp":0,"studiedCount":0},{"id":"m009_mecanismos_de_agress_o_e_defesa","name":"M009 Mecanismos de Agressão e Defesa","topics":["M009 Mecanismos de Agressão e Defesa"],"masteryXp":0,"studiedCount":0},{"id":"m010_integra__o_de_sistemas_humanos_ii__sistema_tegumentar_","name":"M010 Integração de Sistemas Humanos II (Sistema Tegumentar)","topics":["M010 Integração de Sistemas Humanos II (Sistema Tegumentar)"],"masteryXp":0,"studiedCount":0},{"id":"m011_integra__o_de_sistemas_humanos_iii__sistema_nervoso_","name":"M011 Integração de Sistemas Humanos III (Sistema Nervoso)","topics":["M011 Integração de Sistemas Humanos III (Sistema Nervoso)"],"masteryXp":0,"studiedCount":0},{"id":"m012_forma__o_cidad__ii__rela__es_de_diversidade_de_g_nero__rela__es__tnico_raci","name":"M012 Formação Cidadã II (Relações de Diversidade de Gênero, Relações Étnico-raciais, Cultura Afro-brasileira, Africana e Povos Originários)","topics":["M012 Formação Cidadã II (Relações de Diversidade de Gênero, Relações Étnico-raciais, Cultura Afro-brasileira, Africana e Povos Originários)"],"masteryXp":0,"studiedCount":0},{"id":"m044_atividades_curriculares_de_extens_o_ii","name":"M044 Atividades Curriculares de Extensão II","topics":["M044 Atividades Curriculares de Extensão II"],"masteryXp":0,"studiedCount":0}]},{"id":"period_3__semestre","period":"3º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_iii","name":"AC Atividades Complementares III","topics":["AC Atividades Complementares III"],"masteryXp":0,"studiedCount":0},{"id":"m013_habilidades_e_atitudes_profissionais_iii","name":"M013 Habilidades e Atitudes Profissionais III","topics":["M013 Habilidades e Atitudes Profissionais III"],"masteryXp":0,"studiedCount":0},{"id":"m014_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_iii","name":"M014 Ações Integrais em Saúde: Ensino, Serviço e Comunidade III","topics":["M014 Ações Integrais em Saúde: Ensino, Serviço e Comunidade III"],"masteryXp":0,"studiedCount":0},{"id":"m015_integra__o_de_sistemas_humanos_iv__sistema_cardiovascular_","name":"M015 Integração de Sistemas Humanos IV (Sistema Cardiovascular)","topics":["M015 Integração de Sistemas Humanos IV (Sistema Cardiovascular)"],"masteryXp":0,"studiedCount":0},{"id":"m016_integra__o_de_sistemas_humanos_v__sistema_respirat_rio_","name":"M016 Integração de Sistemas Humanos V (Sistema Respiratório)","topics":["M016 Integração de Sistemas Humanos V (Sistema Respiratório)"],"masteryXp":0,"studiedCount":0},{"id":"m017_forma__o_cidad__iii__direito_ambiental__sustentabilidade_e_condi__es_de_ace","name":"M017 Formação Cidadã III (Direito Ambiental, Sustentabilidade e Condições de acessibilidade para pessoas com deficiência ou mobilidade reduzida)","topics":["M017 Formação Cidadã III (Direito Ambiental, Sustentabilidade e Condições de acessibilidade para pessoas com deficiência ou mobilidade reduzida)"],"masteryXp":0,"studiedCount":0},{"id":"m045_atividades_curriculares_de_extens_o_iii","name":"M045 Atividades Curriculares de Extensão III","topics":["M045 Atividades Curriculares de Extensão III"],"masteryXp":0,"studiedCount":0}]},{"id":"period_4__semestre","period":"4º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_iv","name":"AC Atividades Complementares IV","topics":["AC Atividades Complementares IV"],"masteryXp":0,"studiedCount":0},{"id":"m018_habilidades_e_atitudes_profissionais_iv","name":"M018 Habilidades e Atitudes Profissionais IV","topics":["M018 Habilidades e Atitudes Profissionais IV"],"masteryXp":0,"studiedCount":0},{"id":"m019_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_iv","name":"M019 Ações Integrais em Saúde: Ensino, Serviço e Comunidade IV","topics":["M019 Ações Integrais em Saúde: Ensino, Serviço e Comunidade IV"],"masteryXp":0,"studiedCount":0},{"id":"m020_integra__o_de_sistemas_humanos_vi__sistema_end_crino_","name":"M020 Integração de Sistemas Humanos VI (Sistema Endócrino)","topics":["M020 Integração de Sistemas Humanos VI (Sistema Endócrino)"],"masteryXp":0,"studiedCount":0},{"id":"m021_integra__o_de_sistemas_humanos_vii__sistema_hematopoi_tico_","name":"M021 Integração de Sistemas Humanos VII (Sistema Hematopoiético)","topics":["M021 Integração de Sistemas Humanos VII (Sistema Hematopoiético)"],"masteryXp":0,"studiedCount":0},{"id":"m022_integra__o_de_sistemas_humanos_viii__sistema_digest_rio_","name":"M022 Integração de Sistemas Humanos VIII (Sistema Digestório)","topics":["M022 Integração de Sistemas Humanos VIII (Sistema Digestório)"],"masteryXp":0,"studiedCount":0},{"id":"m023_empreendedorismo__planejamento__lideran_a_e_inova__o_em_sa_de","name":"M023 Empreendedorismo, Planejamento, Liderança e Inovação em Saúde","topics":["M023 Empreendedorismo, Planejamento, Liderança e Inovação em Saúde"],"masteryXp":0,"studiedCount":0},{"id":"m046_atividades_curriculares_de_extens_o_iv","name":"M046 Atividades Curriculares de Extensão IV","topics":["M046 Atividades Curriculares de Extensão IV"],"masteryXp":0,"studiedCount":0}]},{"id":"period_5__semestre","period":"5º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_v","name":"AC Atividades Complementares V","topics":["AC Atividades Complementares V"],"masteryXp":0,"studiedCount":0},{"id":"m024_habilidades_e_atitudes_profissionais_v","name":"M024 Habilidades e Atitudes Profissionais V","topics":["M024 Habilidades e Atitudes Profissionais V"],"masteryXp":0,"studiedCount":0},{"id":"m025_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_v","name":"M025 Ações Integrais em Saúde: Ensino, Serviço e Comunidade V","topics":["M025 Ações Integrais em Saúde: Ensino, Serviço e Comunidade V"],"masteryXp":0,"studiedCount":0},{"id":"m026_integra__o_de_sistemas_humanos_ix__sistema_reprodutor_masculino_e_feminino_","name":"M026 Integração de Sistemas Humanos IX (Sistema Reprodutor Masculino e Feminino)","topics":["M026 Integração de Sistemas Humanos IX (Sistema Reprodutor Masculino e Feminino)"],"masteryXp":0,"studiedCount":0},{"id":"m027_integra__o_de_sistemas_humanos_x__sistema_urin_rio_","name":"M027 Integração de Sistemas Humanos X (Sistema Urinário)","topics":["M027 Integração de Sistemas Humanos X (Sistema Urinário)"],"masteryXp":0,"studiedCount":0},{"id":"m047_atividades_curriculares_de_extens_o_v","name":"M047 Atividades Curriculares de Extensão V","topics":["M047 Atividades Curriculares de Extensão V"],"masteryXp":0,"studiedCount":0}]},{"id":"period_6__semestre","period":"6º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_vi","name":"AC Atividades Complementares VI","topics":["AC Atividades Complementares VI"],"masteryXp":0,"studiedCount":0},{"id":"m028_habilidades_e_atitudes_profissionais_vi","name":"M028 Habilidades e Atitudes Profissionais VI","topics":["M028 Habilidades e Atitudes Profissionais VI"],"masteryXp":0,"studiedCount":0},{"id":"m029_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_vi","name":"M029 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VI","topics":["M029 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VI"],"masteryXp":0,"studiedCount":0},{"id":"m030_sa_de_da_crian_a","name":"M030 Saúde da Criança","topics":["M030 Saúde da Criança"],"masteryXp":0,"studiedCount":0},{"id":"m031_sa_de_da_mulher","name":"M031 Saúde da Mulher","topics":["M031 Saúde da Mulher"],"masteryXp":0,"studiedCount":0},{"id":"m048_atividades_curriculares_de_extens_o_vi","name":"M048 Atividades Curriculares de Extensão VI","topics":["M048 Atividades Curriculares de Extensão VI"],"masteryXp":0,"studiedCount":0},{"id":"opt_optativa_i","name":"OPT Optativa I","topics":["OPT Optativa I"],"masteryXp":0,"studiedCount":0}]},{"id":"period_7__semestre","period":"7º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_vii","name":"AC Atividades Complementares VII","topics":["AC Atividades Complementares VII"],"masteryXp":0,"studiedCount":0},{"id":"m032_habilidades_e_atitudes_profissionais_vii","name":"M032 Habilidades e Atitudes Profissionais VII","topics":["M032 Habilidades e Atitudes Profissionais VII"],"masteryXp":0,"studiedCount":0},{"id":"m033_a__es_integrais_em_ensino__servi_o_e_comunidade_vii","name":"M033 Ações Integrais em Ensino, Serviço e Comunidade VII","topics":["M033 Ações Integrais em Ensino, Serviço e Comunidade VII"],"masteryXp":0,"studiedCount":0},{"id":"m034_sa_de_do_adulto","name":"M034 Saúde do Adulto","topics":["M034 Saúde do Adulto"],"masteryXp":0,"studiedCount":0},{"id":"m035_sa_de_da_pessoa_idosa","name":"M035 Saúde da Pessoa Idosa","topics":["M035 Saúde da Pessoa Idosa"],"masteryXp":0,"studiedCount":0},{"id":"m036_metodologia_cient_fica_e_medicina_baseada_em_evid_ncia","name":"M036 Metodologia Científica e Medicina Baseada em Evidência","topics":["M036 Metodologia Científica e Medicina Baseada em Evidência"],"masteryXp":0,"studiedCount":0},{"id":"m049_atividades_curriculares_de_extens_o_vii","name":"M049 Atividades Curriculares de Extensão VII","topics":["M049 Atividades Curriculares de Extensão VII"],"masteryXp":0,"studiedCount":0},{"id":"opt_optativa_ii","name":"OPT Optativa II","topics":["OPT Optativa II"],"masteryXp":0,"studiedCount":0}]},{"id":"period_8__semestre","period":"8º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_viii","name":"AC Atividades Complementares VIII","topics":["AC Atividades Complementares VIII"],"masteryXp":0,"studiedCount":0},{"id":"m037_habilidades_e_atitudes_profissionais_viii","name":"M037 Habilidades e Atitudes Profissionais VIII","topics":["M037 Habilidades e Atitudes Profissionais VIII"],"masteryXp":0,"studiedCount":0},{"id":"m038_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_viii","name":"M038 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VIII","topics":["M038 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VIII"],"masteryXp":0,"studiedCount":0},{"id":"m039_sa_de_mental","name":"M039 Saúde Mental","topics":["M039 Saúde Mental"],"masteryXp":0,"studiedCount":0},{"id":"m040_cuidados_paliativos","name":"M040 Cuidados Paliativos","topics":["M040 Cuidados Paliativos"],"masteryXp":0,"studiedCount":0},{"id":"m041_epidemiologia_e_an_lise_de_dados","name":"M041 Epidemiologia e Análise de Dados","topics":["M041 Epidemiologia e Análise de Dados"],"masteryXp":0,"studiedCount":0},{"id":"m042_psicologia_m_dica","name":"M042 Psicologia Médica","topics":["M042 Psicologia Médica"],"masteryXp":0,"studiedCount":0},{"id":"m050_atividades_curriculares_de_extens_o_viii","name":"M050 Atividades Curriculares de Extensão VIII","topics":["M050 Atividades Curriculares de Extensão VIII"],"masteryXp":0,"studiedCount":0}]},{"id":"period_9__semestre__internato_","period":"9º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m051_internato_em_sa_de_da_crian_a_i__neonatologia_","name":"M051 Internato em Saúde da Criança I (Neonatologia)","topics":["M051 Internato em Saúde da Criança I (Neonatologia)"],"masteryXp":0,"studiedCount":0},{"id":"m051_internato_em_sa_de_da_crian_a_i__neonatologia___48_horas_na_aten__o_b_sica_","name":"M051 Internato em Saúde da Criança I (Neonatologia) (48 horas na Atenção Básica)","topics":["M051 Internato em Saúde da Criança I (Neonatologia) (48 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0},{"id":"m052_internato_em_sa_de_do_adulto_i__cl_nica_","name":"M052 Internato em Saúde do Adulto I (Clínica)","topics":["M052 Internato em Saúde do Adulto I (Clínica)"],"masteryXp":0,"studiedCount":0},{"id":"m052_internato_em_sa_de_do_adulto_i__cl_nica___48_horas_na_aten__o_b_sica_","name":"M052 Internato em Saúde do Adulto I (Clínica) (48 horas na Atenção Básica)","topics":["M052 Internato em Saúde do Adulto I (Clínica) (48 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0},{"id":"m053_internato_em_sa_de_da_mulher_i__obstetr_cia_","name":"M053 Internato em Saúde da Mulher I (Obstetrícia)","topics":["M053 Internato em Saúde da Mulher I (Obstetrícia)"],"masteryXp":0,"studiedCount":0},{"id":"m053_internato_em_sa_de_da_mulher_i__obstetr_cia___48_horas_na_aten__o_b_sica_","name":"M053 Internato em Saúde da Mulher I (Obstetrícia) (48 horas na Atenção Básica)","topics":["M053 Internato em Saúde da Mulher I (Obstetrícia) (48 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0}]},{"id":"period_10__semestre__internato_","period":"10º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m054_internato_em_urg_ncia_e_emerg_ncia_pr__hospitalar","name":"M054 Internato em Urgência e Emergência Pré-hospitalar","topics":["M054 Internato em Urgência e Emergência Pré-hospitalar"],"masteryXp":0,"studiedCount":0},{"id":"m054_internato_em_urg_ncia_e_emerg_ncia_pr__hospitalar__240_horas_em_urg_ncia_e_","name":"M054 Internato em Urgência e Emergência Pré-hospitalar (240 horas em Urgência e Emergência)","topics":["M054 Internato em Urgência e Emergência Pré-hospitalar (240 horas em Urgência e Emergência)"],"masteryXp":0,"studiedCount":0},{"id":"m055_internato_em_urg_ncia_e_emerg_ncia_hospitalar","name":"M055 Internato em Urgência e Emergência Hospitalar","topics":["M055 Internato em Urgência e Emergência Hospitalar"],"masteryXp":0,"studiedCount":0},{"id":"m055_internato_em_urg_ncia_e_emerg_ncia_hospitalar__240_horas_em_urg_ncia_e_emer","name":"M055 Internato em Urgência e Emergência Hospitalar (240 horas em Urgência e Emergência)","topics":["M055 Internato em Urgência e Emergência Hospitalar (240 horas em Urgência e Emergência)"],"masteryXp":0,"studiedCount":0},{"id":"m056_internato_em_sa_de_da_fam_lia_e_comunidade_i","name":"M056 Internato em Saúde da Família e Comunidade I","topics":["M056 Internato em Saúde da Família e Comunidade I"],"masteryXp":0,"studiedCount":0},{"id":"m056_internato_em_sa_de_da_fam_lia_e_comunidade_i__240_horas_na_aten__o_b_sica_","name":"M056 Internato em Saúde da Família e Comunidade I (240 horas na Atenção Básica)","topics":["M056 Internato em Saúde da Família e Comunidade I (240 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0}]},{"id":"period_11__semestre__internato_","period":"11º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m057_internato_em_sa_de_da_crian_a_ii__pediatria_","name":"M057 Internato em Saúde da Criança II (Pediatria)","topics":["M057 Internato em Saúde da Criança II (Pediatria)"],"masteryXp":0,"studiedCount":0},{"id":"m058_internato_em_sa_de_do_adulto_ii__cirurgia_","name":"M058 Internato em Saúde do Adulto II (Cirurgia)","topics":["M058 Internato em Saúde do Adulto II (Cirurgia)"],"masteryXp":0,"studiedCount":0},{"id":"m059_internato_em_sa_de_da_mulher_ii__ginecologia_","name":"M059 Internato em Saúde da Mulher II (Ginecologia)","topics":["M059 Internato em Saúde da Mulher II (Ginecologia)"],"masteryXp":0,"studiedCount":0}]},{"id":"period_12__semestre__internato_","period":"12º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m060_internato_em_sa_de_da_pessoa_idosa","name":"M060 Internato em Saúde da Pessoa Idosa","topics":["M060 Internato em Saúde da Pessoa Idosa"],"masteryXp":0,"studiedCount":0},{"id":"m061_internato_em_sa_de_mental","name":"M061 Internato em Saúde Mental","topics":["M061 Internato em Saúde Mental"],"masteryXp":0,"studiedCount":0},{"id":"m062_internato_em_sa_de_da_fam_lia_e_comunidade_ii_e_sa_de_coletiva","name":"M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva","topics":["M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva"],"masteryXp":0,"studiedCount":0},{"id":"m062_internato_em_sa_de_da_fam_lia_e_comunidade_ii_e_sa_de_coletiva__240_horas_n","name":"M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva (240 horas na Atenção Básica)","topics":["M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva (240 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0},{"id":"m063_trabalho_de_conclus_o_de_curso","name":"M063 Trabalho de Conclusão de Curso","topics":["M063 Trabalho de Conclusão de Curso"],"masteryXp":0,"studiedCount":0},{"id":"opt_internato_optativo","name":"OPT Internato Optativo","topics":["OPT Internato Optativo"],"masteryXp":0,"studiedCount":0}]},{"id":"period_optativas_i","period":"Optativas I","cycle":"Eletivo","cycleName":"Eletivo","source":"gemini-upload","subjects":[{"id":"m064_diagn_stico_por_imagem","name":"M064 Diagnóstico por Imagem","topics":["M064 Diagnóstico por Imagem"],"masteryXp":0,"studiedCount":0},{"id":"m065_m_todos_complementares_em_cardiologia","name":"M065 Métodos Complementares em Cardiologia","topics":["M065 Métodos Complementares em Cardiologia"],"masteryXp":0,"studiedCount":0},{"id":"m066_eletrocardiograma","name":"M066 Eletrocardiograma","topics":["M066 Eletrocardiograma"],"masteryXp":0,"studiedCount":0},{"id":"m067_neuroanatomia_integrada","name":"M067 Neuroanatomia Integrada","topics":["M067 Neuroanatomia Integrada"],"masteryXp":0,"studiedCount":0},{"id":"m068_farmacologia_aplicada___pr_tica_cl_nica","name":"M068 Farmacologia Aplicada à Prática Clínica","topics":["M068 Farmacologia Aplicada à Prática Clínica"],"masteryXp":0,"studiedCount":0},{"id":"m069_desenvolvimento_de_habilidades_cl_nicas","name":"M069 Desenvolvimento de Habilidades Clínicas","topics":["M069 Desenvolvimento de Habilidades Clínicas"],"masteryXp":0,"studiedCount":0},{"id":"m070_suporte_b_sico_inicial_ao_trauma","name":"M070 Suporte Básico Inicial ao Trauma","topics":["M070 Suporte Básico Inicial ao Trauma"],"masteryXp":0,"studiedCount":0},{"id":"m071_homeopatia","name":"M071 Homeopatia","topics":["M071 Homeopatia"],"masteryXp":0,"studiedCount":0},{"id":"m072_telemedicina","name":"M072 Telemedicina","topics":["M072 Telemedicina"],"masteryXp":0,"studiedCount":0},{"id":"m073_medicina_legal_e_forense","name":"M073 Medicina Legal e Forense","topics":["M073 Medicina Legal e Forense"],"masteryXp":0,"studiedCount":0}]},{"id":"period_optativas_ii","period":"Optativas II","cycle":"Eletivo","cycleName":"Eletivo","source":"gemini-upload","subjects":[{"id":"m074_l_ngua_brasileira_de_sinais","name":"M074 Língua Brasileira de Sinais","topics":["M074 Língua Brasileira de Sinais"],"masteryXp":0,"studiedCount":0},{"id":"m075_gest_o_de_pessoas","name":"M075 Gestão de Pessoas","topics":["M075 Gestão de Pessoas"],"masteryXp":0,"studiedCount":0},{"id":"m076_gest_o_de_projetos","name":"M076 Gestão de Projetos","topics":["M076 Gestão de Projetos"],"masteryXp":0,"studiedCount":0},{"id":"m077_inform_tica_m_dica","name":"M077 Informática Médica","topics":["M077 Informática Médica"],"masteryXp":0,"studiedCount":0},{"id":"m078_intelig_ncia_artificial_em_sa_de","name":"M078 Inteligência Artificial em Saúde","topics":["M078 Inteligência Artificial em Saúde"],"masteryXp":0,"studiedCount":0},{"id":"m079_prepara__o_para_a_vida_profissional","name":"M079 Preparação para a Vida Profissional","topics":["M079 Preparação para a Vida Profissional"],"masteryXp":0,"studiedCount":0},{"id":"m080_felici_ncia","name":"M080 Feliciência","topics":["M080 Feliciência"],"masteryXp":0,"studiedCount":0},{"id":"m081_pr_ticas_integrativas_e_complementares_em_sa_de__pics_","name":"M081 Práticas Integrativas e Complementares em Saúde (PICS)","topics":["M081 Práticas Integrativas e Complementares em Saúde (PICS)"],"masteryXp":0,"studiedCount":0},{"id":"m082_escrita_acad_mica","name":"M082 Escrita Acadêmica","topics":["M082 Escrita Acadêmica"],"masteryXp":0,"studiedCount":0},{"id":"m083_ingl_s_instrumental","name":"M083 Inglês Instrumental","topics":["M083 Inglês Instrumental"],"masteryXp":0,"studiedCount":0},{"id":"m084_l_ngua_portuguesa","name":"M084 Língua Portuguesa","topics":["M084 Língua Portuguesa"],"masteryXp":0,"studiedCount":0},{"id":"m085_humaniza__o_em_servi_os_de_sa_de","name":"M085 Humanização em Serviços de Saúde","topics":["M085 Humanização em Serviços de Saúde"],"masteryXp":0,"studiedCount":0},{"id":"m086_marketing_m_dico","name":"M086 Marketing Médico","topics":["M086 Marketing Médico"],"masteryXp":0,"studiedCount":0}]}];
+
     async function getSupabaseStorageClient() {
       if (supabaseStorageClient && supabaseStorageConfig) return { client: supabaseStorageClient, config: supabaseStorageConfig };
       if (supabaseStorageInitPromise) return supabaseStorageInitPromise;
@@ -628,6 +631,14 @@
         if (authUserDisplay) authUserDisplay.textContent = name;
         const authUidDisplay = document.getElementById('firebaseAuthUidDisplay');
         if (authUidDisplay) authUidDisplay.textContent = this.currentUser ? this.currentUser.uid : 'local_guest';
+
+        // Oculta o botão 'Ementa' no topo para estudantes da Universo (já possuem ementa canônica)
+        const facLower = (school || '').toLowerCase();
+        const isUniverso = facLower.includes('universo') || facLower.includes('salgado de oliveira');
+        const btnSyllabus = document.getElementById('btnTopbarSyllabus');
+        if (btnSyllabus) {
+          btnSyllabus.style.display = isUniverso ? 'none' : 'inline-flex';
+        }
       },
 
       updateFirebaseConfigModalUI() {
@@ -2058,6 +2069,18 @@
               }
             }
 
+            // Se o estudante pertence à Universo e não possui ementa na nuvem/local, herda a ementa canônica oficial
+            const userSchool = String(MedTutorAuthService.userProfile?.faculdade || '').toLowerCase();
+            if ((userSchool.includes('universo') || userSchool.includes('salgado de oliveira')) && (!universityCurriculum || universityCurriculum.length === 0)) {
+              if (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
+                universityCurriculum = JSON.parse(JSON.stringify(CANONICAL_UNIVERSO_CURRICULUM));
+                await MedTutorLocalDB.set('curriculum', uid, universityCurriculum);
+                if (this.hasAuthenticatedCloudSession(uid)) {
+                  this.saveCurriculum(universityCurriculum);
+                }
+              }
+            }
+
             const qSnap = await firestoreDb.collection('users').doc(uid).collection('banco_questoes').get();
             if (!qSnap.empty) {
               const cloudQ = [];
@@ -2198,6 +2221,19 @@
       await MedTutorFirebaseService.saveUserProfile(updatedProfile);
       MedTutorAuthService.updateUserTopbarUI();
 
+      // Auto-atribuição da ementa oficial da Universo para novos usuários ou usuários sem ementa
+      const facLower = faculdade.toLowerCase();
+      if ((facLower.includes('universo') || facLower.includes('salgado de oliveira')) && (!universityCurriculum || universityCurriculum.length === 0)) {
+        if (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
+          universityCurriculum = JSON.parse(JSON.stringify(CANONICAL_UNIVERSO_CURRICULUM));
+          await MedTutorLocalDB.set('curriculum', updatedProfile.uid, universityCurriculum);
+          await MedTutorFirebaseService.saveCurriculum(universityCurriculum);
+          if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
+          if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
+          showToast('🏛️ Ementa oficial de Medicina da Universo atribuída com sucesso!');
+        }
+      }
+
       document.getElementById('modalMedicalOnboarding').classList.remove('active');
       showToast(`🩺 Perfil médico de ${nome} atualizado com sucesso!`);
     }
@@ -2276,7 +2312,8 @@
       flashcards: 'Flashcards de Repetição Espaçada',
       quizzes: 'Quizzes & Casos Clínicos',
       curriculum: 'Matérias do Currículo do Estudante',
-      sce: 'SCE: Sistema de Conhecimento & Waze'
+      sce: 'SCE: Sistema de Conhecimento & Waze',
+      challenges: 'Desafios Médicos & Duelos Clínicos'
     };
 
     const tabHelpDescriptions = {
@@ -2299,6 +2336,10 @@
       sce: {
         title: 'SCE & Waze de Estudos',
         text: 'Acompanhe gráficos de evolução por disciplina e conte com o recálculo automático de rota caso se atrase no cumprimento das metas da semana.'
+      },
+      challenges: {
+        title: 'Desafios Médicos & Banco da Faculdade',
+        text: 'Envie desafios compostos por perguntas que você já dominou em Flashcards para seus colegas de faculdade. Conforme respondem, eles avaliam se a pergunta é condizente com a matéria (👍 ou 👎), compondo o banco comunitário da faculdade.'
       }
     };
 
@@ -2311,7 +2352,7 @@
       document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
 
       targetTab.classList.add('active');
-      document.getElementById('currentViewTitle').textContent = viewTitles[tabId];
+      document.getElementById('currentViewTitle').textContent = viewTitles[tabId] || 'MedTutor Brasil';
 
       if (btn) btn.classList.add('active');
       document.querySelectorAll(`.nav-link[onclick*="${tabId}"], .mobile-nav-btn[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
@@ -2319,6 +2360,9 @@
       if (tabId === 'sce') {
         renderSceTimeline();
         renderSceBars();
+      }
+      if (tabId === 'challenges' && typeof MedTutorChallengesService !== 'undefined') {
+        MedTutorChallengesService.initChallengesTab();
       }
       if (tabId === 'flashcards' && typeof renderSharedStudyItems === 'function') {
         // A sessão começa pelo que vence primeiro; sem pendências, libera os inéditos de hoje.
@@ -18870,6 +18914,17 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       rawCurriculum = [];
     }
     var universityCurriculum = sanitizeSavedCurriculum(rawCurriculum);
+    // Universo fallback inicial imediato caso o estudante seja da Universo e não tenha ementa local
+    if ((!universityCurriculum || universityCurriculum.length === 0) && typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
+      try {
+        const _prof = JSON.parse(localStorage.getItem('medtutor_user_profile') || '{}');
+        const _school = String(_prof?.faculdade || '').toLowerCase();
+        if (_school.includes('universo') || _school.includes('salgado de oliveira')) {
+          universityCurriculum = sanitizeSavedCurriculum(CANONICAL_UNIVERSO_CURRICULUM);
+          localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
+        }
+      } catch (e) {}
+    }
     if (savedCurriculum && universityCurriculum.length !== rawCurriculum.length) {
       try {
         if (universityCurriculum.length === 0) {
@@ -26418,7 +26473,1125 @@ ${textSample}
       const readerSub = document.getElementById('readerModalSubtitle');
       if (readerSub) readerSub.textContent = 'Integração de Sistemas Humanos 2 • Módulo Dermatologia';
 
-      initChatDriveMaterials();
+      
+
+    function escapeHtmlText(str) {
+      if (typeof escapeHtml === 'function') return escapeHtml(str);
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+// =========================================================
+    // 16. SERVIÇO DE DESAFIOS CLÍNICOS & BANCO DA FACULDADE
+    // =========================================================
+    const MedTutorChallengesService = {
+      activeChallenge: null,
+      activeChallengeIndex: 0,
+      activeChallengeVotes: [],
+      selectedQuestionIds: new Set(),
+      eligibleQuestionsCache: [],
+      classmatesCache: [],
+      communityQuestionsCache: [],
+      currentSubtab: 'create',
+
+      initChallengesTab() {
+        this.populateSubjectSelects();
+        this.fetchClassmates();
+        this.updateReceivedBadge();
+
+        if (this.currentSubtab === 'create') {
+          this.loadEligibleQuestions();
+        } else if (this.currentSubtab === 'received') {
+          this.loadInbox();
+        } else if (this.currentSubtab === 'sent') {
+          this.loadOutbox();
+        } else if (this.currentSubtab === 'bank') {
+          this.loadCommunityBank();
+        }
+      },
+
+      switchSubtab(tabName) {
+        this.currentSubtab = tabName;
+        const tabs = ['create', 'received', 'sent', 'bank'];
+        tabs.forEach(t => {
+          const cap = t.charAt(0).toUpperCase() + t.slice(1);
+          const btn = document.getElementById('subtabChallenge' + cap);
+          const panel = document.getElementById('panelChallenge' + cap);
+          if (btn) btn.classList.toggle('active', t === tabName);
+          if (panel) {
+            panel.classList.toggle('active', t === tabName);
+            panel.style.display = (t === tabName) ? 'block' : 'none';
+          }
+        });
+
+        if (tabName === 'create') {
+          this.loadEligibleQuestions();
+        } else if (tabName === 'received') {
+          this.loadInbox();
+        } else if (tabName === 'sent') {
+          this.loadOutbox();
+        } else if (tabName === 'bank') {
+          this.loadCommunityBank();
+        }
+      },
+
+      populateSubjectSelects() {
+        const createSelect = document.getElementById('challengeSubjectSelect');
+        const bankSelect = document.getElementById('bankSubjectFilterSelect');
+        if (!createSelect && !bankSelect) return;
+
+        let subjectList = [];
+        if (typeof getAllCurriculumSubjects === 'function') {
+          subjectList = getAllCurriculumSubjects().map(s => typeof s === 'string' ? s : s.name);
+        }
+        if (subjectList.length === 0 && typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
+          CANONICAL_UNIVERSO_CURRICULUM.forEach(p => {
+            (p.subjects || []).forEach(s => {
+              subjectList.push(typeof s === 'string' ? s : s.name);
+            });
+          });
+        }
+        // Deduplica e ordena
+        const uniqueSubjects = [...new Set(subjectList.filter(Boolean))];
+
+        if (createSelect) {
+          const prevVal = createSelect.value;
+          createSelect.innerHTML = '<option value="">-- Selecione uma Disciplina --</option>';
+          uniqueSubjects.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            if (prevVal === s || (!prevVal && typeof currentStudySubject !== 'undefined' && currentStudySubject === s)) {
+              opt.selected = true;
+            }
+            createSelect.appendChild(opt);
+          });
+        }
+
+        if (bankSelect) {
+          const prevBankVal = bankSelect.value || 'all';
+          bankSelect.innerHTML = '<option value="all">Todas as Disciplinas</option>';
+          uniqueSubjects.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            if (prevBankVal === s) opt.selected = true;
+            bankSelect.appendChild(opt);
+          });
+        }
+      },
+
+      async fetchClassmates() {
+        const chipsContainer = document.getElementById('challengeClassmateChips');
+        if (!chipsContainer) return;
+
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const userSchool = (currentProfile.faculdade || 'Universo').trim();
+        const userEmail = (currentUser.email || '').toLowerCase();
+
+        let classmates = [];
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('users')
+              .where('faculdade', '==', userSchool)
+              .limit(20)
+              .get();
+            snap.forEach(doc => {
+              const d = doc.data() || {};
+              const email = (d.email || '').toLowerCase();
+              if (email && email !== userEmail && !classmates.includes(email)) {
+                classmates.push({
+                  email,
+                  nome: d.nome || email.split('@')[0]
+                });
+              }
+            });
+          } catch (e) {
+            console.warn('[Challenges] Falha ao buscar colegas no Firestore:', e);
+          }
+        }
+
+        // Sugestões amigáveis de fallback para a turma Universo
+        if (classmates.length === 0) {
+          classmates = [
+            { email: 'mariana.costa@medicina.universo.br', nome: 'Mariana Costa' },
+            { email: 'lucas.silva@medicina.universo.br', nome: 'Lucas Silva' },
+            { email: 'beatriz.moraes@medicina.universo.br', nome: 'Beatriz Moraes' },
+            { email: 'gabriel.santos@medicina.universo.br', nome: 'Gabriel Santos' }
+          ];
+        }
+
+        this.classmatesCache = classmates;
+        chipsContainer.innerHTML = classmates.slice(0, 5).map(c => `
+          <button type="button" class="classmate-chip-btn" onclick="selectClassmateEmail('${c.email}')" title="Desafiar ${c.nome}">
+            👤 ${c.nome} <small style="opacity: 0.7;">(${c.email.split('@')[0]})</small>
+          </button>
+        `).join('');
+      },
+
+      selectClassmate(email) {
+        const input = document.getElementById('challengeTargetEmail');
+        if (input) {
+          input.value = email;
+          input.focus();
+        }
+      },
+
+      loadEligibleQuestions() {
+        const select = document.getElementById('challengeSubjectSelect');
+        const container = document.getElementById('eligibleQuestionsList');
+        if (!container) return;
+
+        const targetSubject = select ? select.value.trim() : '';
+        this.selectedQuestionIds.clear();
+        this.updateSelectedCounter();
+
+        if (!targetSubject) {
+          container.innerHTML = `
+            <div class="empty-state-notice">
+              <span class="icon">📖</span>
+              <p>Selecione uma disciplina no menu acima para carregar as questões dominadas.</p>
+            </div>
+          `;
+          return;
+        }
+
+        if (!Array.isArray(sharedQuestionsBank) || sharedQuestionsBank.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice">
+              <span class="icon">🎯</span>
+              <p>Nenhum flashcard cadastrado ainda. Crie ou importe materiais de estudo para liberar questões.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const normTarget = targetSubject.toLowerCase();
+        // Critério estrito: Questões existentes já respondidas corretamente no Flashcard
+        const eligible = sharedQuestionsBank.filter(q => {
+          if (!q) return false;
+          const qSubj = (q.subject || '').trim().toLowerCase();
+          const matchesSubject = (qSubj === normTarget || qSubj.includes(normTarget) || normTarget.includes(qSubj));
+          if (!matchesSubject) return false;
+
+          const isMasteredInSRS = Boolean(
+            (q.srs && typeof q.srs.reps === 'number' && q.srs.reps > 0) ||
+            (q.srs && Array.isArray(q.srs.history) && q.srs.history.some(h => Number(h.rating) >= 2)) ||
+            (q.srs && (q.srs.state === 'review' || q.srs.state === 'mastered')) ||
+            (q.quizStats && typeof q.quizStats.correct === 'number' && q.quizStats.correct > 0)
+          );
+          return isMasteredInSRS;
+        });
+
+        this.eligibleQuestionsCache = eligible;
+
+        if (eligible.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice">
+              <span class="icon">🔒</span>
+              <p>Nenhuma questão dominada encontrada para <strong>"${targetSubject}"</strong>.</p>
+              <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-secondary);">
+                Apenas perguntas que você <strong>já acertou na repetição espaçada (SRS)</strong> podem ser enviadas em desafios.
+              </p>
+              <button class="btn-outline-action primary" style="margin-top: 10px;" onclick="closeModals(); openSubjectInTab('${targetSubject.replace(/'/g, "\\'")}', 'flashcards');">
+                ⚡ Praticar Flashcards de ${targetSubject}
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = eligible.map((q, idx) => {
+          const reps = (q.srs && q.srs.reps) || 1;
+          const frontText = q.flashcard?.front || q.question || q.pergunta || 'Sem enunciado';
+          const backSnippet = (q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '').slice(0, 120);
+          const safeId = String(q.id || `el-q-${idx}`).replace(/"/g, '&quot;');
+          const diff = q.difficultyLevel || 'Intermediário';
+
+          return `
+            <div class="eligible-question-item eligible-q-item" id="item-q-${safeId}" onclick="toggleEligibleQuestionItem('${safeId}')">
+              <input type="checkbox" id="chk-q-${safeId}" class="eligible-q-checkbox" onclick="event.stopPropagation(); toggleEligibleQuestionItem('${safeId}');">
+              <div class="eligible-question-body eligible-q-content">
+                <div class="eligible-question-topic eligible-q-title">
+                  <span>${escapeHtmlText(q.flashcardTitle || q.topic || `Questão #${idx + 1}`)}</span>
+                  <span class="disease-tag" style="font-size: 10px; margin-left: 6px;">${diff}</span>
+                </div>
+                <div class="eligible-question-stem eligible-q-text">${escapeHtmlText(frontText)}</div>
+                ${backSnippet ? `<div class="eligible-q-back-snippet" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"><strong>Gabarito:</strong> ${escapeHtmlText(backSnippet)}...</div>` : ''}
+                <div class="eligible-question-meta eligible-q-meta">
+                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Dominado no Flashcard (${reps} ${reps === 1 ? 'repetição' : 'repetições'})</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      toggleEligibleItem(id) {
+        if (this.selectedQuestionIds.has(id)) {
+          this.selectedQuestionIds.delete(id);
+        } else {
+          this.selectedQuestionIds.add(id);
+        }
+        const itemEl = document.getElementById(`item-q-${id}`);
+        const chkEl = document.getElementById(`chk-q-${id}`);
+        const isSelected = this.selectedQuestionIds.has(id);
+        if (itemEl) itemEl.classList.toggle('selected', isSelected);
+        if (chkEl) chkEl.checked = isSelected;
+        this.updateSelectedCounter();
+      },
+
+      toggleSelectAll(state) {
+        if (state) {
+          this.eligibleQuestionsCache.forEach(q => this.selectedQuestionIds.add(String(q.id)));
+        } else {
+          this.selectedQuestionIds.clear();
+        }
+        this.eligibleQuestionsCache.forEach(q => {
+          const id = String(q.id);
+          const itemEl = document.getElementById(`item-q-${id}`);
+          const chkEl = document.getElementById(`chk-q-${id}`);
+          const isSelected = this.selectedQuestionIds.has(id);
+          if (itemEl) itemEl.classList.toggle('selected', isSelected);
+          if (chkEl) chkEl.checked = isSelected;
+        });
+        this.updateSelectedCounter();
+      },
+
+      updateSelectedCounter() {
+        const counter = document.getElementById('challengeSelectedCounter');
+        if (counter) counter.textContent = this.selectedQuestionIds.size;
+      },
+
+      async sendChallenge() {
+        const emailInput = document.getElementById('challengeTargetEmail');
+        const subjectSelect = document.getElementById('challengeSubjectSelect');
+        const targetEmail = (emailInput?.value || '').trim().toLowerCase();
+        const selectedSubject = (subjectSelect?.value || '').trim();
+
+        if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
+          alert('Por favor, informe um endereço de e-mail válido para o colega desafiado.');
+          emailInput?.focus();
+          return;
+        }
+
+        if (!selectedSubject) {
+          alert('Selecione a disciplina da ementa para este desafio.');
+          subjectSelect?.focus();
+          return;
+        }
+
+        if (this.selectedQuestionIds.size === 0) {
+          alert('Selecione pelo menos uma questão dominada em Flashcard para compor o desafio.');
+          return;
+        }
+
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const userEmail = (currentUser.email || 'estudante@medicina.br').toLowerCase();
+        const userSchool = (currentProfile.faculdade || 'Universo').trim();
+
+        const selectedQuestions = this.eligibleQuestionsCache
+          .filter(q => this.selectedQuestionIds.has(String(q.id)))
+          .map((q, idx) => ({
+            id: String(q.id || `q_${Date.now()}_${idx}`),
+            front: q.flashcard?.front || q.question || q.pergunta || '',
+            back: q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '',
+            explanation: q.flashcard?.explanation || q.explanation || q.clinicalPearl || '',
+            title: q.flashcardTitle || q.topic || `Questão #${idx + 1}`,
+            subject: q.subject || selectedSubject,
+            difficultyLevel: q.difficultyLevel || 'Intermediário'
+          }));
+
+        const challengeId = 'desafio_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        const challengeDoc = {
+          id: challengeId,
+          senderUid: currentUser.uid || 'local_user',
+          senderEmail: userEmail,
+          senderName: currentProfile.nome || currentUser.displayName || userEmail.split('@')[0] || 'Colega de Medicina',
+          targetEmail: targetEmail,
+          institution: userSchool,
+          subject: selectedSubject,
+          questions: selectedQuestions,
+          totalQuestions: selectedQuestions.length,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          completedAt: null
+        };
+
+        const btnSend = document.getElementById('btnSubmitSendChallenge');
+        if (btnSend) {
+          btnSend.disabled = true;
+          btnSend.textContent = '⏳ Enviando Desafio...';
+        }
+
+        try {
+          // 1. Salva no Firestore se nuvem estiver ativa
+          if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+            await firestoreDb.collection('desafios').doc(challengeId).set(challengeDoc);
+          }
+
+          // 2. Persiste na lista de enviados local
+          let sentList = [];
+          try {
+            sentList = JSON.parse(localStorage.getItem('medtutor_challenges_sent') || '[]');
+          } catch (e) { sentList = []; }
+          sentList.unshift(challengeDoc);
+          localStorage.setItem('medtutor_challenges_sent', JSON.stringify(sentList));
+
+          // 3. Se o desafio foi enviado para o próprio usuário (para autoteste) ou em modo local:
+          let receivedList = [];
+          try {
+            receivedList = JSON.parse(localStorage.getItem('medtutor_challenges_received') || '[]');
+          } catch (e) { receivedList = []; }
+          receivedList.unshift(challengeDoc);
+          localStorage.setItem('medtutor_challenges_received', JSON.stringify(receivedList));
+
+          if (typeof showToast === 'function') {
+            showToast(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetEmail}!`);
+          } else {
+            alert(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetEmail}!`);
+          }
+
+          // Reseta formulário
+          if (emailInput) emailInput.value = '';
+          this.selectedQuestionIds.clear();
+          this.updateSelectedCounter();
+          this.loadEligibleQuestions();
+          this.switchSubtab('sent');
+        } catch (err) {
+          console.error('[Challenges] Erro ao enviar desafio:', err);
+          alert('Houve um erro ao registrar o desafio na nuvem: ' + (err.message || err));
+        } finally {
+          if (btnSend) {
+            btnSend.disabled = false;
+            btnSend.textContent = '🚀 Enviar Desafio Clínico';
+          }
+        }
+      },
+
+      async loadInbox() {
+        const container = document.getElementById('receivedChallengesList');
+        if (!container) return;
+
+        container.innerHTML = '<div class="empty-state-notice"><span class="icon">⏳</span><p>Buscando desafios recebidos...</p></div>';
+
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const userEmail = (currentUser.email || 'estudante@medicina.br').toLowerCase();
+
+        let challenges = [];
+        // Busca do Firestore se conectado
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('desafios')
+              .where('targetEmail', '==', userEmail)
+              .get();
+            snap.forEach(doc => {
+              challenges.push(doc.data());
+            });
+          } catch (e) {
+            console.warn('[Challenges] Falha ao consultar desafios no Firestore:', e);
+          }
+        }
+
+        // Mescla com cache local de recebidos
+        try {
+          const localReceived = JSON.parse(localStorage.getItem('medtutor_challenges_received') || '[]');
+          localReceived.forEach(lc => {
+            if (!challenges.some(c => c.id === lc.id)) {
+              challenges.push(lc);
+            }
+          });
+        } catch (e) {}
+
+        // Ordena por data decrescente
+        challenges.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+        this.updateReceivedBadge(challenges.filter(c => c.status === 'pending').length);
+
+        if (challenges.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice" style="grid-column: 1 / -1;">
+              <span class="icon">📭</span>
+              <p>Nenhum desafio recebido no momento.</p>
+              <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
+                Quando seus colegas de faculdade enviarem duelos clínicos, eles aparecerão aqui para você responder e avaliar.
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = challenges.map(c => {
+          const isPending = c.status === 'pending';
+          const qCount = Array.isArray(c.questions) ? c.questions.length : (c.totalQuestions || 0);
+          const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+          const safeId = String(c.id).replace(/"/g, '&quot;');
+
+          return `
+            <div class="challenge-feed-card ${isPending ? 'pending' : 'completed'}">
+              <div class="challenge-feed-header">
+                <span class="challenge-feed-badge ${isPending ? 'badge-pending' : 'badge-completed'}">
+                  ${isPending ? '🟡 Pendente' : '🟢 Concluído'}
+                </span>
+                <span class="challenge-feed-date">${dateStr}</span>
+              </div>
+              <div class="challenge-feed-sender">
+                👤 Enviado por: <strong>${escapeHtmlText(c.senderName || c.senderEmail)}</strong>
+              </div>
+              <div class="challenge-feed-subject">
+                📚 <strong>${escapeHtmlText(c.subject || 'Disciplina')}</strong>
+              </div>
+              <div class="challenge-feed-meta">
+                <span>🎯 ${qCount} ${qCount === 1 ? 'questão clínica' : 'questões clínicas'}</span>
+                <span>🏛️ ${escapeHtmlText(c.institution || 'Universo')}</span>
+              </div>
+              <div class="challenge-feed-action">
+                ${isPending ? `
+                  <button class="btn-primary-action" style="width: 100%; font-size: 12px; padding: 7px 14px;" onclick="MedTutorChallengesService.startChallengeReview('${safeId}')">
+                    🔥 Responder Desafio
+                  </button>
+                ` : `
+                  <button class="btn-outline-action" style="width: 100%; font-size: 12px; padding: 7px 14px;" onclick="MedTutorChallengesService.startChallengeReview('${safeId}')">
+                    👁️ Ver Respostas & Gabarito
+                  </button>
+                `}
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      async loadOutbox() {
+        const container = document.getElementById('sentChallengesList');
+        if (!container) return;
+
+        container.innerHTML = '<div class="empty-state-notice"><span class="icon">⏳</span><p>Carregando desafios enviados...</p></div>';
+
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const currentUid = currentUser.uid || 'local_user';
+
+        let challenges = [];
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('desafios')
+              .where('senderUid', '==', currentUid)
+              .get();
+            snap.forEach(doc => challenges.push(doc.data()));
+          } catch (e) {
+            console.warn('[Challenges] Falha ao consultar desafios enviados no Firestore:', e);
+          }
+        }
+
+        try {
+          const localSent = JSON.parse(localStorage.getItem('medtutor_challenges_sent') || '[]');
+          localSent.forEach(lc => {
+            if (!challenges.some(c => c.id === lc.id)) {
+              challenges.push(lc);
+            }
+          });
+        } catch (e) {}
+
+        challenges.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+        if (challenges.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice" style="grid-column: 1 / -1;">
+              <span class="icon">📤</span>
+              <p>Você ainda não enviou nenhum desafio.</p>
+              <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
+                Crie duelos com as perguntas que você já dominou para testar seus colegas e alimentar o banco da sua faculdade!
+              </p>
+              <button class="btn-primary-action" style="margin-top: 10px;" onclick="MedTutorChallengesService.switchSubtab('create')">
+                ⚔️ Criar Meu Primeiro Desafio
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = challenges.map(c => {
+          const isPending = c.status === 'pending';
+          const qCount = Array.isArray(c.questions) ? c.questions.length : (c.totalQuestions || 0);
+          const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+
+          return `
+            <div class="challenge-feed-card ${isPending ? 'pending' : 'completed'}">
+              <div class="challenge-feed-header">
+                <span class="challenge-feed-badge ${isPending ? 'badge-pending' : 'badge-completed'}">
+                  ${isPending ? '⏳ Aguardando Colega' : '✅ Respondido'}
+                </span>
+                <span class="challenge-feed-date">${dateStr}</span>
+              </div>
+              <div class="challenge-feed-sender">
+                🎯 Destinatário: <strong>${escapeHtmlText(c.targetEmail)}</strong>
+              </div>
+              <div class="challenge-feed-subject">
+                📚 <strong>${escapeHtmlText(c.subject || 'Disciplina')}</strong>
+              </div>
+              <div class="challenge-feed-meta">
+                <span>🎯 ${qCount} ${qCount === 1 ? 'questão' : 'questões'}</span>
+                <span>🏛️ ${escapeHtmlText(c.institution || 'Universo')}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      updateReceivedBadge(count) {
+        const badge = document.getElementById('challengeReceivedBadge');
+        if (!badge) return;
+        let c = count;
+        if (typeof c !== 'number') {
+          try {
+            const list = JSON.parse(localStorage.getItem('medtutor_challenges_received') || '[]');
+            c = list.filter(i => i.status === 'pending').length;
+          } catch (e) { c = 0; }
+        }
+        if (c > 0) {
+          badge.textContent = c;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      },
+
+      async startChallengeReview(challengeId) {
+        let challenge = null;
+
+        // Tenta achar em cache local recebido
+        try {
+          const rec = JSON.parse(localStorage.getItem('medtutor_challenges_received') || '[]');
+          challenge = rec.find(c => c.id === challengeId);
+        } catch (e) {}
+
+        // Tenta achar em cache local enviado
+        if (!challenge) {
+          try {
+            const sent = JSON.parse(localStorage.getItem('medtutor_challenges_sent') || '[]');
+            challenge = sent.find(c => c.id === challengeId);
+          } catch (e) {}
+        }
+
+        // Tenta Firestore
+        if (!challenge && typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const doc = await firestoreDb.collection('desafios').doc(challengeId).get();
+            if (doc.exists) challenge = doc.data();
+          } catch (e) {
+            console.warn('[Challenges] Erro ao carregar desafio:', e);
+          }
+        }
+
+        if (!challenge || !Array.isArray(challenge.questions) || challenge.questions.length === 0) {
+          alert('Não foi possível carregar as questões deste desafio.');
+          return;
+        }
+
+        this.activeChallenge = challenge;
+        this.activeChallengeIndex = 0;
+        this.activeChallengeVotes = [];
+
+        const modal = document.getElementById('modalChallengePlayer');
+        if (modal) {
+          modal.classList.add('active');
+          modal.style.display = 'flex';
+        }
+
+        this.renderActivePlayerCard();
+      },
+
+      renderActivePlayerCard() {
+        if (!this.activeChallenge) return;
+        const total = this.activeChallenge.questions.length;
+        if (this.activeChallengeIndex >= total) {
+          this.finishChallengeSession();
+          return;
+        }
+
+        const q = this.activeChallenge.questions[this.activeChallengeIndex];
+        const titleEl = document.getElementById('challengePlayerTitle');
+        const subEl = document.getElementById('challengePlayerSubtitle');
+        const counterEl = document.getElementById('challengePlayerCounter');
+        const subjEl = document.getElementById('challengePlayerSubject');
+        const fillEl = document.getElementById('challengePlayerProgressFill');
+        const topicEl = document.getElementById('challengeCardTopic');
+        const qTextEl = document.getElementById('challengeCardQuestionText');
+        const flipPrompt = document.getElementById('challengeCardFlipPrompt');
+        const backArea = document.getElementById('challengeCardBack');
+        const voteArea = document.getElementById('challengeCardVotingArea');
+        const finishScreen = document.getElementById('challengeFinishScreen');
+        const cardBox = document.getElementById('challengeCardBox');
+
+        if (titleEl) titleEl.textContent = `Duelo Clínico: ${this.activeChallenge.senderName || 'Colega'}`;
+        if (subEl) subEl.textContent = `Desafio de ${this.activeChallenge.subject || 'Medicina'}`;
+        if (counterEl) counterEl.textContent = `Questão ${this.activeChallengeIndex + 1} de ${total}`;
+        if (subjEl) subjEl.textContent = this.activeChallenge.subject || 'Disciplina';
+        if (fillEl) fillEl.style.width = `${Math.round((this.activeChallengeIndex / total) * 100)}%`;
+
+        if (topicEl) topicEl.textContent = q.title || q.subject || 'Caso Clínico';
+        if (qTextEl) qTextEl.innerHTML = escapeHtmlText(q.front).replace(/\n/g, '<br>');
+
+        if (cardBox) cardBox.style.display = 'block';
+        if (flipPrompt) flipPrompt.style.display = 'block';
+        if (backArea) backArea.style.display = 'none';
+        if (voteArea) voteArea.style.display = 'none';
+        if (finishScreen) finishScreen.style.display = 'none';
+      },
+
+      revealAnswer() {
+        if (!this.activeChallenge) return;
+        const q = this.activeChallenge.questions[this.activeChallengeIndex];
+        const flipPrompt = document.getElementById('challengeCardFlipPrompt');
+        const backArea = document.getElementById('challengeCardBack');
+        const ansTextEl = document.getElementById('challengeCardAnswerText');
+        const expBox = document.getElementById('challengeCardExplanationBox');
+        const expTextEl = document.getElementById('challengeCardExplanationText');
+        const voteArea = document.getElementById('challengeCardVotingArea');
+
+        if (flipPrompt) flipPrompt.style.display = 'none';
+        if (backArea) backArea.style.display = 'block';
+        if (ansTextEl) ansTextEl.innerHTML = escapeHtmlText(q.back || 'Sem gabarito informado.').replace(/\n/g, '<br>');
+
+        if (q.explanation && expBox && expTextEl) {
+          expBox.style.display = 'block';
+          expTextEl.innerHTML = escapeHtmlText(q.explanation).replace(/\n/g, '<br>');
+        } else if (expBox) {
+          expBox.style.display = 'none';
+        }
+
+        if (voteArea) {
+          voteArea.style.display = 'block';
+          voteArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      },
+
+      async recordVote(direction) {
+        if (!this.activeChallenge) return;
+        const q = this.activeChallenge.questions[this.activeChallengeIndex];
+        const delta = (direction === 'up') ? 1 : -1;
+
+        const voteRecord = {
+          questionId: q.id,
+          vote: delta,
+          timestamp: new Date().toISOString()
+        };
+        this.activeChallengeVotes.push(voteRecord);
+
+        // Feedback imediato
+        if (typeof showToast === 'function') {
+          showToast(direction === 'up' ? '👍 Avaliada como condizente (+1 ponto no banco)!' : '👎 Avaliada como não condizente (-1 ponto no banco)!');
+        }
+
+        // 1. Salva no Banco Coletivo da Faculdade (Firestore + LocalStorage)
+        await this.persistCommunityQuestionVote(q, delta, this.activeChallenge);
+
+        // 2. Avança para a próxima pergunta
+        this.activeChallengeIndex++;
+        setTimeout(() => {
+          this.renderActivePlayerCard();
+        }, 300);
+      },
+
+      async persistCommunityQuestionVote(question, delta, challenge) {
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const institutionName = (currentProfile.faculdade || challenge.institution || 'Universo').trim();
+        const institutionNormalized = institutionName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const disciplineName = (challenge.subject || question.subject || 'Medicina Geral').trim();
+        const disciplineNormalized = disciplineName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const cleanQuestionId = String(question.id || `q_${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        let existing = null;
+
+        // Busca registro anterior no Firestore se disponível
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('questoes_instituicao').doc(cleanQuestionId).get();
+            if (snap.exists) existing = snap.data();
+          } catch (e) {
+            console.warn('[Challenges] Erro ao buscar questão no banco institucional:', e);
+          }
+        }
+
+        // Fallback para cache local
+        if (!existing) {
+          try {
+            const localBank = JSON.parse(localStorage.getItem('medtutor_community_questions') || '[]');
+            existing = localBank.find(item => item.id === cleanQuestionId);
+          } catch (e) {}
+        }
+
+        const thumbsUp = (existing ? (existing.thumbsUpCount || 0) : 0) + (delta === 1 ? 1 : 0);
+        const thumbsDown = (existing ? (existing.thumbsDownCount || 0) : 0) + (delta === -1 ? 1 : 0);
+        const netScore = thumbsUp - thumbsDown; // Pode ser negativo conforme especificação!
+        const history = (existing && Array.isArray(existing.history)) ? existing.history.slice() : [];
+
+        history.push({
+          uid: currentUser.uid || 'local_user',
+          email: currentUser.email || 'estudante@medicina.br',
+          vote: delta,
+          timestamp: new Date().toISOString(),
+          challengeId: challenge.id
+        });
+
+        const questionBankDoc = {
+          id: cleanQuestionId,
+          institution: institutionNormalized,
+          institutionDisplay: institutionName,
+          discipline: disciplineName,
+          disciplineNormalized: disciplineNormalized,
+          front: question.front,
+          back: question.back,
+          title: question.title || disciplineName,
+          explanation: question.explanation || '',
+          thumbsUpCount: thumbsUp,
+          thumbsDownCount: thumbsDown,
+          score: netScore,
+          totalVotes: thumbsUp + thumbsDown,
+          lastVotedAt: new Date().toISOString(),
+          history: history,
+          createdAt: existing?.createdAt || new Date().toISOString()
+        };
+
+        // 1. Salva em questoes_instituicao no Firestore
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            await firestoreDb.collection('questoes_instituicao').doc(cleanQuestionId).set(questionBankDoc, { merge: true });
+            // Salva também na subcoleção estruturada da instituição para garantia
+            await firestoreDb.collection('instituicoes').doc(institutionNormalized)
+              .collection('disciplinas').doc(disciplineNormalized)
+              .collection('questoes_comunitarias').doc(cleanQuestionId)
+              .set(questionBankDoc, { merge: true });
+          } catch (e) {
+            console.warn('[Challenges] Erro ao gravar questão no Firestore institucional:', e);
+          }
+        }
+
+        // 2. Salva em localStorage medtutor_community_questions
+        try {
+          let localBank = JSON.parse(localStorage.getItem('medtutor_community_questions') || '[]');
+          const idx = localBank.findIndex(item => item.id === cleanQuestionId);
+          if (idx >= 0) {
+            localBank[idx] = questionBankDoc;
+          } else {
+            localBank.unshift(questionBankDoc);
+          }
+          localStorage.setItem('medtutor_community_questions', JSON.stringify(localBank));
+        } catch (e) {}
+      },
+
+      async finishChallengeSession() {
+        if (!this.activeChallenge) return;
+
+        const cardBox = document.getElementById('challengeCardBox');
+        const voteArea = document.getElementById('challengeCardVotingArea');
+        const finishScreen = document.getElementById('challengeFinishScreen');
+        const summaryList = document.getElementById('challengeFinishSummaryList');
+        const fillEl = document.getElementById('challengePlayerProgressFill');
+
+        if (fillEl) fillEl.style.width = '100%';
+        if (cardBox) cardBox.style.display = 'none';
+        if (voteArea) voteArea.style.display = 'none';
+
+        // Atualiza status do desafio para 'completed'
+        this.activeChallenge.status = 'completed';
+        this.activeChallenge.completedAt = new Date().toISOString();
+
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            await firestoreDb.collection('desafios').doc(this.activeChallenge.id).update({
+              status: 'completed',
+              completedAt: this.activeChallenge.completedAt,
+              votes: this.activeChallengeVotes
+            });
+          } catch (e) {
+            console.warn('[Challenges] Erro ao marcar desafio como concluído no Firestore:', e);
+          }
+        }
+
+        // Atualiza em local storage
+        try {
+          let recList = JSON.parse(localStorage.getItem('medtutor_challenges_received') || '[]');
+          const idx = recList.findIndex(c => c.id === this.activeChallenge.id);
+          if (idx >= 0) {
+            recList[idx].status = 'completed';
+            recList[idx].completedAt = this.activeChallenge.completedAt;
+            localStorage.setItem('medtutor_challenges_received', JSON.stringify(recList));
+          }
+        } catch (e) {}
+
+        if (finishScreen) finishScreen.style.display = 'block';
+
+        if (summaryList) {
+          summaryList.innerHTML = this.activeChallenge.questions.map((q, idx) => {
+            const v = this.activeChallengeVotes.find(vote => vote.questionId === q.id);
+            const isUp = v ? v.vote === 1 : true;
+            return `
+              <div class="summary-vote-item ${isUp ? 'positive' : 'negative'}">
+                <span class="vote-icon">${isUp ? '👍' : '👎'}</span>
+                <span class="vote-text"><strong>${escapeHtmlText(q.title || `Questão #${idx + 1}`)}:</strong> ${isUp ? 'Condizente com a matéria (+1)' : 'Não condizente (-1)'}</span>
+              </div>
+            `;
+          }).join('');
+        }
+
+        this.updateReceivedBadge();
+      },
+
+      closePlayerModal() {
+        const modal = document.getElementById('modalChallengePlayer');
+        if (modal) {
+          modal.classList.remove('active');
+          modal.style.display = 'none';
+        }
+        this.activeChallenge = null;
+        this.activeChallengeIndex = 0;
+        this.activeChallengeVotes = [];
+
+        if (this.currentSubtab === 'received') {
+          this.loadInbox();
+        } else if (this.currentSubtab === 'bank') {
+          this.loadCommunityBank();
+        }
+      },
+
+      async loadCommunityBank() {
+        const container = document.getElementById('communityQuestionsList');
+        if (!container) return;
+
+        container.innerHTML = '<div class="empty-state-notice" style="grid-column: 1 / -1;"><span class="icon">⏳</span><p>Carregando banco de questões da faculdade...</p></div>';
+
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const instTitle = document.getElementById('bankInstitutionTitle');
+        const userSchool = currentProfile.faculdade || 'Universo';
+        if (instTitle) {
+          instTitle.textContent = `🏛️ Banco Coletivo de Questões: ${userSchool}`;
+        }
+
+        const institutionNormalized = userSchool.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        let questions = [];
+
+        // Busca no Firestore
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('questoes_instituicao')
+              .where('institution', '==', institutionNormalized)
+              .get();
+            snap.forEach(doc => questions.push(doc.data()));
+          } catch (e) {
+            console.warn('[Challenges] Erro ao buscar questoes_instituicao no Firestore:', e);
+          }
+        }
+
+        // Mescla com localStorage
+        try {
+          const localBank = JSON.parse(localStorage.getItem('medtutor_community_questions') || '[]');
+          localBank.forEach(lq => {
+            if (!questions.some(q => q.id === lq.id)) {
+              questions.push(lq);
+            }
+          });
+        } catch (e) {}
+
+        this.communityQuestionsCache = questions;
+        this.renderCommunityBank();
+      },
+
+      renderCommunityBank() {
+        const container = document.getElementById('communityQuestionsList');
+        const filterSelect = document.getElementById('bankSubjectFilterSelect');
+        const selectedSubj = filterSelect ? filterSelect.value : 'all';
+
+        let list = this.communityQuestionsCache || [];
+        if (selectedSubj && selectedSubj !== 'all') {
+          const norm = selectedSubj.toLowerCase();
+          list = list.filter(q => {
+            const s = (q.discipline || '').toLowerCase();
+            return s === norm || s.includes(norm) || norm.includes(s);
+          });
+        }
+
+        // Estatísticas
+        const total = list.length;
+        const approved = list.filter(q => (q.score || 0) > 0).length;
+        const inReview = list.filter(q => (q.score || 0) < 0).length;
+
+        const elTotal = document.getElementById('bankTotalCount');
+        const elApp = document.getElementById('bankApprovedCount');
+        const elRev = document.getElementById('bankReviewCount');
+        if (elTotal) elTotal.textContent = total;
+        if (elApp) elApp.textContent = approved;
+        if (elRev) elRev.textContent = inReview;
+
+        if (!container) return;
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice" style="grid-column: 1 / -1;">
+              <span class="icon">🏛️</span>
+              <p>Nenhuma questão avaliada para esta disciplina ainda.</p>
+              <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
+                Conforme os estudantes responderem aos desafios e avaliarem com 👍 ou 👎, as questões preencherão este banco coletivo.
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        // Ordena por escore decrescente
+        list.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+        container.innerHTML = list.map(q => {
+          const score = typeof q.score === 'number' ? q.score : ((q.thumbsUpCount || 0) - (q.thumbsDownCount || 0));
+          const isPos = score > 0;
+          const isNeg = score < 0;
+          const scoreClass = isPos ? 'score-positive' : (isNeg ? 'score-negative' : 'score-neutral');
+          const scorePrefix = isPos ? '+' : '';
+          const safeId = String(q.id).replace(/"/g, '&quot;');
+          const totalVotes = (q.thumbsUpCount || 0) + (q.thumbsDownCount || 0);
+
+          return `
+            <div class="community-q-card ${isNeg ? 'card-negative' : ''}">
+              <div class="community-q-header">
+                <span class="community-q-subject">${escapeHtmlText(q.discipline || 'Disciplina')}</span>
+                <span class="score-pill ${scoreClass}" title="Escore líquido: ${scorePrefix}${score} (votos positivos menos negativos)">
+                  ${scorePrefix}${score} ${isPos ? '👍' : (isNeg ? '👎' : '⚖️')}
+                </span>
+              </div>
+              <div class="community-q-front">
+                <strong>${escapeHtmlText(q.title || 'Questão')}</strong>
+                <p style="margin: 6px 0 0 0;">${escapeHtmlText(q.front || '')}</p>
+              </div>
+              <div class="community-q-back">
+                <div class="answer-badge">Gabarito:</div>
+                <p style="margin: 4px 0 0 0;">${escapeHtmlText(q.back || '')}</p>
+                ${q.explanation ? `<p class="explanation-snippet">💡 <em>${escapeHtmlText(q.explanation)}</em></p>` : ''}
+              </div>
+              <div class="community-q-footer">
+                <div class="community-q-votes-meta">
+                  <span>👍 ${q.thumbsUpCount || 0}</span>
+                  <span style="margin: 0 4px;">•</span>
+                  <span>👎 ${q.thumbsDownCount || 0}</span>
+                  <span style="margin: 0 4px;">•</span>
+                  <span style="opacity: 0.7;">${totalVotes} avaliações</span>
+                </div>
+                <button class="btn-outline-action primary" style="font-size: 11px; padding: 4px 10px;" onclick="MedTutorChallengesService.addCommunityQuestionToDeck('${safeId}')" title="Copiar questão para a sua repetição espaçada pessoal">
+                  📥 Adicionar aos meus Flashcards
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      addCommunityQuestionToDeck(questionId) {
+        const q = (this.communityQuestionsCache || []).find(item => item.id === questionId);
+        if (!q) return;
+
+        const newCard = {
+          id: 'fc-comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+          subject: q.discipline || currentStudySubject || 'Medicina',
+          question: q.front,
+          flashcard: {
+            front: q.front,
+            back: q.back,
+            explanation: q.explanation || ''
+          },
+          reference_answer: q.back,
+          explanation: q.explanation || '',
+          topic: q.title || q.discipline || 'Banco Comunitário',
+          source: 'banco-faculdade',
+          srs: {
+            reps: 0,
+            interval: 0,
+            easeFactor: 2.5,
+            lapses: 0,
+            state: 'new',
+            dueDate: null,
+            lastReviewed: null,
+            history: []
+          },
+          createdAt: new Date().toISOString()
+        };
+
+        if (!Array.isArray(sharedQuestionsBank)) sharedQuestionsBank = [];
+        sharedQuestionsBank.unshift(newCard);
+        if (typeof saveSharedQuestionsBank === 'function') saveSharedQuestionsBank();
+        if (typeof updateCardDisplay === 'function') updateCardDisplay();
+
+        if (typeof showToast === 'function') {
+          showToast(`✅ Questão adicionada aos seus Flashcards de "${newCard.subject}"!`);
+        } else {
+          alert(`✅ Questão adicionada aos seus Flashcards de "${newCard.subject}"!`);
+        }
+      }
+    };
+
+    // Exportações globais para os manipuladores de evento do HTML
+    function switchChallengeSubtab(tabName) {
+      MedTutorChallengesService.switchSubtab(tabName);
+    }
+    function selectClassmateEmail(email) {
+      MedTutorChallengesService.selectClassmate(email);
+    }
+    function loadEligibleChallengeQuestions() {
+      MedTutorChallengesService.loadEligibleQuestions();
+    }
+    function toggleEligibleQuestionItem(id) {
+      MedTutorChallengesService.toggleEligibleItem(id);
+    }
+    function toggleSelectAllEligibleQuestions(state) {
+      MedTutorChallengesService.toggleSelectAll(state);
+    }
+    function handleSendChallengeSubmit() {
+      MedTutorChallengesService.sendChallenge();
+    }
+    function loadChallengesInbox() {
+      MedTutorChallengesService.loadInbox();
+    }
+    function loadChallengesOutbox() {
+      MedTutorChallengesService.loadOutbox();
+    }
+    function loadCommunityQuestionsBank() {
+      MedTutorChallengesService.loadCommunityBank();
+    }
+    function renderCommunityQuestionsBank() {
+      MedTutorChallengesService.renderCommunityBank();
+    }
+    function revealChallengeCardAnswer() {
+      MedTutorChallengesService.revealAnswer();
+    }
+    function recordChallengeVote(direction) {
+      MedTutorChallengesService.recordVote(direction);
+    }
+    function closeChallengePlayerModal() {
+      MedTutorChallengesService.closePlayerModal();
+    }
+
+    if (typeof window !== 'undefined') {
+      window.MedTutorChallengesService = MedTutorChallengesService;
+      window.switchChallengeSubtab = switchChallengeSubtab;
+      window.selectClassmateEmail = selectClassmateEmail;
+      window.loadEligibleChallengeQuestions = loadEligibleChallengeQuestions;
+      window.toggleEligibleQuestionItem = toggleEligibleQuestionItem;
+      window.toggleSelectAllEligibleQuestions = toggleSelectAllEligibleQuestions;
+      window.handleSendChallengeSubmit = handleSendChallengeSubmit;
+      window.loadChallengesInbox = loadChallengesInbox;
+      window.loadChallengesOutbox = loadChallengesOutbox;
+      window.loadCommunityQuestionsBank = loadCommunityQuestionsBank;
+      window.renderCommunityQuestionsBank = renderCommunityQuestionsBank;
+      window.revealChallengeCardAnswer = revealChallengeCardAnswer;
+      window.recordChallengeVote = recordChallengeVote;
+      window.closeChallengePlayerModal = closeChallengePlayerModal;
+    }
+
+    initChatDriveMaterials();
       renderSharedStudyItems();
       renderSceBars();
       renderSceTimeline();

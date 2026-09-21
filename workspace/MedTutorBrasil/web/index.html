@@ -70,6 +70,10 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
           SCE & Waze de Estudos
         </button>
+        <button class="nav-link" onclick="navigateTab('challenges', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5l-6 6"/><path d="M8 8l-4-4"/><path d="M5 3L3 5"/></svg>
+          Desafios
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -93,7 +97,7 @@
             <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Upload de Material</span>
           </button>
-          <button class="btn-outline-action" onclick="openSyllabusModal()" title="Importar ementa da sua faculdade">
+          <button class="btn-outline-action" id="btnTopbarSyllabus" onclick="openSyllabusModal()" title="Importar ementa da sua faculdade">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             <span>Ementa</span>
           </button>
@@ -800,6 +804,161 @@
 
         </section>
 
+        <!-- =========================================================
+             6. ABA DE DESAFIOS CLÍNICOS & BANCO COLETIVO DA FACULDADE
+             ========================================================= -->
+        <section id="tab-challenges" class="tab-section">
+          <!-- Top Sub-Navigation Bar -->
+          <div class="challenges-subnav-bar">
+            <div class="challenges-subnav-group">
+              <button class="challenges-subnav-btn active" id="subtabChallengeCreate" onclick="switchChallengeSubtab('create')">
+                <span class="icon">⚔️</span>
+                <span>Criar Desafio</span>
+              </button>
+              <button class="challenges-subnav-btn" id="subtabChallengeReceived" onclick="switchChallengeSubtab('received')">
+                <span class="icon">📬</span>
+                <span>Desafios Recebidos</span>
+                <span class="subnav-badge" id="challengeReceivedBadge" style="display: none;">0</span>
+              </button>
+              <button class="challenges-subnav-btn" id="subtabChallengeSent" onclick="switchChallengeSubtab('sent')">
+                <span class="icon">📤</span>
+                <span>Desafios Enviados</span>
+              </button>
+              <button class="challenges-subnav-btn" id="subtabChallengeBank" onclick="switchChallengeSubtab('bank')">
+                <span class="icon">🏛️</span>
+                <span>Banco da Faculdade</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- PAINEL 1: CRIAR NOVO DESAFIO -->
+          <div id="panelChallengeCreate" class="challenge-subpanel active">
+            <div class="challenge-create-header">
+              <div class="challenge-create-intro">
+                <h2>⚔️ Novo Desafio Clínico Entre Estudantes</h2>
+                <p>Selecione perguntas que você já <strong>dominou e acertou em Flashcards</strong> para desafiar um colega de faculdade. O colega responderá e avaliará a pertinência da questão para a disciplina.</p>
+              </div>
+            </div>
+
+            <!-- Form: Destinatário e Matéria -->
+            <div class="challenge-form-card">
+              <div class="challenge-form-grid">
+                <div class="form-group">
+                  <label for="challengeTargetEmail">1. E-mail do Estudante Desafiado:</label>
+                  <input type="email" id="challengeTargetEmail" class="chat-input" placeholder="ex: colega@medicina.universo.br" autocomplete="off">
+                  <div class="challenge-classmates-hint" id="challengeClassmateHintsContainer">
+                    <span style="font-size: 11px; color: var(--text-muted);">Sugestões de colegas:</span>
+                    <div id="challengeClassmateChips" class="classmate-chips-row"></div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="challengeSubjectSelect">2. Disciplina da Ementa:</label>
+                  <select id="challengeSubjectSelect" class="study-nav-select" onchange="loadEligibleChallengeQuestions()">
+                    <!-- Populado dinamicamente -->
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lista de Perguntas Elegíveis -->
+            <div class="challenge-questions-selection-card">
+              <div class="selection-card-header">
+                <div>
+                  <h3 style="margin: 0; font-size: 14px; font-weight: 700;">3. Selecione as Questões para o Desafio</h3>
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                    ✅ Apenas questões <strong>respondidas corretamente por você em Flashcard</strong> estão disponíveis.
+                  </div>
+                </div>
+                <div class="selection-card-actions">
+                  <button class="btn-outline-action" style="font-size: 11px; padding: 4px 10px;" onclick="toggleSelectAllEligibleQuestions(true)">Selecionar Todas</button>
+                  <button class="btn-outline-action" style="font-size: 11px; padding: 4px 10px;" onclick="toggleSelectAllEligibleQuestions(false)">Limpar</button>
+                </div>
+              </div>
+
+              <!-- Container das Perguntas Elegíveis -->
+              <div id="eligibleQuestionsList" class="eligible-questions-container">
+                <!-- Populado dinamicamente -->
+              </div>
+
+              <!-- Rodapé Flutuante de Envio -->
+              <div class="challenge-create-footer">
+                <div class="selected-counter">
+                  <span id="challengeSelectedCounter">0</span> questões selecionadas para o duelo
+                </div>
+                <button class="btn-primary-action" id="btnSubmitSendChallenge" onclick="handleSendChallengeSubmit()">
+                  🚀 Enviar Desafio Clínico
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PAINEL 2: DESAFIOS RECEBIDOS (INBOX) -->
+          <div id="panelChallengeReceived" class="challenge-subpanel" style="display: none;">
+            <div class="challenge-panel-header">
+              <div>
+                <h2>📬 Desafios Recebidos</h2>
+                <p>Responda aos duelos enviados por seus colegas, revise os flashcards e avalie a pertinência de cada questão.</p>
+              </div>
+              <button class="btn-outline-action" onclick="loadChallengesInbox()">🔄 Atualizar</button>
+            </div>
+            <div id="receivedChallengesList" class="challenges-cards-grid">
+              <!-- Populado dinamicamente -->
+            </div>
+          </div>
+
+          <!-- PAINEL 3: DESAFIOS ENVIADOS (OUTBOX) -->
+          <div id="panelChallengeSent" class="challenge-subpanel" style="display: none;">
+            <div class="challenge-panel-header">
+              <div>
+                <h2>📤 Desafios Enviados</h2>
+                <p>Acompanhe o andamento dos desafios que você lançou e veja as avaliações dos seus colegas.</p>
+              </div>
+              <button class="btn-outline-action" onclick="loadChallengesOutbox()">🔄 Atualizar</button>
+            </div>
+            <div id="sentChallengesList" class="challenges-cards-grid">
+              <!-- Populado dinamicamente -->
+            </div>
+          </div>
+
+          <!-- PAINEL 4: BANCO COMUNITÁRIO DA FACULDADE -->
+          <div id="panelChallengeBank" class="challenge-subpanel" style="display: none;">
+            <div class="challenge-panel-header">
+              <div>
+                <h2 id="bankInstitutionTitle">🏛️ Banco Coletivo de Questões da Faculdade</h2>
+                <p>Questões validadas pelos estudantes da instituição com histórico de aprovação (👍) e ressalvas (👎).</p>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <select id="bankSubjectFilterSelect" class="study-nav-select" onchange="renderCommunityQuestionsBank()">
+                  <option value="all">Todas as Disciplinas</option>
+                </select>
+                <button class="btn-outline-action" onclick="loadCommunityQuestionsBank()">🔄 Recarregar</button>
+              </div>
+            </div>
+
+            <!-- Métricas do Banco -->
+            <div class="bank-stats-grid">
+              <div class="bank-stat-card">
+                <span class="stat-num" id="bankTotalCount">0</span>
+                <span class="stat-lbl">Questões no Banco</span>
+              </div>
+              <div class="bank-stat-card positive">
+                <span class="stat-num" id="bankApprovedCount">0</span>
+                <span class="stat-lbl">Recomendadas (Escore &gt; 0)</span>
+              </div>
+              <div class="bank-stat-card negative">
+                <span class="stat-num" id="bankReviewCount">0</span>
+                <span class="stat-lbl">Em Revisão (Escore &lt; 0)</span>
+              </div>
+            </div>
+
+            <!-- Lista de Questões Avaliadas -->
+            <div id="communityQuestionsList" class="community-questions-grid">
+              <!-- Populado dinamicamente -->
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- MOBILE BOTTOM NAV (iOS & ANDROID) -->
@@ -823,6 +982,10 @@
         <button class="mobile-nav-btn" onclick="navigateTab('sce', this)">
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
           <span>SCE</span>
+        </button>
+        <button class="mobile-nav-btn" onclick="navigateTab('challenges', this)">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5l-6 6"/><path d="M8 8l-4-4"/><path d="M5 3L3 5"/></svg>
+          <span>Desafios</span>
         </button>
       </nav>
 
@@ -2804,6 +2967,103 @@
     </div>
   </aside>
   <div class="doubts-backdrop" id="doubtsBackdrop" onclick="closeDoubtsDrawer()" aria-hidden="true"></div>
+
+  <!-- =========================================================
+       MODAL DE EXECUÇÃO DO DESAFIO (FLASHCARD + AVALIAÇÃO 👍/👎)
+       ========================================================= -->
+  <div class="modal-overlay" id="modalChallengePlayer" onclick="event.stopPropagation()">
+    <div class="modal-window challenge-player-modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="challenge-player-icon">⚔️</div>
+          <div>
+            <h2 id="challengePlayerTitle" style="font-size: 15px; margin: 0;">Duelo Clínico em Andamento</h2>
+            <div id="challengePlayerSubtitle" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">Desafio enviado por ...</div>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="closeChallengePlayerModal()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Barra de Progresso do Duelo -->
+      <div class="challenge-player-progress-bar">
+        <div class="challenge-progress-fill" id="challengePlayerProgressFill" style="width: 0%;"></div>
+      </div>
+      <div class="challenge-player-meta">
+        <span id="challengePlayerCounter">Questão 1 de 5</span>
+        <span id="challengePlayerSubject" class="disease-tag" style="background: rgba(0, 229, 255, 0.1); color: var(--neon);">Disciplina</span>
+      </div>
+
+      <!-- Área do Flashcard -->
+      <div class="challenge-flashcard-stage">
+        <div class="challenge-card-box" id="challengeCardBox">
+          <div class="challenge-card-topic" id="challengeCardTopic">Tema Clínico</div>
+          
+          <!-- Frente: Enunciado / Caso Clínico -->
+          <div class="challenge-card-front" id="challengeCardFront">
+            <div id="challengeCardQuestionText" class="challenge-question-content">Carregando pergunta...</div>
+          </div>
+
+          <!-- Botão para Revelar Resposta -->
+          <div id="challengeCardFlipPrompt" style="text-align: center; margin: 16px 0 8px 0;">
+            <button class="btn-outline-action primary" onclick="revealChallengeCardAnswer()" style="padding: 8px 18px; font-weight: 700;">
+              🔄 Revelar Resposta &amp; Gabarito
+            </button>
+          </div>
+
+          <!-- Verso: Resposta, Justificativa e Pérola Clínica -->
+          <div class="challenge-card-back" id="challengeCardBack" style="display: none;">
+            <div class="challenge-answer-box">
+              <div class="answer-badge">Resposta Correta &amp; Conduta:</div>
+              <div id="challengeCardAnswerText" class="answer-text"></div>
+            </div>
+            <div class="challenge-explanation-box" id="challengeCardExplanationBox">
+              <div class="explanation-title">💡 Justificativa Clínica / Diretriz:</div>
+              <div id="challengeCardExplanationText" class="explanation-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção de Avaliação por Polegares (Obrigatória antes de avançar) -->
+        <div class="challenge-card-voting-area" id="challengeCardVotingArea" style="display: none;">
+          <div class="voting-prompt-title">
+            <span>Avaliação do Conteúdo:</span>
+            <span style="font-weight: 400; color: var(--text-secondary);">Esta questão é condizente com o nível e a ementa da matéria?</span>
+          </div>
+          <div class="voting-buttons-row">
+            <button class="thumb-vote-btn thumb-positive" id="btnVoteThumbUp" onclick="recordChallengeVote('up')" title="Condizente com a matéria (+1 ponto no banco da faculdade)">
+              <span class="thumb-icon">👍</span>
+              <span class="thumb-label">
+                <strong>Condizente</strong>
+                <small>Pergunta Boa (+1)</small>
+              </span>
+            </button>
+            <button class="thumb-vote-btn thumb-negative" id="btnVoteThumbDown" onclick="recordChallengeVote('down')" title="Não condizente com a matéria (-1 ponto no banco da faculdade)">
+              <span class="thumb-icon">👎</span>
+              <span class="thumb-label">
+                <strong>Não Condizente</strong>
+                <small>Pergunta Ruim (-1)</small>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tela de Conclusão do Duelo -->
+        <div class="challenge-finish-screen" id="challengeFinishScreen" style="display: none;">
+          <div class="finish-badge">🏆</div>
+          <h3 style="font-size: 20px; font-weight: 800; color: var(--neon); margin: 6px 0;">Desafio Concluído com Sucesso!</h3>
+          <p style="font-size: 13px; color: var(--text-secondary); max-width: 440px; margin: 0 auto 16px auto;">
+            Todas as perguntas foram respondidas e avaliadas. As questões foram registradas no <strong>Banco Coletivo da sua Faculdade</strong> com os escores atualizados.
+          </p>
+          <div id="challengeFinishSummaryList" class="finish-summary-list"></div>
+          <button class="btn-primary-action" style="margin-top: 14px; padding: 10px 24px;" onclick="closeChallengePlayerModal()">
+            Finalizar e Voltar para Desafios
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
