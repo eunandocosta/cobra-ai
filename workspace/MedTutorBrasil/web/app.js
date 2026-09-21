@@ -26632,6 +26632,64 @@ function escapeHtmlText(str) {
 // =========================================================
     // 16. SERVIÇO DE DESAFIOS CLÍNICOS & BANCO DA FACULDADE
     // =========================================================
+    function getTopicsForSubject(subjectName) {
+      if (!subjectName) return [];
+      const normSubject = subjectName.trim().toLowerCase();
+      const topicsSet = new Set();
+
+      // 1. Matérias/Tópicos da ementa cadastrada (universityCurriculum ou CANONICAL_UNIVERSO_CURRICULUM)
+      let periods = (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0)
+        ? universityCurriculum
+        : (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined' ? CANONICAL_UNIVERSO_CURRICULUM : []);
+
+      periods.forEach(p => {
+        (p.subjects || []).forEach(s => {
+          const sName = typeof s === 'string' ? s : s.name;
+          if (!sName) return;
+          const normSName = sName.trim().toLowerCase();
+          if (normSName === normSubject || normSName.includes(normSubject) || normSubject.includes(normSName)) {
+            if (s && Array.isArray(s.topics)) {
+              s.topics.forEach(t => {
+                if (t && typeof t === 'string' && t.trim() && t.trim().toLowerCase() !== normSName) {
+                  topicsSet.add(t.trim());
+                }
+              });
+            }
+          }
+        });
+      });
+
+      // 2. Matérias/Tópicos das questões dos Flashcards (sharedQuestionsBank)
+      if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
+        sharedQuestionsBank.forEach(q => {
+          if (!q) return;
+          const qSubj = (q.subject || '').trim().toLowerCase();
+          if (qSubj === normSubject || qSubj.includes(normSubject) || normSubject.includes(qSubj)) {
+            const t = (q.topic || q.flashcardTitle || q.titulo_flashcard || q.disease || q.learningFocus || '').trim();
+            if (t && t.length > 1 && t.toLowerCase() !== normSubject) {
+              topicsSet.add(t);
+            }
+          }
+        });
+      }
+
+      // 3. Matérias/Tópicos dos materiais de estudo do ChatDrive
+      if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
+        chatDriveMaterials.forEach(m => {
+          if (!m) return;
+          const mSubj = (m.subject || '').trim().toLowerCase();
+          if (mSubj === normSubject || mSubj.includes(normSubject) || normSubject.includes(mSubj)) {
+            const t = (m.topic || m.learningFocus || m.title || '').trim();
+            if (t && t.length > 1 && t.toLowerCase() !== normSubject) {
+              topicsSet.add(t);
+            }
+          }
+        });
+      }
+
+      return Array.from(topicsSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
     const MedTutorChallengesService = {
       activeChallenge: null,
       activeChallengeIndex: 0,
@@ -26681,6 +26739,35 @@ function escapeHtmlText(str) {
         } else if (tabName === 'bank') {
           this.loadCommunityBank();
         }
+      },
+
+      populateTopicSelect(subjectName) {
+        const topicSelect = document.getElementById('challengeTopicSelect');
+        if (!topicSelect) return;
+        const currentVal = topicSelect.value || 'all';
+        topicSelect.innerHTML = '<option value="all">Todas as Matérias / Tópicos</option>';
+
+        if (!subjectName) return;
+
+        const topics = getTopicsForSubject(subjectName);
+        topics.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          if (t === currentVal) opt.selected = true;
+          topicSelect.appendChild(opt);
+        });
+      },
+
+      onSubjectChange() {
+        const select = document.getElementById('challengeSubjectSelect');
+        const subject = select ? select.value : '';
+        this.populateTopicSelect(subject);
+        this.loadEligibleQuestions();
+      },
+
+      onTopicChange() {
+        this.loadEligibleQuestions();
       },
 
       populateSubjectSelects() {
@@ -26739,6 +26826,8 @@ function escapeHtmlText(str) {
               createSelect.appendChild(opt);
             });
           }
+
+          this.populateTopicSelect(createSelect.value);
         }
 
         if (bankSelect) {
@@ -26833,10 +26922,13 @@ function escapeHtmlText(str) {
 
       loadEligibleQuestions() {
         const select = document.getElementById('challengeSubjectSelect');
+        const topicSelect = document.getElementById('challengeTopicSelect');
         const container = document.getElementById('eligibleQuestionsList');
         if (!container) return;
 
         const targetSubject = select ? select.value.trim() : '';
+        const targetTopic = topicSelect ? topicSelect.value.trim() : 'all';
+
         this.selectedQuestionIds.clear();
         this.updateSelectedCounter();
 
@@ -26861,12 +26953,29 @@ function escapeHtmlText(str) {
         }
 
         const normTarget = targetSubject.toLowerCase();
+        const normTopic = targetTopic.toLowerCase();
+
         // Critério estrito: Questões existentes já respondidas corretamente no Flashcard
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
           const qSubj = (q.subject || '').trim().toLowerCase();
           const matchesSubject = (qSubj === normTarget || qSubj.includes(normTarget) || normTarget.includes(qSubj));
           if (!matchesSubject) return false;
+
+          // Filtro por Matéria / Tópico se selecionado
+          if (targetTopic && targetTopic !== 'all') {
+            const qTopic = (q.topic || '').trim().toLowerCase();
+            const qTitle = (q.flashcardTitle || q.titulo_flashcard || q.title || '').trim().toLowerCase();
+            const qFocus = (q.learningFocus || q.disease || '').trim().toLowerCase();
+            const matchesTopic = (
+              qTopic === normTopic ||
+              qTitle === normTopic ||
+              qFocus === normTopic ||
+              (qTopic && (qTopic.includes(normTopic) || normTopic.includes(qTopic))) ||
+              (qTitle && (qTitle.includes(normTopic) || normTopic.includes(qTitle)))
+            );
+            if (!matchesTopic) return false;
+          }
 
           const isMasteredInSRS = Boolean(
             (q.srs && typeof q.srs.reps === 'number' && q.srs.reps > 0) ||
@@ -26883,7 +26992,7 @@ function escapeHtmlText(str) {
           container.innerHTML = `
             <div class="empty-state-notice">
               <span class="icon">🔒</span>
-              <p>Nenhuma questão dominada encontrada para <strong>"${targetSubject}"</strong>.</p>
+              <p>Nenhuma questão dominada encontrada para <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''}.</p>
               <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-secondary);">
                 Apenas perguntas que você <strong>já acertou na repetição espaçada (SRS)</strong> podem ser enviadas em desafios.
               </p>
@@ -26925,6 +27034,17 @@ function escapeHtmlText(str) {
         if (this.selectedQuestionIds.has(id)) {
           this.selectedQuestionIds.delete(id);
         } else {
+          if (this.selectedQuestionIds.size >= 10) {
+            const msg = '⚠️ Limite atingido: cada desafio clínico suporta no máximo 10 questões.';
+            if (typeof showToast === 'function') {
+              showToast(msg);
+            } else {
+              alert(msg);
+            }
+            const chkEl = document.getElementById(`chk-q-${id}`);
+            if (chkEl) chkEl.checked = false;
+            return;
+          }
           this.selectedQuestionIds.add(id);
         }
         const itemEl = document.getElementById(`item-q-${id}`);
@@ -26936,10 +27056,14 @@ function escapeHtmlText(str) {
       },
 
       toggleSelectAll(state) {
+        this.selectedQuestionIds.clear();
         if (state) {
-          this.eligibleQuestionsCache.forEach(q => this.selectedQuestionIds.add(String(q.id)));
-        } else {
-          this.selectedQuestionIds.clear();
+          const toSelect = this.eligibleQuestionsCache.slice(0, 10);
+          toSelect.forEach(q => this.selectedQuestionIds.add(String(q.id)));
+          if (this.eligibleQuestionsCache.length > 10) {
+            const msg = 'ℹ️ Selecionadas as 10 primeiras questões (limite máximo permitido).';
+            if (typeof showToast === 'function') showToast(msg);
+          }
         }
         this.eligibleQuestionsCache.forEach(q => {
           const id = String(q.id);
@@ -26954,7 +27078,15 @@ function escapeHtmlText(str) {
 
       updateSelectedCounter() {
         const counter = document.getElementById('challengeSelectedCounter');
-        if (counter) counter.textContent = this.selectedQuestionIds.size;
+        if (counter) {
+          const size = this.selectedQuestionIds.size;
+          counter.innerHTML = `${size} / 10`;
+          if (size >= 10) {
+            counter.style.color = '#ffb300';
+          } else {
+            counter.style.color = 'var(--neon)';
+          }
+        }
       },
 
       async sendChallenge() {
@@ -26977,6 +27109,11 @@ function escapeHtmlText(str) {
 
         if (this.selectedQuestionIds.size === 0) {
           alert('Selecione pelo menos uma questão dominada em Flashcard para compor o desafio.');
+          return;
+        }
+
+        if (this.selectedQuestionIds.size > 10) {
+          alert('⚠️ O limite máximo por desafio é de 10 questões. Por favor, desmarque algumas questões.');
           return;
         }
 
@@ -27729,6 +27866,12 @@ function escapeHtmlText(str) {
     function selectClassmateEmail(email) {
       MedTutorChallengesService.selectClassmate(email);
     }
+    function handleChallengeSubjectChange() {
+      MedTutorChallengesService.onSubjectChange();
+    }
+    function handleChallengeTopicChange() {
+      MedTutorChallengesService.onTopicChange();
+    }
     function loadEligibleChallengeQuestions() {
       MedTutorChallengesService.loadEligibleQuestions();
     }
@@ -27767,6 +27910,8 @@ function escapeHtmlText(str) {
       window.MedTutorChallengesService = MedTutorChallengesService;
       window.switchChallengeSubtab = switchChallengeSubtab;
       window.selectClassmateEmail = selectClassmateEmail;
+      window.handleChallengeSubjectChange = handleChallengeSubjectChange;
+      window.handleChallengeTopicChange = handleChallengeTopicChange;
       window.loadEligibleChallengeQuestions = loadEligibleChallengeQuestions;
       window.toggleEligibleQuestionItem = toggleEligibleQuestionItem;
       window.toggleSelectAllEligibleQuestions = toggleSelectAllEligibleQuestions;
@@ -28315,12 +28460,44 @@ function escapeHtmlText(str) {
         this.onDirectDisciplineChange();
       },
 
+      populateDirectTopics(subjectName) {
+        const topicSelect = document.getElementById('directChallengeTopicSelect');
+        if (!topicSelect) return;
+        const currentVal = topicSelect.value || 'all';
+        topicSelect.innerHTML = '<option value="all">Todas as Matérias / Conteúdos</option>';
+
+        if (!subjectName) return;
+
+        const topics = getTopicsForSubject(subjectName);
+        topics.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          if (t === currentVal) opt.selected = true;
+          topicSelect.appendChild(opt);
+        });
+      },
+
       onDirectDisciplineChange() {
         const discSelect = document.getElementById('directChallengeDisciplineSelect');
+        const targetSubject = discSelect ? discSelect.value.trim() : '';
+        this.populateDirectTopics(targetSubject);
+        this.loadDirectEligibleQuestions();
+      },
+
+      onDirectTopicChange() {
+        this.loadDirectEligibleQuestions();
+      },
+
+      loadDirectEligibleQuestions() {
+        const discSelect = document.getElementById('directChallengeDisciplineSelect');
+        const topicSelect = document.getElementById('directChallengeTopicSelect');
         const container = document.getElementById('directChallengeQuestionsList');
         if (!container) return;
 
         const targetSubject = discSelect ? discSelect.value.trim() : '';
+        const targetTopic = topicSelect ? topicSelect.value.trim() : 'all';
+
         this.directSelectedQuestionIds.clear();
         this.updateDirectSelectedCounter();
 
@@ -28345,12 +28522,29 @@ function escapeHtmlText(str) {
         }
 
         const normTarget = targetSubject.toLowerCase();
+        const normTopic = targetTopic.toLowerCase();
+
         // Critério do Usuário: Perguntas existentes já respondidas corretamente no Flashcard
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
           const qSubj = (q.subject || '').trim().toLowerCase();
           const matchesSubject = (qSubj === normTarget || qSubj.includes(normTarget) || normTarget.includes(qSubj));
           if (!matchesSubject) return false;
+
+          // Filtro por Matéria / Conteúdo
+          if (targetTopic && targetTopic !== 'all') {
+            const qTopic = (q.topic || '').trim().toLowerCase();
+            const qTitle = (q.flashcardTitle || q.titulo_flashcard || q.title || '').trim().toLowerCase();
+            const qFocus = (q.learningFocus || q.disease || '').trim().toLowerCase();
+            const matchesTopic = (
+              qTopic === normTopic ||
+              qTitle === normTopic ||
+              qFocus === normTopic ||
+              (qTopic && (qTopic.includes(normTopic) || normTopic.includes(qTopic))) ||
+              (qTitle && (qTitle.includes(normTopic) || normTopic.includes(qTitle)))
+            );
+            if (!matchesTopic) return false;
+          }
 
           const isMasteredInSRS = Boolean(
             (q.srs && typeof q.srs.reps === 'number' && q.srs.reps > 0) ||
@@ -28367,7 +28561,7 @@ function escapeHtmlText(str) {
           container.innerHTML = `
             <div class="empty-state-notice">
               <span class="icon">🔒</span>
-              <p>Você ainda não dominou perguntas de <strong>"${targetSubject}"</strong> em Flashcard.</p>
+              <p>Você ainda não dominou perguntas de <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''} em Flashcard.</p>
               <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
                 Estude e acerte os cartões desta matéria para desbloqueá-las nos desafios.
               </p>
@@ -28409,6 +28603,17 @@ function escapeHtmlText(str) {
         if (this.directSelectedQuestionIds.has(id)) {
           this.directSelectedQuestionIds.delete(id);
         } else {
+          if (this.directSelectedQuestionIds.size >= 10) {
+            const msg = '⚠️ Limite atingido: cada desafio clínico suporta no máximo 10 questões.';
+            if (typeof showToast === 'function') {
+              showToast(msg);
+            } else {
+              alert(msg);
+            }
+            const chkEl = document.getElementById(`chk-dq-${id}`);
+            if (chkEl) chkEl.checked = false;
+            return;
+          }
           this.directSelectedQuestionIds.add(id);
         }
         const itemEl = document.getElementById(`item-dq-${id}`);
@@ -28420,10 +28625,14 @@ function escapeHtmlText(str) {
       },
 
       toggleDirectSelectAll(state) {
+        this.directSelectedQuestionIds.clear();
         if (state) {
-          this.directEligibleQuestionsCache.forEach(q => this.directSelectedQuestionIds.add(String(q.id)));
-        } else {
-          this.directSelectedQuestionIds.clear();
+          const toSelect = this.directEligibleQuestionsCache.slice(0, 10);
+          toSelect.forEach(q => this.directSelectedQuestionIds.add(String(q.id)));
+          if (this.directEligibleQuestionsCache.length > 10) {
+            const msg = 'ℹ️ Selecionadas as 10 primeiras questões (limite máximo permitido).';
+            if (typeof showToast === 'function') showToast(msg);
+          }
         }
         this.directEligibleQuestionsCache.forEach(q => {
           const id = String(q.id);
@@ -28438,7 +28647,15 @@ function escapeHtmlText(str) {
 
       updateDirectSelectedCounter() {
         const counter = document.getElementById('directChallengeSelectedCount');
-        if (counter) counter.textContent = this.directSelectedQuestionIds.size;
+        if (counter) {
+          const size = this.directSelectedQuestionIds.size;
+          counter.innerHTML = `${size} / 10`;
+          if (size >= 10) {
+            counter.style.color = '#ffb300';
+          } else {
+            counter.style.color = 'var(--neon)';
+          }
+        }
       },
 
       async submitDirectChallenge() {
@@ -28458,6 +28675,11 @@ function escapeHtmlText(str) {
 
         if (this.directSelectedQuestionIds.size === 0) {
           alert('Selecione pelo menos uma questão dominada em Flashcard para compor o duelo.');
+          return;
+        }
+
+        if (this.directSelectedQuestionIds.size > 10) {
+          alert('⚠️ O limite máximo por desafio é de 10 questões. Por favor, desmarque algumas questões.');
           return;
         }
 
@@ -28703,6 +28925,11 @@ function escapeHtmlText(str) {
         MedTutorClassmatesService.onDirectDisciplineChange();
       }
     }
+    function handleDirectTopicChange() {
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.onDirectTopicChange();
+      }
+    }
     function toggleDirectQuestionItem(id) {
       if (typeof MedTutorClassmatesService !== 'undefined') {
         MedTutorClassmatesService.toggleDirectQuestionItem(id);
@@ -28734,6 +28961,7 @@ function escapeHtmlText(str) {
       window.closeDirectChallengeModal = closeDirectChallengeModal;
       window.handleDirectPeriodChange = handleDirectPeriodChange;
       window.handleDirectDisciplineChange = handleDirectDisciplineChange;
+      window.handleDirectTopicChange = handleDirectTopicChange;
       window.toggleDirectQuestionItem = toggleDirectQuestionItem;
       window.toggleDirectSelectAll = toggleDirectSelectAll;
       window.submitDirectChallenge = submitDirectChallenge;
