@@ -1408,15 +1408,14 @@
       async deleteMaterialsBySubject(subjectName) {
         if (!subjectName) return;
         const uid = this.getUserId();
-        const sLower = subjectName.toLowerCase().trim();
+        const subjectKey = normalizeStudyComparisonText(subjectName);
 
         // 1. Identifica e remove da memória global
         let deletedItems = [];
         if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
           deletedItems = chatDriveMaterials.filter(m => {
             if (!m.subject) return false;
-            const mLower = m.subject.toLowerCase().trim();
-            return mLower === sLower || mLower.includes(sLower) || sLower.includes(mLower) || (sLower.includes('dermatolog') && mLower.includes('sistemas 2'));
+            return normalizeStudyComparisonText(m.subject || m.disciplina) === subjectKey;
           });
           chatDriveMaterials = chatDriveMaterials.filter(m => !deletedItems.includes(m));
         }
@@ -1448,8 +1447,17 @@
             deletedItems.forEach(item => {
               if (item.id) refs.set(item.id, colRef.doc(item.id));
             });
-            const querySnap = await colRef.where('disciplina', '==', subjectName).get();
-            querySnap.forEach(doc => refs.set(doc.id, doc.ref));
+            // A consulta exata não alcança registros antigos com acentuação ou
+            // capitalização diferentes; como esta é uma exclusão explícita,
+            // varremos os documentos e aplicamos a mesma chave normalizada do
+            // filtro da interface.
+            const querySnap = await colRef.get();
+            querySnap.forEach(doc => {
+              const data = doc.data() || {};
+              if (normalizeStudyComparisonText(data.disciplina || data.subject) === subjectKey) {
+                refs.set(doc.id, doc.ref);
+              }
+            });
             for (const docRef of refs.values()) {
               await this.deleteMaterialDocumentAndChunks(docRef);
             }
@@ -7470,6 +7478,20 @@ ${cleanText}
       return Array.from(set).filter(Boolean);
     }
 
+    // A disciplina selecionada é uma chave de escopo, não uma busca textual.
+    // Comparações por `includes` faziam uma matéria de outra disciplina aparecer
+    // quando os nomes compartilhavam apenas parte do texto.
+    function isExactStudySubject(materialSubject, selectedSubject) {
+      const materialKey = normalizeStudyComparisonText(materialSubject);
+      const selectedKey = normalizeStudyComparisonText(selectedSubject);
+      return Boolean(materialKey && selectedKey && materialKey === selectedKey);
+    }
+
+    function findExactSubjectKey(subjectName, candidates = []) {
+      const targetKey = normalizeStudyComparisonText(subjectName);
+      return (candidates || []).find(candidate => normalizeStudyComparisonText(candidate) === targetKey) || '';
+    }
+
     function ensureCurrentSubjectValid() {
       const list = getAvailableStudySubjects();
       if (!currentStudySubject || !list.includes(currentStudySubject)) {
@@ -7517,11 +7539,7 @@ ${cleanText}
       if (typeof chatDriveMaterials === 'undefined' || !Array.isArray(chatDriveMaterials)) return [];
       const filtered = chatDriveMaterials.map(normalizeMaterial).filter(m => {
         const matSubj = m.subject || m.disciplina || '';
-        if (!matSubj) return false;
-        if (matSubj === sName) return true;
-        const mLower = matSubj.toLowerCase();
-        const sLower = sName.toLowerCase();
-        return mLower.includes(sLower) || sLower.includes(mLower) || (sLower.includes('dermatolog') && mLower.includes('sistemas 2'));
+        return isExactStudySubject(matSubj, sName);
       });
       if (typeof sortMaterialsInPedagogicalOrder === 'function') {
         return sortMaterialsInPedagogicalOrder(filtered, sName);
@@ -7536,7 +7554,7 @@ ${cleanText}
       const originalIds = new Set(sharedQuestionsBank.map(item => item?.id).filter(Boolean));
       let list = sharedQuestionsBank.filter(item => !(item?.reinforcementOf && originalIds.has(item.reinforcementOf)));
       if (currentStudySubject) {
-        list = list.filter(q => q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase()));
+        list = list.filter(q => isExactStudySubject(q.subject, currentStudySubject));
       }
       if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
         list = list.filter(q => {
@@ -12530,6 +12548,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
       if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
       if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
+
       if (typeof updateChatAttachedBar === 'function') updateChatAttachedBar();
       if (typeof currentDetailedSubjectName === 'string' && currentDetailedSubjectName && typeof openSubjectDetailModal === 'function') {
         const modalSubj = document.getElementById('modalSubjectDetail');
@@ -14896,6 +14915,14 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof renderSceBars === 'function') renderSceBars();
       if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
 
+      // Remover o último material também remove o status antigo, evitando que
+      // uma disciplina vazia reapareça por dados de geração obsoletos.
+      if (targetSubject && getMaterialsForSubject(targetSubject).length === 0 && typeof subjectGenerationStatus !== 'undefined') {
+        Object.keys(subjectGenerationStatus)
+          .filter(key => isExactStudySubject(key, targetSubject))
+          .forEach(key => delete subjectGenerationStatus[key]);
+      }
+
       const modal = document.getElementById('subjectDetailModal');
       if (modal && modal.classList.contains('active') && targetSubject) {
         openSubjectDetailModal(targetSubject);
@@ -14946,11 +14973,13 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
         await MedTutorFirebaseService.deleteMaterialsBySubject(target);
       } else if (typeof chatDriveMaterials !== 'undefined') {
-        chatDriveMaterials = chatDriveMaterials.filter(m => m.subject !== target);
+        chatDriveMaterials = chatDriveMaterials.filter(m => !isExactStudySubject(m.subject || m.disciplina, target));
       }
 
       if (typeof subjectGenerationStatus !== 'undefined') {
-        delete subjectGenerationStatus[target];
+        Object.keys(subjectGenerationStatus)
+          .filter(key => isExactStudySubject(key, target))
+          .forEach(key => delete subjectGenerationStatus[key]);
       }
 
       saveChatDriveMaterials();
@@ -14981,10 +15010,12 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
         await MedTutorFirebaseService.deleteMaterialsBySubject(target);
       } else if (typeof chatDriveMaterials !== 'undefined') {
-        chatDriveMaterials = chatDriveMaterials.filter(m => m.subject !== target);
+        chatDriveMaterials = chatDriveMaterials.filter(m => !isExactStudySubject(m.subject || m.disciplina, target));
       }
       sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== target);
-      delete subjectGenerationStatus[target];
+      Object.keys(subjectGenerationStatus)
+        .filter(key => isExactStudySubject(key, target))
+        .forEach(key => delete subjectGenerationStatus[key]);
 
       saveChatDriveMaterials();
       saveSharedQuestionsBank();
@@ -19284,14 +19315,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
 
     function getDisciplineMaterialsCount(subjectName) {
       if (!chatDriveMaterials || chatDriveMaterials.length === 0) return 0;
-      const sLower = subjectName.toLowerCase();
-      return chatDriveMaterials.filter(m => {
-        if (!m.subject) return false;
-        const mSub = m.subject.toLowerCase();
-        if (mSub === sLower) return true;
-        if (mSub.includes(sLower) || sLower.includes(mSub)) return true;
-        return false;
-      }).length;
+      return chatDriveMaterials.filter(m => isExactStudySubject(m.subject || m.disciplina, subjectName)).length;
     }
 
     function filterCurriculumCycle(cycle) {
@@ -21377,19 +21401,7 @@ Para cada material, retorne um objeto no JSON com:
             const matCount = getDisciplineMaterialsCount(sName);
             const hasMaterials = matCount > 0;
             
-            let matchedSubjectKey = sName;
-            if (subjectGenerationStatus[sName]) {
-              matchedSubjectKey = sName;
-            } else {
-              const sLower = sName.toLowerCase();
-              for (const k of Object.keys(subjectGenerationStatus)) {
-                const kLower = k.toLowerCase();
-                if (sLower.includes(kLower) || kLower.includes(sLower) || (sLower.includes('dermatolog') && kLower.includes('sistemas 2'))) {
-                  matchedSubjectKey = k;
-                  break;
-                }
-              }
-            }
+            const matchedSubjectKey = findExactSubjectKey(sName, Object.keys(subjectGenerationStatus)) || sName;
             const statusObj = subjectGenerationStatus[matchedSubjectKey];
             const isPending = hasMaterials && (!statusObj || statusObj.status === 'pending');
 
@@ -23687,8 +23699,8 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
           <figcaption style="font-size: 9.5pt; color: #1e293b; margin-top: 8pt; line-height: 1.5; text-align: justify; padding: 0 6pt;">
             <strong style="color: #1e3a8a;">Figura ${figNum}:</strong> <strong>${escapeHtml(img.title)}.</strong> ${escapeHtml(img.caption)}
             <span style="display: block; font-size: 8.5pt; color: #64748b; margin-top: 3pt;">
-              <strong>Modalidade:</strong> ${escapeHtml(img.modality || 'Ilustração Médica / Atlas')} • 
-              <strong>Fonte Oficial:</strong> ${escapeHtml(img.source)} • 
+              <strong>Modalidade:</strong> ${escapeHtml(img.modality || 'Ilustração Médica / Atlas')} •
+              <strong>Fonte Oficial:</strong> ${escapeHtml(img.source)} •
               <strong>Licença:</strong> ${escapeHtml(img.license || 'Domínio Público')}
             </span>
             ${img.clinicalPearl ? `
@@ -26694,6 +26706,7 @@ function escapeHtmlText(str) {
       activeChallenge: null,
       activeChallengeIndex: 0,
       activeChallengeVotes: [],
+      activeChallengeAnswerSubmitted: false,
       selectedQuestionIds: new Set(),
       eligibleQuestionsCache: [],
       classmatesCache: [],
@@ -26952,14 +26965,12 @@ function escapeHtmlText(str) {
           return;
         }
 
-        const normTarget = targetSubject.toLowerCase();
         const normTopic = targetTopic.toLowerCase();
 
         // Critério estrito: Questões existentes já respondidas corretamente no Flashcard
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
-          const qSubj = (q.subject || '').trim().toLowerCase();
-          const matchesSubject = (qSubj === normTarget || qSubj.includes(normTarget) || normTarget.includes(qSubj));
+          const matchesSubject = isExactStudySubject(q.subject, targetSubject);
           if (!matchesSubject) return false;
 
           // Filtro por Matéria / Tópico se selecionado
@@ -27422,6 +27433,7 @@ function escapeHtmlText(str) {
         this.activeChallenge = challenge;
         this.activeChallengeIndex = 0;
         this.activeChallengeVotes = [];
+        this.activeChallengeAnswerSubmitted = false;
 
         const modal = document.getElementById('modalChallengePlayer');
         if (modal) {
@@ -27453,6 +27465,11 @@ function escapeHtmlText(str) {
         const voteArea = document.getElementById('challengeCardVotingArea');
         const finishScreen = document.getElementById('challengeFinishScreen');
         const cardBox = document.getElementById('challengeCardBox');
+        const writtenArea = document.getElementById('challengeWrittenAnswerArea');
+        const answerInput = document.getElementById('challengeStudentAnswer');
+        const answerFeedback = document.getElementById('challengeAnswerFeedback');
+        const evaluationResult = document.getElementById('challengeEvaluationResult');
+        const submitAnswerButton = document.getElementById('challengeSubmitAnswerButton');
 
         if (titleEl) titleEl.textContent = `Duelo Clínico: ${this.activeChallenge.senderName || 'Colega'}`;
         if (subEl) subEl.textContent = `Desafio de ${this.activeChallenge.subject || 'Medicina'}`;
@@ -27464,10 +27481,88 @@ function escapeHtmlText(str) {
         if (qTextEl) qTextEl.innerHTML = escapeHtmlText(q.front).replace(/\n/g, '<br>');
 
         if (cardBox) cardBox.style.display = 'block';
-        if (flipPrompt) flipPrompt.style.display = 'block';
+        if (writtenArea) writtenArea.style.display = 'grid';
+        if (answerInput) {
+          answerInput.value = '';
+          answerInput.disabled = false;
+        }
+        if (answerFeedback) {
+          answerFeedback.classList.remove('visible');
+          answerFeedback.textContent = '';
+        }
+        if (evaluationResult) {
+          evaluationResult.classList.remove('visible');
+          evaluationResult.innerHTML = '';
+        }
+        if (submitAnswerButton) {
+          submitAnswerButton.disabled = false;
+          submitAnswerButton.innerHTML = '✨ Corrigir com IA e ver gabarito';
+        }
+        if (flipPrompt) flipPrompt.style.display = 'none';
         if (backArea) backArea.style.display = 'none';
         if (voteArea) voteArea.style.display = 'none';
         if (finishScreen) finishScreen.style.display = 'none';
+      },
+
+      async submitWrittenAnswer() {
+        if (!this.activeChallenge) return;
+        const q = this.activeChallenge.questions[this.activeChallengeIndex];
+        const input = document.getElementById('challengeStudentAnswer');
+        const button = document.getElementById('challengeSubmitAnswerButton');
+        const feedback = document.getElementById('challengeAnswerFeedback');
+        const result = document.getElementById('challengeEvaluationResult');
+        const answer = String(input?.value || '').trim();
+        if (!answer) {
+          if (typeof showToast === 'function') showToast('⚠️ Digite sua resposta antes de solicitar correção.');
+          input?.focus();
+          return;
+        }
+
+        if (button) {
+          button.disabled = true;
+          button.innerHTML = '⏳ Corrigindo com IA...';
+        }
+        if (feedback) {
+          feedback.classList.add('visible');
+          feedback.innerHTML = '🩺 Corrigindo sua resposta com o mesmo motor dos flashcards...';
+        }
+
+        let evaluation = null;
+        try {
+          const response = await fetch('/api/quizzes/flashcards/corrigir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              question: q.front || q.question || '',
+              referenceAnswer: q.back || q.reference_answer || q.answer || '',
+              keyConcepts: q.keyConcepts || q.key_concepts || [],
+              studentAnswer: answer
+            })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            evaluation = data?.evaluation || data;
+          }
+        } catch (error) {
+          console.warn('[Challenges] Correção discursiva indisponível:', error);
+        }
+
+        q.studentAnswer = answer;
+        q.answerEvaluation = evaluation;
+        this.activeChallengeAnswerSubmitted = true;
+
+        const accuracy = Number(evaluation?.accuracy);
+        const score = Number(evaluation?.score);
+        const summary = evaluation
+          ? `<strong>${Number.isFinite(accuracy) ? `${accuracy}% de acerto` : 'Correção concluída'}</strong>${Number.isFinite(score) ? ` · ${score.toFixed(1).replace('.', ',')} pt` : ''}<br>${escapeHtmlText(evaluation.feedback || evaluation.commentary || 'Revise o gabarito e compare com sua resposta.')}`
+          : '<strong>Resposta registrada.</strong><br>O motor de correção não respondeu agora; compare sua resposta com o gabarito abaixo.';
+        if (result) {
+          result.innerHTML = `🩺 ${summary}`;
+          result.classList.add('visible');
+        }
+        if (input) input.disabled = true;
+        if (button) button.style.display = 'none';
+        this.revealAnswer();
       },
 
       revealAnswer() {
@@ -27479,8 +27574,16 @@ function escapeHtmlText(str) {
         const expBox = document.getElementById('challengeCardExplanationBox');
         const expTextEl = document.getElementById('challengeCardExplanationText');
         const voteArea = document.getElementById('challengeCardVotingArea');
+        const writtenArea = document.getElementById('challengeWrittenAnswerArea');
+
+        if (!this.activeChallengeAnswerSubmitted) {
+          if (typeof showToast === 'function') showToast('✍️ Responda à questão antes de consultar o gabarito.');
+          document.getElementById('challengeStudentAnswer')?.focus();
+          return;
+        }
 
         if (flipPrompt) flipPrompt.style.display = 'none';
+        if (writtenArea) writtenArea.style.display = 'none';
         if (backArea) backArea.style.display = 'block';
         if (ansTextEl) ansTextEl.innerHTML = escapeHtmlText(q.back || 'Sem gabarito informado.').replace(/\n/g, '<br>');
 
@@ -27679,6 +27782,7 @@ function escapeHtmlText(str) {
         this.activeChallenge = null;
         this.activeChallengeIndex = 0;
         this.activeChallengeVotes = [];
+        this.activeChallengeAnswerSubmitted = false;
 
         if (this.currentSubtab === 'received') {
           this.loadInbox();
@@ -27899,6 +28003,9 @@ function escapeHtmlText(str) {
     function revealChallengeCardAnswer() {
       MedTutorChallengesService.revealAnswer();
     }
+    function submitChallengeWrittenAnswer() {
+      MedTutorChallengesService.submitWrittenAnswer();
+    }
     function recordChallengeVote(direction) {
       MedTutorChallengesService.recordVote(direction);
     }
@@ -27921,6 +28028,7 @@ function escapeHtmlText(str) {
       window.loadCommunityQuestionsBank = loadCommunityQuestionsBank;
       window.renderCommunityQuestionsBank = renderCommunityQuestionsBank;
       window.revealChallengeCardAnswer = revealChallengeCardAnswer;
+      window.submitChallengeWrittenAnswer = submitChallengeWrittenAnswer;
       window.recordChallengeVote = recordChallengeVote;
       window.closeChallengePlayerModal = closeChallengePlayerModal;
     }

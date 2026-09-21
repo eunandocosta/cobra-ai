@@ -5437,7 +5437,7 @@
         right: 12px;
         left: 12px;
         width: auto;
-        bottom: calc(126px + env(safe-area-inset-bottom)) !important;
+        bottom: calc(204px + env(safe-area-inset-bottom)) !important;
       }
     }
 
@@ -6451,7 +6451,7 @@
     @media (max-width: 768px) {
       .doubts-fab {
         top: auto;
-        bottom: calc(77px + env(safe-area-inset-bottom));
+        bottom: calc(78px + env(safe-area-inset-bottom));
         right: 12px;
         left: auto;
         min-height: 44px;
@@ -6459,10 +6459,159 @@
 
       .classmates-fab {
         top: auto;
-        bottom: calc(77px + env(safe-area-inset-bottom));
-        right: 122px;
+        bottom: calc(136px + env(safe-area-inset-bottom));
+        right: 12px;
         left: auto;
         min-height: 44px;
+      }
+
+      /* O modal de leitura precisa caber entre as áreas seguras do telefone;
+         título, badges e ações quebram sem sair da viewport. */
+      .validate-material-modal {
+        width: min(860px, calc(100vw - 20px)) !important;
+        max-height: calc(100dvh - 20px) !important;
+        overflow: hidden;
+        padding: 14px !important;
+      }
+      .validate-material-modal .modal-head {
+        align-items: flex-start;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .validate-modal-header-copy,
+      .validate-modal-header-copy h3,
+      .validate-modal-header-copy #validateModalSourceLabel {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+      .validate-modal-meta {
+        align-items: flex-start !important;
+      }
+      .validate-modal-meta-items,
+      .validate-modal-meta-config {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+      .validate-modal-text-wrap {
+        min-height: 0 !important;
+      }
+      #validateModalTextarea {
+        height: clamp(190px, 42dvh, 420px) !important;
+        min-height: 190px !important;
+        max-height: none !important;
+      }
+      .validate-modal-footer {
+        align-items: stretch !important;
+        flex-wrap: wrap;
+      }
+      .validate-modal-footer > button,
+      .validate-modal-footer > div,
+      .validate-modal-footer > div > button {
+        width: 100%;
+      }
+      .validate-modal-footer > div {
+        display: grid !important;
+        grid-template-columns: 1fr;
+        gap: 8px !important;
+      }
+      .validate-modal-footer button {
+        min-height: 44px;
+        justify-content: center;
+        white-space: normal;
+      }
+
+      .challenges-subnav-bar {
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+      }
+      .challenge-subpanel {
+        padding-bottom: 18px;
+      }
+      .challenge-create-intro h2,
+      .challenge-panel-header h2 {
+        font-size: 18px;
+        line-height: 1.3;
+      }
+      .challenge-create-intro p,
+      .challenge-panel-header p {
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .challenge-form-card,
+      .challenge-questions-selection-card,
+      .challenge-card,
+      .challenge-feed-card {
+        padding: 14px;
+        border-radius: 13px;
+      }
+      .selection-card-header,
+      .challenge-panel-header,
+      .challenge-create-footer {
+        align-items: stretch;
+      }
+      .selection-card-actions,
+      .challenge-create-footer > *,
+      .challenge-panel-header > * {
+        width: 100%;
+      }
+      .selection-card-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .selection-card-actions .btn-outline-action,
+      .challenge-create-footer .btn-primary-action,
+      .challenge-panel-header .btn-outline-action {
+        width: 100% !important;
+        min-height: 44px;
+      }
+      .eligible-questions-container {
+        max-height: 48dvh;
+        padding-right: 0;
+      }
+      .eligible-question-item,
+      .eligible-q-item {
+        gap: 10px;
+        padding: 12px;
+      }
+      .eligible-question-stem {
+        -webkit-line-clamp: 3;
+      }
+      .challenge-player-modal {
+        width: min(680px, calc(100vw - 18px));
+        max-height: calc(100dvh - 18px);
+        padding: 14px !important;
+      }
+      .challenge-player-modal .modal-head {
+        align-items: flex-start;
+      }
+      .challenge-player-modal .modal-head > div:first-child {
+        min-width: 0;
+      }
+      #challengePlayerTitle,
+      #challengePlayerSubtitle {
+        overflow-wrap: anywhere;
+      }
+      .challenge-card-box {
+        min-height: 0;
+        padding: 14px;
+      }
+      .challenge-question-content {
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      .voting-buttons-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .thumb-vote-btn {
+        min-height: 50px;
+        padding: 10px 12px;
+      }
+      .thumb-vote-btn .thumb-icon {
+        font-size: 24px;
       }
 
       .doubts-drawer {
@@ -7766,6 +7915,79 @@
       gap: 12px;
     }
 
+    .challenge-written-answer {
+      display: grid;
+      gap: 9px;
+      margin-top: 4px;
+      padding: 12px;
+      border: 1px solid rgba(0, 229, 255, 0.18);
+      border-radius: 12px;
+      background: rgba(0, 229, 255, 0.035);
+    }
+
+    .challenge-written-answer-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .challenge-written-answer-head label {
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .challenge-written-answer-head span {
+      color: var(--text-muted);
+      font-size: 10.5px;
+    }
+
+    #challengeStudentAnswer {
+      width: 100%;
+      min-height: 108px;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+
+    .challenge-submit-answer {
+      width: 100%;
+      min-height: 44px;
+      justify-content: center;
+    }
+
+    .challenge-answer-feedback {
+      display: none;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      background: rgba(0, 229, 255, 0.06);
+      color: var(--text-secondary);
+      font-size: 11.5px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .challenge-answer-feedback.visible { display: block; }
+
+    .challenge-answer-feedback strong { color: var(--text-primary); }
+
+    .challenge-evaluation-result {
+      display: none;
+      padding: 9px 10px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(0, 255, 102, 0.28);
+      border-radius: 8px;
+      background: rgba(0, 255, 102, 0.06);
+      color: var(--text-secondary);
+      font-size: 11.5px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .challenge-evaluation-result.visible { display: block; }
+
     .challenge-card-topic {
       font-size: 11.5px;
       font-weight: 700;
@@ -8442,4 +8664,3 @@
     #modalMedicalOnboarding {
       z-index: 100005 !important;
     }
-

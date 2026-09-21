@@ -1912,11 +1912,11 @@
        EXIBE O TEXTO ORIGINAL ANTES DE QUALQUER GERAÇÃO DE PERGUNTAS PELA IA
        ========================================================= -->
   <div class="modal-overlay" id="modalValidateMaterialText" onclick="closeModals(event)">
-    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 860px; width: 95%; max-height: 92vh; display: flex; flex-direction: column;">
-      <div class="modal-head" style="margin-bottom: 8px;">
+    <div class="modal-window validate-material-modal" onclick="event.stopPropagation()" style="max-width: 860px; width: 95%; max-height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-head validate-modal-head" style="margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 24px;">🔍</span>
-          <div>
+          <div class="validate-modal-header-copy">
             <h3 id="validateModalTitle" style="font-size: 16px; margin: 0; color: var(--text-primary);">Validação do Texto Original da Aula</h3>
             <div id="validateModalSourceLabel" style="font-size: 11px; color: var(--neon); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
               <span>☁️ Fonte Obrigatória e Exclusiva: Cloud Firestore (<code>materiais_estudo</code>)</span>
@@ -1929,8 +1929,8 @@
       </div>
 
       <!-- Metadados do Material e Badges -->
-      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px 0; align-items: center; justify-content: space-between;">
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+      <div class="validate-modal-meta" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px 0; align-items: center; justify-content: space-between;">
+        <div class="validate-modal-meta-items" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
           <span id="validateModalMaterialNameBadge" style="background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700;">
             📄 Material: ...
           </span>
@@ -1941,7 +1941,7 @@
             📊 0 caracteres • 0 palavras
           </span>
         </div>
-        <div id="validateModalConfigBadge" style="font-size: 11px; color: var(--text-muted); font-weight: 600; background: rgba(255, 255, 255, 0.03); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
+        <div class="validate-modal-meta-config" id="validateModalConfigBadge" style="font-size: 11px; color: var(--text-muted); font-weight: 600; background: rgba(255, 255, 255, 0.03); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
           🎯 5 itens • Acadêmico (Bloom)
         </div>
       </div>
@@ -1952,7 +1952,7 @@
       </div>
 
       <!-- Área de Visualização e Edição do Texto Original -->
-      <div style="display: flex; flex-direction: column; flex: 1; min-height: 260px; margin-bottom: 12px;">
+      <div class="validate-modal-text-wrap" style="display: flex; flex-direction: column; flex: 1; min-height: 260px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <label for="validateModalTextarea" style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
             Texto Clínico da Aula (Auditável e Editável):
@@ -1965,7 +1965,7 @@
       </div>
 
       <!-- Rodapé com Ações -->
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+      <div class="validate-modal-footer" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
         <button type="button" class="btn-outline-action" onclick="closeModals()" style="padding: 8px 16px;">
           Cancelar
         </button>
@@ -3220,15 +3220,22 @@
             <div id="challengeCardQuestionText" class="challenge-question-content">Carregando pergunta...</div>
           </div>
 
-          <!-- Botão para Revelar Resposta -->
-          <div id="challengeCardFlipPrompt" style="text-align: center; margin: 16px 0 8px 0;">
-            <button class="btn-outline-action primary" onclick="revealChallengeCardAnswer()" style="padding: 8px 18px; font-weight: 700;">
-              🔄 Revelar Resposta &amp; Gabarito
+          <!-- Retenção ativa: mesmo fluxo dos flashcards -->
+          <div class="challenge-written-answer" id="challengeWrittenAnswerArea">
+            <div class="challenge-written-answer-head">
+              <label for="challengeStudentAnswer">✍️ Sua resposta clínica</label>
+              <span>Ctrl + Enter para corrigir</span>
+            </div>
+            <textarea id="challengeStudentAnswer" class="written-textarea" placeholder="Digite sua resposta antes de consultar o gabarito..." onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); submitChallengeWrittenAnswer();}"></textarea>
+            <div id="challengeAnswerFeedback" class="challenge-answer-feedback" aria-live="polite"></div>
+            <button id="challengeSubmitAnswerButton" class="btn-outline-action primary challenge-submit-answer" type="button" onclick="submitChallengeWrittenAnswer()">
+              ✨ Corrigir com IA e ver gabarito
             </button>
           </div>
 
           <!-- Verso: Resposta, Justificativa e Pérola Clínica -->
           <div class="challenge-card-back" id="challengeCardBack" style="display: none;">
+            <div class="challenge-evaluation-result" id="challengeEvaluationResult" aria-live="polite"></div>
             <div class="challenge-answer-box">
               <div class="answer-badge">Resposta Correta &amp; Conduta:</div>
               <div id="challengeCardAnswerText" class="answer-text"></div>
@@ -3314,7 +3321,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260921-science-based-sem-limite-v1"></script>
+  <script defer src="/app.min.js?v=20260921-desafios-flashcard-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
