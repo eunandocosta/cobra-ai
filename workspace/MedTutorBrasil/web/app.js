@@ -187,6 +187,22 @@
         authScreen.setAttribute('aria-busy', String(isChecking));
       },
 
+      hydrateLocalProfileForUid(uid) {
+        if (!uid) return;
+        try {
+          const saved = JSON.parse(localStorage.getItem('medtutor_user_profile') || 'null');
+          if (saved?.uid === uid) {
+            this.userProfile = saved;
+          } else {
+            this.userProfile = null;
+            localStorage.removeItem('medtutor_user_profile');
+          }
+        } catch (e) {
+          this.userProfile = null;
+          try { localStorage.removeItem('medtutor_user_profile'); } catch (ignore) {}
+        }
+      },
+
       refreshCloudDataInBackground(uid) {
         if (!uid || !firebaseAuth?.currentUser || firebaseAuth.currentUser.uid !== uid) return Promise.resolve();
         if (this.cloudRefreshPromise && this.cloudRefreshUid === uid) return this.cloudRefreshPromise;
@@ -208,22 +224,8 @@
       init() {
         // Carrega dados locais persistidos do usuário
         try {
-          const savedProfile = localStorage.getItem('medtutor_user_profile');
-          if (savedProfile) {
-            this.userProfile = JSON.parse(savedProfile);
-          }
-          // O registro local serve apenas para evitar o "pisca" da tela de
-          // login enquanto o Firebase restaura a sessão. Ele nunca é usado
-          // como autorização para ler ou gravar dados na nuvem.
-          const savedAuthUser = localStorage.getItem('medtutor_auth_user');
-          if (savedAuthUser) {
-            const parsedUser = JSON.parse(savedAuthUser);
-            const isLocalUser = /^(guest_|local_email_|local_user_)/.test(parsedUser?.uid || '');
-            if (!isLocalUser && parsedUser?.uid) {
-              this.currentUser = parsedUser;
-              this.authMode = 'restoring';
-            }
-          }
+          // A identidade nunca é restaurada visualmente do localStorage.
+          // Somente o Firebase Auth pode confirmar o usuário desta sessão.
         } catch (e) {}
 
         // Se estiver rodando via file://, exibe aviso explicativo na tela de login
@@ -289,6 +291,7 @@
                     photoURL: user.photoURL || ''
                   };
                   this.authMode = 'firebase';
+                  this.hydrateLocalProfileForUid(user.uid);
                   localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                   showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
                   this.setAuthScreenState('hidden');
@@ -310,6 +313,7 @@
                   photoURL: user.photoURL || ''
                 };
                 this.authMode = 'firebase';
+                this.hydrateLocalProfileForUid(user.uid);
                 localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
                 this.updateUserTopbarUI();
                 // A sessão autenticada libera o app imediatamente. Com a cota
@@ -366,10 +370,20 @@
               this.updateUserTopbarUI();
               return;
             }
-          } catch (e) {}
+            // A leitura concluiu com sucesso e o documento realmente não
+            // existe: somente neste caso o cadastro precisa ser solicitado.
+          } catch (e) {
+            // Indisponibilidade, cota ou regras do Firestore não significam
+            // que o estudante perdeu o cadastro. Não abra onboarding por erro
+            // de rede e não sobrescreva o perfil de outra sessão.
+            console.warn('[MedTutor Firebase] Perfil não pôde ser lido agora; onboarding adiado:', e);
+            return;
+          }
         }
         // Se ainda não tem perfil no Firestore, abre o onboarding
-        if (!this.userProfile || !this.userProfile.nome) {
+        if (this.currentUser?.uid === uid && (!this.userProfile || this.userProfile.uid !== uid || !this.userProfile.nome)) {
+          this.userProfile = null;
+          try { localStorage.removeItem('medtutor_user_profile'); } catch (e) {}
           openMedicalOnboardingModal(false);
         }
       },
@@ -557,6 +571,7 @@
           displayName: 'Estudante Visitante'
         };
         this.authMode = 'guest';
+        this.authStateResolved = true;
         localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
         if (!this.userProfile) {
           this.userProfile = {
@@ -585,9 +600,11 @@
           try { await firebaseAuth.signOut(); } catch (e) {}
         }
         this.currentUser = null;
+        this.userProfile = null;
         this.authMode = 'guest';
         this.authStateResolved = true;
         localStorage.removeItem('medtutor_auth_user');
+        localStorage.removeItem('medtutor_user_profile');
         const dropdown = document.getElementById('userProfileDropdown');
         if (dropdown) dropdown.classList.remove('active');
         this.setAuthScreenState('login');
@@ -2273,6 +2290,12 @@
     }
 
     function checkMandatoryFacultyRedeclaration() {
+      // Nunca abra o onboarding durante a resolução da sessão ou para um
+      // visitante não autenticado. O cadastro deve começar somente após login
+      // real ou após a escolha explícita do modo demonstração.
+      const authService = typeof MedTutorAuthService !== 'undefined' ? MedTutorAuthService : null;
+      if (!authService?.authStateResolved || !authService.currentUser) return false;
+
       // Se a tela de login estiver visível (usuário deslogado), não abre para não bloquear a tela de auth
       const authScreen = document.getElementById('authScreen');
       if (authScreen && authScreen.style.display !== 'none') {
@@ -28203,16 +28226,6 @@ function escapeHtmlText(str) {
               challengerThumbsUp: 9,
               challengerThumbsDown: 1,
               challengerScore: 8
-            },
-            {
-              uid: 'usr_fernando',
-              nome: 'Fernando Matheus',
-              email: 'fmscosta99@gmail.com',
-              faculdade: userSchool,
-              periodo_atual: userPeriod,
-              challengerThumbsUp: 26,
-              challengerThumbsDown: 1,
-              challengerScore: 25
             },
             {
               uid: 'usr_beatriz',
