@@ -12812,16 +12812,15 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     // =========================================================
     // HANDLERS PARA GERAÇÃO DE PERGUNTA DERIVADA COM NOVO CONTEXTO
     // =========================================================
-    let activeDerivedQuestionItem = null;
+    let activeDerivedQuestionState = { item: null, studentMistake: '' };
 
-    function openDerivedQuestionModal(questionId) {
+    function openDerivedQuestionModal(questionId, isCorrect, optIdx, customMistakeInfo) {
       const item = (sharedQuestionsBank && sharedQuestionsBank.find(q => q.id === questionId)) ||
                    (typeof getSrsFilteredList === 'function' && typeof getFilteredQuestions === 'function' ? getSrsFilteredList(getFilteredQuestions())[currentCardIndex] : null);
       if (!item) {
         if (typeof showToast === 'function') showToast('⚠️ Nenhuma pergunta ou explicação selecionada.');
         return;
       }
-      activeDerivedQuestionItem = item;
 
       const modal = document.getElementById('derivedQuestionModal');
       const refText = document.getElementById('derivedOriginalRefText');
@@ -12829,11 +12828,48 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (!modal || !refText || !container) return;
 
       const stem = item.vignette || item.question || item.pergunta || item.flashcard?.front || '';
-      const exp = item.tripartite?.correctReason || item.explanation || item.answer || item.flashcard?.back || '';
-      
+      const exp = item.tripartite?.correctReason || item.explanation || item.answer || item.flashcard?.back || 'Conceito norteado pelas diretrizes clínicas oficiais.';
+
+      let mistakeText = customMistakeInfo || '';
+      let mistakeHtml = '';
+
+      if (isCorrect === false && typeof optIdx === 'number' && Array.isArray(item.quizOptions)) {
+        const chosenLetter = String.fromCharCode(65 + optIdx);
+        const chosenText = item.quizOptions[optIdx] || '';
+        const distractorReason = (item.tripartite && item.tripartite.distractorAnalysis && item.tripartite.distractorAnalysis[optIdx]) ||
+                                 (item.distractorAnalysis && item.distractorAnalysis[optIdx]) ||
+                                 'Esta alternativa não contempla o critério diagnóstico ou a conduta de escolha preconizada.';
+        mistakeText = `O aluno marcou incorretamente a Letra ${chosenLetter} ("${chosenText}"). Motivo do erro no caso anterior: ${distractorReason}`;
+        mistakeHtml = `
+          <div style="margin-top: 8px; padding: 8px 12px; background: rgba(255, 68, 68, 0.1); border-left: 3px solid var(--danger); border-radius: 6px; font-size: 12px; color: #ff6666;">
+            <strong>❌ Sua Resposta Marcada: Letra ${chosenLetter} (${(typeof escapeHtml === 'function') ? escapeHtml(chosenText) : chosenText})</strong><br>
+            <span style="color: var(--text-primary); margin-top: 3px; display: inline-block;"><em>Análise do Erro:</em> ${(typeof escapeHtml === 'function') ? escapeHtml(distractorReason) : distractorReason}</span>
+          </div>
+        `;
+      } else if (mistakeText) {
+        mistakeHtml = `
+          <div style="margin-top: 8px; padding: 8px 12px; background: rgba(255, 170, 0, 0.1); border-left: 3px solid #ffaa00; border-radius: 6px; font-size: 12px; color: #ffbb33;">
+            <strong>⚠️ Atenção / Lacunas da Avaliação Anterior:</strong><br>
+            <span style="color: var(--text-primary); margin-top: 3px; display: inline-block;">${(typeof escapeHtml === 'function') ? escapeHtml(mistakeText) : mistakeText}</span>
+          </div>
+        `;
+      } else if (isCorrect === true) {
+        mistakeHtml = `
+          <div style="margin-top: 8px; padding: 6px 12px; background: rgba(0, 255, 102, 0.08); border-left: 3px solid #00ff66; border-radius: 6px; font-size: 11.5px; color: #00ff66;">
+            <strong>✅ Resposta Correta! A nova pergunta trabalhará casos mais desafiadores com as variantes que você adicionar.</strong>
+          </div>
+        `;
+      }
+
+      activeDerivedQuestionState = {
+        item: item,
+        studentMistake: mistakeText
+      };
+
       refText.innerHTML = `
         <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Enunciado / Caso Original: ${(typeof escapeHtml === 'function') ? escapeHtml(stem) : stem}</div>
-        <div style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;"><strong>Explicação / Gabarito de Base:</strong> ${(typeof escapeHtml === 'function') ? escapeHtml(exp) : exp}</div>
+        <div style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;"><strong>Gabarito / Explicação Central:</strong> ${(typeof escapeHtml === 'function') ? escapeHtml(exp) : exp}</div>
+        ${mistakeHtml}
       `;
 
       container.innerHTML = '';
@@ -12849,13 +12885,26 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (typeof showToast === 'function') showToast('⚠️ Selecione um flashcard para gerar a nova pergunta.');
         return;
       }
-      openDerivedQuestionModal(item.id);
+
+      let mistakeInfo = '';
+      let isCorrect = true;
+      if (item.lastEvaluation) {
+        const acc = typeof item.lastEvaluation.accuracy === 'number' ? item.lastEvaluation.accuracy : 100;
+        if (acc < 80) {
+          isCorrect = false;
+          mistakeInfo = `Resposta escrita do aluno: "${item.lastStudentAnswer || ''}". Lacunas identificadas pela IA: "${item.lastEvaluation.gaps || item.lastEvaluation.feedback || 'Conceito não consolidado na retenção ativa.'}"`;
+        }
+      }
+
+      openDerivedQuestionModal(item.id, isCorrect, null, mistakeInfo);
     }
 
     function addDerivedContextBox(initialText = '') {
       const container = document.getElementById('derivedContextsListContainer');
       if (!container) return;
 
+      const currentCount = container.querySelectorAll('.derived-context-box').length;
+      const boxNum = currentCount + 1;
       const boxId = `derived_ctx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const box = document.createElement('div');
       box.className = 'derived-context-box';
@@ -12864,10 +12913,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       
       box.innerHTML = `
         <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-          <label style="font-size: 11px; font-weight: 700; color: var(--neon); text-transform: uppercase;">
-            📌 Novo Contexto Clínico / Variante do Aluno:
+          <label class="derived-box-label" style="font-size: 11px; font-weight: 700; color: var(--neon); text-transform: uppercase;">
+            📌 Novo Contexto Clínico / Variante #${boxNum}:
           </label>
-          <textarea class="derived-context-textarea" placeholder="Ex: Paciente gestante de 28 semanas com alergia grave a penicilina, ou atendimento em UBS sem tomógrafo disponível..." style="width: 100%; min-height: 56px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; color: var(--text-primary); resize: vertical; font-family: inherit; line-height: 1.4;"></textarea>
+          <textarea class="derived-context-textarea" placeholder="Ex: Paciente gestante de 28 semanas com alergia grave a penicilina, ou atendimento em UBS sem tomógrafo disponível..." style="width: 100%; min-height: 56px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; color: var(--text-primary); resize: vertical; font-family: inherit; line-height: 1.4;" onkeydown="if((event.ctrlKey || event.metaKey) && event.key === 'Enter'){ event.preventDefault(); submitDerivedQuestionWithContext(); }"></textarea>
         </div>
         <button class="btn-outline-action danger" type="button" onclick="removeDerivedContextBox('${boxId}')" title="Remover este contexto" style="padding: 6px 9px; align-self: center; margin-top: 16px;">
           🗑️
@@ -12885,10 +12934,20 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function removeDerivedContextBox(boxId) {
       const box = document.getElementById(boxId);
       if (box) box.remove();
+      
+      // Re-indexa os rótulos visuais das caixas restantes
+      const container = document.getElementById('derivedContextsListContainer');
+      if (container) {
+        container.querySelectorAll('.derived-context-box').forEach((b, idx) => {
+          const lbl = b.querySelector('.derived-box-label');
+          if (lbl) lbl.textContent = `📌 Novo Contexto Clínico / Variante #${idx + 1}:`;
+        });
+      }
     }
 
     async function submitDerivedQuestionWithContext() {
-      const item = activeDerivedQuestionItem;
+      const state = activeDerivedQuestionState;
+      const item = state?.item;
       if (!item) {
         if (typeof showToast === 'function') showToast('⚠️ Pergunta de referência não encontrada.');
         return;
@@ -12900,7 +12959,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         .filter(Boolean);
 
       if (contexts.length === 0) {
-        if (typeof showToast === 'function') showToast('⚠️ Adicione ao menos um novo contexto para gerar a pergunta.');
+        if (typeof showToast === 'function') showToast('⚠️ Adicione ao menos um novo contexto na caixa para gerar a pergunta.');
         return;
       }
 
@@ -12914,6 +12973,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const originalExplanation = item.tripartite?.correctReason || item.explanation || item.answer || item.flashcard?.back || '';
       const subject = item.subject || 'Clínica Médica';
       const topic = item.topic || item.disease || item.flashcardTitle || '';
+      const studentMistake = state.studentMistake || '';
 
       let newQuestionData = null;
 
@@ -12926,12 +12986,19 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             originalExplanation,
             contexts,
             subject,
-            topic
+            topic,
+            studentMistake
           })
         });
 
         if (response.ok) {
-          newQuestionData = await response.json();
+          const resData = await response.json();
+          // Extrai o objeto da questão caso venha envelopado em { success: true, question: { ... } }
+          if (resData && resData.question && typeof resData.question === 'object') {
+            newQuestionData = resData.question;
+          } else {
+            newQuestionData = resData;
+          }
         } else {
           console.warn('⚠️ Endpoint backend retornou erro, tentando fallback no cliente...');
         }
@@ -12939,13 +13006,15 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         console.warn('⚠️ Falha na requisição ao backend, tentando fallback local...', err);
       }
 
+      // Fallback local se backend não responder
       if (!newQuestionData || !newQuestionData.question) {
         try {
           const userKey = localStorage.getItem('gemini_api_key');
           if (userKey && typeof GeminiService !== 'undefined') {
+            const mistakePrompt = studentMistake ? `\nEquívoco prévio do aluno para trabalhar e esclarecer: ${studentMistake}` : '';
             const prompt = `Gere UMA NOVA QUESTÃO DERIVADA (caso clínico inédito) baseada na pergunta/explicação original e nos novos contextos:
 Original: ${originalQuestion}
-Explicação: ${originalExplanation}
+Explicação: ${originalExplanation}${mistakePrompt}
 Novos Contextos: ${contexts.join('; ')}
 
 Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (array com 4 strings), correctIndex (0 a 3), explanation, tripartite ({correctReason, distractorAnalysis, pearl}), flashcardTitle, flashcardFront, flashcardBack.`;
@@ -12997,15 +13066,31 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
         btnSubmit.innerHTML = '⚡ Gerar Pergunta com Novo Contexto';
       }
 
-      if (newQuestionData && newQuestionData.question) {
+      if (newQuestionData && (typeof newQuestionData.question === 'string' || typeof newQuestionData.pergunta === 'string')) {
         if (!newQuestionData.id) newQuestionData.id = `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        if (!Array.isArray(newQuestionData.quizOptions) || newQuestionData.quizOptions.length === 0) {
+          newQuestionData.quizOptions = [
+            'Conduta diagnóstica de primeira escolha',
+            'Exame complementar de alta sensibilidade',
+            'Manejo terapêutico farmacológico inicial',
+            'Acompanhamento e estratificação de risco'
+          ];
+        }
+        if (typeof newQuestionData.correctIndex !== 'number') {
+          newQuestionData.correctIndex = 0;
+        }
+        if (!newQuestionData.answer) {
+          newQuestionData.answer = newQuestionData.quizOptions[newQuestionData.correctIndex] || '';
+        }
         if (!newQuestionData.flashcard) {
           newQuestionData.flashcard = {
             front: newQuestionData.question,
-            back: newQuestionData.answer || newQuestionData.quizOptions?.[newQuestionData.correctIndex] || '',
+            back: newQuestionData.answer || newQuestionData.quizOptions[newQuestionData.correctIndex] || '',
             keyConcepts: contexts
           };
         }
+        if (!newQuestionData.subject) newQuestionData.subject = subject;
+        if (!newQuestionData.topic) newQuestionData.topic = topic;
         
         sharedQuestionsBank.unshift(newQuestionData);
         saveSharedQuestionsBank();
@@ -13749,7 +13834,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
           <!-- Botão para Gerar Pergunta Derivada com Novo Contexto -->
           <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
-            <button class="btn-outline-action primary" type="button" onclick="openDerivedQuestionModal('${item.id}')" style="font-size: 12px; font-weight: 700; padding: 7px 14px; display: flex; align-items: center; gap: 6px;">
+            <button class="btn-outline-action primary" type="button" onclick="openDerivedQuestionModal('${item.id}', ${isCorrect ? 'true' : 'false'}, ${typeof optIdx === 'number' ? optIdx : 'null'})" style="font-size: 12px; font-weight: 700; padding: 7px 14px; display: flex; align-items: center; gap: 6px;">
               ✨ Gerar Nova Pergunta com Novo Contexto
             </button>
           </div>

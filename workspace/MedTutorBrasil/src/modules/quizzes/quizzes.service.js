@@ -1023,11 +1023,12 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
   }
 
   /**
-   * Gera uma nova pergunta derivada incorporando a explicação base e os novos contextos do estudante.
+   * Gera uma nova pergunta derivada incorporando a explicação base, análise de acerto/erro e novos contextos.
    */
-  async generateDerivedQuestion({ originalQuestion, originalExplanation, contexts = [], subject = 'Clínica Médica', topic = '' }) {
+  async generateDerivedQuestion({ originalQuestion, originalExplanation, contexts = [], subject = 'Clínica Médica', topic = '', studentMistake = '' }) {
     const cleanQuestion = String(originalQuestion || '').trim();
     const cleanExplanation = String(originalExplanation || '').trim();
+    const cleanMistake = String(studentMistake || '').trim();
     const validContexts = (Array.isArray(contexts) ? contexts : [contexts]).map(c => String(c || '').trim()).filter(Boolean);
 
     if (!cleanQuestion && !cleanExplanation) {
@@ -1047,6 +1048,12 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
       }
     });
 
+    const mistakeBlock = cleanMistake ? `
+RESPOSTA MARCADA / PONTO DE EQUÍVOCO DO ESTUDANTE:
+${cleanMistake}
+(Atenção: Elabore a nova pergunta de modo a esclarecer esta confusão diagnóstica/terapêutica e reforçar o raciocínio correto perante os novos contextos.)
+` : '';
+
     const prompt = `Você é um preceptor médico sênior da MedTutor Brasil e elaborador de exames de residência médica.
 Sua missão é criar UMA NOVA QUESTÃO DERIVADA (caso clínico inédito de múltipla escolha + flashcard) fundamentada na explicação/conceito biológico original e incorporando OBRIGATORIAMENTE os novos contextos clínicos fornecidos pelo estudante de medicina.
 
@@ -1055,7 +1062,7 @@ ${cleanQuestion}
 
 EXPLICAÇÃO DE BASE / GABARITO:
 ${cleanExplanation}
-
+${mistakeBlock}
 NOVOS CONTEXTOS CLÍNICOS E VARIANTES ADICIONADOS PELO ESTUDANTE:
 ${validContexts.map((ctx, idx) => `[Novo Contexto #${idx + 1}]: ${ctx}`).join('\n')}
 
