@@ -844,8 +844,8 @@
             <div class="challenge-form-card">
               <div class="challenge-form-grid">
                 <div class="form-group">
-                  <label for="challengeTargetEmail">1. E-mail do Estudante Desafiado:</label>
-                  <input type="email" id="challengeTargetEmail" class="chat-input" placeholder="ex: colega@medicina.universo.br" autocomplete="off">
+                  <label for="challengeTargetEmail" class="challenge-form-label">1. E-mail do Estudante Desafiado:</label>
+                  <input type="email" id="challengeTargetEmail" class="chat-input challenge-input-field" placeholder="ex: colega@medicina.universo.br" autocomplete="off">
                   <div class="challenge-classmates-hint" id="challengeClassmateHintsContainer">
                     <span style="font-size: 11px; color: var(--text-muted);">Sugestões de colegas:</span>
                     <div id="challengeClassmateChips" class="classmate-chips-row"></div>
@@ -853,8 +853,8 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="challengeSubjectSelect">2. Disciplina da Ementa:</label>
-                  <select id="challengeSubjectSelect" class="study-nav-select" onchange="loadEligibleChallengeQuestions()">
+                  <label for="challengeSubjectSelect" class="challenge-form-label">2. Disciplina da Ementa:</label>
+                  <select id="challengeSubjectSelect" class="study-nav-select challenge-select-field" onchange="loadEligibleChallengeQuestions()">
                     <!-- Populado dinamicamente -->
                   </select>
                 </div>
@@ -929,7 +929,7 @@
                 <p>Questões validadas pelos estudantes da instituição com histórico de aprovação (👍) e ressalvas (👎).</p>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
-                <select id="bankSubjectFilterSelect" class="study-nav-select" onchange="renderCommunityQuestionsBank()">
+                <select id="bankSubjectFilterSelect" class="study-nav-select challenge-select-field" onchange="renderCommunityQuestionsBank()">
                   <option value="all">Todas as Disciplinas</option>
                 </select>
                 <button class="btn-outline-action" onclick="loadCommunityQuestionsBank()">🔄 Recarregar</button>
@@ -2875,23 +2875,36 @@
             🩺
           </div>
           <div>
-            <h2 style="margin: 0; font-size: 16px;">Perfil do Estudante de Medicina</h2>
-            <p style="font-size: 11.5px; color: var(--text-secondary); margin: 2px 0 0 0;">Personalização socrática da Dra. Sofia e grade curricular</p>
+            <h2 style="margin: 0; font-size: 16px;" id="onboardingModalTitle">Perfil do Estudante de Medicina</h2>
+            <p style="font-size: 11.5px; color: var(--text-secondary); margin: 2px 0 0 0;" id="onboardingModalSubtitle">Personalização socrática da Dra. Sofia e grade curricular</p>
           </div>
         </div>
+        <button class="btn-close-modal" id="btnCloseMedicalOnboarding" type="button" onclick="closeMedicalOnboardingModal()" style="display: none;" aria-label="Fechar">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-      <form id="formMedicalOnboarding" onsubmit="handleMedicalOnboardingSubmit(event)" style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+
+      <!-- Banner de Notificação de Redeclaração Obrigatória -->
+      <div id="onboardingRedeclarationNotice" class="redeclaration-notice-banner" style="display: none;">
+        <span class="notice-icon">📢</span>
         <div>
-          <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">1. Nome Completo</label>
-          <input type="text" id="onboardingStudentName" placeholder="Ex: Mariana Costa" required style="width: 100%; padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 13.5px; outline: none;">
+          <strong>Confirmação de Vínculo Acadêmico Obrigatória</strong>
+          <p>Para ativar a ementa canônica oficial, o Banco Coletivo de Questões e duelos com colegas de turma, por favor confirme a sua Faculdade de Medicina e o Período Atual.</p>
+        </div>
+      </div>
+
+      <form id="formMedicalOnboarding" onsubmit="handleMedicalOnboardingSubmit(event)" style="display: flex; flex-direction: column; gap: 14px; margin-top: 6px;">
+        <div>
+          <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">1. Nome Completo</label>
+          <input type="text" id="onboardingStudentName" placeholder="Ex: Mariana Costa" required class="challenge-input-field">
         </div>
         <div>
-          <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">2. Faculdade / Instituição de Ensino</label>
-          <input type="text" id="onboardingStudentSchool" placeholder="Ex: USP, UFRJ, UNICAMP, PUC..." required style="width: 100%; padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 13.5px; outline: none;">
+          <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">2. Faculdade / Instituição de Ensino</label>
+          <input type="text" id="onboardingStudentSchool" placeholder="Ex: Universo, USP, UFRJ, UNICAMP, PUC..." required class="challenge-input-field">
         </div>
         <div>
-          <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">3. Período / Ano Atual</label>
-          <select id="onboardingStudentPeriod" required style="width: 100%; padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 13.5px; outline: none;">
+          <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">3. Período / Ano Atual</label>
+          <select id="onboardingStudentPeriod" required class="challenge-select-field">
             <option value="" disabled selected>Selecione seu período curricular...</option>
             <optgroup label="Ciclo Básico">
               <option value="1º Período">1º Período (1º Ano - Ciclo Básico)</option>
@@ -2914,8 +2927,8 @@
           </select>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-          <button type="submit" class="btn-outline-action primary" style="padding: 10px 20px; font-size: 13.5px; font-weight: 700;">
-            Concluir Perfil e Acessar Grade ➔
+          <button type="submit" class="btn-primary-action" id="btnSubmitMedicalOnboarding" style="width: 100%; font-size: 14px;">
+            Salvar e Confirmar Perfil Acadêmico ➔
           </button>
         </div>
       </form>
@@ -3000,7 +3013,7 @@
         <form id="formAddClassmate" class="classmate-add-form" onsubmit="event.preventDefault(); handleAddClassmateSubmit();">
           <div class="add-input-wrapper">
             <span class="add-icon">✉️</span>
-            <input type="email" id="classmateAddEmail" class="chat-input" placeholder="Adicionar colega por e-mail (ex: mariana@medicina.universo.br)" required autocomplete="off">
+            <input type="email" id="classmateAddEmail" class="chat-input challenge-input-field" placeholder="Adicionar colega por e-mail (ex: mariana@medicina.universo.br)" required autocomplete="off">
           </div>
           <button type="submit" class="btn-primary-action" id="btnAddClassmateSubmit">
             ➕ Adicionar
@@ -3106,16 +3119,16 @@
         <div class="selectors-grid">
           <!-- 1. Período -->
           <div class="form-group">
-            <label for="directChallengePeriodSelect">1. Período Curricular:</label>
-            <select id="directChallengePeriodSelect" class="study-nav-select" onchange="handleDirectPeriodChange()">
+            <label for="directChallengePeriodSelect" class="challenge-form-label">1. Período Curricular:</label>
+            <select id="directChallengePeriodSelect" class="study-nav-select challenge-select-field" onchange="handleDirectPeriodChange()">
               <!-- Populado dinamicamente -->
             </select>
           </div>
 
           <!-- 2. Disciplina / Matéria -->
           <div class="form-group">
-            <label for="directChallengeDisciplineSelect">2. Disciplina / Matéria:</label>
-            <select id="directChallengeDisciplineSelect" class="study-nav-select" onchange="handleDirectDisciplineChange()">
+            <label for="directChallengeDisciplineSelect" class="challenge-form-label">2. Disciplina / Matéria:</label>
+            <select id="directChallengeDisciplineSelect" class="study-nav-select challenge-select-field" onchange="handleDirectDisciplineChange()">
               <!-- Populado dinamicamente -->
             </select>
           </div>

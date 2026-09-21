@@ -499,7 +499,11 @@
         localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
         showToast('✓ Acesso local concedido!');
         this.setAuthScreenState('hidden');
-        if (!this.userProfile) openMedicalOnboardingModal(false);
+        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+          setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
+        } else if (!this.userProfile) {
+          openMedicalOnboardingModal(false);
+        }
         this.updateUserTopbarUI();
         return true;
       },
@@ -517,7 +521,11 @@
             localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
             showToast('🎉 Conta criada com sucesso! Complete seu perfil médico.');
             this.setAuthScreenState('hidden');
-            openMedicalOnboardingModal(false);
+            if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+              setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
+            } else {
+              openMedicalOnboardingModal(false);
+            }
             return true;
           } catch (err) {
             showAuthError(this.mapAuthErrorMessage(err.code || err.message));
@@ -534,7 +542,11 @@
         localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
         showToast('🎉 Conta local registrada!');
         this.setAuthScreenState('hidden');
-        openMedicalOnboardingModal(false);
+        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+          setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
+        } else {
+          openMedicalOnboardingModal(false);
+        }
         return true;
       },
 
@@ -563,6 +575,9 @@
         showToast('⚡ Modo Demonstração Rápida Ativado!');
         this.setAuthScreenState('hidden');
         this.updateUserTopbarUI();
+        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+          setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
+        }
       },
 
       async signOut() {
@@ -2140,6 +2155,17 @@
         if (typeof renderSceTimeline === 'function') renderSceTimeline();
         if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
         if (typeof renderChatHistorySidebar === 'function') renderChatHistorySidebar();
+        if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.populateSubjectSelects) {
+          MedTutorChallengesService.populateSubjectSelects();
+        }
+        if (typeof MedTutorClassmatesService !== 'undefined' && MedTutorClassmatesService.populateDirectPeriods) {
+          MedTutorClassmatesService.populateDirectPeriods();
+        }
+        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+          setTimeout(() => {
+            checkMandatoryFacultyRedeclaration();
+          }, 350);
+        }
       }
     };
 
@@ -2181,16 +2207,82 @@
       }
     }
 
-    function openMedicalOnboardingModal(allowClose) {
+    const MEDTUTOR_FACULTY_REDECLARATION_VERSION = 'v2026_09_21_canonical_universo_v2';
+
+    function openMedicalOnboardingModal(allowClose = false, isMandatoryRedeclaration = false) {
       const modal = document.getElementById('modalMedicalOnboarding');
       if (!modal) return;
-      const profile = MedTutorAuthService.userProfile;
-      if (profile) {
-        if (document.getElementById('onboardingStudentName')) document.getElementById('onboardingStudentName').value = profile.nome || '';
-        if (document.getElementById('onboardingStudentSchool')) document.getElementById('onboardingStudentSchool').value = profile.faculdade || '';
-        if (document.getElementById('onboardingStudentPeriod')) document.getElementById('onboardingStudentPeriod').value = profile.periodo_atual || '5º Período';
+
+      const btnClose = document.getElementById('btnCloseMedicalOnboarding');
+      if (btnClose) {
+        btnClose.style.display = allowClose ? 'inline-flex' : 'none';
       }
+
+      const noticeBanner = document.getElementById('onboardingRedeclarationNotice');
+      if (noticeBanner) {
+        noticeBanner.style.display = isMandatoryRedeclaration ? 'flex' : 'none';
+      }
+
+      const titleEl = document.getElementById('onboardingModalTitle');
+      const subEl = document.getElementById('onboardingModalSubtitle');
+      if (isMandatoryRedeclaration) {
+        if (titleEl) titleEl.textContent = 'Confirmação de Faculdade & Período';
+        if (subEl) subEl.textContent = 'Confirmação necessária para ativar a ementa oficial, rede de colegas e desafios';
+      } else {
+        if (titleEl) titleEl.textContent = 'Perfil do Estudante de Medicina';
+        if (subEl) subEl.textContent = 'Personalização socrática da Dra. Sofia e grade curricular';
+      }
+
+      const profile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+      let localProfile = {};
+      try { localProfile = JSON.parse(localStorage.getItem('medtutor_user_profile') || '{}'); } catch (e) {}
+      const merged = { ...localProfile, ...profile };
+
+      const nameInput = document.getElementById('onboardingStudentName');
+      const schoolInput = document.getElementById('onboardingStudentSchool');
+      const periodInput = document.getElementById('onboardingStudentPeriod');
+
+      if (nameInput) {
+        nameInput.value = merged.nome || (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser?.displayName) || '';
+      }
+      if (schoolInput) {
+        schoolInput.value = merged.faculdade || 'Universo';
+      }
+      if (periodInput) {
+        periodInput.value = merged.periodo_atual || '5º Período';
+      }
+
       modal.classList.add('active');
+      modal.style.display = 'flex';
+    }
+
+    function closeMedicalOnboardingModal() {
+      const modal = document.getElementById('modalMedicalOnboarding');
+      if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+      }
+    }
+
+    function checkMandatoryFacultyRedeclaration() {
+      // Se a tela de login estiver visível (usuário deslogado), não abre para não bloquear a tela de auth
+      const authScreen = document.getElementById('authScreen');
+      if (authScreen && authScreen.style.display !== 'none') {
+        const isUserLogged = typeof MedTutorAuthService !== 'undefined' && Boolean(MedTutorAuthService.currentUser);
+        if (!isUserLogged) return false;
+      }
+
+      const localVer = localStorage.getItem('medtutor_faculty_redeclared_version');
+      const profile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || null;
+      const profileVer = profile?.faculty_redeclared_version;
+
+      if (localVer === MEDTUTOR_FACULTY_REDECLARATION_VERSION && profileVer === MEDTUTOR_FACULTY_REDECLARATION_VERSION) {
+        return false;
+      }
+
+      // Abre obrigatoriamente sem permitir fechar sem confirmar
+      openMedicalOnboardingModal(false, true);
+      return true;
     }
 
     async function handleMedicalOnboardingSubmit(event) {
@@ -2206,36 +2298,74 @@
         ciclo = 'Internato';
       }
 
+      const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+      const uid = (typeof MedTutorFirebaseService !== 'undefined' && MedTutorFirebaseService.getUserId()) || (MedTutorAuthService.currentUser && MedTutorAuthService.currentUser.uid) || 'local_user';
       const updatedProfile = {
-        uid: MedTutorFirebaseService.getUserId(),
-        nome: nome,
-        email: (MedTutorAuthService.currentUser && MedTutorAuthService.currentUser.email) || '',
+        ...currentProfile,
+        uid: uid,
+        nome: nome || currentProfile.nome || 'Estudante de Medicina',
+        email: (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser && MedTutorAuthService.currentUser.email) || currentProfile.email || '',
         faculdade: faculdade,
         periodo_atual: periodo,
         ciclo: ciclo,
-        tema_preferido: currentTheme,
-        maestria_xp: (MedTutorAuthService.userProfile && MedTutorAuthService.userProfile.maestria_xp) || 0
+        tema_preferido: typeof currentTheme !== 'undefined' ? currentTheme : 'cyberpunk',
+        maestria_xp: currentProfile.maestria_xp || 0,
+        faculty_redeclared_version: MEDTUTOR_FACULTY_REDECLARATION_VERSION,
+        data_atualizacao_vinculo: new Date().toISOString()
       };
 
-      MedTutorAuthService.userProfile = updatedProfile;
-      await MedTutorFirebaseService.saveUserProfile(updatedProfile);
-      MedTutorAuthService.updateUserTopbarUI();
+      if (typeof MedTutorAuthService !== 'undefined') {
+        MedTutorAuthService.userProfile = updatedProfile;
+        MedTutorAuthService.updateUserTopbarUI();
+      }
+      try {
+        localStorage.setItem('medtutor_user_profile', JSON.stringify(updatedProfile));
+        localStorage.setItem('medtutor_faculty_redeclared_version', MEDTUTOR_FACULTY_REDECLARATION_VERSION);
+      } catch (e) {}
 
-      // Auto-atribuição da ementa oficial da Universo para novos usuários ou usuários sem ementa
+      if (typeof MedTutorFirebaseService !== 'undefined') {
+        await MedTutorFirebaseService.saveUserProfile(updatedProfile);
+      }
+
+      // Auto-atribuição e garantia da ementa canônica oficial da Universo
       const facLower = faculdade.toLowerCase();
-      if ((facLower.includes('universo') || facLower.includes('salgado de oliveira')) && (!universityCurriculum || universityCurriculum.length === 0)) {
+      if (facLower.includes('universo') || facLower.includes('salgado de oliveira')) {
         if (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
           universityCurriculum = JSON.parse(JSON.stringify(CANONICAL_UNIVERSO_CURRICULUM));
-          await MedTutorLocalDB.set('curriculum', updatedProfile.uid, universityCurriculum);
-          await MedTutorFirebaseService.saveCurriculum(universityCurriculum);
+          try {
+            localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(universityCurriculum));
+            if (typeof MedTutorLocalDB !== 'undefined') {
+              await MedTutorLocalDB.set('curriculum', updatedProfile.uid, universityCurriculum);
+            }
+          } catch (e) {}
+          if (typeof MedTutorFirebaseService !== 'undefined') {
+            await MedTutorFirebaseService.saveCurriculum(universityCurriculum);
+          }
           if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
           if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
-          showToast('🏛️ Ementa oficial de Medicina da Universo atribuída com sucesso!');
+          if (typeof showToast === 'function') {
+            showToast('🏛️ Ementa oficial de Medicina da Universo ativada e sincronizada!');
+          }
         }
       }
 
-      document.getElementById('modalMedicalOnboarding').classList.remove('active');
-      showToast(`🩺 Perfil médico de ${nome} atualizado com sucesso!`);
+      // Atualiza os dropdowns de disciplinas do módulo de Desafios e Colegas
+      if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.populateSubjectSelects) {
+        MedTutorChallengesService.populateSubjectSelects();
+      }
+      if (typeof MedTutorClassmatesService !== 'undefined' && MedTutorClassmatesService.populateDirectPeriods) {
+        MedTutorClassmatesService.populateDirectPeriods();
+      }
+
+      const modal = document.getElementById('modalMedicalOnboarding');
+      if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+      }
+
+      if (typeof showToast === 'function') {
+        showToast(`🩺 Vínculo confirmado: ${faculdade} (${periodo})!`);
+      }
     }
 
     function toggleUserProfileDropdown(event) {
@@ -26473,9 +26603,23 @@ ${textSample}
       const readerSub = document.getElementById('readerModalSubtitle');
       if (readerSub) readerSub.textContent = 'Integração de Sistemas Humanos 2 • Módulo Dermatologia';
 
-      
+      initChatDriveMaterials();
+      renderSharedStudyItems();
+      renderSceBars();
+      renderSceTimeline();
+      updateSubjectFilterMenus();
+      renderCurriculumGrid();
 
-    function escapeHtmlText(str) {
+      if (typeof MedTutorFirebaseService !== 'undefined') {
+        MedTutorFirebaseService.saveCurriculum(universityCurriculum);
+        MedTutorFirebaseService.saveAllMaterials(chatDriveMaterials);
+        MedTutorFirebaseService.saveAllQuestions(sharedQuestionsBank);
+      }
+
+      showToast('✨ Demonstração padrão restaurada e sincronizada na nuvem!');
+    }
+
+function escapeHtmlText(str) {
       if (typeof escapeHtml === 'function') return escapeHtml(str);
       if (!str) return '';
       return String(str)
@@ -26544,44 +26688,89 @@ ${textSample}
         const bankSelect = document.getElementById('bankSubjectFilterSelect');
         if (!createSelect && !bankSelect) return;
 
+        let periods = (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0)
+          ? universityCurriculum
+          : (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined' ? CANONICAL_UNIVERSO_CURRICULUM : []);
+
         let subjectList = [];
         if (typeof getAllCurriculumSubjects === 'function') {
           subjectList = getAllCurriculumSubjects().map(s => typeof s === 'string' ? s : s.name);
         }
-        if (subjectList.length === 0 && typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
-          CANONICAL_UNIVERSO_CURRICULUM.forEach(p => {
+        if (subjectList.length === 0 && periods.length > 0) {
+          periods.forEach(p => {
             (p.subjects || []).forEach(s => {
               subjectList.push(typeof s === 'string' ? s : s.name);
             });
           });
         }
-        // Deduplica e ordena
         const uniqueSubjects = [...new Set(subjectList.filter(Boolean))];
 
         if (createSelect) {
           const prevVal = createSelect.value;
-          createSelect.innerHTML = '<option value="">-- Selecione uma Disciplina --</option>';
-          uniqueSubjects.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s;
-            opt.textContent = s;
-            if (prevVal === s || (!prevVal && typeof currentStudySubject !== 'undefined' && currentStudySubject === s)) {
-              opt.selected = true;
-            }
-            createSelect.appendChild(opt);
-          });
+          createSelect.innerHTML = '<option value="">-- Selecione uma Disciplina da Ementa --</option>';
+
+          if (periods.length > 0) {
+            periods.forEach(p => {
+              const subjects = p.subjects || [];
+              if (subjects.length === 0) return;
+              const group = document.createElement('optgroup');
+              group.label = `${p.period} (${p.cycle || p.cycleName || 'Geral'})`;
+              subjects.forEach(s => {
+                const sName = typeof s === 'string' ? s : s.name;
+                if (!sName) return;
+                const opt = document.createElement('option');
+                opt.value = sName;
+                opt.textContent = sName;
+                if (prevVal === sName || (!prevVal && typeof currentStudySubject !== 'undefined' && currentStudySubject === sName)) {
+                  opt.selected = true;
+                }
+                group.appendChild(opt);
+              });
+              createSelect.appendChild(group);
+            });
+          } else {
+            uniqueSubjects.forEach(s => {
+              const opt = document.createElement('option');
+              opt.value = s;
+              opt.textContent = s;
+              if (prevVal === s || (!prevVal && typeof currentStudySubject !== 'undefined' && currentStudySubject === s)) {
+                opt.selected = true;
+              }
+              createSelect.appendChild(opt);
+            });
+          }
         }
 
         if (bankSelect) {
           const prevBankVal = bankSelect.value || 'all';
           bankSelect.innerHTML = '<option value="all">Todas as Disciplinas</option>';
-          uniqueSubjects.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s;
-            opt.textContent = s;
-            if (prevBankVal === s) opt.selected = true;
-            bankSelect.appendChild(opt);
-          });
+
+          if (periods.length > 0) {
+            periods.forEach(p => {
+              const subjects = p.subjects || [];
+              if (subjects.length === 0) return;
+              const group = document.createElement('optgroup');
+              group.label = `${p.period} (${p.cycle || p.cycleName || 'Geral'})`;
+              subjects.forEach(s => {
+                const sName = typeof s === 'string' ? s : s.name;
+                if (!sName) return;
+                const opt = document.createElement('option');
+                opt.value = sName;
+                opt.textContent = sName;
+                if (prevBankVal === sName) opt.selected = true;
+                group.appendChild(opt);
+              });
+              bankSelect.appendChild(group);
+            });
+          } else {
+            uniqueSubjects.forEach(s => {
+              const opt = document.createElement('option');
+              opt.value = s;
+              opt.textContent = s;
+              if (prevBankVal === s) opt.selected = true;
+              bankSelect.appendChild(opt);
+            });
+          }
         }
       },
 
@@ -28452,43 +28641,87 @@ ${textSample}
       }
     };
 
-    // Exportações globais de Colegas
+    // Exportações globais de Colegas e Onboarding
     function openClassmatesModal() {
-      MedTutorClassmatesService.openModal();
+      const modal = document.getElementById('modalClassmates');
+      if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+      }
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.openModal();
+      }
     }
     function closeClassmatesModal() {
-      MedTutorClassmatesService.closeModal();
+      const modal = document.getElementById('modalClassmates');
+      if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+      }
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.closeModal();
+      }
     }
     function switchClassmatesView(view) {
-      MedTutorClassmatesService.switchView(view);
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.switchView(view);
+      }
     }
     function handleAddClassmateSubmit() {
       const input = document.getElementById('classmateAddEmail');
-      if (input) MedTutorClassmatesService.addColleagueByEmail(input.value);
+      if (input && typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.addColleagueByEmail(input.value);
+      }
     }
     function openDirectChallenge(targetEmail, targetName, targetUid) {
-      MedTutorClassmatesService.openDirectChallenge(targetEmail, targetName, targetUid);
+      const modal = document.getElementById('modalDirectChallenge');
+      if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+      }
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.openDirectChallenge(targetEmail, targetName, targetUid);
+      }
     }
     function closeDirectChallengeModal() {
-      MedTutorClassmatesService.closeDirectChallenge();
+      const modal = document.getElementById('modalDirectChallenge');
+      if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+      }
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.closeDirectChallenge();
+      }
     }
     function handleDirectPeriodChange() {
-      MedTutorClassmatesService.onDirectPeriodChange();
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.onDirectPeriodChange();
+      }
     }
     function handleDirectDisciplineChange() {
-      MedTutorClassmatesService.onDirectDisciplineChange();
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.onDirectDisciplineChange();
+      }
     }
     function toggleDirectQuestionItem(id) {
-      MedTutorClassmatesService.toggleDirectQuestionItem(id);
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.toggleDirectQuestionItem(id);
+      }
     }
     function toggleDirectSelectAll(state) {
-      MedTutorClassmatesService.toggleDirectSelectAll(state);
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.toggleDirectSelectAll(state);
+      }
     }
     function submitDirectChallenge() {
-      MedTutorClassmatesService.submitDirectChallenge();
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.submitDirectChallenge();
+      }
     }
     function recordChallengerVote(direction) {
-      MedTutorClassmatesService.recordChallengerVote(direction);
+      if (typeof MedTutorClassmatesService !== 'undefined') {
+        MedTutorClassmatesService.recordChallengerVote(direction);
+      }
     }
 
     if (typeof window !== 'undefined') {
@@ -28505,23 +28738,12 @@ ${textSample}
       window.toggleDirectSelectAll = toggleDirectSelectAll;
       window.submitDirectChallenge = submitDirectChallenge;
       window.recordChallengerVote = recordChallengerVote;
+      window.openMedicalOnboardingModal = openMedicalOnboardingModal;
+      window.closeMedicalOnboardingModal = closeMedicalOnboardingModal;
+      window.checkMandatoryFacultyRedeclaration = checkMandatoryFacultyRedeclaration;
+      window.handleMedicalOnboardingSubmit = handleMedicalOnboardingSubmit;
     }
 
-    initChatDriveMaterials();
-      renderSharedStudyItems();
-      renderSceBars();
-      renderSceTimeline();
-      updateSubjectFilterMenus();
-      renderCurriculumGrid();
-
-      if (typeof MedTutorFirebaseService !== 'undefined') {
-        MedTutorFirebaseService.saveCurriculum(universityCurriculum);
-        MedTutorFirebaseService.saveAllMaterials(chatDriveMaterials);
-        MedTutorFirebaseService.saveAllQuestions(sharedQuestionsBank);
-      }
-
-      showToast('✨ Demonstração padrão restaurada e sincronizada na nuvem!');
-    }
 
     // Inicialização ao carregar a página (respeita o estado de reset ou ementa salva)
     if (localStorage.getItem('medtutor_reset_clean') === 'true') {
@@ -28589,4 +28811,17 @@ ${textSample}
       window.MedTutorAuthService = MedTutorAuthService;
       window.MedTutorFirebaseService = MedTutorFirebaseService;
       window.MedTutorLocalDB = MedTutorLocalDB;
+    }
+
+    // Inicialização e pré-população imediata dos seletores de Desafios e Colegas
+    if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.populateSubjectSelects) {
+      MedTutorChallengesService.populateSubjectSelects();
+    }
+    if (typeof MedTutorClassmatesService !== 'undefined' && MedTutorClassmatesService.populateDirectPeriods) {
+      MedTutorClassmatesService.populateDirectPeriods();
+    }
+    if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+      setTimeout(() => {
+        checkMandatoryFacultyRedeclaration();
+      }, 500);
     }
