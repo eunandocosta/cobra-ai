@@ -2943,6 +2943,13 @@
     </div>
   </div>
 
+  <!-- BOTÃO FLUTUANTE DE COLEGAS (AO LADO DE DÚVIDAS) -->
+  <button class="classmates-fab" id="btnOpenClassmates" type="button" onclick="openClassmatesModal()" aria-controls="modalClassmates" aria-label="Abrir comunidade de colegas da faculdade">
+    <span class="classmates-fab-icon">👥</span>
+    <span>Colegas</span>
+    <span class="classmates-fab-badge" id="classmatesFabBadge" style="display: none;">0</span>
+  </button>
+
   <!-- CADERNO PESSOAL DE DÚVIDAS -->
   <button class="doubts-fab" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir caderno de dúvidas">
     <span class="doubts-fab-icon">?</span>
@@ -2967,6 +2974,186 @@
     </div>
   </aside>
   <div class="doubts-backdrop" id="doubtsBackdrop" onclick="closeDoubtsDrawer()" aria-hidden="true"></div>
+
+  <!-- =========================================================
+       MODAL DE COLEGAS DA FACULDADE & DESAFIOS CLÍNICOS
+       ========================================================= -->
+  <div class="modal-overlay" id="modalClassmates" onclick="event.stopPropagation()">
+    <div class="modal-window classmates-modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="classmates-header-icon">👥</div>
+          <div>
+            <h2 id="classmatesModalTitle" style="font-size: 16px; margin: 0;">Colegas de Medicina</h2>
+            <div id="classmatesModalSubtitle" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+              Universidade Salgado de Oliveira (Universo) • Comunidade de Estudantes
+            </div>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="closeClassmatesModal()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Formulário de Adicionar Colega por E-mail -->
+      <div class="classmate-add-box">
+        <form id="formAddClassmate" class="classmate-add-form" onsubmit="event.preventDefault(); handleAddClassmateSubmit();">
+          <div class="add-input-wrapper">
+            <span class="add-icon">✉️</span>
+            <input type="email" id="classmateAddEmail" class="chat-input" placeholder="Adicionar colega por e-mail (ex: mariana@medicina.universo.br)" required autocomplete="off">
+          </div>
+          <button type="submit" class="btn-primary-action" id="btnAddClassmateSubmit">
+            ➕ Adicionar
+          </button>
+        </form>
+        <div id="classmateAddFeedback" class="classmate-add-feedback" style="display: none;"></div>
+      </div>
+
+      <!-- Barra de Navegação/Filtros das Seções -->
+      <div class="classmates-filter-tabs">
+        <button class="classmates-tab-btn active" id="tabClassmatesAllSections" onclick="switchClassmatesView('all')">
+          📋 Todas as Seções
+        </button>
+        <button class="classmates-tab-btn" id="tabClassmatesSamePeriod" onclick="switchClassmatesView('same_period')">
+          🎓 Mesmo Período <span class="tab-count-pill" id="badgeCountSamePeriod">0</span>
+        </button>
+        <button class="classmates-tab-btn" id="tabClassmatesAllFaculty" onclick="switchClassmatesView('all_faculty')">
+          🏛️ Toda a Faculdade <span class="tab-count-pill" id="badgeCountAllFaculty">0</span>
+        </button>
+        <button class="classmates-tab-btn" id="tabClassmatesAdded" onclick="switchClassmatesView('added')">
+          ⭐ Adicionados <span class="tab-count-pill" id="badgeCountAdded">0</span>
+        </button>
+      </div>
+
+      <!-- Conteúdo com as 3 Seções -->
+      <div class="classmates-sections-container" id="classmatesSectionsContainer">
+        
+        <!-- SEÇÃO 1: MESMO PERÍODO -->
+        <section class="classmates-section-block" id="sectionClassmatesSamePeriod">
+          <div class="classmates-section-header">
+            <div class="section-title-wrap">
+              <span class="section-icon">🎓</span>
+              <div>
+                <h3 id="classmatesSamePeriodHeading">Colegas do Meu Período (5º Período)</h3>
+                <p>Estudantes que estão cursando o mesmo período que você na faculdade.</p>
+              </div>
+            </div>
+            <span class="section-count-tag" id="countSamePeriodTag">0 colegas</span>
+          </div>
+          <div class="classmates-cards-grid" id="classmatesSamePeriodList">
+            <!-- Populado dinamicamente -->
+          </div>
+        </section>
+
+        <!-- SEÇÃO 2: TODA A FACULDADE -->
+        <section class="classmates-section-block" id="sectionClassmatesAllFaculty">
+          <div class="classmates-section-header">
+            <div class="section-title-wrap">
+              <span class="section-icon">🏛️</span>
+              <div>
+                <h3 id="classmatesAllFacultyHeading">Todos os Estudantes da Faculdade</h3>
+                <p>Alunos de todos os períodos cadastrados na instituição.</p>
+              </div>
+            </div>
+            <span class="section-count-tag" id="countAllFacultyTag">0 colegas</span>
+          </div>
+          <div class="classmates-cards-grid" id="classmatesAllFacultyList">
+            <!-- Populado dinamicamente -->
+          </div>
+        </section>
+
+        <!-- SEÇÃO 3: ADICIONADOS PELO USUÁRIO -->
+        <section class="classmates-section-block" id="sectionClassmatesAdded">
+          <div class="classmates-section-header">
+            <div class="section-title-wrap">
+              <span class="section-icon">⭐</span>
+              <div>
+                <h3>Colegas Adicionados</h3>
+                <p>Contatos que você adicionou diretamente pelo endereço de e-mail.</p>
+              </div>
+            </div>
+            <span class="section-count-tag" id="countAddedTag">0 colegas</span>
+          </div>
+          <div class="classmates-cards-grid" id="classmatesAddedList">
+            <!-- Populado dinamicamente -->
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       BOX DE DESAFIO CURRICULAR DIRETO (PERÍODO -> DISCIPLINA -> QUESTÕES)
+       ========================================================= -->
+  <div class="modal-overlay" id="modalDirectChallenge" onclick="event.stopPropagation()">
+    <div class="modal-window direct-challenge-modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="challenge-player-icon">⚔️</div>
+          <div>
+            <h2 id="directChallengeTargetTitle" style="font-size: 15px; margin: 0;">Lançar Desafio Clínico</h2>
+            <div id="directChallengeTargetSubtitle" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">Para: ...</div>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="closeDirectChallengeModal()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Seletores Curriculares Hierárquicos -->
+      <div class="direct-challenge-selectors-card">
+        <div class="selectors-grid">
+          <!-- 1. Período -->
+          <div class="form-group">
+            <label for="directChallengePeriodSelect">1. Período Curricular:</label>
+            <select id="directChallengePeriodSelect" class="study-nav-select" onchange="handleDirectPeriodChange()">
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+
+          <!-- 2. Disciplina / Matéria -->
+          <div class="form-group">
+            <label for="directChallengeDisciplineSelect">2. Disciplina / Matéria:</label>
+            <select id="directChallengeDisciplineSelect" class="study-nav-select" onchange="handleDirectDisciplineChange()">
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Perguntas Disponíveis (Apenas dominadas em Flashcards) -->
+      <div class="direct-challenge-questions-box">
+        <div class="selection-card-header">
+          <div>
+            <h3 style="margin: 0; font-size: 13.5px; font-weight: 700;">3. Perguntas Disponíveis na Disciplina</h3>
+            <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+              ✅ Apenas flashcards que você <strong>já acertou/dominou</strong> nesta matéria.
+            </div>
+          </div>
+          <div class="selection-card-actions">
+            <button class="btn-outline-action" style="font-size: 11px; padding: 4px 8px;" onclick="toggleDirectSelectAll(true)">Selecionar Todas</button>
+            <button class="btn-outline-action" style="font-size: 11px; padding: 4px 8px;" onclick="toggleDirectSelectAll(false)">Limpar</button>
+          </div>
+        </div>
+
+        <!-- Container das Perguntas -->
+        <div id="directChallengeQuestionsList" class="eligible-questions-container" style="max-height: 260px;">
+          <!-- Populado dinamicamente -->
+        </div>
+      </div>
+
+      <!-- Rodapé com Contador e Botão de Envio -->
+      <div class="direct-challenge-footer">
+        <div class="selected-counter">
+          <span id="directChallengeSelectedCount">0</span> questões selecionadas
+        </div>
+        <button class="btn-primary-action" id="btnSubmitDirectChallenge" onclick="submitDirectChallenge()">
+          🚀 Enviar Desafio Clínico
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- =========================================================
        MODAL DE EXECUÇÃO DO DESAFIO (FLASHCARD + AVALIAÇÃO 👍/👎)
@@ -3057,7 +3244,38 @@
             Todas as perguntas foram respondidas e avaliadas. As questões foram registradas no <strong>Banco Coletivo da sua Faculdade</strong> com os escores atualizados.
           </p>
           <div id="challengeFinishSummaryList" class="finish-summary-list"></div>
-          <button class="btn-primary-action" style="margin-top: 14px; padding: 10px 24px;" onclick="closeChallengePlayerModal()">
+
+          <!-- Avaliação do Desafiador (Bom Desafiador vs Ruim Desafiador) -->
+          <div class="challenger-rating-box" id="challengerRatingBox">
+            <div class="challenger-rating-prompt">
+              <span class="challenger-prompt-icon">⚔️</span>
+              <div style="text-align: left;">
+                <h4 id="challengerRatingPromptTitle" style="margin: 0; font-size: 14px; font-weight: 700;">Avalie o Colega Desafiador</h4>
+                <p id="challengerRatingPromptText" style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-secondary);">
+                  Como você avalia as perguntas e o nível deste duelo? Vote com polegares:
+                </p>
+              </div>
+            </div>
+            <div class="voting-buttons-row" id="challengerRatingActions" style="margin-top: 10px;">
+              <button class="thumb-vote-btn thumb-positive" id="btnChallengerVoteUp" onclick="recordChallengerVote('up')" title="Bom Desafiador (+1 ponto de reputação)">
+                <span class="thumb-icon">👍</span>
+                <span class="thumb-label">
+                  <strong>Bom Desafiador</strong>
+                  <small>Desafio Relevante (+1)</small>
+                </span>
+              </button>
+              <button class="thumb-vote-btn thumb-negative" id="btnChallengerVoteDown" onclick="recordChallengerVote('down')" title="Ruim Desafiador (-1 ponto de reputação)">
+                <span class="thumb-icon">👎</span>
+                <span class="thumb-label">
+                  <strong>Ruim Desafiador</strong>
+                  <small>Desafio Fraco / Incoerente (-1)</small>
+                </span>
+              </button>
+            </div>
+            <div id="challengerVoteFeedback" class="challenger-vote-feedback" style="display: none;"></div>
+          </div>
+
+          <button class="btn-primary-action" style="margin-top: 16px; padding: 10px 24px;" onclick="closeChallengePlayerModal()">
             Finalizar e Voltar para Desafios
           </button>
         </div>

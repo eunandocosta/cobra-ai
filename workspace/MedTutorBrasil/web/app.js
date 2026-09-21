@@ -27591,6 +27591,922 @@ ${textSample}
       window.closeChallengePlayerModal = closeChallengePlayerModal;
     }
 
+    
+// =========================================================
+    // 17. SERVIÇO DE COLEGAS, DESAFIO DIRETO E AVALIAÇÃO DE DESAFIADOR
+    // =========================================================
+    const MedTutorClassmatesService = {
+      allUsersCache: [],
+      addedClassmatesCache: [],
+      activeDirectTarget: { email: '', name: '', uid: '' },
+      directSelectedQuestionIds: new Set(),
+      directEligibleQuestionsCache: [],
+      currentView: 'all',
+
+      init() {
+        this.loadAddedClassmatesFromStorage();
+        this.updateFabBadge();
+      },
+
+      loadAddedClassmatesFromStorage() {
+        try {
+          const stored = localStorage.getItem('medtutor_added_classmates');
+          this.addedClassmatesCache = stored ? JSON.parse(stored) : [];
+        } catch (e) {
+          this.addedClassmatesCache = [];
+        }
+      },
+
+      saveAddedClassmatesToStorage() {
+        try {
+          localStorage.setItem('medtutor_added_classmates', JSON.stringify(this.addedClassmatesCache));
+        } catch (e) {}
+      },
+
+      updateFabBadge() {
+        const badge = document.getElementById('classmatesFabBadge');
+        if (!badge) return;
+        const total = (this.allUsersCache.length > 0) ? this.allUsersCache.length : (this.addedClassmatesCache.length || 0);
+        if (total > 0) {
+          badge.textContent = total;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      },
+
+      openModal() {
+        const modal = document.getElementById('modalClassmates');
+        if (modal) {
+          modal.classList.add('active');
+          modal.style.display = 'flex';
+        }
+        this.loadClassmates();
+      },
+
+      closeModal() {
+        const modal = document.getElementById('modalClassmates');
+        if (modal) {
+          modal.classList.remove('active');
+          modal.style.display = 'none';
+        }
+      },
+
+      switchView(viewName) {
+        this.currentView = viewName;
+        const tabs = [
+          { id: 'tabClassmatesAllSections', view: 'all' },
+          { id: 'tabClassmatesSamePeriod', view: 'same_period' },
+          { id: 'tabClassmatesAllFaculty', view: 'all_faculty' },
+          { id: 'tabClassmatesAdded', view: 'added' }
+        ];
+
+        tabs.forEach(t => {
+          const btn = document.getElementById(t.id);
+          if (btn) btn.classList.toggle('active', t.view === viewName);
+        });
+
+        const secSamePeriod = document.getElementById('sectionClassmatesSamePeriod');
+        const secAllFaculty = document.getElementById('sectionClassmatesAllFaculty');
+        const secAdded = document.getElementById('sectionClassmatesAdded');
+
+        if (viewName === 'all') {
+          if (secSamePeriod) secSamePeriod.style.display = 'block';
+          if (secAllFaculty) secAllFaculty.style.display = 'block';
+          if (secAdded) secAdded.style.display = 'block';
+        } else if (viewName === 'same_period') {
+          if (secSamePeriod) secSamePeriod.style.display = 'block';
+          if (secAllFaculty) secAllFaculty.style.display = 'none';
+          if (secAdded) secAdded.style.display = 'none';
+        } else if (viewName === 'all_faculty') {
+          if (secSamePeriod) secSamePeriod.style.display = 'none';
+          if (secAllFaculty) secAllFaculty.style.display = 'block';
+          if (secAdded) secAdded.style.display = 'none';
+        } else if (viewName === 'added') {
+          if (secSamePeriod) secSamePeriod.style.display = 'none';
+          if (secAllFaculty) secAllFaculty.style.display = 'none';
+          if (secAdded) secAdded.style.display = 'block';
+        }
+      },
+
+      async loadClassmates() {
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const userSchool = (currentProfile.faculdade || 'Universo').trim();
+        const userPeriod = (currentProfile.periodo_atual || '5º Período').trim();
+        const userEmail = (currentUser.email || '').toLowerCase();
+
+        // Atualiza títulos do cabeçalho
+        const subTitleEl = document.getElementById('classmatesModalSubtitle');
+        if (subTitleEl) {
+          subTitleEl.textContent = `${userSchool} • Comunidade Médica • Seu Período: ${userPeriod}`;
+        }
+        const samePeriodHeading = document.getElementById('classmatesSamePeriodHeading');
+        if (samePeriodHeading) {
+          samePeriodHeading.textContent = `Colegas do Meu Período (${userPeriod})`;
+        }
+        const allFacultyHeading = document.getElementById('classmatesAllFacultyHeading');
+        if (allFacultyHeading) {
+          allFacultyHeading.textContent = `Todos os Estudantes da Faculdade (${userSchool})`;
+        }
+
+        let users = [];
+
+        // 1. Busca usuários da instituição no Firestore
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('users')
+              .where('faculdade', '==', userSchool)
+              .get();
+            snap.forEach(doc => {
+              const d = doc.data() || {};
+              const email = (d.email || '').toLowerCase();
+              if (email && email !== userEmail) {
+                users.push({
+                  uid: doc.id,
+                  email: email,
+                  nome: d.nome || email.split('@')[0],
+                  faculdade: d.faculdade || userSchool,
+                  periodo_atual: d.periodo_atual || 'Período Geral',
+                  challengerThumbsUp: d.challengerThumbsUp || 0,
+                  challengerThumbsDown: d.challengerThumbsDown || 0,
+                  challengerScore: typeof d.challengerScore === 'number' ? d.challengerScore : ((d.challengerThumbsUp || 0) - (d.challengerThumbsDown || 0))
+                });
+              }
+            });
+          } catch (e) {
+            console.warn('[Classmates] Falha ao buscar usuários no Firestore:', e);
+          }
+        }
+
+        // 2. Mock robusto de colegas da Faculdade Universo se estiver offline ou banco com poucos usuários
+        if (users.length === 0) {
+          users = [
+            {
+              uid: 'usr_mariana',
+              nome: 'Mariana Costa',
+              email: 'mariana.costa@medicina.universo.br',
+              faculdade: userSchool,
+              periodo_atual: userPeriod,
+              challengerThumbsUp: 15,
+              challengerThumbsDown: 1,
+              challengerScore: 14
+            },
+            {
+              uid: 'usr_lucas',
+              nome: 'Lucas Silva',
+              email: 'lucas.silva@medicina.universo.br',
+              faculdade: userSchool,
+              periodo_atual: userPeriod,
+              challengerThumbsUp: 9,
+              challengerThumbsDown: 1,
+              challengerScore: 8
+            },
+            {
+              uid: 'usr_fernando',
+              nome: 'Fernando Matheus',
+              email: 'fmscosta99@gmail.com',
+              faculdade: userSchool,
+              periodo_atual: userPeriod,
+              challengerThumbsUp: 26,
+              challengerThumbsDown: 1,
+              challengerScore: 25
+            },
+            {
+              uid: 'usr_beatriz',
+              nome: 'Beatriz Moraes',
+              email: 'beatriz.moraes@medicina.universo.br',
+              faculdade: userSchool,
+              periodo_atual: '3º Semestre',
+              challengerThumbsUp: 6,
+              challengerThumbsDown: 1,
+              challengerScore: 5
+            },
+            {
+              uid: 'usr_gabriel',
+              nome: 'Gabriel Santos',
+              email: 'gabriel.santos@medicina.universo.br',
+              faculdade: userSchool,
+              periodo_atual: '8º Semestre',
+              challengerThumbsUp: 2,
+              challengerThumbsDown: 5,
+              challengerScore: -3 // Escore negativo testado
+            },
+            {
+              uid: 'usr_camila',
+              nome: 'Camila Albuquerque',
+              email: 'camila.albuquerque@medicina.universo.br',
+              faculdade: userSchool,
+              periodo_atual: '10º Semestre (Internato)',
+              challengerThumbsUp: 19,
+              challengerThumbsDown: 1,
+              challengerScore: 18
+            },
+            {
+              uid: 'usr_rodrigo',
+              nome: 'Rodrigo Fagundes',
+              email: 'rodrigo.fagundes@medicina.universo.br',
+              faculdade: userSchool,
+              periodo_atual: '2º Semestre',
+              challengerThumbsUp: 0,
+              challengerThumbsDown: 0,
+              challengerScore: 0
+            }
+          ].filter(u => u.email.toLowerCase() !== userEmail);
+        }
+
+        // Aplica avaliações locais salvas no navegador
+        try {
+          const localRatings = JSON.parse(localStorage.getItem('medtutor_challenger_ratings') || '{}');
+          users.forEach(u => {
+            if (localRatings[u.email]) {
+              const lr = localRatings[u.email];
+              u.challengerThumbsUp = lr.thumbsUp;
+              u.challengerThumbsDown = lr.thumbsDown;
+              u.challengerScore = lr.score;
+            }
+          });
+        } catch (e) {}
+
+        this.allUsersCache = users;
+
+        // 3. Colegas Adicionados (carrega e mescla com os perfis conhecidos)
+        this.loadAddedClassmatesFromStorage();
+        const addedUsers = [];
+        this.addedClassmatesCache.forEach(item => {
+          const email = (typeof item === 'string' ? item : item.email).toLowerCase();
+          if (email === userEmail) return;
+          const found = users.find(u => u.email.toLowerCase() === email);
+          if (found) {
+            addedUsers.push(found);
+          } else {
+            addedUsers.push({
+              uid: (typeof item === 'object' && item.uid) || `usr_${email.replace(/[^a-z0-9]/g, '_')}`,
+              nome: (typeof item === 'object' && item.nome) || email.split('@')[0],
+              email: email,
+              faculdade: (typeof item === 'object' && item.faculdade) || userSchool,
+              periodo_atual: (typeof item === 'object' && item.periodo_atual) || 'Adicionado',
+              challengerThumbsUp: 0,
+              challengerThumbsDown: 0,
+              challengerScore: 0
+            });
+          }
+        });
+
+        // 4. Colegas do Mesmo Período
+        const normUserPeriod = userPeriod.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const samePeriodUsers = users.filter(u => {
+          const p = (u.periodo_atual || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return p === normUserPeriod || p.includes(normUserPeriod) || normUserPeriod.includes(p);
+        });
+
+        // 5. Renderiza Seções
+        this.renderClassmatesGrid('classmatesSamePeriodList', samePeriodUsers, 'Nenhum colega cadastrado no seu período ainda.');
+        this.renderClassmatesGrid('classmatesAllFacultyList', users, 'Nenhum outro estudante encontrado nesta faculdade.');
+        this.renderClassmatesGrid('classmatesAddedList', addedUsers, 'Você ainda não adicionou nenhum colega por e-mail.');
+
+        // 6. Atualiza contadores
+        const bSame = document.getElementById('badgeCountSamePeriod');
+        const bAll = document.getElementById('badgeCountAllFaculty');
+        const bAdd = document.getElementById('badgeCountAdded');
+        const tagSame = document.getElementById('countSamePeriodTag');
+        const tagAll = document.getElementById('countAllFacultyTag');
+        const tagAdd = document.getElementById('countAddedTag');
+
+        if (bSame) bSame.textContent = samePeriodUsers.length;
+        if (bAll) bAll.textContent = users.length;
+        if (bAdd) bAdd.textContent = addedUsers.length;
+        if (tagSame) tagSame.textContent = `${samePeriodUsers.length} ${samePeriodUsers.length === 1 ? 'colega' : 'colegas'}`;
+        if (tagAll) tagAll.textContent = `${users.length} ${users.length === 1 ? 'estudante' : 'estudantes'}`;
+        if (tagAdd) tagAdd.textContent = `${addedUsers.length} ${addedUsers.length === 1 ? 'adicionado' : 'adicionados'}`;
+
+        this.updateFabBadge();
+      },
+
+      renderClassmatesGrid(containerId, list, emptyMessage) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        if (!list || list.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice" style="grid-column: 1 / -1; padding: 14px 10px;">
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0;">${emptyMessage}</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = list.map(u => {
+          const name = u.nome || u.email.split('@')[0];
+          const parts = name.trim().split(/\s+/);
+          const initials = parts.length > 1
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : (parts[0] ? parts[0].slice(0, 2).toUpperCase() : 'MD');
+
+          const score = typeof u.challengerScore === 'number' ? u.challengerScore : ((u.challengerThumbsUp || 0) - (u.challengerThumbsDown || 0));
+          const isPos = score > 0;
+          const isNeg = score < 0;
+          const repClass = isPos ? 'positive' : (isNeg ? 'negative' : 'neutral');
+          const scorePrefix = isPos ? '+' : '';
+
+          let repText = '⚖️ Desafiador Iniciante';
+          if (isPos) {
+            repText = `⭐ Bom Desafiador (${scorePrefix}${score} 👍)`;
+          } else if (isNeg) {
+            repText = `⚠️ Ruim Desafiador (${score} 👎)`;
+          }
+
+          const safeEmail = String(u.email).replace(/'/g, "\\'");
+          const safeName = String(name).replace(/'/g, "\\'");
+          const safeUid = String(u.uid || '').replace(/'/g, "\\'");
+
+          return `
+            <div class="classmate-card" onclick="openDirectChallenge('${safeEmail}', '${safeName}', '${safeUid}')">
+              <div class="classmate-card-top">
+                <div class="classmate-avatar">${initials}</div>
+                <div class="classmate-info">
+                  <div class="classmate-name" title="${escapeHtmlText(name)}">${escapeHtmlText(name)}</div>
+                  <div class="classmate-email" title="${escapeHtmlText(u.email)}">${escapeHtmlText(u.email)}</div>
+                </div>
+              </div>
+              <div class="classmate-meta-tags">
+                <span class="classmate-period-pill">${escapeHtmlText(u.periodo_atual || 'Período')}</span>
+                <span class="challenger-reputation-pill ${repClass}" title="Escore de desafiador: ${scorePrefix}${score} (${u.challengerThumbsUp || 0} 👍 / ${u.challengerThumbsDown || 0} 👎)">
+                  ${repText}
+                </span>
+              </div>
+              <div class="classmate-card-action">
+                <button class="btn-primary-action btn-challenge-colleague" onclick="event.stopPropagation(); openDirectChallenge('${safeEmail}', '${safeName}', '${safeUid}')">
+                  ⚔️ Desafiar Colega
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      async addColleagueByEmail(emailInputVal) {
+        const email = (emailInputVal || '').trim().toLowerCase();
+        const feedbackEl = document.getElementById('classmateAddFeedback');
+        const input = document.getElementById('classmateAddEmail');
+
+        const showFeedback = (msg, isError = false) => {
+          if (!feedbackEl) return;
+          feedbackEl.style.display = 'block';
+          feedbackEl.className = `classmate-add-feedback ${isError ? 'error' : 'success'}`;
+          feedbackEl.textContent = msg;
+          setTimeout(() => {
+            if (feedbackEl) feedbackEl.style.display = 'none';
+          }, 4000);
+        };
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          showFeedback('Por favor, informe um endereço de e-mail válido.', true);
+          input?.focus();
+          return;
+        }
+
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        if (email === (currentUser.email || '').toLowerCase()) {
+          showFeedback('Você não pode adicionar o seu próprio e-mail como colega.', true);
+          return;
+        }
+
+        this.loadAddedClassmatesFromStorage();
+        if (this.addedClassmatesCache.some(item => (typeof item === 'string' ? item : item.email).toLowerCase() === email)) {
+          showFeedback(`O colega ${email} já está na sua lista de adicionados.`, true);
+          return;
+        }
+
+        // Tenta buscar no Firestore para obter o nome real
+        let classmateObj = {
+          email: email,
+          nome: email.split('@')[0],
+          faculdade: currentProfile.faculdade || 'Universo',
+          periodo_atual: 'Colega Adicionado',
+          addedAt: new Date().toISOString()
+        };
+
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const snap = await firestoreDb.collection('users').where('email', '==', email).limit(1).get();
+            if (!snap.empty) {
+              const d = snap.docs[0].data();
+              classmateObj.uid = snap.docs[0].id;
+              classmateObj.nome = d.nome || classmateObj.nome;
+              classmateObj.faculdade = d.faculdade || classmateObj.faculdade;
+              classmateObj.periodo_atual = d.periodo_atual || classmateObj.periodo_atual;
+            }
+
+            // Persiste no Firestore do usuário
+            if (currentUser.uid) {
+              const emailKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
+              await firestoreDb.collection('users').doc(currentUser.uid)
+                .collection('colegas').doc(emailKey).set(classmateObj, { merge: true });
+            }
+          } catch (e) {
+            console.warn('[Classmates] Erro ao salvar colega no Firestore:', e);
+          }
+        }
+
+        this.addedClassmatesCache.unshift(classmateObj);
+        this.saveAddedClassmatesToStorage();
+
+        if (input) input.value = '';
+        showFeedback(`✅ Colega ${classmateObj.nome} (${email}) adicionado com sucesso!`);
+        this.loadClassmates();
+        if (typeof showToast === 'function') showToast(`👥 Colega ${classmateObj.nome} adicionado com sucesso!`);
+      },
+
+      // =========================================================
+      // FLUXO DE DESAFIO DIRETO (PERÍODO -> DISCIPLINA -> QUESTÕES)
+      // =========================================================
+      openDirectChallenge(targetEmail, targetName, targetUid) {
+        this.activeDirectTarget = {
+          email: targetEmail,
+          name: targetName || targetEmail.split('@')[0],
+          uid: targetUid || ''
+        };
+
+        const modal = document.getElementById('modalDirectChallenge');
+        const titleEl = document.getElementById('directChallengeTargetTitle');
+        const subEl = document.getElementById('directChallengeTargetSubtitle');
+
+        if (titleEl) titleEl.textContent = `Lançar Desafio para ${this.activeDirectTarget.name}`;
+        if (subEl) subEl.textContent = `Destinatário: ${this.activeDirectTarget.email}`;
+
+        if (modal) {
+          modal.classList.add('active');
+          modal.style.display = 'flex';
+        }
+
+        this.populateDirectPeriods();
+      },
+
+      closeDirectChallenge() {
+        const modal = document.getElementById('modalDirectChallenge');
+        if (modal) {
+          modal.classList.remove('active');
+          modal.style.display = 'none';
+        }
+        this.activeDirectTarget = { email: '', name: '', uid: '' };
+        this.directSelectedQuestionIds.clear();
+      },
+
+      populateDirectPeriods() {
+        const periodSelect = document.getElementById('directChallengePeriodSelect');
+        if (!periodSelect) return;
+
+        let periods = [];
+        if (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0) {
+          periods = universityCurriculum;
+        } else if (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
+          periods = CANONICAL_UNIVERSO_CURRICULUM;
+        }
+
+        periodSelect.innerHTML = '<option value="">-- Selecione o Período --</option>';
+        periods.forEach((p, idx) => {
+          const opt = document.createElement('option');
+          opt.value = p.period || `period_${idx}`;
+          opt.textContent = `${p.period} (${(p.subjects || []).length} disciplinas)`;
+          periodSelect.appendChild(opt);
+        });
+
+        // Tenta pré-selecionar o período do usuário
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const userPeriod = (currentProfile.periodo_atual || '').toLowerCase();
+        if (userPeriod) {
+          for (let i = 0; i < periodSelect.options.length; i++) {
+            if (periodSelect.options[i].text.toLowerCase().includes(userPeriod)) {
+              periodSelect.selectedIndex = i;
+              break;
+            }
+          }
+        }
+        if (periodSelect.selectedIndex <= 0 && periodSelect.options.length > 1) {
+          periodSelect.selectedIndex = 1;
+        }
+
+        this.onDirectPeriodChange();
+      },
+
+      onDirectPeriodChange() {
+        const periodSelect = document.getElementById('directChallengePeriodSelect');
+        const discSelect = document.getElementById('directChallengeDisciplineSelect');
+        if (!periodSelect || !discSelect) return;
+
+        const selectedPeriodName = periodSelect.value;
+        discSelect.innerHTML = '<option value="">-- Selecione a Disciplina --</option>';
+
+        if (!selectedPeriodName) {
+          this.onDirectDisciplineChange();
+          return;
+        }
+
+        let periods = (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0)
+          ? universityCurriculum
+          : (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined' ? CANONICAL_UNIVERSO_CURRICULUM : []);
+
+        const foundPeriod = periods.find(p => p.period === selectedPeriodName || p.id === selectedPeriodName);
+        const subjects = foundPeriod?.subjects || [];
+
+        subjects.forEach(s => {
+          const name = typeof s === 'string' ? s : s.name;
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          discSelect.appendChild(opt);
+        });
+
+        if (discSelect.options.length > 1) {
+          discSelect.selectedIndex = 1;
+        }
+
+        this.onDirectDisciplineChange();
+      },
+
+      onDirectDisciplineChange() {
+        const discSelect = document.getElementById('directChallengeDisciplineSelect');
+        const container = document.getElementById('directChallengeQuestionsList');
+        if (!container) return;
+
+        const targetSubject = discSelect ? discSelect.value.trim() : '';
+        this.directSelectedQuestionIds.clear();
+        this.updateDirectSelectedCounter();
+
+        if (!targetSubject) {
+          container.innerHTML = `
+            <div class="empty-state-notice">
+              <span class="icon">📖</span>
+              <p>Selecione uma matéria acima para carregar suas perguntas dominadas.</p>
+            </div>
+          `;
+          return;
+        }
+
+        if (!Array.isArray(sharedQuestionsBank) || sharedQuestionsBank.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice">
+              <span class="icon">🎯</span>
+              <p>Nenhum flashcard cadastrado ainda na sua conta.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const normTarget = targetSubject.toLowerCase();
+        // Critério do Usuário: Perguntas existentes já respondidas corretamente no Flashcard
+        const eligible = sharedQuestionsBank.filter(q => {
+          if (!q) return false;
+          const qSubj = (q.subject || '').trim().toLowerCase();
+          const matchesSubject = (qSubj === normTarget || qSubj.includes(normTarget) || normTarget.includes(qSubj));
+          if (!matchesSubject) return false;
+
+          const isMasteredInSRS = Boolean(
+            (q.srs && typeof q.srs.reps === 'number' && q.srs.reps > 0) ||
+            (q.srs && Array.isArray(q.srs.history) && q.srs.history.some(h => Number(h.rating) >= 2)) ||
+            (q.srs && (q.srs.state === 'review' || q.srs.state === 'mastered')) ||
+            (q.quizStats && typeof q.quizStats.correct === 'number' && q.quizStats.correct > 0)
+          );
+          return isMasteredInSRS;
+        });
+
+        this.directEligibleQuestionsCache = eligible;
+
+        if (eligible.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state-notice">
+              <span class="icon">🔒</span>
+              <p>Você ainda não dominou perguntas de <strong>"${targetSubject}"</strong> em Flashcard.</p>
+              <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
+                Estude e acerte os cartões desta matéria para desbloqueá-las nos desafios.
+              </p>
+              <button class="btn-outline-action primary" style="margin-top: 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${targetSubject.replace(/'/g, "\\'")}', 'flashcards');">
+                ⚡ Estudar Flashcards desta Matéria
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = eligible.map((q, idx) => {
+          const reps = (q.srs && q.srs.reps) || 1;
+          const frontText = q.flashcard?.front || q.question || q.pergunta || 'Sem enunciado';
+          const backSnippet = (q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '').slice(0, 110);
+          const safeId = String(q.id || `dq-${idx}`).replace(/"/g, '&quot;');
+          const diff = q.difficultyLevel || 'Intermediário';
+
+          return `
+            <div class="eligible-question-item eligible-q-item" id="item-dq-${safeId}" onclick="toggleDirectQuestionItem('${safeId}')">
+              <input type="checkbox" id="chk-dq-${safeId}" class="eligible-q-checkbox" onclick="event.stopPropagation(); toggleDirectQuestionItem('${safeId}');">
+              <div class="eligible-question-body eligible-q-content">
+                <div class="eligible-question-topic eligible-q-title">
+                  <span>${escapeHtmlText(q.flashcardTitle || q.topic || `Questão #${idx + 1}`)}</span>
+                  <span class="disease-tag" style="font-size: 10px; margin-left: 6px;">${diff}</span>
+                </div>
+                <div class="eligible-question-stem eligible-q-text">${escapeHtmlText(frontText)}</div>
+                ${backSnippet ? `<div class="eligible-q-back-snippet" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"><strong>Gabarito:</strong> ${escapeHtmlText(backSnippet)}...</div>` : ''}
+                <div class="eligible-question-meta eligible-q-meta">
+                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Dominado no Flashcard (${reps} ${reps === 1 ? 'repetição' : 'repetições'})</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      toggleDirectQuestionItem(id) {
+        if (this.directSelectedQuestionIds.has(id)) {
+          this.directSelectedQuestionIds.delete(id);
+        } else {
+          this.directSelectedQuestionIds.add(id);
+        }
+        const itemEl = document.getElementById(`item-dq-${id}`);
+        const chkEl = document.getElementById(`chk-dq-${id}`);
+        const isSelected = this.directSelectedQuestionIds.has(id);
+        if (itemEl) itemEl.classList.toggle('selected', isSelected);
+        if (chkEl) chkEl.checked = isSelected;
+        this.updateDirectSelectedCounter();
+      },
+
+      toggleDirectSelectAll(state) {
+        if (state) {
+          this.directEligibleQuestionsCache.forEach(q => this.directSelectedQuestionIds.add(String(q.id)));
+        } else {
+          this.directSelectedQuestionIds.clear();
+        }
+        this.directEligibleQuestionsCache.forEach(q => {
+          const id = String(q.id);
+          const itemEl = document.getElementById(`item-dq-${id}`);
+          const chkEl = document.getElementById(`chk-dq-${id}`);
+          const isSelected = this.directSelectedQuestionIds.has(id);
+          if (itemEl) itemEl.classList.toggle('selected', isSelected);
+          if (chkEl) chkEl.checked = isSelected;
+        });
+        this.updateDirectSelectedCounter();
+      },
+
+      updateDirectSelectedCounter() {
+        const counter = document.getElementById('directChallengeSelectedCount');
+        if (counter) counter.textContent = this.directSelectedQuestionIds.size;
+      },
+
+      async submitDirectChallenge() {
+        if (!this.activeDirectTarget.email) {
+          alert('Colega destinatário não identificado.');
+          return;
+        }
+
+        const discSelect = document.getElementById('directChallengeDisciplineSelect');
+        const selectedDiscipline = (discSelect?.value || '').trim();
+
+        if (!selectedDiscipline) {
+          alert('Selecione a disciplina da ementa para este desafio.');
+          discSelect?.focus();
+          return;
+        }
+
+        if (this.directSelectedQuestionIds.size === 0) {
+          alert('Selecione pelo menos uma questão dominada em Flashcard para compor o duelo.');
+          return;
+        }
+
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
+        const userEmail = (currentUser.email || 'estudante@medicina.br').toLowerCase();
+        const userSchool = (currentProfile.faculdade || 'Universo').trim();
+
+        const selectedQuestions = this.directEligibleQuestionsCache
+          .filter(q => this.directSelectedQuestionIds.has(String(q.id)))
+          .map((q, idx) => ({
+            id: String(q.id || `q_${Date.now()}_${idx}`),
+            front: q.flashcard?.front || q.question || q.pergunta || '',
+            back: q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '',
+            explanation: q.flashcard?.explanation || q.explanation || q.clinicalPearl || '',
+            title: q.flashcardTitle || q.topic || `Questão #${idx + 1}`,
+            subject: q.subject || selectedDiscipline,
+            difficultyLevel: q.difficultyLevel || 'Intermediário'
+          }));
+
+        const challengeId = 'desafio_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        const challengeDoc = {
+          id: challengeId,
+          senderUid: currentUser.uid || 'local_user',
+          senderEmail: userEmail,
+          senderName: currentProfile.nome || currentUser.displayName || userEmail.split('@')[0] || 'Colega de Medicina',
+          targetEmail: this.activeDirectTarget.email.toLowerCase(),
+          institution: userSchool,
+          subject: selectedDiscipline,
+          questions: selectedQuestions,
+          totalQuestions: selectedQuestions.length,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          completedAt: null
+        };
+
+        const btnSend = document.getElementById('btnSubmitDirectChallenge');
+        if (btnSend) {
+          btnSend.disabled = true;
+          btnSend.textContent = '⏳ Despachando Desafio...';
+        }
+
+        try {
+          if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+            await firestoreDb.collection('desafios').doc(challengeId).set(challengeDoc);
+          }
+
+          let sentList = [];
+          try {
+            sentList = JSON.parse(localStorage.getItem('medtutor_challenges_sent') || '[]');
+          } catch (e) { sentList = []; }
+          sentList.unshift(challengeDoc);
+          localStorage.setItem('medtutor_challenges_sent', JSON.stringify(sentList));
+
+          let receivedList = [];
+          try {
+            receivedList = JSON.parse(localStorage.getItem('medtutor_challenges_received') || '[]');
+          } catch (e) { receivedList = []; }
+          receivedList.unshift(challengeDoc);
+          localStorage.setItem('medtutor_challenges_received', JSON.stringify(receivedList));
+
+          const targetName = this.activeDirectTarget.name;
+          this.closeDirectChallenge();
+          this.closeModal();
+
+          if (typeof showToast === 'function') {
+            showToast(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetName}!`);
+          } else {
+            alert(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetName}!`);
+          }
+
+          // Se estiver na aba desafios, atualiza
+          if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.initChallengesTab) {
+            MedTutorChallengesService.switchSubtab('sent');
+          }
+        } catch (err) {
+          console.error('[Classmates] Erro ao enviar desafio direto:', err);
+          alert('Houve um erro ao registrar o desafio: ' + (err.message || err));
+        } finally {
+          if (btnSend) {
+            btnSend.disabled = false;
+            btnSend.textContent = '🚀 Enviar Desafio Clínico';
+          }
+        }
+      },
+
+      // =========================================================
+      // AVALIAÇÃO DO DESAFIADOR AO FINAL DO DUELO (👍 / 👎)
+      // =========================================================
+      async recordChallengerVote(direction) {
+        const activeChallenge = (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.activeChallenge);
+        if (!activeChallenge) return;
+
+        const delta = direction === 'up' ? 1 : -1;
+        const challengerEmail = (activeChallenge.senderEmail || '').toLowerCase();
+        const challengerName = activeChallenge.senderName || challengerEmail.split('@')[0] || 'Colega';
+        const challengerUid = activeChallenge.senderUid;
+
+        const btnUp = document.getElementById('btnChallengerVoteUp');
+        const btnDown = document.getElementById('btnChallengerVoteDown');
+        const feedbackEl = document.getElementById('challengerVoteFeedback');
+
+        if (btnUp) btnUp.disabled = true;
+        if (btnDown) btnDown.disabled = true;
+
+        const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
+        const evaluatorUid = currentUser.uid || 'local_user';
+        const evaluatorEmail = (currentUser.email || 'estudante@medicina.br').toLowerCase();
+
+        // 1. Atualiza no cache de classificações local
+        let ratingsCache = {};
+        try {
+          ratingsCache = JSON.parse(localStorage.getItem('medtutor_challenger_ratings') || '{}');
+        } catch (e) {}
+
+        const prev = ratingsCache[challengerEmail] || { thumbsUp: 0, thumbsDown: 0, score: 0, history: [] };
+        const newUp = prev.thumbsUp + (delta === 1 ? 1 : 0);
+        const newDown = prev.thumbsDown + (delta === -1 ? 1 : 0);
+        const newScore = newUp - newDown; // Pode ser negativo conforme especificação!
+        const newHistory = (prev.history || []).concat([{
+          evaluatorUid,
+          evaluatorEmail,
+          vote: delta,
+          timestamp: new Date().toISOString(),
+          challengeId: activeChallenge.id
+        }]);
+
+        ratingsCache[challengerEmail] = {
+          thumbsUp: newUp,
+          thumbsDown: newDown,
+          score: newScore,
+          history: newHistory
+        };
+        try {
+          localStorage.setItem('medtutor_challenger_ratings', JSON.stringify(ratingsCache));
+        } catch (e) {}
+
+        // 2. Persiste no Firestore
+        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+          try {
+            const ratingDocId = `rating_${challengerUid || challengerEmail.replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+            await firestoreDb.collection('avaliacoes_desafiadores').doc(ratingDocId).set({
+              challengerUid: challengerUid || null,
+              challengerEmail: challengerEmail,
+              challengerName: challengerName,
+              evaluatorUid: evaluatorUid,
+              evaluatorEmail: evaluatorEmail,
+              vote: delta,
+              challengeId: activeChallenge.id,
+              createdAt: new Date().toISOString()
+            });
+
+            if (challengerUid && challengerUid !== 'local_user') {
+              await firestoreDb.collection('users').doc(challengerUid).set({
+                challengerThumbsUp: newUp,
+                challengerThumbsDown: newDown,
+                challengerScore: newScore,
+                challengerHistory: newHistory
+              }, { merge: true });
+            }
+          } catch (e) {
+            console.warn('[Classmates] Falha ao persistir voto de desafiador no Firestore:', e);
+          }
+        }
+
+        // 3. Feedback visual
+        if (feedbackEl) {
+          feedbackEl.style.display = 'block';
+          feedbackEl.className = `challenger-vote-feedback ${direction === 'up' ? 'positive' : 'negative'}`;
+          feedbackEl.innerHTML = direction === 'up'
+            ? `👍 <strong>Avaliação Registrada!</strong> Você avaliou ${escapeHtmlText(challengerName)} como <strong>Bom Desafiador (+1)</strong>.`
+            : `👎 <strong>Avaliação Registrada!</strong> Você avaliou ${escapeHtmlText(challengerName)} como <strong>Ruim Desafiador (-1)</strong>.`;
+        }
+
+        if (typeof showToast === 'function') {
+          showToast(direction === 'up' ? `⭐ ${challengerName} avaliado como Bom Desafiador (+1)!` : `👎 ${challengerName} avaliado como Ruim Desafiador (-1).`);
+        }
+
+        // Atualiza a lista de colegas se o modal estiver aberto
+        this.loadClassmates();
+      }
+    };
+
+    // Exportações globais de Colegas
+    function openClassmatesModal() {
+      MedTutorClassmatesService.openModal();
+    }
+    function closeClassmatesModal() {
+      MedTutorClassmatesService.closeModal();
+    }
+    function switchClassmatesView(view) {
+      MedTutorClassmatesService.switchView(view);
+    }
+    function handleAddClassmateSubmit() {
+      const input = document.getElementById('classmateAddEmail');
+      if (input) MedTutorClassmatesService.addColleagueByEmail(input.value);
+    }
+    function openDirectChallenge(targetEmail, targetName, targetUid) {
+      MedTutorClassmatesService.openDirectChallenge(targetEmail, targetName, targetUid);
+    }
+    function closeDirectChallengeModal() {
+      MedTutorClassmatesService.closeDirectChallenge();
+    }
+    function handleDirectPeriodChange() {
+      MedTutorClassmatesService.onDirectPeriodChange();
+    }
+    function handleDirectDisciplineChange() {
+      MedTutorClassmatesService.onDirectDisciplineChange();
+    }
+    function toggleDirectQuestionItem(id) {
+      MedTutorClassmatesService.toggleDirectQuestionItem(id);
+    }
+    function toggleDirectSelectAll(state) {
+      MedTutorClassmatesService.toggleDirectSelectAll(state);
+    }
+    function submitDirectChallenge() {
+      MedTutorClassmatesService.submitDirectChallenge();
+    }
+    function recordChallengerVote(direction) {
+      MedTutorClassmatesService.recordChallengerVote(direction);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.MedTutorClassmatesService = MedTutorClassmatesService;
+      window.openClassmatesModal = openClassmatesModal;
+      window.closeClassmatesModal = closeClassmatesModal;
+      window.switchClassmatesView = switchClassmatesView;
+      window.handleAddClassmateSubmit = handleAddClassmateSubmit;
+      window.openDirectChallenge = openDirectChallenge;
+      window.closeDirectChallengeModal = closeDirectChallengeModal;
+      window.handleDirectPeriodChange = handleDirectPeriodChange;
+      window.handleDirectDisciplineChange = handleDirectDisciplineChange;
+      window.toggleDirectQuestionItem = toggleDirectQuestionItem;
+      window.toggleDirectSelectAll = toggleDirectSelectAll;
+      window.submitDirectChallenge = submitDirectChallenge;
+      window.recordChallengerVote = recordChallengerVote;
+    }
+
     initChatDriveMaterials();
       renderSharedStudyItems();
       renderSceBars();
@@ -27658,6 +28574,7 @@ ${textSample}
     updateGeminiKeyBadge();
     setupMobileChatDrawer();
     loadDoubtsNotebook();
+    if (typeof MedTutorClassmatesService !== 'undefined') MedTutorClassmatesService.init();
     restoreStudyNavigationState();
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)

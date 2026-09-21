@@ -170,10 +170,16 @@ service cloud.firestore {
 
     // 1. Perfil do Usuário
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isAuthenticated();
       allow create: if isOwner(userId) && uidUnchanged() && isValidUserProfile(request.resource.data);
-      allow update: if isOwner(userId) && uidNotModified() && isValidUserProfile(request.resource.data);
+      allow update: if (isOwner(userId) && uidNotModified()) ||
+                       (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['challengerThumbsUp', 'challengerThumbsDown', 'challengerScore', 'challengerHistory']));
       allow delete: if isOwner(userId);
+
+      // Colegas salvos pelo estudante
+      match /colegas/{colleagueId} {
+        allow read, write: if isOwner(userId);
+      }
 
       // 2. Grade Curricular do Estudante
       match /grade_curricular/{disciplineId} {
@@ -250,6 +256,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() && uidUnchanged();
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated() && (resource.data.challengerUid == request.auth.uid || resource.data.uid == request.auth.uid);
+    }
+
+    // 10. Avaliações de Desafiadores (Reputação dos Estudantes)
+    match /avaliacoes_desafiadores/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
     }
 
     // Bloqueio Global por Padrão (Default Deny)

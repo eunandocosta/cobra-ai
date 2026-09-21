@@ -6456,6 +6456,14 @@
         min-height: 44px;
       }
 
+      .classmates-fab {
+        top: auto;
+        bottom: calc(77px + env(safe-area-inset-bottom));
+        right: 122px;
+        left: auto;
+        min-height: 44px;
+      }
+
       .doubts-drawer {
         width: 100%;
         max-width: none;
@@ -7630,3 +7638,458 @@
       overflow-y: auto;
       margin: 12px 0;
     }
+
+    /* =========================================================
+       BOTÃO FLUTUANTE DE COLEGAS (AO LADO DE DÚVIDAS)
+       ========================================================= */
+    .classmates-fab {
+      position: fixed;
+      z-index: 9000;
+      right: 136px;
+      bottom: 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 48px;
+      padding: 8px 15px 8px 8px;
+      border: 1px solid rgba(0, 229, 255, .42);
+      border-radius: 999px;
+      color: var(--text-primary);
+      background: rgba(8, 36, 29, .95);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s ease;
+    }
+
+    .classmates-fab:hover {
+      border-color: var(--neon);
+      color: var(--neon);
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .classmates-fab-icon {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(0, 229, 255, 0.15);
+      font-size: 14px;
+    }
+
+    .classmates-fab-badge {
+      background: var(--neon);
+      color: #06170d;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    /* =========================================================
+       MODAL DE COLEGAS DA FACULDADE
+       ========================================================= */
+    .classmates-modal {
+      max-width: 820px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .classmates-header-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+
+    .classmate-add-box {
+      margin-bottom: 14px;
+      padding: 12px;
+      background: rgba(0, 229, 255, 0.03);
+      border: 1px dashed rgba(0, 229, 255, 0.3);
+      border-radius: 10px;
+    }
+
+    .classmate-add-form {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .add-input-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .add-input-wrapper .add-icon {
+      position: absolute;
+      left: 12px;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .add-input-wrapper input {
+      width: 100%;
+      padding-left: 36px;
+    }
+
+    .classmate-add-feedback {
+      margin-top: 8px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
+    .classmate-add-feedback.success {
+      background: rgba(0, 255, 102, 0.12);
+      color: #00ff66;
+      border: 1px solid rgba(0, 255, 102, 0.3);
+    }
+
+    .classmate-add-feedback.error {
+      background: rgba(255, 68, 68, 0.12);
+      color: #ff5555;
+      border: 1px solid rgba(255, 68, 68, 0.3);
+    }
+
+    /* Subnav / Filtros de Colegas */
+    .classmates-filter-tabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+      overflow-x: auto;
+    }
+
+    .classmates-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.18s ease;
+    }
+
+    .classmates-tab-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .classmates-tab-btn.active {
+      color: var(--neon);
+      background: rgba(0, 229, 255, 0.1);
+      border-color: rgba(0, 229, 255, 0.4);
+    }
+
+    .tab-count-pill {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+
+    .classmates-tab-btn.active .tab-count-pill {
+      background: var(--neon);
+      color: #06170d;
+    }
+
+    /* Seções de Colegas */
+    .classmates-sections-container {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding-right: 4px;
+    }
+
+    .classmates-section-block {
+      background: rgba(14, 26, 32, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .classmates-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title-wrap .section-icon {
+      font-size: 20px;
+    }
+
+    .section-title-wrap h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .section-title-wrap p {
+      margin: 2px 0 0 0;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .section-count-tag {
+      font-size: 11px;
+      color: var(--neon);
+      background: rgba(0, 229, 255, 0.08);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    /* Grid de Cards de Colegas */
+    .classmates-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 12px;
+    }
+
+    .classmate-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .classmate-card:hover {
+      border-color: var(--neon);
+      background: rgba(0, 229, 255, 0.04);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+
+    .classmate-card-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .classmate-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(0, 255, 102, 0.2));
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: var(--neon);
+      font-weight: 800;
+      font-size: 13px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .classmate-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .classmate-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .classmate-email {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .classmate-meta-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .classmate-period-pill {
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .challenger-reputation-pill {
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .challenger-reputation-pill.positive {
+      background: rgba(0, 255, 102, 0.12);
+      color: #00ff66;
+      border: 1px solid rgba(0, 255, 102, 0.3);
+    }
+
+    .challenger-reputation-pill.negative {
+      background: rgba(255, 68, 68, 0.12);
+      color: #ff5555;
+      border: 1px solid rgba(255, 68, 68, 0.3);
+    }
+
+    .challenger-reputation-pill.neutral {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .classmate-card-action {
+      margin-top: 4px;
+    }
+
+    .btn-challenge-colleague {
+      width: 100%;
+      padding: 6px 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    /* =========================================================
+       BOX DE DESAFIO CURRICULAR DIRETO
+       ========================================================= */
+    .direct-challenge-modal {
+      max-width: 660px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .direct-challenge-selectors-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .direct-challenge-selectors-card .selectors-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .direct-challenge-selectors-card .selectors-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .direct-challenge-questions-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 220px;
+    }
+
+    .direct-challenge-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* =========================================================
+       AVALIAÇÃO DO DESAFIADOR NO PLAYER DE FLASHCARD
+       ========================================================= */
+    .challenger-rating-box {
+      margin-top: 16px;
+      padding: 14px;
+      background: rgba(0, 229, 255, 0.04);
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      border-radius: 12px;
+      text-align: left;
+    }
+
+    .challenger-rating-prompt {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .challenger-prompt-icon {
+      font-size: 24px;
+    }
+
+    .challenger-vote-feedback {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .challenger-vote-feedback.positive {
+      background: rgba(0, 255, 102, 0.15);
+      color: #00ff66;
+      border: 1px solid rgba(0, 255, 102, 0.35);
+    }
+
+    .challenger-vote-feedback.negative {
+      background: rgba(255, 68, 68, 0.15);
+      color: #ff5555;
+      border: 1px solid rgba(255, 68, 68, 0.35);
+    }
+
