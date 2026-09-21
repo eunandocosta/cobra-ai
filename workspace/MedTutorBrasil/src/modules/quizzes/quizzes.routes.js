@@ -4,6 +4,7 @@ const router = express.Router();
 const quizzesController = require('./quizzes.controller');
 
 router.post('/gerar', (req, res) => quizzesController.generate(req, res));
+router.post('/gerar-derivada', (req, res) => quizzesController.generateDerived(req, res));
 router.post('/analisar-material', (req, res) => quizzesController.analyzeMaterial(req, res));
 router.post('/responder', (req, res) => quizzesController.submit(req, res));
 router.get('/flashcards/:subjectId', (req, res) => quizzesController.getFlashcards(req, res));

@@ -12809,6 +12809,231 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       answerFlashcardSrs(remembered ? 3 : 1);
     }
 
+    // =========================================================
+    // HANDLERS PARA GERAÇÃO DE PERGUNTA DERIVADA COM NOVO CONTEXTO
+    // =========================================================
+    let activeDerivedQuestionItem = null;
+
+    function openDerivedQuestionModal(questionId) {
+      const item = (sharedQuestionsBank && sharedQuestionsBank.find(q => q.id === questionId)) ||
+                   (typeof getSrsFilteredList === 'function' && typeof getFilteredQuestions === 'function' ? getSrsFilteredList(getFilteredQuestions())[currentCardIndex] : null);
+      if (!item) {
+        if (typeof showToast === 'function') showToast('⚠️ Nenhuma pergunta ou explicação selecionada.');
+        return;
+      }
+      activeDerivedQuestionItem = item;
+
+      const modal = document.getElementById('derivedQuestionModal');
+      const refText = document.getElementById('derivedOriginalRefText');
+      const container = document.getElementById('derivedContextsListContainer');
+      if (!modal || !refText || !container) return;
+
+      const stem = item.vignette || item.question || item.pergunta || item.flashcard?.front || '';
+      const exp = item.tripartite?.correctReason || item.explanation || item.answer || item.flashcard?.back || '';
+      
+      refText.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Enunciado / Caso Original: ${(typeof escapeHtml === 'function') ? escapeHtml(stem) : stem}</div>
+        <div style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;"><strong>Explicação / Gabarito de Base:</strong> ${(typeof escapeHtml === 'function') ? escapeHtml(exp) : exp}</div>
+      `;
+
+      container.innerHTML = '';
+      addDerivedContextBox();
+
+      modal.classList.add('active');
+    }
+
+    function openDerivedQuestionModalFromCurrentFlashcard() {
+      const list = (typeof getSrsFilteredList === 'function' && typeof getFilteredQuestions === 'function') ? getSrsFilteredList(getFilteredQuestions()) : [];
+      const item = list[currentCardIndex];
+      if (!item) {
+        if (typeof showToast === 'function') showToast('⚠️ Selecione um flashcard para gerar a nova pergunta.');
+        return;
+      }
+      openDerivedQuestionModal(item.id);
+    }
+
+    function addDerivedContextBox(initialText = '') {
+      const container = document.getElementById('derivedContextsListContainer');
+      if (!container) return;
+
+      const boxId = `derived_ctx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const box = document.createElement('div');
+      box.className = 'derived-context-box';
+      box.id = boxId;
+      box.style.cssText = 'display: flex; gap: 8px; align-items: flex-start; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; transition: border-color 0.2s;';
+      
+      box.innerHTML = `
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--neon); text-transform: uppercase;">
+            📌 Novo Contexto Clínico / Variante do Aluno:
+          </label>
+          <textarea class="derived-context-textarea" placeholder="Ex: Paciente gestante de 28 semanas com alergia grave a penicilina, ou atendimento em UBS sem tomógrafo disponível..." style="width: 100%; min-height: 56px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; color: var(--text-primary); resize: vertical; font-family: inherit; line-height: 1.4;"></textarea>
+        </div>
+        <button class="btn-outline-action danger" type="button" onclick="removeDerivedContextBox('${boxId}')" title="Remover este contexto" style="padding: 6px 9px; align-self: center; margin-top: 16px;">
+          🗑️
+        </button>
+      `;
+
+      container.appendChild(box);
+      const txt = box.querySelector('textarea');
+      if (txt) {
+        if (initialText) txt.value = initialText;
+        txt.focus();
+      }
+    }
+
+    function removeDerivedContextBox(boxId) {
+      const box = document.getElementById(boxId);
+      if (box) box.remove();
+    }
+
+    async function submitDerivedQuestionWithContext() {
+      const item = activeDerivedQuestionItem;
+      if (!item) {
+        if (typeof showToast === 'function') showToast('⚠️ Pergunta de referência não encontrada.');
+        return;
+      }
+
+      const textareas = document.querySelectorAll('.derived-context-textarea');
+      const contexts = Array.from(textareas)
+        .map(t => t.value.trim())
+        .filter(Boolean);
+
+      if (contexts.length === 0) {
+        if (typeof showToast === 'function') showToast('⚠️ Adicione ao menos um novo contexto para gerar a pergunta.');
+        return;
+      }
+
+      const btnSubmit = document.getElementById('btnSubmitDerivedQuestion');
+      if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '⏳ Gerando Pergunta com Novo Contexto...';
+      }
+
+      const originalQuestion = item.vignette || item.question || item.pergunta || item.flashcard?.front || '';
+      const originalExplanation = item.tripartite?.correctReason || item.explanation || item.answer || item.flashcard?.back || '';
+      const subject = item.subject || 'Clínica Médica';
+      const topic = item.topic || item.disease || item.flashcardTitle || '';
+
+      let newQuestionData = null;
+
+      try {
+        const response = await fetch('/api/quizzes/gerar-derivada', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalQuestion,
+            originalExplanation,
+            contexts,
+            subject,
+            topic
+          })
+        });
+
+        if (response.ok) {
+          newQuestionData = await response.json();
+        } else {
+          console.warn('⚠️ Endpoint backend retornou erro, tentando fallback no cliente...');
+        }
+      } catch (err) {
+        console.warn('⚠️ Falha na requisição ao backend, tentando fallback local...', err);
+      }
+
+      if (!newQuestionData || !newQuestionData.question) {
+        try {
+          const userKey = localStorage.getItem('gemini_api_key');
+          if (userKey && typeof GeminiService !== 'undefined') {
+            const prompt = `Gere UMA NOVA QUESTÃO DERIVADA (caso clínico inédito) baseada na pergunta/explicação original e nos novos contextos:
+Original: ${originalQuestion}
+Explicação: ${originalExplanation}
+Novos Contextos: ${contexts.join('; ')}
+
+Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (array com 4 strings), correctIndex (0 a 3), explanation, tripartite ({correctReason, distractorAnalysis, pearl}), flashcardTitle, flashcardFront, flashcardBack.`;
+
+            const rawRes = await GeminiService.callWithRetry(prompt, {
+              apiKey: userKey,
+              model: 'gemini-3.5-flash-lite',
+              responseMimeType: 'application/json'
+            });
+            let parsed = {};
+            try { parsed = JSON.parse(rawRes); } catch(e) {
+              const m = rawRes.match(/\{[\s\S]*\}/);
+              if (m) parsed = JSON.parse(m[0]);
+            }
+            if (parsed.question) {
+              const options = Array.isArray(parsed.quizOptions) && parsed.quizOptions.length === 4 ? parsed.quizOptions : ['Opção A', 'Opção B', 'Opção C', 'Opção D'];
+              const cIdx = typeof parsed.correctIndex === 'number' ? parsed.correctIndex : 0;
+              newQuestionData = {
+                id: `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                subject: subject,
+                topic: parsed.flashcardTitle || topic || 'Pergunta Derivada com Contexto',
+                flashcardTitle: parsed.flashcardTitle || topic || 'Pergunta Derivada',
+                question: parsed.question,
+                vignette: parsed.vignette || '',
+                quizOptions: options,
+                correctIndex: cIdx,
+                answer: options[cIdx] || '',
+                explanation: parsed.explanation || 'Resolução fundamentada na integração do caso clínico com os novos contextos.',
+                tripartite: parsed.tripartite || {
+                  correctReason: parsed.explanation || 'Conduta fundamentada nas diretrizes.',
+                  distractorAnalysis: {},
+                  pearl: 'Pérola clínica de memorização.'
+                },
+                flashcard: {
+                  front: parsed.flashcardFront || parsed.question,
+                  back: parsed.flashcardBack || options[cIdx] || '',
+                  keyConcepts: contexts
+                }
+              };
+            }
+          }
+        } catch (localErr) {
+          console.error('❌ Erro no fallback local:', localErr);
+        }
+      }
+
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '⚡ Gerar Pergunta com Novo Contexto';
+      }
+
+      if (newQuestionData && newQuestionData.question) {
+        if (!newQuestionData.id) newQuestionData.id = `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        if (!newQuestionData.flashcard) {
+          newQuestionData.flashcard = {
+            front: newQuestionData.question,
+            back: newQuestionData.answer || newQuestionData.quizOptions?.[newQuestionData.correctIndex] || '',
+            keyConcepts: contexts
+          };
+        }
+        
+        sharedQuestionsBank.unshift(newQuestionData);
+        saveSharedQuestionsBank();
+        
+        if (typeof syncAllDataToFirebaseCloud === 'function') {
+          syncAllDataToFirebaseCloud();
+        }
+
+        if (typeof closeModals === 'function') closeModals();
+        if (typeof showToast === 'function') showToast('✨ Nova pergunta derivada gerada com sucesso e adicionada ao banco!');
+
+        if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+        if (typeof updateCardDisplay === 'function') updateCardDisplay();
+        if (typeof renderSceBars === 'function') renderSceBars();
+        if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
+      } else {
+        if (typeof showToast === 'function') showToast('❌ Não foi possível gerar a pergunta derivada. Tente novamente.');
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.openDerivedQuestionModal = openDerivedQuestionModal;
+      window.openDerivedQuestionModalFromCurrentFlashcard = openDerivedQuestionModalFromCurrentFlashcard;
+      window.addDerivedContextBox = addDerivedContextBox;
+      window.removeDerivedContextBox = removeDerivedContextBox;
+      window.submitDerivedQuestionWithContext = submitDerivedQuestionWithContext;
+    }
+
     // Renderiza o feedback formatado e a pontuação do flashcard
     function renderEvaluationFeedback(evalData) {
       const feedbackBanner = document.getElementById('aiEvaluationFeedback');
@@ -12877,9 +13102,12 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             </div>
           </div>
 
-          <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+          <div style="display: flex; justify-content: flex-end; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
             <button class="btn-outline-action" style="font-size: 11.5px; padding: 4px 12px;" onclick="flipCardManual()">
               🔄 Ver Gabarito Completo no Verso
+            </button>
+            <button class="btn-outline-action primary" style="font-size: 11.5px; padding: 4px 12px;" onclick="openDerivedQuestionModalFromCurrentFlashcard()">
+              ✨ Gerar Pergunta com Novo Contexto
             </button>
           </div>
         </div>
@@ -13517,6 +13745,13 @@ Retorne EXCLUSIVAMENTE um JSON:
               <a href="${elsevierUrl}" target="_blank" rel="noopener noreferrer" class="discrete-citation-link citation-elsevier" title="Buscar artigos e capítulos na ScienceDirect / Elsevier">📄 Elsevier ↗</a>
             </div>
             ${evidenceArticlesHtml}
+          </div>
+
+          <!-- Botão para Gerar Pergunta Derivada com Novo Contexto -->
+          <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
+            <button class="btn-outline-action primary" type="button" onclick="openDerivedQuestionModal('${item.id}')" style="font-size: 12px; font-weight: 700; padding: 7px 14px; display: flex; align-items: center; gap: 6px;">
+              ✨ Gerar Nova Pergunta com Novo Contexto
+            </button>
           </div>
         </div>
       `;

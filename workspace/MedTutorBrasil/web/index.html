@@ -520,6 +520,9 @@
               <button class="btn-outline-action" onclick="openQuestionDiscussionForCurrentFlashcard()">
                 💬 Perguntar sobre esta questão
               </button>
+              <button class="btn-outline-action primary" onclick="openDerivedQuestionModalFromCurrentFlashcard()" title="Gerar nova pergunta a partir desta explicação com novos contextos">
+                ✨ Pergunta com Contexto
+              </button>
               <button class="btn-outline-action danger" onclick="confirmDeleteCurrentCard()" title="Remove esta pergunta do Quiz, Flashcards e filas de revisão">
                 🗑️ Eliminar pergunta
               </button>
@@ -1658,6 +1661,51 @@
         <button class="btn-outline-action" onclick="closeModals()">Cancelar</button>
         <button class="btn-outline-action primary" id="btnConfirmGenerateStudy" onclick="confirmGenerateStudyCount()" style="font-weight: 700;">
           🔍 Avançar para Validação do Texto (Firestore)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL DE GERAR PERGUNTA DERIVADA COM NOVO CONTEXTO
+       ========================================================= -->
+  <div class="modal-overlay" id="derivedQuestionModal" onclick="closeModals(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="max-width: 620px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">✨</span>
+          <h3 style="font-size: 16px; margin: 0; color: var(--text-primary);">Gerar Nova Pergunta com Novo Contexto</h3>
+        </div>
+        <button class="btn-close-modal" onclick="closeModals()">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin: 6px 0 14px 0; line-height: 1.45;">
+        A IA utilizará a explicação da resposta correta ou incorreta atual como base biológica/clínica e incorporará os novos contextos adicionados abaixo para criar uma nova pergunta inédita.
+      </p>
+
+      <!-- REFERÊNCIA DA PERGUNTA ORIGINAL -->
+      <div id="derivedOriginalRefCard" style="background: rgba(0, 229, 255, 0.04); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px; max-height: 170px; overflow-y: auto;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--neon); text-transform: uppercase; margin-bottom: 4px;">📖 Pergunta & Explicação de Origem:</div>
+        <div id="derivedOriginalRefText" style="font-size: 12.5px; color: var(--text-primary); line-height: 1.45;"></div>
+      </div>
+
+      <!-- BOTÃO CENTRAL DE ADICIONAR CONTEXTO -->
+      <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+        <button class="btn-outline-action primary" type="button" onclick="addDerivedContextBox()" style="padding: 10px 22px; font-weight: 700; font-size: 13px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 229, 255, 0.15); display: flex; align-items: center; gap: 6px;">
+          <svg class="icon" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Adicionar Contexto
+        </button>
+      </div>
+
+      <!-- CONTAINER DOS BOXES DE CONTEXTO DADOS PELO ESTUDANTE -->
+      <div id="derivedContextsListContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 280px; overflow-y: auto; padding-right: 4px; margin-bottom: 16px;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn-outline-action" type="button" onclick="closeModals()">Cancelar</button>
+        <button class="btn-outline-action primary" id="btnSubmitDerivedQuestion" type="button" onclick="submitDerivedQuestionWithContext()" style="padding: 8px 18px; font-weight: 700; font-size: 13px;">
+          ⚡ Gerar Pergunta com Novo Contexto
         </button>
       </div>
     </div>

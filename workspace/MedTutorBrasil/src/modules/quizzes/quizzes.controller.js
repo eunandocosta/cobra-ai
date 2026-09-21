@@ -80,6 +80,16 @@ class QuizzesController {
       return res.status(500).json({ error: 'Erro ao analisar material de estudo', details: err.message });
     }
   }
+
+  async generateDerived(req, res) {
+    try {
+      const result = await quizzesService.generateDerivedQuestion(req.body || {});
+      return res.json(result);
+    } catch (err) {
+      console.error("❌ Erro no QuizzesController ao gerar pergunta derivada:", err);
+      return res.status(500).json({ error: 'Erro ao gerar pergunta derivada', details: err.message });
+    }
+  }
 }
 
 module.exports = new QuizzesController();
