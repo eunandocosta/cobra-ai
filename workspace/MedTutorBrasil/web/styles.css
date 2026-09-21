@@ -1181,11 +1181,13 @@
     }
 
     /* Material "Banco de Questões" — borda amarelo-neon ao hover */
-    .chat-drive-vertical-item.questions-only-item:hover {
+    .questions-only-item:hover,
+    .chat-drive-vertical-item.questions-only-item:hover,
+    .learning-step-card.questions-only-item:hover {
       border-color: #ffe600 !important;
-      background: rgba(255, 230, 0, 0.04) !important;
-      box-shadow: 0 0 0 2px rgba(255, 230, 0, 0.18), 0 0 14px rgba(255, 230, 0, 0.12) !important;
+      box-shadow: 0 0 0 2px rgba(255, 230, 0, 0.25), 0 0 12px rgba(255, 230, 0, 0.15) !important;
     }
+    .questions-only-item.selected,
     .chat-drive-vertical-item.questions-only-item.selected {
       border-color: #ffe600;
       background: rgba(255, 230, 0, 0.08);
@@ -1194,9 +1196,9 @@
       display: inline-flex;
       align-items: center;
       gap: 3px;
-      background: rgba(255, 230, 0, 0.13);
+      background: rgba(255, 230, 0, 0.12);
       color: #ffe600;
-      border: 1px solid rgba(255, 230, 0, 0.38);
+      border: 1px solid rgba(255, 230, 0, 0.35);
       padding: 1px 6px;
       border-radius: 4px;
       font-size: 10px;
@@ -1206,7 +1208,7 @@
 
     /* Nome de material clicável para edição inline */
     .material-name-editable {
-      cursor: text;
+      cursor: pointer;
       border-radius: 4px;
       padding: 1px 3px;
       margin: 0 -3px;
@@ -1218,20 +1220,20 @@
       white-space: nowrap;
     }
     .material-name-editable:hover {
-      background: rgba(0, 229, 255, 0.09);
-      outline: 1px dashed rgba(0, 229, 255, 0.5);
+      background: rgba(0, 229, 255, 0.1);
+      outline: 1px dashed rgba(0, 229, 255, 0.4);
     }
     .material-name-input {
-      background: rgba(0, 0, 0, 0.35);
-      border: 1.5px solid var(--neon);
+      background: var(--bg-surface, rgba(0, 0, 0, 0.35));
+      border: 1px solid var(--neon);
       border-radius: 5px;
       color: var(--text-primary);
       font-size: 13px;
       font-weight: 600;
-      padding: 2px 8px;
+      padding: 2px 6px;
       outline: none;
       width: 100%;
-      max-width: 340px;
+      max-width: 320px;
       font-family: inherit;
       box-shadow: 0 0 6px rgba(0, 229, 255, 0.2);
     }

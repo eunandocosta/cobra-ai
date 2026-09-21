@@ -12308,6 +12308,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         mat.topic = trimmed;
       }
 
+      // Salva resumo em localStorage e cache do FirebaseService
+      if (typeof saveChatDriveMaterials === 'function') {
+        try {
+          await saveChatDriveMaterials();
+        } catch (e) {}
+      }
+
       // 2. Persiste no IndexedDB
       try {
         const uid = MedTutorFirebaseService.getUserId?.() || '';
@@ -12344,8 +12351,18 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         }
       }
 
-      // 4. Re-renderiza as listas
+      // 4. Re-renderiza as listas e interfaces ativas
       if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
+      if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
+      if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
+      if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
+      if (typeof updateChatAttachedBar === 'function') updateChatAttachedBar();
+      if (typeof currentDetailedSubjectName === 'string' && currentDetailedSubjectName && typeof openSubjectDetailModal === 'function') {
+        const modalSubj = document.getElementById('modalSubjectDetail');
+        if (modalSubj && modalSubj.classList.contains('active')) {
+          openSubjectDetailModal(currentDetailedSubjectName);
+        }
+      }
       showToast(`✏️ Material renomeado para "${trimmed}"`);
       return true;
     }
@@ -12371,6 +12388,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       input.title = 'Enter para salvar • Esc para cancelar';
       input.setAttribute('aria-label', 'Editar nome do material');
 
+      input.onclick = (e) => e.stopPropagation();
+      input.onmousedown = (e) => e.stopPropagation();
+
       const restore = () => {
         if (input.parentNode) {
           input.parentNode.replaceChild(spanEl, input);
@@ -12382,8 +12402,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (e.key === 'Enter') {
           e.preventDefault();
           const ok = await renameMaterialInline(materialId, input.value);
-          if (!ok) input.focus();
-          // renderChatDriveVerticalList já fará o re-render
+          if (!ok) {
+            input.focus();
+          } else {
+            restore();
+          }
         } else if (e.key === 'Escape') {
           restore();
         }
@@ -12396,9 +12419,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const newVal = input.value.trim();
         if (newVal && newVal !== cleanOriginal) {
           await renameMaterialInline(materialId, newVal);
-        } else {
-          restore();
         }
+        restore();
       });
 
       spanEl.parentNode.replaceChild(input, spanEl);
@@ -20957,7 +20979,7 @@ Para cada material, retorne um objeto no JSON com:
               ? 'border: 1px solid rgba(255, 230, 0, 0.35);'
               : 'border: 1px solid var(--border);';
             return `
-            <div class="learning-step-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-surface); ${borderStyle} border-radius: 10px; gap: 10px; flex-wrap: wrap;">
+            <div class="learning-step-card ${isQO ? 'questions-only-item' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-surface); ${borderStyle} border-radius: 10px; gap: 10px; flex-wrap: wrap; transition: all 0.2s ease;">
               <div style="display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 150px;">
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.25); color: var(--neon); font-weight: 800; font-size: 13px; flex-shrink: 0;" title="Etapa ${step} de ${total} na sequência pedagógica">
                   ${step}
@@ -20972,7 +20994,7 @@ Para cada material, retorne um objeto no JSON com:
                     <span
                       class="material-name-editable"
                       title="Clique para renomear"
-                      onclick="startMaterialRename('${safeMatId}', this)"
+                      onclick="event.stopPropagation(); startMaterialRename('${safeMatId}', this)"
                     >${escapeHtml(m.name)}</span>
                   </div>
                   <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 1px;">
@@ -24835,16 +24857,25 @@ Linha 04: __________________________________________________
         if (!suggestedName || suggestedName.trim().length < 3) suggestedName = cleanFileTitle;
         suggestedName = suggestedName.trim().slice(0, 250);
 
-        // --- Feature: Confirmação quando a IA detecta questions_only ---
+        // --- Feature 1: Confirmação quando a IA detecta questions_only ---
         let resolvedMaterialType = analysisResult.detectedType === 'questions_only' ? 'questions_only' : 'text';
         if (analysisResult.detectedType === 'questions_only') {
           const userConfirm = window.confirm(
-            `📋 A IA identificou que este arquivo contém apenas questões/perguntas sem texto teórico de aula.\n\n` +
+            `⚠️ A IA detectou que este material contém apenas questões/perguntas, sem texto teórico de aula.\n\n` +
             `Deseja salvá-lo como "Banco de Questões"?\n\n` +
-            `✅ OK → salvar como Banco de Questões (identificado com borda amarela)\n` +
-            `❌ Cancelar → salvar como Material de Aula normal`
+            `[OK] Confirmar como Banco de Questões (recebe tag e destaque amarelo-neon)\n` +
+            `[Cancelar] Salvar como Aula Normal`
           );
           if (!userConfirm) resolvedMaterialType = 'text';
+        }
+
+        // --- Feature 2: Confirmação / edição do nome sugerido pela IA ---
+        const userChosenName = window.prompt(
+          `✨ Nome sugerido pela IA para este material:\n(Você pode aceitar ou editar antes de salvar)`,
+          suggestedName
+        );
+        if (userChosenName !== null && userChosenName.trim().length >= 2) {
+          suggestedName = userChosenName.trim().slice(0, 250);
         }
 
         // Aluno optou por salvar na biblioteca de materiais
