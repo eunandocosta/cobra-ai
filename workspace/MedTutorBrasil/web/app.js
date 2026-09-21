@@ -11705,6 +11705,176 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     // MODAL DE QUANTIDADE (BOTÃO ÚNICO QUIZ ⇄ FLASHCARD)
+    let currentStudyRecommendation = null;
+
+    function analyzeDocumentForStudyRecommendation(materialName, subjectName) {
+      const targetSubj = subjectName || currentStudySubject || 'Clínica Médica';
+      let mat = null;
+      let text = '';
+      let charCount = 0;
+      let wordCount = 0;
+      const isSubjectWide = !materialName;
+      let subjectMaterials = [];
+
+      if (materialName && Array.isArray(chatDriveMaterials)) {
+        mat = chatDriveMaterials.find(m => 
+          m.id === materialName || 
+          m.name === materialName || 
+          m.originalFileName === materialName ||
+          (m.name && typeof normalizeStudyComparisonText === 'function' && normalizeStudyComparisonText(m.name) === normalizeStudyComparisonText(materialName))
+        );
+      }
+
+      if (mat) {
+        text = String(mat.markdownText || mat.conteudo_md || mat.text || mat.texto || mat.content || '');
+        charCount = text.length || (mat.compressionStats?.rawChars) || 0;
+        wordCount = text ? text.trim().split(/\s+/).filter(Boolean).length : (mat.compressionStats?.wordCount || Math.round(charCount / 6));
+      } else {
+        subjectMaterials = (typeof getMaterialsForSubject === 'function') ? getMaterialsForSubject(targetSubj) : [];
+        charCount = subjectMaterials.reduce((acc, m) => acc + (m.markdownText?.length || m.text?.length || 4000), 0);
+        wordCount = Math.round(charCount / 6);
+      }
+
+      const lowerName = (materialName || targetSubj || '').toLowerCase();
+      const lowerText = text.slice(0, 6000).toLowerCase();
+
+      // Perfil clínico vs básico vs diretrizes
+      const isClinicalCondition = /doen[cç]|s[ií]ndrome|infarto|insufici[eê]ncia|choque|asma|dpoc|trauma|sepse|pneumonia|arritmia|diabetes|hipertens|meningite|apendicite|dengue|covid|cefaleia|avc|hemorragia|abdome/i.test(lowerName) ||
+                                  /quadro cl[ií]nico|sinais e sintomas|diagn[oó]stico|conduta|terap[eê]utica|semiolog|exame f[ií]sico/i.test(lowerText);
+
+      const isBasicScience = /anatomia|histologia|embriologia|fisiologia|bioqu[ií]mica|gen[eé]tica|farmacologia g|imunologia/i.test(lowerName) ||
+                             /estrutura|nervo|art[eé]ria|m[úu]sculo|vias|c[eé]lula|enzima|receptor|anatom|nervo|tronco|medula/i.test(lowerText);
+
+      const isGuidelinesOrEvidence = /diretriz|consenso|pcdt|revis[aã]o sistem[aá]tica|protocolo|meta-an[aá]lise/i.test(lowerName) ||
+                                     /grau de recomenda[cç][aã]o|n[ií]vel de evid[eê]ncia|ensaio cl[ií]nico|diretrizes/i.test(lowerText);
+
+      // Quantidade sugerida
+      let suggestedCount = 5;
+      let countRationale = '';
+
+      if (isSubjectWide) {
+        const matCount = subjectMaterials.length || 1;
+        suggestedCount = Math.min(30, Math.max(10, matCount * 5));
+        countRationale = `Disciplina com ${matCount} aula(s) ativa(s). Uma bateria de ${suggestedCount} questões garante amostragem uniforme de todos os temas.`;
+      } else if (charCount < 3000 && wordCount < 500) {
+        suggestedCount = 5;
+        countRationale = `Documento conciso (~${wordCount > 0 ? wordCount : '< 500'} palavras). 5 questões concentram os conceitos cardinais e evitam itens repetitivos.`;
+      } else if (charCount <= 12000) {
+        suggestedCount = 10;
+        countRationale = `Material de extensão padrão (~${wordCount.toLocaleString('pt-BR')} palavras). 10 questões equilibram fixação teórica, raciocínio diagnóstico e retenção ativa.`;
+      } else {
+        suggestedCount = 15;
+        countRationale = `Documento extenso e aprofundado (~${wordCount.toLocaleString('pt-BR')} palavras). 15 questões proporcionam varredura abrangente de todas as seções e casos.`;
+      }
+
+      // Estratégia de geração
+      let suggestedMode = 'sections';
+      let suggestedModeLabel = '📄 Cobertura por Seções / Páginas';
+      let modeRationale = '';
+
+      if (isGuidelinesOrEvidence || (charCount > 10000 && isClinicalCondition)) {
+        suggestedMode = 'science_based';
+        suggestedModeLabel = '🧪 Science Based (Progressão por Evidências)';
+        modeRationale = 'Estrutura o aprendizado em progressão rigorosa (fundamentos → correlações → aplicação prática), ideal para diretrizes e temas aprofundados.';
+      } else if (isClinicalCondition) {
+        suggestedMode = 'curated';
+        suggestedModeLabel = '🧠 Curadoria Integral (50% Base • 30% Reconhecimento • 20% Conduta)';
+        modeRationale = 'Distribui as perguntas de forma equilibrada entre mecanismos biológicos, reconhecimento semiológico e conduta terapêutica.';
+      } else {
+        suggestedMode = 'sections';
+        suggestedModeLabel = '📄 Cobertura por Seções / Páginas';
+        modeRationale = 'Varre uniformemente cada página ou divisão temática do material garantindo que nenhum tópico seja ignorado.';
+      }
+
+      // Estilo de prova
+      let suggestedExamStyle = isClinicalCondition ? 'enare' : (isBasicScience ? 'bloom' : 'bloom');
+      let suggestedExamStyleLabel = suggestedExamStyle === 'enare' ? '🏥 Padrão ENARE (Casos Clínicos / Residência)' : '🎓 Acadêmico (Taxonomia de Bloom)';
+
+      return {
+        charCount,
+        wordCount,
+        suggestedCount,
+        countRationale,
+        suggestedMode,
+        suggestedModeLabel,
+        modeRationale,
+        suggestedExamStyle,
+        suggestedExamStyleLabel,
+        materialName: materialName || `Disciplina Integral (${targetSubj})`
+      };
+    }
+
+    function updateStudyRecommendationUI(materialName, subjectName) {
+      const rec = analyzeDocumentForStudyRecommendation(materialName, subjectName);
+      currentStudyRecommendation = rec;
+
+      const badgeEl = document.getElementById('generateStudyDocStatsBadge');
+      const contentEl = document.getElementById('generateStudyRecommendationContent');
+      if (!badgeEl || !contentEl) return;
+
+      const statsText = rec.charCount > 0 
+        ? `📊 ~${rec.wordCount.toLocaleString('pt-BR')} palavras • ${rec.charCount.toLocaleString('pt-BR')} caracteres`
+        : `📚 Material do Drive`;
+      badgeEl.textContent = statsText;
+
+      contentEl.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px;">
+            <!-- Quantidade Recomendada -->
+            <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(0, 229, 255, 0.2); border-left: 3px solid var(--neon); border-radius: 8px; padding: 8px 10px;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
+                🎯 Quantidade Recomendada:
+              </div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--neon); margin: 2px 0;">
+                ${rec.suggestedCount} Questões
+              </div>
+              <div style="font-size: 10.5px; color: var(--text-muted); line-height: 1.35;">
+                ${rec.countRationale}
+              </div>
+            </div>
+
+            <!-- Estratégia Recomendada -->
+            <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(0, 255, 102, 0.2); border-left: 3px solid #00ff66; border-radius: 8px; padding: 8px 10px;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
+                ⚙️ Estratégia Recomendada:
+              </div>
+              <div style="font-size: 12.5px; font-weight: 800; color: #00ff66; margin: 2px 0;">
+                ${rec.suggestedModeLabel}
+              </div>
+              <div style="font-size: 10.5px; color: var(--text-muted); line-height: 1.35;">
+                ${rec.modeRationale}
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-secondary); background: rgba(255, 255, 255, 0.02); padding: 5px 8px; border-radius: 6px; border: 1px dashed rgba(255, 255, 255, 0.1);">
+            💡 <strong>Estilo de Avaliação Sugerido:</strong> <span style="color: var(--text-primary); font-weight: 600;">${rec.suggestedExamStyleLabel}</span>
+          </div>
+        </div>
+      `;
+
+      // Pré-seleciona os valores recomendados no formulário
+      setGenerateStudyCount(rec.suggestedCount);
+      const modeSelect = document.getElementById('generateStudyModeSelect');
+      if (modeSelect) modeSelect.value = rec.suggestedMode;
+      const styleSelect = document.getElementById('generateStudyExamStyleSelect');
+      if (styleSelect) styleSelect.value = rec.suggestedExamStyle;
+    }
+
+    function applyStudyRecommendation() {
+      if (!currentStudyRecommendation) return;
+      const rec = currentStudyRecommendation;
+      setGenerateStudyCount(rec.suggestedCount);
+      const modeSelect = document.getElementById('generateStudyModeSelect');
+      if (modeSelect) modeSelect.value = rec.suggestedMode;
+      const styleSelect = document.getElementById('generateStudyExamStyleSelect');
+      if (styleSelect) styleSelect.value = rec.suggestedExamStyle;
+
+      if (typeof showToast === 'function') {
+        showToast(`✨ Sugestão aplicada: ${rec.suggestedCount} questões com ${rec.suggestedModeLabel}`);
+      }
+    }
+
     function openGenerateStudyModal(materialName, subjectName) {
       const targetSubj = subjectName || currentStudySubject;
       pendingGenerateStudyContext = {
@@ -11713,14 +11883,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       };
       const titleEl = document.getElementById('generateStudyModalTitle');
       const targetEl = document.getElementById('generateStudyModalTargetName');
-      const inputEl = document.getElementById('generateStudyQuestionsCountInput');
       if (titleEl) {
         titleEl.textContent = materialName ? '⚡ Gerar Estudo (Gemini 3.5 Flash-Lite)' : `⚡ Gerar Estudo: ${targetSubj} (Gemini 3.5 Flash-Lite)`;
       }
       if (targetEl) {
         targetEl.textContent = materialName ? `📄 ${materialName} (${targetSubj})` : `📚 Disciplina Integral: ${targetSubj}`;
       }
-      if (inputEl) inputEl.value = '5';
+
+      // Calcula e exibe a sugestão de quantidade e estratégia baseada no documento
+      updateStudyRecommendationUI(materialName, targetSubj);
+
       const customInstructionsToggle = document.getElementById('generateStudyCustomInstructionsEnabled');
       const customInstructionsInput = document.getElementById('generateStudyCustomInstructionsInput');
       if (customInstructionsToggle) customInstructionsToggle.checked = false;
@@ -13117,6 +13289,8 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
       window.addDerivedContextBox = addDerivedContextBox;
       window.removeDerivedContextBox = removeDerivedContextBox;
       window.submitDerivedQuestionWithContext = submitDerivedQuestionWithContext;
+      window.applyStudyRecommendation = applyStudyRecommendation;
+      window.openGenerateStudyModal = openGenerateStudyModal;
     }
 
     // Renderiza o feedback formatado e a pontuação do flashcard
