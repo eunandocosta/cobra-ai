@@ -5488,17 +5488,36 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: var(--bg-main);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      /* A autenticação é uma superfície própria: nada do shell do app deve
+         aparecer por trás (nem conteúdo, nem identidade de outro usuário). */
+      background:
+        radial-gradient(circle at 50% 8%, rgba(0, 255, 102, 0.08), transparent 42%),
+        var(--bg-main);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      isolation: isolate;
       z-index: 9999;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      overflow-y: auto;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s ease;
+    }
+
+    .auth-screen-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      background-image: linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+      background-size: 34px 34px;
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 75%);
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent 75%);
     }
 
     .auth-screen-overlay.active {
@@ -5597,6 +5616,11 @@
       box-shadow: 0 0 20px var(--neon-glow);
     }
 
+    .auth-logo-badge .icon {
+      width: 25px;
+      height: 25px;
+    }
+
     .auth-brand h1 {
       font-size: 22px;
       font-weight: 800;
@@ -5622,6 +5646,7 @@
 
     .auth-tab-btn {
       flex: 1;
+      min-height: 40px;
       padding: 8px 12px;
       border-radius: 8px;
       border: none;
@@ -5645,6 +5670,7 @@
       justify-content: center;
       gap: 12px;
       width: 100%;
+      min-height: 46px;
       padding: 12px 16px;
       background: var(--bg-surface);
       border: 1px solid var(--border);
@@ -5706,6 +5732,7 @@
     }
 
     .auth-input-group input {
+      min-height: 44px;
       padding: 10px 14px;
       background: var(--bg-surface);
       border: 1px solid var(--border);
@@ -5726,6 +5753,7 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
+      min-height: 46px;
       padding: 12px;
       background: var(--neon);
       color: #000000;
@@ -5742,25 +5770,6 @@
       background: var(--neon-hover);
       box-shadow: 0 0 20px var(--neon-glow);
       transform: translateY(-1px);
-    }
-
-    .btn-guest-mode {
-      background: transparent;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: underline;
-      transition: color 0.2s ease;
-      display: block;
-      width: 100%;
-      text-align: center;
-      padding: 6px;
-    }
-
-    .btn-guest-mode:hover {
-      color: var(--neon);
     }
 
     .auth-error-alert {

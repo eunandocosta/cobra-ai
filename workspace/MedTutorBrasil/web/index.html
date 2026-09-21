@@ -2794,23 +2794,7 @@
         <button class="auth-tab-btn" id="tabAuthRegister" onclick="switchAuthTab('register')">Cadastrar</button>
       </div>
 
-      <!-- O login é sempre escolhido pelo próprio estudante no botão Google ou no formulário abaixo. -->
-      <!-- Nenhuma conta, e-mail ou foto de terceiro é exibida antes da autenticação. -->
-      <!--
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <!-- Foto de terceiro removida; a imagem do usuário só é exibida após o login real. -->
-          <div style="text-align: left;">
-            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-              <span>Entrar na conta do estudante</span>
-              <span style="font-size: 9px; background: rgba(0, 255, 102, 0.2); color: #00ff66; padding: 2px 5px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">FIREBASE</span>
-            </div>
-            <div style="font-size: 11px; color: var(--text-secondary);">Use a conta Google que possui seus materiais salvos</div>
-          </div>
-        </div>
-        <button type="button" class="btn-outline-action primary" style="font-size: 11px; padding: 6px 12px; pointer-events: none; white-space: nowrap;">
-          Entrar com Google ➔
-        </button>
-      </div> -->
+      <!-- A identidade só aparece depois que o estudante autentica a própria conta. -->
 
       <!-- Alerta de Ambiente Local / HTTP para Google OAuth -->
       <div id="authLocalServerHint" style="display: none; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
@@ -2863,12 +2847,6 @@
         </button>
       </form>
 
-      <!-- Rodapé: Modo Demonstração Rápida -->
-      <div class="auth-footer-demo">
-        <button class="btn-guest-mode" onclick="MedTutorAuthService.enterGuestMode()">
-          ⚡ Modo Demonstração Rápida (Offline / Sem Cadastro)
-        </button>
-      </div>
     </div>
   </div>
 
@@ -3322,7 +3300,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260921-auth-isolamento-v2"></script>
+  <script defer src="/app.min.js?v=20260921-auth-isolamento-v3"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

@@ -1,9 +1,9 @@
-const CACHE_NAME = 'medtutor-static-v46';
+const CACHE_NAME = 'medtutor-static-v47';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/styles.css?v=20260919-relatorio-a4-seguro-v1',
-  '/app.min.js?v=20260921-auth-isolamento-v2',
+  '/app.min.js?v=20260921-auth-isolamento-v3',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
 ];

@@ -564,37 +564,6 @@
         return true;
       },
 
-      enterGuestMode() {
-        this.currentUser = {
-          uid: 'guest_' + Date.now(),
-          email: 'estudante@medtutor.local',
-          displayName: 'Estudante Visitante'
-        };
-        this.authMode = 'guest';
-        this.authStateResolved = true;
-        localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-        if (!this.userProfile) {
-          this.userProfile = {
-            uid: this.currentUser.uid,
-            nome: 'Estudante de Medicina',
-            email: 'estudante@medtutor.local',
-            faculdade: 'Faculdade de Medicina',
-            periodo_atual: '5º Período',
-            ciclo: 'Ciclo Clínico',
-            tema_preferido: currentTheme,
-            maestria_xp: 0,
-            data_criacao: new Date().toISOString()
-          };
-          localStorage.setItem('medtutor_user_profile', JSON.stringify(this.userProfile));
-        }
-        showToast('⚡ Modo Demonstração Rápida Ativado!');
-        this.setAuthScreenState('hidden');
-        this.updateUserTopbarUI();
-        if (typeof checkMandatoryFacultyRedeclaration === 'function') {
-          setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
-        }
-      },
-
       async signOut() {
         if (firebaseAuth) {
           try { await firebaseAuth.signOut(); } catch (e) {}
@@ -627,7 +596,7 @@
           case 'auth/network-request-failed':
             return 'Erro de conexão com o Firebase. Verifique sua internet.';
           default:
-            return 'Ocorreu um erro na autenticação. Tente novamente ou use o Modo Demonstração.';
+            return 'Ocorreu um erro na autenticação. Tente novamente ou escolha outro método de login.';
         }
       },
 
