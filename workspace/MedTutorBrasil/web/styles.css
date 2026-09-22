@@ -3949,6 +3949,32 @@
         max-width: 100% !important;
         overflow-wrap: anywhere !important;
         word-break: normal !important;
+        word-wrap: break-word !important;
+      }
+
+      /* Safari/WebKit pode manter nowrap/justificação de estilos inline do
+         relatório ao imprimir. Reforce fluxo normal e alinhamento legível em
+         todo o corpo; o fallback word-wrap cobre palavras longas em Safari. */
+      #readerModalContent .academic-body-content,
+      #readerModalContent .academic-body-content * {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+      }
+
+      #readerModalContent .academic-body-content p,
+      #readerModalContent .academic-body-content li,
+      #readerModalContent .academic-body-content blockquote,
+      #readerModalContent .academic-body-content figcaption,
+      #readerModalContent .academic-body-content td,
+      #readerModalContent .academic-body-content th,
+      #readerModalContent .academic-body-content .doc-table-wrapper {
+        text-align: left !important;
       }
 
       html, body {
@@ -4041,6 +4067,8 @@
         font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
       }
 
+      #readerModalContent .academic-body-content pre,
+      #readerModalContent .academic-body-content code,
       #readerModalContent pre,
       #readerModalContent code {
         max-width: 100% !important;
@@ -4172,7 +4200,7 @@
         line-height: 1.45 !important;
         padding: 2pt 0 2pt 8pt !important;
         margin: 8pt 0 !important;
-        text-align: justify !important;
+        text-align: left !important;
         page-break-inside: avoid !important;
         text-indent: 0 !important;
       }
@@ -4316,7 +4344,7 @@
       .gemini-ul li, .gemini-ol li, li, .academic-article-container li {
         color: #111827 !important;
         margin-bottom: 3pt !important;
-        text-align: justify !important;
+        text-align: left !important;
       }
 
       .doc-table-wrapper {
@@ -4630,7 +4658,7 @@
         line-height: 1.2 !important;
         margin: 6pt 0 6pt 3.5cm !important;
         text-indent: 0 !important;
-        text-align: justify !important;
+        text-align: left !important;
       }
 
       /* FIGURAS E ILUSTRAÇÕES MÉDICAS INTERCALADAS NA IMPRESSÃO A4 */
