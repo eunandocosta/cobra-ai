@@ -7743,26 +7743,37 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 40px 24px;
+      gap: 12px;
+      padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 24px);
       background: rgba(15, 36, 29, 0.45);
       border: 1.5px dashed rgba(0, 229, 255, 0.25);
       border-radius: 16px;
       margin: 12px 0;
+      min-width: 0;
     }
 
     .empty-state-notice .icon {
-      font-size: 40px;
-      margin-bottom: 12px;
-      display: inline-block;
+      /* .icon global define 20×20 px para SVG; o emoji escapava dessa caixa
+         e invadia a primeira linha do texto no estado vazio do passo 4. */
+      width: clamp(36px, 9vw, 48px);
+      height: clamp(36px, 9vw, 48px);
+      flex: 0 0 clamp(36px, 9vw, 48px);
+      display: grid;
+      place-items: center;
+      font-size: clamp(28px, 7vw, 36px);
+      line-height: 1;
+      margin: 0;
       filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.4));
     }
 
     .empty-state-notice p {
-      font-size: 13.5px;
+      width: 100%;
+      font-size: clamp(12px, 3.5vw, 13.5px);
       color: var(--text-primary);
-      margin: 2px 0;
+      margin: 0;
       max-width: 480px;
       line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
     /* Banco Comunitário da Faculdade */

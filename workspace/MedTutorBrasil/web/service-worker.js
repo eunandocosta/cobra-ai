@@ -1,8 +1,8 @@
-const CACHE_NAME = 'medtutor-static-v49';
+const CACHE_NAME = 'medtutor-static-v50';
 const APP_SHELL = [
   '/',
   '/index.html',
-  '/styles.css?v=20260921-rotas-login-v1',
+  '/styles.css?v=20260922-empty-state-icon-v1',
   '/app.min.js?v=20260921-rotas-login-v1',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
