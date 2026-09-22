@@ -1866,31 +1866,42 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
-      max-width: 720px;
-      margin: 14px auto 28px auto;
-      padding-bottom: 24px;
+      gap: 12px;
+      width: min(100%, 780px);
+      max-width: 780px;
+      margin: 18px auto 0;
+      /* Mantém os controles acima dos atalhos flutuantes da aplicação. */
+      padding: 4px 12px 104px;
+      box-sizing: border-box;
     }
 
     .study-review-nav-row,
     .study-review-tools-row {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: stretch;
       gap: 10px;
-      flex-wrap: wrap;
       width: 100%;
     }
 
+    .study-review-nav-row .btn-outline-action,
+    .study-review-tools-row .btn-outline-action {
+      width: 100%;
+      min-width: 0;
+      justify-content: center;
+      white-space: normal;
+      line-height: 1.25;
+    }
+
     .study-review-nav-row .btn-outline-action {
-      min-height: 40px;
-      padding: 8px 18px;
+      min-height: 44px;
+      padding: 9px 12px;
       font-weight: 600;
     }
 
     .study-review-tools-row .btn-outline-action {
-      min-height: 36px;
-      padding: 6px 14px;
+      min-height: 44px;
+      padding: 8px 12px;
       font-size: 12.5px;
     }
 
@@ -7057,18 +7068,27 @@
       }
 
       .study-review-actions {
-        margin: 12px auto 20px auto;
-        padding-bottom: 16px;
+        width: 100%;
+        margin: 14px auto 0;
+        padding: 4px 14px calc(92px + env(safe-area-inset-bottom));
       }
 
-      .study-review-nav-row,
+      .study-review-nav-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
       .study-review-tools-row {
-        justify-content: stretch;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .study-review-tools-row .btn-outline-action:first-child {
+        grid-column: 1 / -1;
       }
 
       .study-review-nav-row .btn-outline-action,
       .study-review-tools-row .btn-outline-action {
-        flex: 1 1 132px;
+        min-height: 46px;
+        font-size: 13px;
       }
 
       .quiz-opt {
