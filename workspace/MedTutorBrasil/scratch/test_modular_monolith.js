@@ -34,7 +34,9 @@ const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), '
 const curriculumSubjectAliases = appSource.match(/function getCurriculumSubjectAliases\(value\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const sameCurriculumSubject = appSource.match(/function isSameCurriculumSubject\(first, second\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const uniqueCurriculumDisciplines = appSource.match(/function getUniqueCurriculumDisciplines\(disciplines = \[\]\) \{[\s\S]*?\n    \}/)?.[0] || '';
-assert(curriculumSubjectAliases && sameCurriculumSubject && uniqueCurriculumDisciplines, 'a grade deve resolver nomes legados e remover disciplinas curriculares duplicadas sem correspondência parcial');
+const exactStudySubject = appSource.match(/function isExactStudySubject\(materialSubject, selectedSubject\) \{[\s\S]*?\n    \}/)?.[0] || '';
+const canonicalSubjectResolver = appSource.match(/function resolveCanonicalCurriculumSubjectName\(value\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(curriculumSubjectAliases && sameCurriculumSubject && uniqueCurriculumDisciplines && exactStudySubject && canonicalSubjectResolver, 'a grade deve resolver nomes legados, canonicalizar matérias e remover disciplinas curriculares duplicadas sem correspondência parcial');
 const areSameCurriculumSubjects = new Function(`
   const normalizeStudyComparisonText = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
   ${curriculumSubjectAliases}
@@ -44,6 +46,16 @@ const areSameCurriculumSubjects = new Function(`
 assert(areSameCurriculumSubjects('Integração de Sistemas Humanos 2 (Dermatologia Clínica)', 'M010 Integração de Sistemas Humanos II (Sistema Tegumentar)'), 'o material legado do módulo tegumentar deve aparecer na disciplina equivalente da ementa');
 assert(areSameCurriculumSubjects('Sistema Nervoso', 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'), 'o rótulo anatômico entre parênteses deve associar o material à disciplina correspondente');
 assert(!areSameCurriculumSubjects('Integração de Sistemas Humanos 2 (Dermatologia)', 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'), 'a resolução não pode misturar módulos diferentes');
+const resolveCanonicalCurriculumSubjectName = new Function(`
+  const normalizeStudyComparisonText = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
+  const getAllCurriculumSubjects = () => [{ name: 'M009 Mecanismos de Agressão e Defesa', period: '2º Semestre' }];
+  ${exactStudySubject}
+  ${curriculumSubjectAliases}
+  ${sameCurriculumSubject}
+  ${canonicalSubjectResolver}
+  return resolveCanonicalCurriculumSubjectName;
+`)();
+assert.strictEqual(resolveCanonicalCurriculumSubjectName('2º Semestre - M009 Mecanismos de Agressão e Defesa'), 'M009 Mecanismos de Agressão e Defesa', 'nomes gerados com prefixo de período devem ser salvos como a matéria oficial da ementa');
 const getUniqueCurriculumDisciplines = new Function(`
   const normalizeStudyComparisonText = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
   ${curriculumSubjectAliases}
@@ -61,6 +73,14 @@ assert.deepStrictEqual(uniqueCurriculumList.map(subject => subject.name), [
   'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'
 ], 'aliases/cópias de disciplinas devem ser deduplicados, preservando o nome oficial da ementa');
 assert(!appSource.includes('extraSubs') && !appSource.includes('<optgroup label="Outras Disciplinas">'), 'o filtro de Flashcards não deve acrescentar matéria crua fora da ementa ao selecionar todos os períodos');
+assert(appSource.includes("selectManualSubjectFromAccordion('${escapeHtml(it.name)}')"), 'alocação manual deve enviar o nome oficial da matéria, não o rótulo completo com período');
+assert(appSource.includes('const finalSubject = resolveCanonicalCurriculumSubjectName(requestedSubject);'), 'toda alocação deve canonicalizar o nome antes de persistir');
+assert(appSource.includes('disciplines.map(d => d.name)'), 'seletor de desafios deve usar nome oficial da matéria, sem prefixo de exibição do semestre');
+assert(appSource.includes('isSameCurriculumSubject(q.subject || q.disciplina, discipline)'), 'desafios devem localizar questões por equivalência curricular, inclusive registros legados');
+assert(appSource.includes('isSameCurriculumSubject(data.disciplina || data.subject, subjectName)'), 'a leitura autoritativa deve aceitar o nome legado equivalente sem aceitar disciplina diferente');
+assert(appSource.includes('isSameCurriculumSubject(m.subject || m.disciplina, subjectName)'), 'exclusões por disciplina devem também alcançar materiais salvos com o rótulo legado');
+assert(appSource.includes('getLegacyDisciplineQuestionBankId(legacyLabel)'), 'banco didático deve recuperar perfis legados com nome de exibição do semestre');
+assert(!/sharedQuestionsBank\.filter\(q\s*=>\s*q\.subject\s*===\s*(?:targetSubj|targetSubject|currentStudySubject|discipline)\)/.test(appSource), 'filtros de questões não devem usar igualdade literal nos escopos de disciplina');
 console.log('[PASS] Filtro curricular de Flashcards usa nomes oficiais e elimina cópias por alias');
 
 const persistenceLoader = appSource.match(/async loadAllDataFromPersistence\(\) \{[\s\S]*?\n      \}\n    \};/)?.[0] || '';
@@ -84,10 +104,10 @@ console.log('[PASS] Diretório de colegas sem perfis fictícios embutidos');
 assert(/subject:\s*q\.subject\s*\|\|\s*q\.disciplina/.test(appSource), 'questões remotas devem mapear disciplina para subject');
 assert(/topic:\s*q\.topic\s*\|\|\s*q\.materia/.test(appSource), 'questões remotas devem mapear materia para topic');
 const challengeTopicsHelper = appSource.match(/function getTopicsForSubject\(subjectName\) \{[\s\S]*?\n    \}/)?.[0] || '';
-assert(challengeTopicsHelper.includes('isExactStudySubject(q.subject || q.disciplina, subjectName)'), 'o filtro de tópicos deve aceitar apenas questões da disciplina exata');
+assert(challengeTopicsHelper.includes('isSameCurriculumSubject(q.subject || q.disciplina, subjectName)'), 'o filtro de tópicos deve aceitar aliases curriculares sem ampliar por correspondência parcial');
 assert(!challengeTopicsHelper.includes('.includes(normSubject)'), 'o filtro de tópicos não deve ampliar a disciplina por correspondência parcial');
 assert(!challengeTopicsHelper.includes('q.flashcardTitle'), 'títulos individuais de cards não devem virar matéria no filtro');
-assert(challengeTopicsHelper.includes('m.name') && challengeTopicsHelper.includes('m.originalFileName') && challengeTopicsHelper.includes('m.title'), 'materiais enviados da disciplina devem continuar disponíveis no filtro');
+assert(challengeTopicsHelper.includes('isSameCurriculumSubject(m.subject || m.disciplina, subjectName)') && challengeTopicsHelper.includes('m.name') && challengeTopicsHelper.includes('m.originalFileName') && challengeTopicsHelper.includes('m.title'), 'materiais enviados com rótulos curriculares equivalentes devem continuar disponíveis no filtro');
 assert(/slideName:\s*q\.slideName\s*\|\|\s*q\.nome_material/.test(appSource), 'questões devem manter a associação com o arquivo de origem ao recarregar da nuvem');
 assert(/nome_material:\s*q\.slideName\s*\|\|\s*q\.materialName/.test(appSource), 'a associação da questão com o arquivo deve ser persistida no Firestore');
 console.log('[PASS] Questões e materiais enviados são preservados e limitados à disciplina selecionada');

@@ -111,6 +111,16 @@
     }
 
     function getDisciplineQuestionBankId(subjectName) {
+      const canonicalSubject = typeof resolveCanonicalCurriculumSubjectName === 'function'
+        ? resolveCanonicalCurriculumSubjectName(subjectName)
+        : subjectName;
+      const normalized = String(canonicalSubject || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      return `disciplina_${(normalized || 'sem_nome').slice(0, 100)}`;
+    }
+
+    function getLegacyDisciplineQuestionBankId(subjectName) {
       const normalized = String(subjectName || '')
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -1441,7 +1451,8 @@
       async rebuildDisciplineQuestionBanks(materialsArray) {
         const profiles = {};
         (materialsArray || []).forEach(material => {
-          const subject = String(material?.subject || material?.disciplina || '').trim();
+          const rawSubject = String(material?.subject || material?.disciplina || '').trim();
+          const subject = resolveCanonicalCurriculumSubjectName(rawSubject);
           const text = typeof getMaterialStudyText === 'function' ? getMaterialStudyText(material) : String(material?.markdownText || material?.conteudo_md || material?.text || '');
           if (!subject || !text || typeof extractAuthoredQuestionsFromMaterial !== 'function') return;
           const samples = extractAuthoredQuestionsFromMaterial(text, 30);
@@ -1486,14 +1497,35 @@
 
       async getDisciplineQuestionBank(subjectName) {
         const id = getDisciplineQuestionBankId(subjectName);
+        const canonicalSubject = resolveCanonicalCurriculumSubjectName(subjectName);
         if (!Object.keys(disciplineQuestionBankCache).length) {
           try { disciplineQuestionBankCache = JSON.parse(localStorage.getItem('medtutor_discipline_question_banks_v1') || '{}') || {}; } catch (e) {}
+        }
+        if (!disciplineQuestionBankCache[id]) {
+          const cachedAlias = Object.entries(disciplineQuestionBankCache)
+            .find(([, profile]) => isSameCurriculumSubject(profile?.disciplina, canonicalSubject));
+          if (cachedAlias) disciplineQuestionBankCache[id] = cachedAlias[1];
         }
         const uid = this.getUserId();
         if (this.hasAuthenticatedCloudSession(uid)) {
           try {
-            const snapshot = await firestoreDb.collection('users').doc(uid).collection('perfis_didaticos').doc(id).get();
-            if (snapshot.exists) disciplineQuestionBankCache[id] = snapshot.data();
+            const profilesRef = firestoreDb.collection('users').doc(uid).collection('perfis_didaticos');
+            let snapshot = await profilesRef.doc(id).get();
+            if (!snapshot.exists) {
+              const legacyLabels = new Set([String(subjectName || '').trim()]);
+              getOfficialCurriculumDisciplineList()
+                .filter(discipline => isSameCurriculumSubject(discipline.name, canonicalSubject))
+                .forEach(discipline => legacyLabels.add(discipline.fullName));
+              for (const legacyLabel of legacyLabels) {
+                const legacyId = getLegacyDisciplineQuestionBankId(legacyLabel);
+                if (legacyId === id) continue;
+                snapshot = await profilesRef.doc(legacyId).get();
+                if (snapshot.exists) break;
+              }
+            }
+            if (snapshot.exists) {
+              disciplineQuestionBankCache[id] = { ...snapshot.data(), disciplina: canonicalSubject };
+            }
           } catch (error) {
             console.warn('[Banco didático] Perfil remoto indisponível; usando cache local:', error);
           }
@@ -1609,14 +1641,13 @@
       async deleteMaterialsBySubject(subjectName) {
         if (!subjectName) return;
         const uid = this.getUserId();
-        const subjectKey = normalizeStudyComparisonText(subjectName);
 
         // 1. Identifica e remove da memória global
         let deletedItems = [];
         if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
           deletedItems = chatDriveMaterials.filter(m => {
             if (!m.subject) return false;
-            return normalizeStudyComparisonText(m.subject || m.disciplina) === subjectKey;
+            return isSameCurriculumSubject(m.subject || m.disciplina, subjectName);
           });
           chatDriveMaterials = chatDriveMaterials.filter(m => !deletedItems.includes(m));
         }
@@ -1655,7 +1686,7 @@
             const querySnap = await colRef.get();
             querySnap.forEach(doc => {
               const data = doc.data() || {};
-              if (normalizeStudyComparisonText(data.disciplina || data.subject) === subjectKey) {
+              if (isSameCurriculumSubject(data.disciplina || data.subject, subjectName)) {
                 refs.set(doc.id, doc.ref);
               }
             });
@@ -1725,6 +1756,23 @@
                   break;
                 }
               }
+              // Compatibilidade de migração: materiais antigos podem ter sido
+              // gravados com o período no campo disciplina. Primeiro usamos a
+              // consulta indexada exata; só recorremos ao cache já carregado se
+              // ela não localizou o arquivo solicitado.
+              if (!doc && subjectName && Array.isArray(chatDriveMaterials)) {
+                const cachedAlias = chatDriveMaterials.find(material => {
+                  const sameSubject = isSameCurriculumSubject(material.subject || material.disciplina, subjectName);
+                  const sameMaterial = normalizeStudyComparisonText(material.name || '') === normalizedTarget
+                    || normalizeStudyComparisonText(material.originalFileName || '') === normalizedTarget
+                    || material.id === materialIdOrName;
+                  return sameSubject && sameMaterial && material.id;
+                });
+                if (cachedAlias) {
+                  const aliasDoc = await colRef.doc(cachedAlias.id).get();
+                  if (aliasDoc.exists) doc = aliasDoc;
+                }
+              }
             }
 
             if (doc) {
@@ -1760,7 +1808,7 @@
               // persistida divergir daquela que o aluno selecionou.
               const storedSubject = String(data.disciplina || data.subject || '').trim();
               if (subjectName && storedSubject &&
-                  normalizeStudyComparisonText(storedSubject) !== normalizeStudyComparisonText(subjectName)) {
+                  !isSameCurriculumSubject(storedSubject, subjectName)) {
                 console.error('[Firestore] Material recusado por divergência de disciplina.', {
                   materialId: doc.id,
                   solicitado: subjectName,
@@ -1813,8 +1861,24 @@
           try {
             const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
             const querySnap = await colRef.where('disciplina', '==', subjectName).get();
-            for (const doc of querySnap.docs) {
+            const subjectDocs = new Map(querySnap.docs.map(doc => [doc.id, doc]));
+            // Materiais legados com rótulo de período não aparecem na query
+            // exata. Reaproveita apenas IDs já presentes no cache do estudante,
+            // evitando uma leitura integral da coleção do Firestore.
+            const cachedAliases = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : [])
+              .filter(material => material.id && isSameCurriculumSubject(material.subject || material.disciplina, subjectName));
+            for (const material of cachedAliases) {
+              if (subjectDocs.has(material.id)) continue;
+              try {
+                const aliasDoc = await colRef.doc(material.id).get();
+                if (aliasDoc.exists) subjectDocs.set(aliasDoc.id, aliasDoc);
+              } catch (readError) {
+                console.warn('[Firestore] Não foi possível recuperar material legado da disciplina:', material.id, readError);
+              }
+            }
+            for (const doc of subjectDocs.values()) {
               const data = doc.data() || {};
+              if (!isSameCurriculumSubject(data.disciplina || data.subject, subjectName)) continue;
               let chunksText = '';
               if (data.conteudo_armazenamento === 'chunks_v1') {
                 try {
@@ -7811,17 +7875,21 @@ ${cleanText}
 
     function getAvailableStudySubjects() {
       const set = new Set();
+      const addSubject = value => {
+        const canonical = resolveCanonicalCurriculumSubjectName(value);
+        if (canonical) set.add(canonical);
+      };
       if (typeof getAllCurriculumSubjects === 'function') {
         try {
-          getAllCurriculumSubjects().forEach(s => { if (s && s.name) set.add(s.name); });
+          getAllCurriculumSubjects().forEach(s => { if (s && s.name) addSubject(s.name); });
         } catch (e) {}
       }
-      Object.keys(subjectGenerationStatus).forEach(s => { if (s) set.add(s); });
+      Object.keys(subjectGenerationStatus).forEach(addSubject);
       if (Array.isArray(chatDriveMaterials)) {
-        chatDriveMaterials.forEach(m => { if (m.subject) set.add(m.subject); });
+        chatDriveMaterials.forEach(m => { if (m.subject) addSubject(m.subject); });
       }
       if (Array.isArray(sharedQuestionsBank)) {
-        sharedQuestionsBank.forEach(q => { if (q.subject) set.add(q.subject); });
+        sharedQuestionsBank.forEach(q => { if (q.subject) addSubject(q.subject); });
       }
       return Array.from(set).filter(Boolean);
     }
@@ -7845,6 +7913,8 @@ ${cleanText}
       const aliases = new Set();
       const romanNumerals = { i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8', ix: '9', x: '10' };
       const normalizeCore = text => normalizeStudyComparisonText(text)
+        .replace(/^\d{1,2}\s+(?:semestre|periodo|fase|termo|ano|serie)\s+/, '')
+        .replace(/^(?:semestre|periodo|fase|termo|ano|serie)\s+\d{1,2}\s+/, '')
         .replace(/^m\d{1,3}\s+/, '')
         .replace(/\b(sistemas? humanos?)\s+(i{1,3}|iv|v|vi|vii|viii|ix|x)\b/g, (_, prefix, roman) => `${prefix} ${romanNumerals[roman] || roman}`)
         .replace(/\s+/g, ' ')
@@ -7878,9 +7948,22 @@ ${cleanText}
       return unique;
     }
 
+    function resolveCanonicalCurriculumSubjectName(value) {
+      const rawName = String(value || '').trim();
+      if (!rawName) return '';
+      const curriculumSubjects = typeof getAllCurriculumSubjects === 'function' ? getAllCurriculumSubjects() : [];
+      const exactMatch = curriculumSubjects.find(subject => isExactStudySubject(subject.name, rawName));
+      if (exactMatch) return exactMatch.name;
+      const aliasMatch = curriculumSubjects.find(subject => isSameCurriculumSubject(subject.name, rawName));
+      return aliasMatch ? aliasMatch.name : rawName;
+    }
+
     function findExactSubjectKey(subjectName, candidates = []) {
       const targetKey = normalizeStudyComparisonText(subjectName);
-      return (candidates || []).find(candidate => normalizeStudyComparisonText(candidate) === targetKey) || '';
+      const list = candidates || [];
+      return list.find(candidate => normalizeStudyComparisonText(candidate) === targetKey)
+        || list.find(candidate => isSameCurriculumSubject(candidate, subjectName))
+        || '';
     }
 
     function ensureCurrentSubjectValid() {
@@ -7893,7 +7976,7 @@ ${cleanText}
     }
 
     function selectStudySubject(subjectName) {
-      currentStudySubject = subjectName;
+      currentStudySubject = resolveCanonicalCurriculumSubjectName(subjectName);
       currentDiseaseFilter = 'all';
       currentQuizSlideFilter = 'all';
       currentCardIndex = 0;
@@ -7947,7 +8030,7 @@ ${cleanText}
       const originalIds = new Set(sharedQuestionsBank.map(item => item?.id).filter(Boolean));
       let list = sharedQuestionsBank.filter(item => !(item?.reinforcementOf && originalIds.has(item.reinforcementOf)));
       if (currentStudySubject) {
-        list = list.filter(q => isExactStudySubject(q.subject, currentStudySubject));
+        list = list.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, currentStudySubject));
       }
       if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
         list = list.filter(q => {
@@ -8219,7 +8302,7 @@ ${cleanText}
               if (!sName) return;
               const isSel = sName === currentStudySubject || (sName && sName.toLowerCase() === (currentStudySubject || '').toLowerCase());
               const mCount = getMaterialsForSubject(sName).length;
-              const qCount = sharedQuestionsBank.filter(q => q.subject === sName).length;
+              const qCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, sName)).length;
               const countBadge = mCount > 0 ? ` (${mCount} ${mCount === 1 ? 'aula' : 'aulas'})` : (qCount > 0 ? ` (${qCount} cards)` : '');
               discOptionsHtml += `<option value="${sName.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>${sName}${countBadge}</option>`;
             });
@@ -8231,7 +8314,7 @@ ${cleanText}
           const sName = d.name;
           const isSel = sName === currentStudySubject || (sName && sName.toLowerCase() === (currentStudySubject || '').toLowerCase());
           const mCount = getMaterialsForSubject(sName).length;
-          const qCount = sharedQuestionsBank.filter(q => q.subject === sName).length;
+          const qCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, sName)).length;
           const countBadge = mCount > 0 ? ` (${mCount} ${mCount === 1 ? 'aula' : 'aulas'})` : (qCount > 0 ? ` (${qCount} cards)` : '');
           discOptionsHtml += `<option value="${sName.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>${sName}${countBadge}</option>`;
         });
@@ -8255,7 +8338,7 @@ ${cleanText}
           materials.map((m, idx) => {
             const isSel = currentQuizSlideFilter === m.name;
             const shortName = m.name.length > 36 ? m.name.slice(0, 33) + '...' : m.name;
-            const countForSlide = sharedQuestionsBank.filter(q => (q.subject === currentStudySubject || (q.subject && q.subject.toLowerCase() === currentStudySubject.toLowerCase())) && (q.slideName === m.name || (q.disease && m.disease && q.disease.includes(m.disease)))).length;
+            const countForSlide = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, currentStudySubject) && (q.slideName === m.name || (q.disease && m.disease && q.disease.includes(m.disease)))).length;
             const countStr = countForSlide > 0 ? ` [${countForSlide} questões]` : '';
             const stepNum = m.learningOrder || (idx + 1);
             const icon = m.pedagogicalIcon || '📄';
@@ -8496,7 +8579,7 @@ ${cleanText}
       [currentSubject, newSubject].forEach(subj => {
         if (subj) {
           const mCount = getMaterialsForSubject(subj).length;
-          const qCount = sharedQuestionsBank.filter(q => q.subject === subj).length;
+          const qCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, subj)).length;
           subjectGenerationStatus[subj] = {
             status: qCount > 0 ? 'ready' : (mCount > 0 ? 'pending' : 'ready'),
             materialsCount: mCount,
@@ -13045,7 +13128,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         ? getMaterialsForSubject(currentStudySubject)
         : [];
       const matCount = resolvedMaterials.length || currentStatus.materialsCount || 0;
-      const qCount = sharedQuestionsBank.filter(q => q.subject === currentStudySubject).length;
+      const qCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, currentStudySubject)).length;
       const isPending = currentStatus.status === 'pending' || (matCount > 0 && qCount === 0);
 
       // 1. Atualiza os seletores hierárquicos e badges
@@ -14846,7 +14929,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       quizExamState.finished = false;
 
       let generated = null;
-      const existingQuestionsForSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj);
+      const existingQuestionsForSubject = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubj));
 
       // 3. Tenta gerar via Gemini
       if (slideText && slideText.length > 30) {
@@ -14908,7 +14991,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         subjectGenerationStatus[targetSubj] = { status: 'ready', materialsCount: materials.length, questionsCount: 0 };
       }
       subjectGenerationStatus[targetSubj].status = 'ready';
-      subjectGenerationStatus[targetSubj].questionsCount = sharedQuestionsBank.filter(q => q.subject === targetSubj).length;
+      subjectGenerationStatus[targetSubj].questionsCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubj)).length;
 
       currentStudySubject = targetSubj;
       currentQuizSlideFilter = materialName;
@@ -14934,7 +15017,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const qCount = normalizeStudyQuestionCount(count);
       const materials = getMaterialsForSubject(targetSubj);
-      const existingQuestionsForSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj);
+      const existingQuestionsForSubject = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubj));
       const generatedForSubject = [];
       let totalCreated = 0;
       let createdForMat = [];
@@ -15039,7 +15122,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       subjectGenerationStatus[targetSubj] = {
         status: 'ready',
         materialsCount: materials.length,
-        questionsCount: sharedQuestionsBank.filter(q => q.subject === targetSubj).length
+        questionsCount: sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubj)).length
       };
 
       currentStudySubject = targetSubj;
@@ -15051,7 +15134,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       renderSceBars();
       updateSubjectFilterMenus();
 
-      const totalInSubject = sharedQuestionsBank.filter(q => q.subject === targetSubj).length;
+      const totalInSubject = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubj)).length;
       showToast(totalCreated < qCount
         ? `⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • não encontrei mais conceitos distintos no material para completar as ${qCount} solicitadas. Total da matéria: ${totalInSubject}.`
         : `⚡ ${totalCreated} novos pares adicionados a "${targetSubj}" • total: ${totalInSubject}.`);
@@ -15073,7 +15156,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         showToast('ℹ️ Esta disciplina ainda não possui arquivos com texto para sincronizar.');
         return 0;
       }
-      const previousCount = sharedQuestionsBank.filter(question => question.subject === targetSubject).length;
+      const previousCount = sharedQuestionsBank.filter(question => isSameCurriculumSubject(question.subject || question.disciplina, targetSubject)).length;
       // Uma questão inicial por arquivo (até o limite seguro da interface),
       // enquanto o banco didático já varre todos os arquivos da disciplina.
       const amount = Math.max(5, materials.length);
@@ -15084,7 +15167,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         console.error('[Sincronização de disciplina] Falha:', targetSubject, error);
         if (!options.silent) showToast(`⚠️ Não foi possível sincronizar "${targetSubject}".`);
       }
-      return Math.max(0, sharedQuestionsBank.filter(question => question.subject === targetSubject).length - previousCount);
+      return Math.max(0, sharedQuestionsBank.filter(question => isSameCurriculumSubject(question.subject || question.disciplina, targetSubject)).length - previousCount);
     }
 
     async function synchronizePendingDisciplinesQuestions() {
@@ -15093,7 +15176,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         const name = typeof subject === 'string' ? subject : subject?.name;
         if (!name || subjects.includes(name)) return;
         const hasMaterials = getMaterialsForSubject(name).length > 0;
-        const hasQuestions = sharedQuestionsBank.some(question => question.subject === name || String(question.subject || '').toLowerCase() === name.toLowerCase());
+        const hasQuestions = sharedQuestionsBank.some(question => isSameCurriculumSubject(question.subject || question.disciplina, name));
         if (hasMaterials && !hasQuestions) subjects.push(name);
       }));
       if (!subjects.length) {
@@ -15118,7 +15201,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
     function auditSubjectRedundancy(subjectName) {
       const targetSubject = subjectName || currentStudySubject;
-      const questions = sharedQuestionsBank.filter(q => q.subject === targetSubject);
+      const questions = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubject));
       const container = document.getElementById('subjectRedundancyContent');
       if (!container) return;
 
@@ -15247,7 +15330,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
     function autoPruneSubjectRedundancies(subjectName) {
       const targetSubject = subjectName || currentStudySubject;
-      const questions = sharedQuestionsBank.filter(q => q.subject === targetSubject);
+      const questions = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubject));
       const toRemove = new Set();
 
       for (let i = 0; i < questions.length; i++) {
@@ -15305,7 +15388,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       // uma disciplina vazia reapareça por dados de geração obsoletos.
       if (targetSubject && getMaterialsForSubject(targetSubject).length === 0 && typeof subjectGenerationStatus !== 'undefined') {
         Object.keys(subjectGenerationStatus)
-          .filter(key => isExactStudySubject(key, targetSubject))
+          .filter(key => isSameCurriculumSubject(key, targetSubject))
           .forEach(key => delete subjectGenerationStatus[key]);
       }
 
@@ -15359,12 +15442,12 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
         await MedTutorFirebaseService.deleteMaterialsBySubject(target);
       } else if (typeof chatDriveMaterials !== 'undefined') {
-        chatDriveMaterials = chatDriveMaterials.filter(m => !isExactStudySubject(m.subject || m.disciplina, target));
+        chatDriveMaterials = chatDriveMaterials.filter(m => !isSameCurriculumSubject(m.subject || m.disciplina, target));
       }
 
       if (typeof subjectGenerationStatus !== 'undefined') {
         Object.keys(subjectGenerationStatus)
-          .filter(key => isExactStudySubject(key, target))
+          .filter(key => isSameCurriculumSubject(key, target))
           .forEach(key => delete subjectGenerationStatus[key]);
       }
 
@@ -15396,11 +15479,11 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
         await MedTutorFirebaseService.deleteMaterialsBySubject(target);
       } else if (typeof chatDriveMaterials !== 'undefined') {
-        chatDriveMaterials = chatDriveMaterials.filter(m => !isExactStudySubject(m.subject || m.disciplina, target));
+        chatDriveMaterials = chatDriveMaterials.filter(m => !isSameCurriculumSubject(m.subject || m.disciplina, target));
       }
-      sharedQuestionsBank = sharedQuestionsBank.filter(q => q.subject !== target);
+      sharedQuestionsBank = sharedQuestionsBank.filter(q => !isSameCurriculumSubject(q.subject || q.disciplina, target));
       Object.keys(subjectGenerationStatus)
-        .filter(key => isExactStudySubject(key, target))
+        .filter(key => isSameCurriculumSubject(key, target))
         .forEach(key => delete subjectGenerationStatus[key]);
 
       saveChatDriveMaterials();
@@ -17060,7 +17143,9 @@ DIRETRIZES CIRÚRGICAS:
             finalSubject = chosenSubjectFullName;
           } else {
             const candidate = currentConfirmCandidate || classifyMedicalDocumentSemantically(pendingUploadMaterial.text, pendingUploadMaterial.fileName);
-            finalSubject = candidate ? candidate.fullName : '5º Período - Clínica Médica';
+            finalSubject = candidate
+              ? (candidate.matchedSubject || candidate.name || candidate.fullName)
+              : '5º Período - Clínica Médica';
           }
           const disease = currentConfirmCandidate ? currentConfirmCandidate.diseaseTopic : extractDiseaseFromFilename(finalTitle);
           applyConfirmedMaterialAllocation(finalSubject, disease, mode, finalTitle);
@@ -17088,7 +17173,7 @@ DIRETRIZES CIRÚRGICAS:
         finalSubject = chosenSubjectFullName;
       } else {
         const candidate = currentConfirmCandidate || classifyMedicalDocumentSemantically(currentItem.text, currentItem.fileName);
-        finalSubject = candidate.fullName;
+        finalSubject = candidate.matchedSubject || candidate.name || candidate.fullName;
       }
 
       const disease = currentConfirmCandidate ? currentConfirmCandidate.diseaseTopic : extractDiseaseFromFilename(finalTitle);
@@ -17117,7 +17202,9 @@ DIRETRIZES CIRÚRGICAS:
             null,
             pendingUploadMaterial.targetSemester || window.activeBatchTargetSemester
           );
-          const finalSubj = candidate ? candidate.fullName : '5º Período - Clínica Médica';
+          const finalSubj = candidate
+            ? (candidate.matchedSubject || candidate.name || candidate.fullName)
+            : '5º Período - Clínica Médica';
           const disease = candidate ? candidate.diseaseTopic : extractDiseaseFromFilename(finalTitle);
           applyConfirmedMaterialAllocation(finalSubj, disease, 'suggested', finalTitle, pendingUploadMaterial);
           closeModals();
@@ -17170,7 +17257,9 @@ DIRETRIZES CIRÚRGICAS:
           );
         }
 
-        const finalSubject = candidate ? candidate.fullName : '5º Período - Clínica Médica';
+        const finalSubject = candidate
+          ? (candidate.matchedSubject || candidate.name || candidate.fullName)
+          : '5º Período - Clínica Médica';
         const disease = candidate ? candidate.diseaseTopic : extractDiseaseFromFilename(finalTitle);
 
         applyConfirmedMaterialAllocation(finalSubject, disease, 'suggested', finalTitle, item);
@@ -17303,7 +17392,7 @@ DIRETRIZES CIRÚRGICAS:
                 <div style="font-size: 11.5px; font-weight: 600; color: var(--text-primary); line-height: 1.3;">
                   ${escapeHtml(it.name)}
                 </div>
-                <button class="btn-outline-action primary" style="font-size: 10px; padding: 3px 8px; flex-shrink: 0;" onclick="selectManualSubjectFromAccordion('${escapeHtml(it.fullName)}')">
+                <button class="btn-outline-action primary" style="font-size: 10px; padding: 3px 8px; flex-shrink: 0;" onclick="selectManualSubjectFromAccordion('${escapeHtml(it.name)}')">
                   Salvar Aqui & Prosseguir ➔
                 </button>
               </div>
@@ -17337,7 +17426,10 @@ DIRETRIZES CIRÚRGICAS:
         return;
       }
 
-      const finalSubject = subjectName || (currentConfirmCandidate ? currentConfirmCandidate.fullName : '5º Período - Clínica Médica');
+      const requestedSubject = subjectName
+        || (currentConfirmCandidate && (currentConfirmCandidate.matchedSubject || currentConfirmCandidate.name || currentConfirmCandidate.fullName))
+        || '5º Período - Clínica Médica';
+      const finalSubject = resolveCanonicalCurriculumSubjectName(requestedSubject);
       const finalTitle = materialTitle || (document.getElementById('confirmSubjMaterialTitleInput')?.value.trim()) || currentMat.fileName || 'Material de Aula';
       const finalDisease = diseaseName || extractDiseaseFromFilename(finalTitle) || 'Clínica Geral';
 
@@ -17454,8 +17546,8 @@ DIRETRIZES CIRÚRGICAS:
       currentStudySubject = finalSubject;
       currentQuizSlideFilter = newMaterial.name;
 
-      const countInSubj = chatDriveMaterials.filter(m => m.subject === finalSubject).length;
-      const questionsInSubj = sharedQuestionsBank.filter(q => q.subject === finalSubject).length;
+      const countInSubj = chatDriveMaterials.filter(m => isSameCurriculumSubject(m.subject || m.disciplina, finalSubject)).length;
+      const questionsInSubj = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, finalSubject)).length;
       subjectGenerationStatus[finalSubject] = {
         status: questionsInSubj > 0 ? 'ready' : 'pending',
         materialsCount: countInSubj,
@@ -17838,7 +17930,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
         return;
       }
 
-      const available = sharedQuestionsBank.filter(q => q.subject === targetSubj || (targetSubj === 'all'));
+      const available = sharedQuestionsBank.filter(q => targetSubj === 'all' || isSameCurriculumSubject(q.subject || q.disciplina, targetSubj));
       if (available.length === 0) {
         showToast(`🎲 Banco Global: Nenhuma questão gerada para "${targetSubj}". Gerando novas questões agora...`);
         generateUnifiedStudyForSubject(targetSubj, 5);
@@ -17890,7 +17982,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       const count = sharedQuestionsBank.filter(q => {
         if (!q.isStarred) return false;
         if (!targetSubj || targetSubj === 'all') return true;
-        return q.subject === targetSubj;
+        return isSameCurriculumSubject(q.subject || q.disciplina, targetSubj);
       }).length;
       countEl.textContent = count;
     }
@@ -17912,8 +18004,8 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
         const availableSubjs = Array.from(new Set([
           ...(currentStudySubject ? [currentStudySubject] : []),
           ...sharedQuestionsBank.map(q => q.subject).filter(Boolean),
-          ...disciplines.map(d => d.fullName)
-        ])).filter(Boolean);
+          ...disciplines.map(d => d.name)
+        ].map(resolveCanonicalCurriculumSubjectName).filter(Boolean)));
 
         select.innerHTML = availableSubjs.map(s => `
           <option value="${escapeHtml(s)}" ${s === currentStudySubject ? 'selected' : ''}>
@@ -17965,13 +18057,13 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
       const roundsSelect = document.getElementById('pvpRoundsSelect');
       const modeSelect = document.getElementById('pvpModeSelect');
 
-      const discipline = (discSelect && discSelect.value) ? discSelect.value : (currentStudySubject || '5º Período - Cardiologia Clínica');
+      const discipline = resolveCanonicalCurriculumSubjectName((discSelect && discSelect.value) ? discSelect.value : (currentStudySubject || '5º Período - Cardiologia Clínica'));
       const rounds = (roundsSelect && roundsSelect.value) ? (parseInt(roundsSelect.value, 10) || 5) : 5;
       const mode = (modeSelect && modeSelect.value) ? modeSelect.value : 'ai_resident';
 
-      let questions = sharedQuestionsBank.filter(q => q.subject === discipline);
+      let questions = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, discipline));
       if (questions.length < rounds) {
-        const extra = sharedQuestionsBank.filter(q => q.subject !== discipline);
+        const extra = sharedQuestionsBank.filter(q => !isSameCurriculumSubject(q.subject || q.disciplina, discipline));
         questions = questions.concat(extra);
       }
       if (questions.length < rounds) {
@@ -21262,7 +21354,7 @@ Para cada material, retorne um objeto no JSON com:
           });
         }
 
-        let finalSubject = semanticAnalysis?.fullName || ((bestMatchSubject && highestScore >= 3)
+        let finalSubject = semanticAnalysis?.matchedSubject || semanticAnalysis?.name || ((bestMatchSubject && highestScore >= 3)
           ? bestMatchSubject
           : (allSubjects.length > 0 ? allSubjects[0].name : (currentScannedFolder?.disciplineKey || 'Clínica Médica')));
         const finalTitle = semanticAnalysis?.suggestedTitle || generateSmartMaterialTitle(
@@ -25719,7 +25811,7 @@ Linha 04: __________________________________________________
         subjectGenerationStatus[targetSubject] = { status: 'ready', materialsCount: 1, questionsCount: 0 };
       }
       subjectGenerationStatus[targetSubject].status = 'ready';
-      subjectGenerationStatus[targetSubject].questionsCount = sharedQuestionsBank.filter(q => q.subject === targetSubject).length;
+      subjectGenerationStatus[targetSubject].questionsCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, targetSubject)).length;
 
       currentStudySubject = targetSubject;
       currentQuizSlideFilter = 'all';
@@ -26558,12 +26650,12 @@ ${textSample}
     function getAvailableDiseases() {
       const diseases = new Set();
       sharedQuestionsBank.forEach(q => {
-        if ((!currentStudySubject || q.subject === currentStudySubject) && q.disease) {
+        if ((!currentStudySubject || isSameCurriculumSubject(q.subject || q.disciplina, currentStudySubject)) && q.disease) {
           diseases.add(q.disease);
         }
       });
       chatDriveMaterials.forEach(m => {
-        if ((!currentStudySubject || m.subject === currentStudySubject) && m.disease) {
+        if ((!currentStudySubject || isSameCurriculumSubject(m.subject || m.disciplina, currentStudySubject)) && m.disease) {
           diseases.add(m.disease);
         }
       });
@@ -27063,7 +27155,7 @@ function escapeHtmlText(str) {
       if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
         sharedQuestionsBank.forEach(q => {
           if (!q) return;
-          if (isExactStudySubject(q.subject || q.disciplina, subjectName)) {
+          if (isSameCurriculumSubject(q.subject || q.disciplina, subjectName)) {
             // Preserve os tópicos e o arquivo-fonte sem transformar cada
             // título individual de flashcard/diagnóstico em uma opção.
             [q.topic, q.materia, q.slideName, q.materialName, q.nome_material].forEach(addTopic);
@@ -27075,7 +27167,7 @@ function escapeHtmlText(str) {
       if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
         chatDriveMaterials.forEach(m => {
           if (!m) return;
-          if (isExactStudySubject(m.subject || m.disciplina, subjectName)) {
+          if (isSameCurriculumSubject(m.subject || m.disciplina, subjectName)) {
             // Materiais enviados continuam visíveis, mas somente no filtro da
             // disciplina à qual foram efetivamente associados.
             [m.topic, m.name, m.originalFileName, m.title].forEach(addTopic);
@@ -27403,7 +27495,7 @@ function escapeHtmlText(str) {
         // Qualquer questão pronta (enunciado + gabarito) pode ser usada sem espera por acerto ou SRS.
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
-          const matchesSubject = isExactStudySubject(q.subject || q.disciplina, targetSubject);
+          const matchesSubject = isSameCurriculumSubject(q.subject || q.disciplina, targetSubject);
           if (!matchesSubject) return false;
 
           // Filtro por Matéria / Tópico se selecionado
@@ -28999,7 +29091,7 @@ function escapeHtmlText(str) {
         // Critério do Usuário: Perguntas existentes já respondidas corretamente no Flashcard
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
-          const matchesSubject = isExactStudySubject(q.subject || q.disciplina, targetSubject);
+          const matchesSubject = isSameCurriculumSubject(q.subject || q.disciplina, targetSubject);
           if (!matchesSubject) return false;
 
           // Filtro por Matéria / Conteúdo
