@@ -1174,6 +1174,10 @@
         return `medtutor_firestore_data_revision_v1_${uid}`;
       },
 
+      getMaterialsCacheHydratedKey(uid) {
+        return `medtutor_firestore_materials_cache_hydrated_v1_${uid}`;
+      },
+
       async markCloudDataRevision(uid) {
         if (!this.hasAuthenticatedCloudSession(uid)) return null;
         const revision = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1202,6 +1206,7 @@
           `medtutor_firestore_sync_materiais_${uid}`,
           `medtutor_firestore_sync_questoes_${uid}`,
           `medtutor_firestore_sync_chats_${uid}`,
+          this.getMaterialsCacheHydratedKey(uid),
           this.getCloudDataRevisionKey(uid),
           `medtutor_firestore_last_refresh_recovery_v2_${uid}`
         ].forEach(key => {
@@ -1410,6 +1415,9 @@
             changedCount++;
           }
           saveFirestoreSyncRegistry(uid, 'materiais', registry);
+          if (materialsArray.length > 0) {
+            try { localStorage.setItem(this.getMaterialsCacheHydratedKey(uid), 'true'); } catch (error) {}
+          }
           console.info(`[Firestore] ${changedCount} de ${materialsArray.length} material(is) exigiu(ram) sincronização.`, { uid });
           if (changedCount > 0) {
             await this.rebuildDisciplineQuestionBanks(materialsArray);
@@ -2151,6 +2159,7 @@
       async loadAllDataFromPersistence() {
         const uid = this.getUserId();
         let studyResetMarker = '';
+        let hasLocalMaterialsCache = Array.isArray(chatDriveMaterials) && chatDriveMaterials.length > 0;
         let localResetStateVerified = !this.hasAuthenticatedCloudSession(uid);
         if (!localResetStateVerified) {
           try {
@@ -2166,6 +2175,7 @@
         try {
           if (!localResetStateVerified) throw new Error('Não foi possível validar a versão remota de reset dos dados.');
           const loadedMaterials = await MedTutorLocalDB.get('materials', uid);
+          hasLocalMaterialsCache = hasLocalMaterialsCache || (Array.isArray(loadedMaterials) && loadedMaterials.length > 0);
           if (Array.isArray(loadedMaterials) && loadedMaterials.length > 0) {
             chatDriveMaterials = mergeStudyMaterialsPreservingContent(loadedMaterials);
           }
@@ -2196,8 +2206,10 @@
         const refreshKey = `medtutor_firestore_last_refresh_recovery_v2_${uid}`;
         const revisionKey = this.getCloudDataRevisionKey(uid);
         const lastRefreshAt = Number(localStorage.getItem(refreshKey) || 0);
+        const materialsCacheHydrated = localStorage.getItem(this.getMaterialsCacheHydratedKey(uid)) === 'true';
+        const needsInitialMaterialsHydration = !materialsCacheHydrated && !hasLocalMaterialsCache;
         const shouldRefreshCloud = this.hasAuthenticatedCloudSession(uid)
-          && (Date.now() - lastRefreshAt >= FIRESTORE_REFRESH_INTERVAL_MS);
+          && (Date.now() - lastRefreshAt >= FIRESTORE_REFRESH_INTERVAL_MS || needsInitialMaterialsHydration);
         if (shouldRefreshCloud) {
           try {
             const userDoc = await firestoreDb.collection('users').doc(uid).get();
@@ -2206,7 +2218,11 @@
             // A abertura periódica consulta somente o perfil. As três coleções
             // grandes são lidas apenas no primeiro acesso ou quando outra sessão
             // efetivamente alterou os dados do estudante.
-            const requiresFullCloudRead = !localRevision || (remoteRevision && remoteRevision !== localRevision);
+            // Um cache vazio ainda não validado precisa de uma leitura remota,
+            // mesmo que o número de revisão local coincida com o do perfil.
+            const requiresFullCloudRead = !localRevision
+              || (remoteRevision && remoteRevision !== localRevision)
+              || (!materialsCacheHydrated && !hasLocalMaterialsCache);
             if (userDoc.exists) {
               MedTutorAuthService.userProfile = userDoc.data();
               MedTutorAuthService.updateUserTopbarUI();
@@ -2217,6 +2233,7 @@
             } else {
 
             const matsSnap = await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').get();
+            let materialCacheHydratedSuccessfully = matsSnap.empty;
             if (!matsSnap.empty) {
               const cloudMats = [];
               for (const doc of matsSnap.docs) {
@@ -2268,15 +2285,20 @@
               }
               if (cloudMats.length > 0) {
                 chatDriveMaterials = mergeStudyMaterialsPreservingContent(chatDriveMaterials, cloudMats);
-                await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+                const materialCacheSaved = await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+                materialCacheHydratedSuccessfully = materialCacheSaved || hasLocalMaterialsCache;
                 console.info(`[Firestore] ${cloudMats.length} material(is) recebido(s) da nuvem e unido(s) com a cópia local sem perdas.`);
               } else {
                 console.warn('[Firestore] A coleção de materiais veio vazia; a cópia local foi preservada para evitar perda de dados.');
+                materialCacheHydratedSuccessfully = hasLocalMaterialsCache;
               }
             } else {
               // Uma resposta vazia pode ser causada por cota, regras ou atraso de
               // rede. Nunca elimine uploads locais automaticamente por isso.
               console.warn('[Firestore] Nenhum material retornado pela nuvem; mantendo a cópia local intacta.');
+            }
+            if (materialCacheHydratedSuccessfully) {
+              try { localStorage.setItem(this.getMaterialsCacheHydratedKey(uid), 'true'); } catch (error) {}
             }
 
             const currSnap = await firestoreDb.collection('users').doc(uid).collection('grade_curricular').get();
@@ -7813,6 +7835,39 @@ ${cleanText}
       return Boolean(materialKey && selectedKey && materialKey === selectedKey);
     }
 
+    // Nomes de disciplinas em materiais antigos podem diferir da ementa atual
+    // apenas pelo código M###, numeral romano/arábico ou pelo rótulo entre
+    // parênteses. Mantém a comparação conservadora: as partes centrais precisam
+    // coincidir por inteiro; não usa busca parcial que misture disciplinas.
+    function getCurriculumSubjectAliases(value) {
+      const raw = String(value || '');
+      if (!raw.trim()) return [];
+      const aliases = new Set();
+      const romanNumerals = { i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8', ix: '9', x: '10' };
+      const normalizeCore = text => normalizeStudyComparisonText(text)
+        .replace(/^m\d{1,3}\s+/, '')
+        .replace(/\b(sistemas? humanos?)\s+(i{1,3}|iv|v|vi|vii|viii|ix|x)\b/g, (_, prefix, roman) => `${prefix} ${romanNumerals[roman] || roman}`)
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const withoutParentheticalLabels = raw.replace(/\([^)]*\)/g, ' ');
+      [raw, withoutParentheticalLabels].forEach(candidate => {
+        const key = normalizeCore(candidate);
+        if (key) aliases.add(key);
+      });
+      for (const match of raw.matchAll(/\(([^)]+)\)/g)) {
+        const key = normalizeCore(match[1]);
+        if (key) aliases.add(key);
+      }
+      return [...aliases];
+    }
+
+    function isSameCurriculumSubject(first, second) {
+      const firstAliases = getCurriculumSubjectAliases(first);
+      const secondAliases = new Set(getCurriculumSubjectAliases(second));
+      return firstAliases.some(alias => secondAliases.has(alias));
+    }
+
     function findExactSubjectKey(subjectName, candidates = []) {
       const targetKey = normalizeStudyComparisonText(subjectName);
       return (candidates || []).find(candidate => normalizeStudyComparisonText(candidate) === targetKey) || '';
@@ -7865,7 +7920,7 @@ ${cleanText}
       if (typeof chatDriveMaterials === 'undefined' || !Array.isArray(chatDriveMaterials)) return [];
       const filtered = chatDriveMaterials.map(normalizeMaterial).filter(m => {
         const matSubj = m.subject || m.disciplina || '';
-        return isExactStudySubject(matSubj, sName);
+        return isSameCurriculumSubject(matSubj, sName);
       });
       if (typeof sortMaterialsInPedagogicalOrder === 'function') {
         return sortMaterialsInPedagogicalOrder(filtered, sName);
@@ -19641,7 +19696,7 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
 
     function getDisciplineMaterialsCount(subjectName) {
       if (!chatDriveMaterials || chatDriveMaterials.length === 0) return 0;
-      return chatDriveMaterials.filter(m => isExactStudySubject(m.subject || m.disciplina, subjectName)).length;
+      return chatDriveMaterials.filter(m => isSameCurriculumSubject(m.subject || m.disciplina, subjectName)).length;
     }
 
     function filterCurriculumCycle(cycle) {

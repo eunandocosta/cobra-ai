@@ -31,6 +31,26 @@ console.log('[PASS] index.js livre de regras de negócio acopladas');
 
 // O diretório de colegas deve vir de contas reais, nunca de perfis de demonstração.
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf-8');
+const curriculumSubjectAliases = appSource.match(/function getCurriculumSubjectAliases\(value\) \{[\s\S]*?\n    \}/)?.[0] || '';
+const sameCurriculumSubject = appSource.match(/function isSameCurriculumSubject\(first, second\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(curriculumSubjectAliases && sameCurriculumSubject, 'a grade deve resolver nomes legados de disciplinas sem correspondência parcial');
+const areSameCurriculumSubjects = new Function(`
+  const normalizeStudyComparisonText = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
+  ${curriculumSubjectAliases}
+  ${sameCurriculumSubject}
+  return isSameCurriculumSubject;
+`)();
+assert(areSameCurriculumSubjects('Integração de Sistemas Humanos 2 (Dermatologia Clínica)', 'M010 Integração de Sistemas Humanos II (Sistema Tegumentar)'), 'o material legado do módulo tegumentar deve aparecer na disciplina equivalente da ementa');
+assert(areSameCurriculumSubjects('Sistema Nervoso', 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'), 'o rótulo anatômico entre parênteses deve associar o material à disciplina correspondente');
+assert(!areSameCurriculumSubjects('Integração de Sistemas Humanos 2 (Dermatologia)', 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'), 'a resolução não pode misturar módulos diferentes');
+console.log('[PASS] Materiais são associados à disciplina curricular por aliases exatos e seguros');
+
+const persistenceLoader = appSource.match(/async loadAllDataFromPersistence\(\) \{[\s\S]*?\n      \}\n    \};/)?.[0] || '';
+assert(persistenceLoader.includes('!materialsCacheHydrated && !hasLocalMaterialsCache'), 'cache local vazio não deve impedir a primeira leitura de materiais no Firestore');
+assert(persistenceLoader.includes('|| needsInitialMaterialsHydration'), 'a primeira hidratação deve ignorar o intervalo de 15 minutos quando não existe cópia local');
+assert(persistenceLoader.includes('getMaterialsCacheHydratedKey(uid), \'true\''), 'marcar cache hidratado somente após consulta bem-sucedida à nuvem');
+console.log('[PASS] Primeira hidratação do cache de materiais força leitura da nuvem quando necessário');
+
 for (const fakeColleague of [
   'mariana.costa@medicina.universo.br',
   'lucas.silva@medicina.universo.br',
