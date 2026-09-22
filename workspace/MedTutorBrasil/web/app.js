@@ -14060,6 +14060,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const studentMistake = state.studentMistake || '';
 
       let newQuestionData = null;
+      let backendErrorMessage = '';
 
       try {
         const response = await fetch('/api/quizzes/gerar-derivada', {
@@ -14084,9 +14085,12 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             newQuestionData = resData;
           }
         } else {
-          console.warn('⚠️ Endpoint backend retornou erro, tentando fallback no cliente...');
+          const errData = await response.json().catch(() => null);
+          backendErrorMessage = errData?.error || errData?.details || `Erro do servidor (${response.status})`;
+          console.warn('⚠️ Endpoint backend retornou erro:', backendErrorMessage, 'tentando fallback no cliente...');
         }
       } catch (err) {
+        backendErrorMessage = err.message || 'Falha na conexão com o servidor';
         console.warn('⚠️ Falha na requisição ao backend, tentando fallback local...', err);
       }
 
@@ -14191,7 +14195,8 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
         if (typeof renderSceBars === 'function') renderSceBars();
         if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
       } else {
-        if (typeof showToast === 'function') showToast('❌ Não foi possível gerar a pergunta derivada. Tente novamente.');
+        const msg = backendErrorMessage ? `❌ Não foi possível gerar a pergunta derivada: ${backendErrorMessage}` : '❌ Não foi possível gerar a pergunta derivada. Tente novamente.';
+        if (typeof showToast === 'function') showToast(msg);
       }
     }
 

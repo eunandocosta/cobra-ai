@@ -218,6 +218,27 @@ const quizService = require('../src/modules/quizzes/quizzes.service');
 const chatService = require('../src/modules/chat/chat.service');
 reportService.generateReport = async (payload) => ({ title: payload.title, subject: payload.subject, html: '<p>Relatório de teste</p>' });
 quizService.generateQuestions = async () => ({ questions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }] });
+quizService.generateDerivedQuestion = async (payload) => {
+  if (!payload.originalQuestion && !payload.originalExplanation) {
+    const err = new Error('Pergunta ou explicação de referência não fornecida.');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!payload.contexts || payload.contexts.length === 0) {
+    const err = new Error('Informe ao menos um novo contexto para a geração da pergunta derivada.');
+    err.statusCode = 400;
+    throw err;
+  }
+  return {
+    success: true,
+    question: {
+      id: 'deriv_test_123',
+      question: 'Questão derivada de teste?',
+      quizOptions: ['A', 'B', 'C', 'D'],
+      correctIndex: 0
+    }
+  };
+};
 chatService.processMessage = async () => ({ reply: 'Resposta de teste baseada em diretrizes médicas.' });
 const app = require('../index.js');
 const server = http.createServer((req, res) => app.handle(req, res));
@@ -328,6 +349,19 @@ server.listen(TEST_PORT, async () => {
     assert.strictEqual(retiredFlashcardsEndpoint.statusCode, 410);
     assert(retiredFlashcardsEndpoint.body.error.includes('descontinuado'));
     console.log('[PASS] GET /api/quizzes/flashcards/:subjectId -> 410 explícito (sem falso deck vazio)');
+
+    const derivedBad = await makeRequest('POST', '/api/quizzes/gerar-derivada', {});
+    assert.strictEqual(derivedBad.statusCode, 400);
+    console.log('[PASS] POST /api/quizzes/gerar-derivada sem contextos -> 400 Bad Request');
+
+    const derivedGood = await makeRequest('POST', '/api/quizzes/gerar-derivada', {
+      originalQuestion: 'Caso clínico base',
+      originalExplanation: 'Gabarito base',
+      contexts: ['Novo contexto teste']
+    });
+    assert.strictEqual(derivedGood.statusCode, 200);
+    assert.strictEqual(derivedGood.body.success, true);
+    console.log('[PASS] POST /api/quizzes/gerar-derivada com contextos -> 200 OK');
 
     // Test 6: Chat & Evidências Module
     const chatEvidence = await makeRequest('POST', '/api/chat/evidencias', {

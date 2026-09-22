@@ -342,6 +342,84 @@ const questionsSchema = {
   }
 };
 
+const derivedQuestionSchema = {
+  type: SchemaType.OBJECT,
+  description: "Estrutura completa da questão clínica derivada inédita com alternativas e flashcard",
+  properties: {
+    question: {
+      type: SchemaType.STRING,
+      description: "Enunciado da nova questão autossuficiente e inédita incorporando os novos contextos clínicos"
+    },
+    vignette: {
+      type: SchemaType.STRING,
+      description: "Vinheta clínica concisa do caso integrando os novos contextos clínicos"
+    },
+    quizOptions: {
+      type: SchemaType.ARRAY,
+      description: "Exatamente 4 alternativas de múltipla escolha técnicas e verossímeis sem letras A/B/C/D",
+      items: { type: SchemaType.STRING }
+    },
+    correctIndex: {
+      type: SchemaType.INTEGER,
+      description: "Índice (0, 1, 2 ou 3) da alternativa correta no array quizOptions"
+    },
+    explanation: {
+      type: SchemaType.STRING,
+      description: "Mecanismo central e fundamentação da conduta correta perante os novos contextos"
+    },
+    tripartite: {
+      type: SchemaType.OBJECT,
+      description: "Justificativa estruturada com motivo do acerto, análise dos distratores e pérola",
+      properties: {
+        correctReason: {
+          type: SchemaType.STRING,
+          description: "Explicação minuciosa da alternativa correta"
+        },
+        distractorAnalysis: {
+          type: SchemaType.OBJECT,
+          description: "Análise sucinta de cada alternativa",
+          properties: {
+            "0": { type: SchemaType.STRING },
+            "1": { type: SchemaType.STRING },
+            "2": { type: SchemaType.STRING },
+            "3": { type: SchemaType.STRING }
+          }
+        },
+        pearl: {
+          type: SchemaType.STRING,
+          description: "Pérola clínica de memorização e alto rendimento"
+        }
+      },
+      required: ["correctReason", "pearl"]
+    },
+    flashcardTitle: {
+      type: SchemaType.STRING,
+      description: "Título temático conciso da afecção ou conduta clínica"
+    },
+    flashcardFront: {
+      type: SchemaType.STRING,
+      description: "Pergunta aberta e direta para o lado da frente do flashcard"
+    },
+    flashcardBack: {
+      type: SchemaType.STRING,
+      description: "Resposta sintética e memorável para o verso do flashcard"
+    }
+  },
+  required: ["question", "quizOptions", "correctIndex", "explanation", "flashcardTitle", "flashcardFront", "flashcardBack"]
+};
+
+function getDerivedCandidateModels() {
+  return [...new Set([
+    process.env.MODEL_REASONING,
+    process.env.MODEL_BALANCED,
+    process.env.MODEL_FAST,
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite'
+  ].map(m => String(m || '').trim()).filter(Boolean))];
+}
+
 const SYSTEM_INSTRUCTION = `
 Você cria questões formativas para estudantes de medicina estritamente baseadas no conteúdo enviado.
 
@@ -1032,21 +1110,17 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     const validContexts = (Array.isArray(contexts) ? contexts : [contexts]).map(c => String(c || '').trim()).filter(Boolean);
 
     if (!cleanQuestion && !cleanExplanation) {
-      throw new Error('Pergunta ou explicação de referência não fornecida.');
+      const err = new Error('Pergunta ou explicação de referência não fornecida.');
+      err.statusCode = 400;
+      throw err;
     }
     if (validContexts.length === 0) {
-      throw new Error('Informe ao menos um novo contexto para a geração da pergunta derivada.');
+      const err = new Error('Informe ao menos um novo contexto para a geração da pergunta derivada.');
+      err.statusCode = 400;
+      throw err;
     }
 
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_REASONING || "gemini-3.5-flash-lite",
-      generationConfig: {
-        temperature: 0.3,
-        topP: 0.9,
-        responseMimeType: "application/json"
-      }
-    });
 
     const mistakeBlock = cleanMistake ? `
 RESPOSTA MARCADA / PONTO DE EQUÍVOCO DO ESTUDANTE:
@@ -1058,95 +1132,147 @@ ${cleanMistake}
 Sua missão é criar UMA NOVA QUESTÃO DERIVADA (caso clínico inédito de múltipla escolha + flashcard) fundamentada na explicação/conceito biológico original e incorporando OBRIGATORIAMENTE os novos contextos clínicos fornecidos pelo estudante de medicina.
 
 QUESTÃO ORIGINAL DE REFERÊNCIA:
-${cleanQuestion}
+${cleanQuestion || 'Conceito clínico geral'}
 
 EXPLICAÇÃO DE BASE / GABARITO:
-${cleanExplanation}
+${cleanExplanation || 'Fundamentação diagnóstica e terapêutica baseada em diretrizes clínicas oficiais.'}
 ${mistakeBlock}
 NOVOS CONTEXTOS CLÍNICOS E VARIANTES ADICIONADOS PELO ESTUDANTE:
 ${validContexts.map((ctx, idx) => `[Novo Contexto #${idx + 1}]: ${ctx}`).join('\n')}
 
 DIRETRIZES DE ESCRITA:
 1. Formule uma vinheta clínica realista integrando os novos contextos trazidos pelo aluno com o mecanismo fisiopatológico de base.
-2. Crie 4 alternativas de múltipla escolha (A, B, C, D) com distratores plausíveis e APENAS 1 alternativa correta.
-3. Elabore a justificativa com: por que a resposta correta está certa, análise dos distratores errados e uma pérola clínica ("take-home message").
+2. Crie 4 alternativas de múltipla escolha (sem prefixar 'A)', 'B)', etc.) com distratores plausíveis e APENAS 1 alternativa correta.
+3. Elabore a justificativa com: por que a resposta correta está certa, análise dos distratores e uma pérola clínica ("take-home message").
 4. Elabore o título e o formato de Flashcard para revisão espaçada.
 
-Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
-{
-  "question": "Enunciado da nova questão baseada nos novos contextos...",
-  "vignette": "Vinheta do caso clínico...",
-  "quizOptions": ["Opção A", "Opção B", "Opção C", "Opção D"],
-  "correctIndex": 0,
-  "explanation": "Mecanismo central em 1-2 frases...",
-  "tripartite": {
-    "correctReason": "Explicação detalhada da alternativa correta...",
-    "distractorAnalysis": {
-      "0": "Por que A está errada ou certa",
-      "1": "Por que B está errada ou certa",
-      "2": "Por que C está errada ou certa",
-      "3": "Por que D está errada ou certa"
-    },
-    "pearl": "Pérola clínica de plantão..."
-  },
-  "flashcardTitle": "Título do tema",
-  "flashcardFront": "Pergunta em formato Flashcard",
-  "flashcardBack": "Resposta do Flashcard"
-}`;
+Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.`;
 
-    try {
-      const result = await runWithAiLimit(() => model.generateContent(prompt));
-      const rawText = result.response.text();
-      let parsed = {};
+    const candidates = getDerivedCandidateModels();
+    let lastError = null;
+    let parsed = null;
+    let usedModel = candidates[0] || 'gemini-3.5-flash-lite';
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidateModel = candidates[i];
       try {
-        parsed = JSON.parse(rawText);
-      } catch (e) {
-        const match = rawText.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-      }
+        const model = genAI.getGenerativeModel({
+          model: candidateModel,
+          generationConfig: {
+            temperature: 0.25,
+            topP: 0.9,
+            responseMimeType: "application/json",
+            responseSchema: derivedQuestionSchema
+          }
+        });
 
-      const correctIdx = typeof parsed.correctIndex === 'number' ? parsed.correctIndex : 0;
-      const options = Array.isArray(parsed.quizOptions) && parsed.quizOptions.length === 4 ? parsed.quizOptions : [
+        const result = await runWithAiLimit(() => model.generateContent(prompt));
+
+        let rawText = '';
+        try {
+          rawText = result?.response?.text ? result.response.text() : '';
+        } catch (textErr) {
+          const candidate = result?.response?.candidates?.[0];
+          if (candidate?.finishReason === 'SAFETY') {
+            throw new Error(`Bloqueado por filtro de segurança (${candidateModel})`);
+          }
+          throw textErr;
+        }
+
+        if (!rawText || !rawText.trim()) {
+          throw new Error(`Resposta vazia do modelo ${candidateModel}`);
+        }
+
+        let parsedCandidate = null;
+        try {
+          parsedCandidate = JSON.parse(rawText);
+        } catch (parseErr) {
+          const cleaned = rawText
+            .replace(/```json\s*/gi, '')
+            .replace(/```\s*$/gi, '')
+            .replace(/,\s*([}\]])/g, '$1')
+            .trim();
+          try {
+            parsedCandidate = JSON.parse(cleaned);
+          } catch (e2) {
+            const match = cleaned.match(/\{[\s\S]*\}/);
+            if (match) {
+              parsedCandidate = JSON.parse(match[0]);
+            } else {
+              throw new Error(`JSON inválido: ${parseErr.message}`);
+            }
+          }
+        }
+
+        if (parsedCandidate && (parsedCandidate.question || parsedCandidate.quizOptions)) {
+          parsed = parsedCandidate;
+          usedModel = candidateModel;
+          break;
+        } else {
+          throw new Error('Formato da resposta não atende à estrutura esperada da questão');
+        }
+      } catch (geminiErr) {
+        lastError = geminiErr;
+        console.warn(`⚠️ [Quiz Engine - Pergunta Derivada] Modelo "${candidateModel}" falhou (${geminiErr.message}). Tentando contingência...`);
+      }
+    }
+
+    if (!parsed) {
+      console.error("❌ [Quiz Engine - Pergunta Derivada] Todos os modelos na esteira falharam:", lastError);
+      const error = new Error(`Não foi possível gerar a pergunta derivada com IA: ${lastError?.message || 'Falha na IA'}`);
+      error.statusCode = 502;
+      throw error;
+    }
+
+    const rawOptions = Array.isArray(parsed.quizOptions) && parsed.quizOptions.length === 4
+      ? parsed.quizOptions
+      : [
         'Conduta diagnóstica de primeira escolha',
         'Exame complementar de alta sensibilidade',
         'Manejo terapêutico farmacológico inicial',
         'Acompanhamento e estratificação de risco'
       ];
 
-      const generatedQuestion = {
-        id: `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        subject: subject || 'Clínica Médica',
-        topic: parsed.flashcardTitle || topic || 'Pergunta Derivada com Contexto',
-        flashcardTitle: parsed.flashcardTitle || topic || 'Pergunta Derivada',
-        question: parsed.question || 'Qual a conduta adequada perante os novos achados clínicos?',
-        vignette: parsed.vignette || '',
-        quizOptions: options,
-        correctIndex: correctIdx,
-        answer: options[correctIdx] || '',
-        explanation: parsed.explanation || 'Resolução fundamentada na integração do caso clínico com os novos contextos.',
-        tripartite: parsed.tripartite || {
-          correctReason: parsed.explanation || 'Opção alinhada às diretrizes.',
-          distractorAnalysis: {},
-          pearl: 'A integração de múltiplos dados de anamnese e exames reduz erros de diagnóstico.'
-        },
-        flashcard: {
-          front: parsed.flashcardFront || parsed.question || 'Qual o diagnóstico/conduta no caso?',
-          back: parsed.flashcardBack || options[correctIdx] || 'Resposta de referência.'
-        },
-        derivedFromQuestionId: cleanQuestion,
-        addedContexts: validContexts,
-        generatorModel: 'gemini-3.5-flash-lite',
-        createdAt: new Date().toISOString()
-      };
+    const cleanOptions = rawOptions.map((opt, i) => {
+      const s = String(opt || '').trim();
+      return s.replace(/^[A-Da-d][\)\.\:\-]\s*/, '').trim() || `Alternativa ${String.fromCharCode(65 + i)}`;
+    });
 
-      return {
-        success: true,
-        question: generatedQuestion
-      };
-    } catch (err) {
-      console.error("❌ Erro ao gerar pergunta derivada com IA:", err);
-      throw err;
-    }
+    const safeCorrectIdx = (typeof parsed.correctIndex === 'number' && parsed.correctIndex >= 0 && parsed.correctIndex < cleanOptions.length)
+      ? Math.floor(parsed.correctIndex)
+      : 0;
+
+    const generatedQuestion = {
+      id: `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      subject: subject || 'Clínica Médica',
+      topic: parsed.flashcardTitle || topic || 'Pergunta Derivada com Contexto',
+      flashcardTitle: parsed.flashcardTitle || topic || 'Pergunta Derivada',
+      question: parsed.question || 'Qual a conduta adequada perante os novos achados clínicos?',
+      vignette: parsed.vignette || '',
+      quizOptions: cleanOptions,
+      correctIndex: safeCorrectIdx,
+      answer: cleanOptions[safeCorrectIdx] || '',
+      explanation: parsed.explanation || 'Resolução fundamentada na integração do caso clínico com os novos contextos.',
+      tripartite: {
+        correctReason: parsed.tripartite?.correctReason || parsed.explanation || 'Opção alinhada às diretrizes clínicas vigentes.',
+        distractorAnalysis: parsed.tripartite?.distractorAnalysis || {},
+        pearl: parsed.tripartite?.pearl || 'A integração de múltiplos dados de anamnese e exames reduz erros de diagnóstico.'
+      },
+      flashcard: {
+        front: parsed.flashcardFront || parsed.question || 'Qual o diagnóstico/conduta no caso?',
+        back: parsed.flashcardBack || cleanOptions[safeCorrectIdx] || 'Resposta de referência.',
+        keyConcepts: validContexts
+      },
+      derivedFromQuestionId: cleanQuestion,
+      addedContexts: validContexts,
+      generatorModel: usedModel,
+      createdAt: new Date().toISOString()
+    };
+
+    return {
+      success: true,
+      question: generatedQuestion
+    };
   }
 }
 

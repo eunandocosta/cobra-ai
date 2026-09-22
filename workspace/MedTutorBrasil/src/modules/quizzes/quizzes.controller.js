@@ -87,7 +87,11 @@ class QuizzesController {
       return res.json(result);
     } catch (err) {
       console.error("❌ Erro no QuizzesController ao gerar pergunta derivada:", err);
-      return res.status(500).json({ error: 'Erro ao gerar pergunta derivada', details: err.message });
+      const status = err.statusCode || (err.status >= 400 && err.status < 600 ? err.status : 500);
+      return res.status(status).json({
+        error: err.statusCode === 400 ? err.message : 'Erro ao gerar pergunta derivada',
+        details: err.message
+      });
     }
   }
 }
