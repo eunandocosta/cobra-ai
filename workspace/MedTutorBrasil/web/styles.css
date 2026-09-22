@@ -2841,7 +2841,7 @@
       border-color: var(--border-accent);
     }
 
-    /* ESTILOS DE ARTIGO ACADÊMICO & TRATADO MÉDICO (HIERARQUIA ARIAL & EDITORIAL LIMPO) */
+    /* ESTILOS DE ARTIGO ACADÊMICO & TRATADO MÉDICO (PADRÃO ACADÊMICO ABNT) */
     .academic-article-container {
       background: #ffffff;
       border: 1px solid #e2e8f0;
@@ -2852,12 +2852,18 @@
       min-height: auto;
       margin: 0 auto;
       padding: 28px 36px;
-      font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-      color: #111827;
-      font-size: 11pt; /* Tamanho editorial equilibrado para leitura e impressão */
+      font-family: "Times New Roman", Times, serif;
+      color: #111111;
+      font-weight: 400;
+      font-size: 12pt;
       line-height: 1.5; /* Espaçamento entrelinhas 1,5 */
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
       text-align: justify;
+    }
+
+    .academic-article-container strong,
+    .academic-article-container b {
+      font-weight: 600;
     }
 
     @media (max-width: 768px) {
@@ -2883,7 +2889,7 @@
     #readerModalContent {
       padding: 0 !important;
       margin: 0 !important;
-      font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+      font-family: "Times New Roman", Times, serif !important;
     }
 
     .academic-header-block,
@@ -2975,10 +2981,10 @@
 
     .academic-title,
     .abnt-title {
-      font-size: 18pt;
-      font-weight: 800;
-      text-transform: uppercase;
-      color: #0f172a;
+      font-size: 14pt;
+      font-weight: 600;
+      text-transform: none;
+      color: #222222;
       margin: 12pt 0 6pt 0;
       line-height: 1.25;
       text-align: center;
@@ -3023,13 +3029,13 @@
       margin-bottom: 20pt;
     }
 
-    /* SEÇÕES: Hierarquia tipográfica Arial com variação proporcional de tamanho */
+    /* SEÇÕES: hierarquia acadêmica discreta, sem peso tipográfico excessivo */
     .academic-section h2, .academic-article-container .gemini-h2 {
       font-size: 14pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: #1e3a8a;
-      border-bottom: 1.5pt solid #1e3a8a;
+      font-weight: 600;
+      text-transform: none;
+      color: #333333;
+      border-bottom: 0.75pt solid #777777;
       padding-bottom: 3pt;
       margin: 20pt 0 8pt 0;
       display: flex;
@@ -3042,8 +3048,8 @@
 
     .academic-section h3, .academic-article-container .gemini-h3 {
       font-size: 12.5pt;
-      font-weight: 700;
-      color: #0f172a;
+      font-weight: 600;
+      color: #333333;
       border-bottom: 1px solid #cbd5e1;
       padding-bottom: 2pt;
       margin: 16pt 0 6pt 0;
@@ -3054,8 +3060,8 @@
 
     .academic-section h4, .academic-article-container .gemini-h4 {
       font-size: 11.5pt;
-      font-weight: 700;
-      color: #1e293b;
+      font-weight: 600;
+      color: #333333;
       margin: 12pt 0 4pt 0;
       text-indent: 0 !important;
       text-align: left;
@@ -3064,17 +3070,17 @@
 
     .academic-section h5, .academic-article-container .gemini-h5 {
       font-size: 11pt;
-      font-weight: 700;
+      font-weight: 600;
       font-style: italic;
-      color: #334155;
+      color: #333333;
       margin: 10pt 0 4pt 0;
       text-indent: 0 !important;
       text-align: left;
       line-height: 1.4;
     }
 
-    /* REGRAS DE PARÁGRAFO E JUSTIFICAÇÃO ABNT EM ARIAL:
-       - Tamanho 11pt / 12pt proporcional
+    /* REGRAS DE PARÁGRAFO ACADÊMICO:
+       - Times New Roman 12pt
        - Espaçamento entrelinhas 1,5
        - Texto justificado
        - Recuo de primeira linha de 1,25cm
@@ -3082,7 +3088,7 @@
     .academic-article-container .gemini-p,
     .academic-article-container p {
       color: #111827;
-      font-size: 11pt;
+      font-size: 12pt;
       line-height: 1.5;
       margin-top: 0;
       margin-bottom: 10pt;
@@ -3967,6 +3973,16 @@
         word-break: normal !important;
       }
 
+      #readerModalContent .academic-article-container,
+      #readerModalContent .academic-article-container * {
+        font-family: "Times New Roman", Times, serif !important;
+      }
+
+      #readerModalContent .academic-article-container strong,
+      #readerModalContent .academic-article-container b {
+        font-weight: 600 !important;
+      }
+
       #readerModalContent .academic-body-content p,
       #readerModalContent .academic-body-content li,
       #readerModalContent .academic-body-content blockquote,
@@ -4041,11 +4057,11 @@
 
       html, body {
         background: #ffffff !important;
-        color: #111827 !important;
+        color: #111111 !important;
         margin: 0 !important;
         padding: 0 !important;
-        font-size: 11pt !important;
-        font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+        font-size: 12pt !important;
+        font-family: "Times New Roman", Times, serif !important;
         line-height: 1.5 !important;
       }
 
@@ -4123,10 +4139,10 @@
         padding: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
-        color: #111827 !important;
-        font-size: 11pt !important;
+        color: #111111 !important;
+        font-size: 12pt !important;
         line-height: 1.5 !important;
-        font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+        font-family: "Times New Roman", Times, serif !important;
       }
 
       #readerModalContent .academic-body-content pre,
@@ -4147,14 +4163,15 @@
 
       .academic-article-container {
         background: #ffffff !important;
-        color: #111827 !important;
+        color: #111111 !important;
         border: none !important;
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
         width: 100% !important;
-        font-size: 11pt !important;
+        font-size: 12pt !important;
         line-height: 1.5 !important;
+        font-family: "Times New Roman", Times, serif !important;
         max-width: 100% !important;
       }
 
@@ -4236,10 +4253,10 @@
       }
 
       .academic-title, .abnt-title {
-        color: #0f172a !important;
-        font-size: 16pt !important;
-        font-weight: 800 !important;
-        text-transform: uppercase !important;
+        color: #222222 !important;
+        font-size: 14pt !important;
+        font-weight: 600 !important;
+        text-transform: none !important;
         margin: 8pt 0 6pt 0 !important;
         line-height: 1.25 !important;
         text-align: center !important;
@@ -4250,7 +4267,7 @@
         color: #0369a1 !important;
         font-size: 8.5pt !important;
         font-weight: 600 !important;
-        text-transform: uppercase !important;
+        text-transform: none !important;
       }
 
       .academic-abstract-box {
@@ -4275,11 +4292,11 @@
       }
 
       .academic-section h2, .academic-article-container .gemini-h2 {
-        color: #1e3a8a !important;
-        font-size: 13pt !important;
-        font-weight: 700 !important;
+        color: #111111 !important;
+        font-size: 12pt !important;
+        font-weight: 600 !important;
         text-transform: uppercase !important;
-        border-bottom: 1.5pt solid #1e3a8a !important;
+        border-bottom: 0.75pt solid #555555 !important;
         padding-bottom: 2pt !important;
         margin: 14pt 0 5pt 0 !important;
         text-indent: 0 !important;
@@ -4287,9 +4304,9 @@
       }
 
       .academic-section h3, .academic-article-container .gemini-h3 {
-        color: #0f172a !important;
+        color: #111111 !important;
         font-size: 12pt !important;
-        font-weight: 700 !important;
+        font-weight: 600 !important;
         border-bottom: 0.75pt solid #cbd5e1 !important;
         padding-bottom: 2pt !important;
         margin: 10pt 0 4pt 0 !important;
@@ -4298,33 +4315,39 @@
       }
 
       .academic-section h4, .academic-article-container .gemini-h4 {
-        color: #1e293b !important;
-        font-size: 11pt !important;
-        font-weight: 700 !important;
+        color: #111111 !important;
+        font-size: 12pt !important;
+        font-weight: 600 !important;
         margin: 8pt 0 3pt 0 !important;
         text-indent: 0 !important;
         page-break-after: avoid !important;
       }
 
       .academic-section h5, .academic-article-container .gemini-h5 {
-        color: #334155 !important;
-        font-size: 10.5pt !important;
-        font-weight: 700 !important;
+        color: #111111 !important;
+        font-size: 12pt !important;
+        font-weight: 600 !important;
         font-style: italic !important;
         margin: 6pt 0 2pt 0 !important;
         text-indent: 0 !important;
       }
 
       .gemini-p, p, .academic-article-container p {
-        color: #111827 !important;
-        font-size: 11pt !important;
+        color: #111111 !important;
+        font-size: 12pt !important;
         line-height: 1.5 !important;
         margin-bottom: 7pt !important;
-        text-align: left !important;
-        text-indent: 0 !important;
+        text-align: justify !important;
+        text-indent: 1.25cm !important;
         hyphens: none !important;
         overflow-wrap: anywhere !important;
         word-break: normal !important;
+      }
+
+      #readerModalContent .academic-body-content li p,
+      #readerModalContent .academic-body-content td p,
+      #readerModalContent .academic-body-content th p {
+        text-indent: 0 !important;
       }
 
       /* Texto extraído de slides frequentemente chega como blockquote. No
@@ -4343,7 +4366,7 @@
         margin: 0 0 7pt 0 !important;
         padding: 0 !important;
         border-left: 0 !important;
-        font-size: 11pt !important;
+        font-size: 12pt !important;
         line-height: 1.5 !important;
         text-align: left !important;
       }
@@ -4792,7 +4815,7 @@
 
       @page {
         size: A4 portrait;
-        margin: 15mm 15mm 15mm 15mm; /* Área segura real para Safari e impressoras domésticas */
+        margin: 3cm 2cm 2cm 3cm;
       }
     }
 

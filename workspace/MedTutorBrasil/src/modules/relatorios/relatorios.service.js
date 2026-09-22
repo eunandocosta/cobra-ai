@@ -88,8 +88,63 @@ function normalizeGeneratedStructuralHtml(markdown) {
   return text.replace(/MEDTUTOR_PROTECTED_BLOCK_(\d+)_END/g, (_, index) => protectedBlocks[Number(index)] || '');
 }
 
+function normalizeReportTextArtifacts(markdown) {
+  const protectedBlocks = [];
+  let text = String(markdown || '').replace(/\x60{3}[\s\S]*?\x60{3}|\x60[^\x60\n]*\x60/g, block => {
+    const token = 'MEDTUTOR_REPORT_PROTECTED_' + protectedBlocks.length + '_END';
+    protectedBlocks.push(block);
+    return token;
+  });
+  const currencies = [];
+  const keepCurrency = value => {
+    const token = 'MEDTUTOR_REPORT_CURRENCY_' + currencies.length + '_END';
+    currencies.push(value);
+    return token;
+  };
+
+  text = text.replace(/(?:R\$|US\$|U\$|EUR\$|BRL\$)\s*-?\d+(?:[.,]\d+)*/gi, keepCurrency);
+  text = text.replace(/(^|[\s(])\$\s*(\d+(?:[.,]\d+)*)(?![\d.,])(?!\s*(?:[×x]|°\s?[CFK]\b|mm\s?Hg\b|mmol\b|mEq\b|bpm\b|irpm\b|kg\b|mg\b|mL\b|L\b|cm\b|mm\b|%|\/))/gi,
+    (match, prefix, amount) => prefix + keepCurrency('$' + amount));
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, '$1')
+    .replace(/\$([^$\n]+)\$/g, '$1')
+    .replace(/\$/g, '');
+
+  const lines = text.split('\n');
+  const output = [];
+  let blockLines = [];
+  const flushBlock = () => {
+    if (!blockLines.length) return;
+    const block = blockLines.join('\n');
+    const visible = block
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\x60[^\x60]*\x60/g, ' ')
+      .replace(/\[[^\]]*\]\([^)]*\)/g, ' ');
+    let depth = 0;
+    for (let index = 0; index < visible.length; index += 1) {
+      if (visible[index] === '\\') { index += 1; continue; }
+      if (visible[index] === '(') depth += 1;
+      else if (visible[index] === ')' && depth > 0) depth -= 1;
+    }
+    const balancedBlock = block + (depth > 0 ? ')'.repeat(depth) : '');
+    output.push(balancedBlock.replace(/([.!?])([)]+)$/g, '$2$1'));
+    blockLines = [];
+  };
+  for (const line of lines) {
+    const startsBlock = /^\s*(?:#{1,6}\s|[-*+]\s|>\s)/.test(line);
+    if (!line.trim() || (startsBlock && blockLines.length)) flushBlock();
+    if (line.trim()) blockLines.push(line);
+    else output.push('');
+  }
+  flushBlock();
+
+  text = output.join('\n')
+    .replace(/MEDTUTOR_REPORT_CURRENCY_(\d+)_END/g, (_, index) => currencies[Number(index)] || '')
+    .replace(/MEDTUTOR_REPORT_PROTECTED_(\d+)_END/g, (_, index) => protectedBlocks[Number(index)] || '');
+  return text.replace(/\n{3,}/g, '\n\n');
+}
+
 function normalizeReportMarkdownForPrint(markdown) {
-  const lines = normalizeGeneratedStructuralHtml(markdown).replace(/\r\n/g, '\n').split('\n');
+  const lines = normalizeReportTextArtifacts(normalizeGeneratedStructuralHtml(markdown)).replace(/\r\n/g, '\n').split('\n');
   const output = [];
   const splitCells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '')
     .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
@@ -298,13 +353,14 @@ DIRETRIZES FUNDAMENTAIS DE CONTEÚDO:
 7. FECHAMENTO DIDÁTICO: finalize com um caso clínico autossuficiente que exija explicar estrutura, mecanismo e consequência, seguido de 3 a 5 pérolas de prova.
 
 DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
-0. FORMATO DE SAÍDA: Retorne somente Markdown, nunca use HTML estrutural. Não escreva tags como <h4>, <ul>, <ol>, <li> ou <div>; use títulos Markdown (#, ##, ###) e listas com - ou 1. Não envolva o relatório em blocos de código.
-1. DIAGRAMAÇÃO SEGURA PARA A4:
+0. FORMATO E REVISÃO DE TEXTO: Retorne somente Markdown, nunca use HTML estrutural nem envolva o relatório em blocos de código. Não use delimitadores matemáticos com cifrão ($...$ ou $$...$$); escreva unidades e valores médicos em texto simples e Unicode (ex.: 39,2 °C; 90 × 55 mmHg; 4,2 mmol/L). Revise cada parêntese aberto e feche-o no mesmo parágrafo; não deixe parênteses pendentes.
+1. HIERARQUIA ABNT: Use títulos numerados sem ponto após o último algarismo (1 INTRODUÇÃO; 1.1 Organização). Prefira hierarquia tipográfica discreta, sem caixa alta integral quando prejudicar a leitura.
+2. DIAGRAMAÇÃO SEGURA PARA A4:
    - Não gere diagramas, fluxogramas, mapas conceituais, Mermaid, esquemas ASCII, caixas de caracteres nem sequências visuais de setas.
    - Tabelas são permitidas quando forem a forma mais clara de comparar dados. Limite a 4 colunas, use cabeçalhos curtos e consistentes e mantenha cada célula concisa (preferencialmente uma frase curta ou até 30 palavras). Não coloque parágrafos, listas longas ou subtítulos dentro das células.
    - Se uma comparação ficar larga ou exigir explicações extensas, divida-a em tabelas menores ou apresente-a como lista rotulada. Cada tabela deve ter cabeçalho semântico, linhas alinhadas e informação suficiente para ser entendida sem depender de cor.
    - Apresente relações causais em frases ou listas numeradas curtas, não em setas ou diagramas.
-2. INTEGRAÇÃO DE ILUSTRAÇÕES MÉDICAS:
+3. INTEGRAÇÃO DE ILUSTRAÇÕES MÉDICAS:
    - Você tem acesso a um catálogo de figuras do material.
    - Quando explicar um corte anatômico, ECG, radiografia ou mecanismo correspondente a uma dessas figuras, insira-a imediatamente após o parágrafo explicativo:
      ![Descrição técnica detalhada](URL_EXATA_DO_CATÁLOGO)
@@ -547,3 +603,4 @@ module.exports.default = relatoriosServiceInstance;
 module.exports.getReportEngineLabel = getReportEngineLabel;
 module.exports.getGeminiReportCandidateModels = getGeminiReportCandidateModels;
 module.exports.normalizeGeneratedStructuralHtml = normalizeGeneratedStructuralHtml;
+module.exports.normalizeReportTextArtifacts = normalizeReportTextArtifacts;

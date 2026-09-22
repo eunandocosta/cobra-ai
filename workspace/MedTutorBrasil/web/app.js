@@ -8346,7 +8346,7 @@ ${cleanText}
         currencies.push(m);
         return `@@MEDCURRENCY${currencies.length - 1}@@`;
       });
-      s = s.replace(/(^|[\s(])\$\s*(\d+(?:[.,]\d+)*)/g, (m, prefix, num) => {
+      s = s.replace(/(^|[\s(])\$\s*(\d+(?:[.,]\d+)*)(?![\d.,])(?!\s*(?:[×x]|°\s?[CFK]\b|mm\s?Hg\b|mmol\b|mEq\b|bpm\b|irpm\b|kg\b|mg\b|mL\b|L\b|cm\b|mm\b|%|\/))/gi, (m, prefix, num) => {
         currencies.push('$' + num);
         return `${prefix}@@MEDCURRENCY${currencies.length - 1}@@`;
       });
@@ -8413,6 +8413,9 @@ ${cleanText}
       // 6. Remover delimitadores de bloco $$ ... $$ e inline $ ... $ restantes
       s = s.replace(/\$\$([^\$]+)\$\$/g, '$1');
       s = s.replace(/\$([^\$\s][^\$]*?)\$/g, '$1');
+      // Relatórios médicos às vezes usam cifrões isolados como delimitadores
+      // de fórmula; unidades clínicas já estão em texto Unicode e não são moeda.
+      s = s.replace(/\$/g, '');
 
       // 7. Sobrescritos e Subscritos médicos: Ca^{2+}, Na^+, H_2O, PaO_2, etc.
       s = s.replace(/[\^]\{([^}]+)\}|\^([0-9]+|[\+\-]|[a-zA-Z])/g, '<sup>$1$2</sup>');
@@ -9939,7 +9942,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 </tbody>
               </table>
 
-              <h1 class="academic-title abnt-title">${escapeHtml(typeof renderMedicalMathAndSymbols === 'function' ? renderMedicalMathAndSymbols(cleanTitle) : cleanTitle).toUpperCase()}: ARTIGO CIENTÍFICO & TRATADO ACADÊMICO DE MEDICINA</h1>
+              <h1 class="academic-title abnt-title">${escapeHtml(typeof renderMedicalMathAndSymbols === 'function' ? renderMedicalMathAndSymbols(cleanTitle) : cleanTitle)}: Artigo científico e tratado acadêmico de medicina</h1>
               <div class="academic-subtitle-badge abnt-nature-badge">
                 DOCUMENTO FORMAL DE ESTUDO & CONDUTA CLÍNICA (DIRETRIZES SUS / CFM / ENARE / PADRÃO ABNT NBR 14724)
               </div>
@@ -11903,7 +11906,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 </tbody>
               </table>
 
-              <h1 class="academic-title abnt-title">${escapeHtml(cleanTitle).toUpperCase()}: FUNDAMENTOS EM CAMADAS — ESTRUTURA, FUNÇÃO E CONSEQUÊNCIA</h1>
+              <h1 class="academic-title abnt-title">${escapeHtml(cleanTitle)}: Fundamentos em camadas — estrutura, função e consequência</h1>
               <div class="academic-subtitle-badge abnt-nature-badge">
                 DOCUMENTO DE ESTUDO: FUNDAMENTOS → MECANISMOS → CONSEQUÊNCIAS → APLICAÇÃO CLÍNICA
               </div>
@@ -12084,23 +12087,26 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           <style>
             @page Section1 {
               size: 21.0cm 29.7cm;
-              margin: 2.0cm 2.0cm 2.0cm 2.0cm; /* Margens confortáveis para leitura e impressão sem comprimir o texto */
+              margin: 3.0cm 2.0cm 2.0cm 3.0cm;
               mso-page-orientation: portrait;
               mso-header-margin: 1.5cm;
               mso-footer-margin: 1.5cm;
             }
             div.Section1 { page: Section1; }
             * { box-sizing: border-box; max-width: 100%; }
-            body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; color: #111827; margin: 2.0cm 2.0cm 2.0cm 2.0cm; overflow-wrap: anywhere; word-wrap: break-word; }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #111111; margin: 0; overflow-wrap: anywhere; word-wrap: break-word; }
+            .academic-article-container, .academic-article-container * { font-family: 'Times New Roman', Times, serif !important; }
+            .academic-article-container strong, .academic-article-container b { font-weight: 600; }
             .academic-article-container, .academic-body-content, p, li, blockquote, figcaption, td, th, h1, h2, h3, h4, h5, h6 { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; word-wrap: break-word; }
             .academic-article-container h1, .academic-article-container h2, .academic-article-container h3, .academic-article-container h4, .academic-article-container h5, .academic-article-container h6, .academic-article-container .gemini-h1, .academic-article-container .gemini-h2, .academic-article-container .gemini-h3, .academic-article-container .gemini-h4, .academic-article-container .gemini-h5 { display: block; width: 100%; text-align: left; }
             pre, code, .gemini-code-block { white-space: pre-wrap; overflow-wrap: anywhere; word-wrap: break-word; word-break: break-word; }
-            p { font-size: 11pt; line-height: 1.5; text-align: justify; text-indent: 1.25cm; margin-bottom: 7pt; }
-            h1 { font-size: 18pt; text-align: center; color: #0f172a; text-transform: uppercase; font-weight: bold; margin-bottom: 6pt; text-indent: 0; }
-            h2 { font-size: 14pt; color: #1e3a8a; text-transform: uppercase; border-bottom: 1.5pt solid #1e3a8a; padding-bottom: 3pt; margin-top: 16pt; font-weight: bold; text-indent: 0; }
-            h3 { font-size: 12.5pt; font-weight: bold; margin-top: 12pt; color: #0f172a; border-bottom: 1pt solid #cbd5e1; padding-bottom: 2pt; text-indent: 0; }
-            h4 { font-size: 11.5pt; font-weight: bold; color: #1e293b; text-indent: 0; }
-            h5 { font-size: 11pt; font-style: italic; font-weight: bold; color: #334155; text-indent: 0; }
+            p { font-size: 12pt; line-height: 1.5; text-align: justify; text-indent: 1.25cm; margin-bottom: 7pt; }
+            li p, td p, th p, blockquote p { text-indent: 0; }
+            h1 { font-size: 14pt; text-align: center; color: #222222; text-transform: none; font-weight: 600; margin-bottom: 6pt; text-indent: 0; }
+            h2 { font-size: 12pt; color: #111111; text-transform: none; border-bottom: 0.75pt solid #555555; padding-bottom: 3pt; margin-top: 16pt; font-weight: 600; text-indent: 0; }
+            h3 { font-size: 12pt; font-weight: 600; margin-top: 12pt; color: #111111; border-bottom: 0.5pt solid #999999; padding-bottom: 2pt; text-indent: 0; }
+            h4 { font-size: 12pt; font-weight: 600; color: #111111; text-indent: 0; }
+            h5 { font-size: 12pt; font-style: italic; font-weight: 600; color: #111111; text-indent: 0; }
             table.abnt-header-table { width: 100%; border-collapse: collapse; border-top: 1.5pt solid #1e3a8a; border-bottom: 1.5pt solid #1e3a8a; margin: 10pt 0 14pt 0; background-color: #f8fafc; }
             td.abnt-header-col { width: 50%; vertical-align: top; padding: 6pt 10pt; font-size: 9.5pt; line-height: 1.4; color: #1e293b; }
             td.abnt-col-left { border-right: 1pt solid #cbd5e1; }
