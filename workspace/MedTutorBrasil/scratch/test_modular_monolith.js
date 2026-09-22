@@ -145,6 +145,9 @@ assert(appSource.includes("setAppRoute('/pagamento', { replace: true })"), 'cont
 assert(authMarkup.includes('class="route-resolving" data-route="resolving"'), 'o documento deve iniciar numa tela neutra enquanto o Firebase restaura a sessão');
 assert(appSource.includes("setRoutePresentation('resolving')") && appSource.includes("this.setAuthScreenState('checking')"), 'o formulário de login não deve piscar antes da confirmação do Firebase Auth');
 assert(appSource.includes("pendingRoutePath = window.location.pathname || pendingRoutePath || '/login'"), 'a rota solicitada deve ser preservada enquanto o Auth está pendente');
+assert(appSource.includes('authStartupCompleted') && appSource.includes('setTimeout(() => {') && appSource.includes('}, 12000)'), 'a restauração e validação do Auth devem encerrar com limite de tempo');
+assert(appSource.includes('this.authSessionErrorMessage = this.authStateResolved') && appSource.includes('this.setAuthScreenState(\'error\')'), 'falha/timeout de autenticação deve apresentar estado recuperável');
+assert(authMarkup.includes('id="authSessionError"') && authMarkup.includes('retryAuthSessionResolution()') && authMarkup.includes('openLoginAfterAuthResolutionError()'), 'a tela de erro de sessão deve oferecer tentar novamente e ir ao login');
 assert(authMarkup.includes('id="semesterRenameModal"') && authMarkup.includes('id="semesterRenameProgressTrack"'), 'a revisão de renomeação deve exibir modal e barra de progresso');
 assert(appSource.includes('function readMaterialTextDirectlyFromFirestore(doc)') && appSource.includes('readMaterialTextChunks(doc.ref'), 'a renomeação deve ler o conteúdo e os chunks diretamente do Firestore');
 assert(appSource.includes('async function analyzeSemesterSubjectNames(periodId)') && appSource.includes('classifyMaterialWithServerGemini(text, name, selectedCat.period)'), 'a análise por semestre deve classificar o conteúdo contra o catálogo oficial com Gemini');

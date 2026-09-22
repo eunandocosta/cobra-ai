@@ -225,6 +225,9 @@
       authMode: 'guest', // 'firebase' | 'guest'
       googleSignInInProgress: false,
       authStateResolved: false,
+      authStartupCompleted: false,
+      authResolutionTimeout: null,
+      authSessionErrorMessage: '',
       accessGranted: null,
       accessResolvedUid: '',
       accessResolvePromise: null,
@@ -236,21 +239,28 @@
         const authScreen = document.getElementById('authScreenContainer');
         if (!authScreen) return;
         const isChecking = state === 'checking';
+        const isError = state === 'error';
         const isAccess = state === 'access';
-        const isVisible = isChecking || state === 'login';
+        const isLogin = state === 'login';
+        const isVisible = isChecking || isLogin || isError;
         const paymentScreen = document.getElementById('paymentScreenContainer');
         authScreen.classList.toggle('active', isVisible);
         authScreen.classList.toggle('auth-state-resolving', isChecking);
+        authScreen.classList.toggle('auth-state-error', isError);
         authScreen.setAttribute('aria-hidden', String(!isVisible));
         authScreen.setAttribute('aria-busy', String(isChecking));
         const accessCard = document.getElementById('accessGateCard');
         const loginCard = authScreen.querySelector('.auth-card');
+        const errorCard = document.getElementById('authSessionError');
+        const errorDetail = document.getElementById('authSessionErrorDetail');
         if (paymentScreen) {
           paymentScreen.classList.toggle('active', isAccess);
           paymentScreen.setAttribute('aria-hidden', String(!isAccess));
         }
         if (accessCard) accessCard.setAttribute('aria-hidden', String(!isAccess));
-        if (loginCard) loginCard.setAttribute('aria-hidden', String(!isVisible || isChecking));
+        if (loginCard) loginCard.setAttribute('aria-hidden', String(!isLogin));
+        if (errorCard) errorCard.setAttribute('aria-hidden', String(!isError));
+        if (errorDetail && isError) errorDetail.textContent = this.authSessionErrorMessage || 'A confirmação do Firebase demorou mais que o esperado.';
         const accessError = document.getElementById('accessCouponError');
         if (accessError && state !== 'access') accessError.textContent = '';
         if (isAccess) {
@@ -261,6 +271,63 @@
         }
       },
 
+      clearAuthResolutionTimeout() {
+        if (this.authResolutionTimeout) clearTimeout(this.authResolutionTimeout);
+        this.authResolutionTimeout = null;
+      },
+
+      startAuthResolutionTimeout() {
+        this.clearAuthResolutionTimeout();
+        this.authResolutionTimeout = setTimeout(() => {
+          if (this.authStartupCompleted) return;
+          this.authSessionErrorMessage = this.authStateResolved
+            ? 'O Firebase confirmou sua conta, mas a validação de acesso não terminou. Tente novamente ou abra o login.'
+            : 'Não foi possível confirmar sua sessão com o Firebase. Sua conta e seus dados não foram alterados.';
+          console.error('[MedTutor Auth] Tempo limite ao restaurar ou validar a sessão Firebase.');
+          setRoutePresentation('resolving');
+          this.setAuthScreenState('error');
+        }, 12000);
+      },
+
+      async retryAuthSessionResolution() {
+        const user = firebaseAuth?.currentUser;
+        if (user) {
+          this.authStateResolved = true;
+          this.authStartupCompleted = false;
+          this.setAuthScreenState('checking');
+          this.startAuthResolutionTimeout();
+          try {
+            await this.continueWithAuthenticatedUser(user);
+          } catch (error) {
+            this.authSessionErrorMessage = 'A sessão foi encontrada, mas não foi possível concluir a validação. Tente novamente ou abra o login.';
+            console.error('[MedTutor Auth] Falha ao retomar a sessão:', error);
+            setRoutePresentation('resolving');
+            this.setAuthScreenState('error');
+          } finally {
+            this.authStartupCompleted = true;
+            this.clearAuthResolutionTimeout();
+          }
+          return;
+        }
+        this.authSessionErrorMessage = '';
+        this.authStateResolved = false;
+        this.authStartupCompleted = false;
+        setRoutePresentation('resolving');
+        this.setAuthScreenState('checking');
+        this.startAuthResolutionTimeout();
+      },
+
+      openLoginAfterAuthResolutionError() {
+        // Mostra apenas o formulário público. O acesso aos dados continua
+        // bloqueado até uma autenticação Firebase confirmada.
+        setRoutePresentation('login');
+        this.authStartupCompleted = true;
+        this.clearAuthResolutionTimeout();
+        this.setAuthScreenState('login');
+        if (window.location.pathname === '/cadastro') switchAuthTab('register');
+        else switchAuthTab('login');
+      },
+
       async resolveAccessForUser(user, { force = false } = {}) {
         if (!user?.uid) return false;
         if (!force && this.accessResolvedUid === user.uid && typeof this.accessGranted === 'boolean') return this.accessGranted;
@@ -268,9 +335,26 @@
 
         this.accessResolveUid = user.uid;
         this.accessResolvePromise = (async () => {
+          let idTokenTimeout = null;
+          let requestTimeout = null;
+          const controller = typeof AbortController === 'function' ? new AbortController() : null;
           try {
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/access/status', { headers: { Authorization: `Bearer ${idToken}` } });
+            const idToken = await Promise.race([
+              user.getIdToken(),
+              new Promise((_, reject) => { idTokenTimeout = setTimeout(() => reject(new Error('Tempo limite ao preparar a sessão segura.')), 10000); })
+            ]);
+            const response = await Promise.race([
+              fetch('/api/access/status', {
+                headers: { Authorization: `Bearer ${idToken}` },
+                ...(controller ? { signal: controller.signal } : {})
+              }),
+              new Promise((_, reject) => {
+                requestTimeout = setTimeout(() => {
+                  controller?.abort();
+                  reject(new Error('Tempo limite na validação do acesso.'));
+                }, 12000);
+              })
+            ]);
             const result = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(result.error || 'Não foi possível validar seu acesso.');
 
@@ -284,15 +368,25 @@
             this.accessGranted = result.required !== true || result.active === true;
             this.accessResolvedUid = user.uid;
             if (!this.accessGranted) {
-              // A API atualiza as custom claims antes de negar o acesso; renova
-              // o token para que as regras do Firestore também respeitem o bloqueio.
-              try { await user.getIdToken(true); } catch (e) {}
               setPaymentRoute();
               this.setAuthScreenState('access');
+              // A API atualiza as custom claims antes de negar o acesso; renova
+              // o token para que as regras do Firestore também respeitem o bloqueio.
+              try {
+                await Promise.race([
+                  user.getIdToken(true),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo limite ao atualizar as permissões da sessão.')), 5000))
+                ]);
+              } catch (e) {}
               return false;
             }
             if (result.required === true) {
-              try { await user.getIdToken(true); } catch (e) {}
+              try {
+                await Promise.race([
+                  user.getIdToken(true),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo limite ao atualizar as permissões da sessão.')), 5000))
+                ]);
+              } catch (e) {}
             }
             return true;
           } catch (error) {
@@ -301,10 +395,14 @@
             setPaymentRoute();
             this.setAuthScreenState('access');
             const accessError = document.getElementById('accessCouponError');
-            if (accessError) accessError.textContent = 'Não foi possível validar o cupom agora. Verifique a conexão ou procure o suporte.';
+            if (accessError) accessError.textContent = error?.name === 'AbortError' || /tempo limite/i.test(error?.message || '')
+              ? 'A validação do acesso demorou demais. Verifique sua conexão e tente novamente.'
+              : 'Não foi possível validar o cupom agora. Verifique a conexão ou procure o suporte.';
             console.warn('[MedTutor Access] Falha na validação segura do acesso:', error?.message || 'erro desconhecido');
             return false;
           } finally {
+            if (idTokenTimeout) clearTimeout(idTokenTimeout);
+            if (requestTimeout) clearTimeout(requestTimeout);
             this.accessResolvePromise = null;
             this.accessResolveUid = '';
           }
@@ -322,12 +420,15 @@
         };
         this.authMode = 'firebase';
         this.hydrateLocalProfileForUid(user.uid);
-        localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
+        try { localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser)); }
+        catch (storageError) { console.warn('[MedTutor Auth] Armazenamento local indisponível; a sessão Firebase continua válida.', storageError); }
         this.updateUserTopbarUI();
 
         if (!await this.resolveAccessForUser(user)) return false;
 
         this.setAuthScreenState('hidden');
+        this.authStartupCompleted = true;
+        this.clearAuthResolutionTimeout();
         applyRouteFromLocation({ replace: true });
         accessReturnPath = '';
         this.refreshCloudDataInBackground(user.uid);
@@ -433,6 +534,8 @@
         // Mantém uma tela neutra até o Firebase confirmar a identidade. Não
         // troque a rota solicitada por /login durante a hidratação do Auth.
         setRoutePresentation('resolving');
+        this.authStartupCompleted = false;
+        this.startAuthResolutionTimeout();
         // Carrega dados locais persistidos do usuário
         try {
           // A identidade nunca é restaurada visualmente do localStorage.
@@ -462,6 +565,8 @@
         if (typeof firebase === 'undefined') {
           console.log('[MedTutor Firebase] SDK não detectado no ambiente, operando em modo local resiliente.');
           this.authStateResolved = true;
+          this.authStartupCompleted = true;
+          this.clearAuthResolutionTimeout();
           setRoutePresentation('login');
           this.setAuthScreenState('login');
           if (this.authMode === 'restoring') {
@@ -508,8 +613,21 @@
             firebaseAuth.onAuthStateChanged(async (user) => {
               this.authStateResolved = true;
               if (user) {
-                await this.continueWithAuthenticatedUser(user);
+                this.authSessionErrorMessage = '';
+                try {
+                  await this.continueWithAuthenticatedUser(user);
+                } catch (authError) {
+                  this.authSessionErrorMessage = 'O Firebase encontrou sua conta, mas não foi possível terminar de preparar a sessão. Tente novamente ou abra o login.';
+                  console.error('[MedTutor Auth] Erro ao preparar sessão autenticada:', authError);
+                  setRoutePresentation('resolving');
+                  this.setAuthScreenState('error');
+                } finally {
+                  this.authStartupCompleted = true;
+                  this.clearAuthResolutionTimeout();
+                }
               } else {
+                this.authStartupCompleted = true;
+                this.clearAuthResolutionTimeout();
                 // Não mantenha um UID antigo apenas no localStorage: ele fazia a
                 // interface parecer conectada, mas as regras do Firestore o negavam.
                 this.currentUser = null;
@@ -518,6 +636,7 @@
                 this.accessResolvedUid = '';
                 this.accessResolvePromise = null;
                 this.accessResolveUid = '';
+                this.authSessionErrorMessage = '';
                 localStorage.removeItem('medtutor_auth_user');
                 this.updateUserTopbarUI();
                 this.updateFirebaseConfigModalUI();
@@ -534,6 +653,8 @@
             });
           } else {
             this.authStateResolved = true;
+            this.authStartupCompleted = true;
+            this.clearAuthResolutionTimeout();
             setRoutePresentation('login');
             this.setAuthScreenState('login');
           }
@@ -556,6 +677,8 @@
         } catch (e) {
           console.warn('[MedTutor Firebase] Inicialização em modo local resiliente:', e);
           this.authStateResolved = true;
+          this.authStartupCompleted = true;
+          this.clearAuthResolutionTimeout();
           setRoutePresentation('login');
           this.setAuthScreenState('login');
         }

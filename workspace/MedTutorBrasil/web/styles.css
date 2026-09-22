@@ -5618,6 +5618,40 @@
       z-index: 1;
     }
 
+    .auth-session-error {
+      display: none;
+      width: min(100%, 390px);
+      padding: 28px;
+      align-items: center;
+      flex-direction: column;
+      gap: 14px;
+      text-align: center;
+      color: var(--text-primary);
+      background: var(--surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .3);
+      position: relative;
+      z-index: 1;
+    }
+
+    .auth-session-error > .auth-session-mark { color: #ffbf69; }
+    .auth-session-error > strong { font-size: 17px; }
+    .auth-session-error > p {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .auth-session-error-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      margin-top: 4px;
+    }
+    .auth-session-error-actions button { min-height: 44px; }
+
     .auth-session-check .loader-spinner {
       width: 24px;
       height: 24px;
@@ -5657,6 +5691,11 @@
     .auth-screen-overlay.auth-state-resolving .auth-session-check {
       display: flex;
     }
+
+    .auth-screen-overlay.auth-state-error .auth-card,
+    .auth-screen-overlay.auth-state-error .auth-session-check { display: none; }
+
+    .auth-screen-overlay.auth-state-error .auth-session-error { display: flex; }
 
     .payment-screen-overlay {
       z-index: 10000;

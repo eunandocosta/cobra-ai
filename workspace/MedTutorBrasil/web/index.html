@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260922-payment-page-v1">
+  <link rel="stylesheet" href="/styles.css?v=20260922-auth-timeout-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -2777,6 +2777,17 @@
       <strong>Verificando sua sessão</strong>
       <small>Preparando seu espaço de estudo…</small>
     </div>
+    <section class="auth-session-error" id="authSessionError" role="alert" aria-labelledby="authSessionErrorTitle" aria-hidden="true">
+      <div class="auth-session-mark" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A1.6 1.6 0 0 0 3.2 21h17.6a1.6 1.6 0 0 0 1.4-2.4L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      </div>
+      <strong id="authSessionErrorTitle">Não foi possível verificar sua sessão</strong>
+      <p id="authSessionErrorDetail">A confirmação do Firebase demorou mais que o esperado.</p>
+      <div class="auth-session-error-actions">
+        <button type="button" class="btn-primary" onclick="MedTutorAuthService.retryAuthSessionResolution()">Tentar novamente</button>
+        <button type="button" class="btn-secondary" onclick="MedTutorAuthService.openLoginAfterAuthResolutionError()">Ir para login</button>
+      </div>
+    </section>
     <div class="auth-card">
       <div class="auth-brand">
         <div class="auth-logo-badge">
@@ -3348,7 +3359,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260922-semester-rename-auth-restore-v1"></script>
+  <script defer src="/app.min.js?v=20260922-auth-timeout-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
