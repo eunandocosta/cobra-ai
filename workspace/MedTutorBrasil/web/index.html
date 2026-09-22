@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260922-auth-recovery-v2">
+  <link rel="stylesheet" href="/styles.css?v=20260922-auth-recovery-v3">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -2865,8 +2865,21 @@
   <script>
     // Proteção independente do bundle: falhas de rede/cache no app.js nunca
     // devem transformar a verificação de sessão em uma tela sem saída.
+    window.__medTutorAuthBootFailure = false;
+    window.addEventListener('error', function (event) {
+      var fileName = String(event && event.filename || '');
+      if (fileName.indexOf('/app.min.js') === -1 && fileName.indexOf('/app.js') === -1) return;
+      window.__medTutorAuthBootFailure = true;
+      var screen = document.getElementById('authScreenContainer');
+      var detail = document.getElementById('authSessionErrorDetail');
+      if (!screen) return;
+      if (detail) detail.textContent = 'O aplicativo encontrou um erro ao iniciar. Atualize a página ou abra o login.';
+      screen.classList.remove('auth-state-resolving');
+      screen.classList.add('active', 'auth-state-error');
+      screen.setAttribute('aria-busy', 'false');
+    }, true);
     window.setTimeout(function () {
-      if (window.__medTutorAuthBundleReady) return;
+      if (window.__medTutorAuthBundleReady && !window.__medTutorAuthBootFailure) return;
       var screen = document.getElementById('authScreenContainer');
       var detail = document.getElementById('authSessionErrorDetail');
       if (!screen) return;
@@ -3375,7 +3388,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260922-auth-recovery-v2"></script>
+  <script defer src="/app.min.js?v=20260922-auth-recovery-v3"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

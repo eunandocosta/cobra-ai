@@ -1,3 +1,8 @@
+    // O bundle foi baixado e começou a executar. Este sinal acontece antes
+    // das renderizações pesadas do app para que navegadores mais lentos não
+    // confundam inicialização demorada com falha de carregamento.
+    if (typeof window !== 'undefined') window.__medTutorAuthBundleReady = true;
+
     // =========================================================
     // 0. FIREBASE AUTH & FIRESTORE / STORAGE PERSISTENCE SERVICE
     // =========================================================
@@ -531,10 +536,6 @@
       },
 
       init() {
-        // Sinaliza ao vigia mínimo do HTML que o bundle principal foi carregado.
-        // Se este código nem chegar a executar, o HTML ainda oferece saída da
-        // tela de espera em vez de deixar o estudante preso indefinidamente.
-        if (typeof window !== 'undefined') window.__medTutorAuthBundleReady = true;
         // Mantém uma tela neutra até o Firebase confirmar a identidade. Não
         // troque a rota solicitada por /login durante a hidratação do Auth.
         setRoutePresentation('resolving');
