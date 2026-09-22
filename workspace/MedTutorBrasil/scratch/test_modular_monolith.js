@@ -42,15 +42,20 @@ for (const fakeColleague of [
 console.log('[PASS] Diretório de colegas sem perfis fictícios embutidos');
 
 const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
+assert(authMarkup.includes('id="paymentScreenContainer"'), 'a tela de cupom deve ter um container independente da tela de login');
+assert(/<\/div>\s*<\/div>\s*<div id="paymentScreenContainer"/.test(authMarkup), 'a tela de pagamento deve estar fora do container de login');
 assert(authMarkup.includes('id="accessGateCard" role="dialog" aria-modal="true"'), 'a solicitação de cupom deve ser um modal acessível');
 assert(authMarkup.includes('id="accessCouponInput"'), 'o modal deve conter o campo para inserir cupom');
 assert(appSource.includes('couponInput.focus()'), 'o campo de cupom deve receber foco ao abrir o modal');
 assert(authMarkup.includes('id="accessCouponInput"') && authMarkup.includes('id="btnAccessCouponSubmit"'), 'a tela de pagamento deve solicitar cupom com campo e botão de envio');
 const accessCardMarkup = authMarkup.match(/<section[^>]*id="accessGateCard"[\s\S]*?<\/section>/)?.[0] || '';
-assert(accessCardMarkup && !accessCardMarkup.includes('MedTutorAuthService.signOut()'), 'a tela de pagamento não deve oferecer ação para deslogar o usuário');
+assert(accessCardMarkup.includes('MedTutorAuthService.signOut()'), 'a tela de pagamento deve permitir sair da conta');
 assert(indexContent.includes("'/pagamento'"), 'a rota /pagamento deve ser servida diretamente pelo servidor');
 assert(appSource.includes("setAppRoute('/pagamento', { replace: true })"), 'contas sem acesso devem ser redirecionadas para /pagamento');
-assert(appSource.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
+const chatSaveMethod = appSource.match(/async saveChatSessions\(sessionsArray\)[\s\S]*?(?=\/\/ Upload de imagem)/)?.[0] || '';
+assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
+const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)[\s\S]*?\n      },/)?.[0] || '';
+assert(cloudSessionMethod.includes('MedTutorAuthService.accessGranted === true'), 'leituras e escritas do Firestore devem aguardar a liberação do cupom');
 console.log('[PASS] Modal de ativação do cupom acessível e pronto para receber o código');
 
 const rulesVersion = '2026-09-22-v1';

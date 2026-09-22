@@ -5589,16 +5589,8 @@
       display: flex;
     }
 
-    .auth-screen-overlay.auth-access-mode .auth-card:not(#accessGateCard) {
-      display: none;
-    }
-
-    .auth-screen-overlay #accessGateCard {
-      display: none;
-    }
-
-    .auth-screen-overlay.auth-access-mode #accessGateCard {
-      display: flex !important;
+    .payment-screen-overlay {
+      z-index: 10000;
     }
 
     .access-account-summary {
@@ -5652,8 +5644,7 @@
 
     @media (max-width: 480px) {
       .auth-screen-overlay { padding: 14px; }
-      .auth-screen-overlay.auth-access-mode #accessGateCard { padding: 25px 20px; }
-      .access-gate-actions { flex-direction: column; }
+      #paymentScreenContainer #accessGateCard { padding: 25px 20px; }
     }
 
     .auth-card {

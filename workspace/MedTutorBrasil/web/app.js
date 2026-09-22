@@ -212,24 +212,26 @@
         if (!authScreen) return;
         const isChecking = state === 'checking';
         const isAccess = state === 'access';
-        const isVisible = isChecking || state === 'login' || isAccess;
+        const isVisible = isChecking || state === 'login';
+        const paymentScreen = document.getElementById('paymentScreenContainer');
         authScreen.classList.toggle('active', isVisible);
         authScreen.classList.toggle('auth-state-resolving', isChecking);
-        authScreen.classList.toggle('auth-access-mode', isAccess);
+        authScreen.setAttribute('aria-hidden', String(!isVisible));
         authScreen.setAttribute('aria-busy', String(isChecking));
         const accessCard = document.getElementById('accessGateCard');
-        const loginCard = authScreen.querySelector('.auth-card:not(#accessGateCard)');
-        if (accessCard) {
-          accessCard.style.display = isAccess ? 'flex' : 'none';
-          accessCard.setAttribute('aria-hidden', String(!isAccess));
+        const loginCard = authScreen.querySelector('.auth-card');
+        if (paymentScreen) {
+          paymentScreen.classList.toggle('active', isAccess);
+          paymentScreen.setAttribute('aria-hidden', String(!isAccess));
         }
-        if (loginCard) loginCard.setAttribute('aria-hidden', String(isAccess || isChecking));
+        if (accessCard) accessCard.setAttribute('aria-hidden', String(!isAccess));
+        if (loginCard) loginCard.setAttribute('aria-hidden', String(!isVisible || isChecking));
         const accessError = document.getElementById('accessCouponError');
         if (accessError && state !== 'access') accessError.textContent = '';
         if (isAccess) {
           window.requestAnimationFrame(() => {
             const couponInput = document.getElementById('accessCouponInput');
-            if (couponInput && authScreen.classList.contains('active')) couponInput.focus();
+            if (couponInput && paymentScreen?.classList.contains('active')) couponInput.focus();
           });
         }
       },
@@ -1138,7 +1140,7 @@
       },
 
       hasAuthenticatedCloudSession(uid) {
-        return !!(firestoreDb && isFirebaseCloudActive && firebaseAuth?.currentUser?.uid === uid);
+        return !!(firestoreDb && isFirebaseCloudActive && firebaseAuth?.currentUser?.uid === uid && MedTutorAuthService.accessGranted === true);
       },
 
       getCloudDataRevisionKey(uid) {
@@ -1906,7 +1908,7 @@
         } catch (e) {}
 
         // 2. Cloud Firestore
-        if (firestoreDb && isFirebaseCloudActive) {
+        if (firestoreDb && isFirebaseCloudActive && MedTutorAuthService.accessGranted === true) {
           try {
             const batch = firestoreDb.batch();
             const colRef = firestoreDb.collection('users').doc(uid).collection('historico_chats');
