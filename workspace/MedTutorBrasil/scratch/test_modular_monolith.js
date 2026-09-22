@@ -75,14 +75,19 @@ assert(/nome_material:\s*q\.slideName\s*\|\|\s*q\.materialName/.test(appSource),
 console.log('[PASS] Questões e materiais enviados são preservados e limitados à disciplina selecionada');
 
 const challengeScoreFunction = appSource.match(/function getChallengeQuestionScore\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
+const challengeAnswerFunction = appSource.match(/function getChallengeQuestionAnswer\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const challengeEligibilityFunction = appSource.match(/function isChallengeQuestionEligible\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
-assert(challengeScoreFunction && challengeEligibilityFunction, 'os desafios devem calcular elegibilidade pelo score do quiz');
-const isChallengeQuestionEligible = new Function(`${challengeScoreFunction}\n${challengeEligibilityFunction}\nreturn isChallengeQuestionEligible;`)();
-assert(isChallengeQuestionEligible({ quizStats: { attempts: 20, correct: 17 } }), '85% de acerto deve liberar a questão');
-assert(!isChallengeQuestionEligible({ quizStats: { attempts: 20, correct: 16 } }), '80% de acerto não deve liberar a questão');
-assert(!isChallengeQuestionEligible({ srs: { reps: 8, state: 'mastered' }, quizStats: { attempts: 0, correct: 0 } }), 'SRS sozinho não deve liberar a questão');
-assert(!isChallengeQuestionEligible({ quizStats: { attempts: 0, correct: 0 } }), 'questões sem tentativas não devem receber score presumido');
-console.log('[PASS] Elegibilidade de desafios exige score de quiz >= 85%, sem requisito de SRS');
+assert(challengeScoreFunction && challengeAnswerFunction && challengeEligibilityFunction, 'os desafios devem verificar enunciado e gabarito e continuar exibindo desempenho quando houver');
+const challengeHelpers = new Function(`${challengeScoreFunction}\n${challengeAnswerFunction}\n${challengeEligibilityFunction}\nreturn { getChallengeQuestionScore, getChallengeQuestionAnswer, isChallengeQuestionEligible };`)();
+assert(challengeHelpers.isChallengeQuestionEligible({ question: 'Questão recém-gerada', reference_answer: 'Resposta de referência' }), 'questão gerada com resposta deve ficar elegível sem tentativas');
+assert(challengeHelpers.isChallengeQuestionEligible({ question: 'Questão de múltipla escolha', quizOptions: ['A) Resposta correta', 'B) Distrator'], correctIndex: 0, quizStats: { attempts: 0, correct: 0 } }), 'questão de quiz deve ficar elegível imediatamente e resolver a alternativa correta');
+assert.strictEqual(challengeHelpers.getChallengeQuestionAnswer({ question: 'Questão', quizOptions: ['A) Resposta correta', 'B) Distrator'], correctIndex: 0 }), 'Resposta correta', 'o desafio deve receber o texto da alternativa correta, não apenas seu índice');
+assert(challengeHelpers.isChallengeQuestionEligible({ flashcard: { front: 'Frente', back: 'Verso' }, quizStats: { attempts: 20, correct: 16 } }), 'desempenho abaixo de 85% não deve bloquear questão pronta');
+assert(!challengeHelpers.isChallengeQuestionEligible({ question: 'Questão sem gabarito' }), 'questão sem resposta utilizável não deve ser enviada a um desafio');
+assert(!challengeHelpers.isChallengeQuestionEligible({ quizStats: { attempts: 20, correct: 20 } }), 'estatística sem enunciado e gabarito não transforma item inválido em questão');
+const challengeSendMethod = appSource.match(/async sendChallenge\(\) \{[\s\S]*?\n      \},/)?.[0] || '';
+assert(challengeSendMethod.includes('back: getChallengeQuestionAnswer(q)'), 'o desafio enviado deve incluir a resposta correta da questão selecionada');
+console.log('[PASS] Questões com enunciado e gabarito ficam imediatamente elegíveis para desafios, sem score mínimo ou requisito de SRS');
 const openScheduleQuestions = appSource.match(/function openScheduleQuestions\(taskIndex\) \{[\s\S]*?\n    \}/)?.[0] || '';
 assert(openScheduleQuestions.includes("navigateTab('flashcards')"), 'cards diários do SCE devem abrir Flashcards');
 assert(!openScheduleQuestions.includes("navigateTab('quizzes')"), 'cards diários do SCE não devem abrir Quizzes');

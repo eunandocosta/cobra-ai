@@ -27081,9 +27081,8 @@ function escapeHtmlText(str) {
       return Array.from(topicsSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     }
 
-    // Elegibilidade para desafios baseada no desempenho objetivo em quizzes,
-    // sem exigir estado/revisões do SRS. Sem tentativas registradas, a questão
-    // ainda não tem score suficiente para ser liberada.
+    // Questões com enunciado e gabarito válidos ficam disponíveis para desafios
+    // assim que entram no deck; desempenho em quiz e estado do SRS não são pré-requisitos.
     function getChallengeQuestionScore(question) {
       const stats = question?.quizStats || {};
       const attempts = Number(stats.attempts);
@@ -27098,9 +27097,33 @@ function escapeHtmlText(str) {
       };
     }
 
+    function getChallengeQuestionAnswer(question) {
+      if (!question || typeof question !== 'object') return '';
+      const options = question.quizOptions || question.alternativas || question.options;
+      const correctIndex = Number(question.correctIndex);
+      const hasCorrectIndex = question.correctIndex !== undefined && question.correctIndex !== null && String(question.correctIndex).trim() !== '';
+      if (Array.isArray(options) && hasCorrectIndex && Number.isInteger(correctIndex) && correctIndex >= 0 && correctIndex < options.length) {
+        return String(options[correctIndex] || '').replace(/^[A-D][).:\s-]+/i, '').trim();
+      }
+
+      const answerLetter = String(question.resposta_correta || '').trim().toUpperCase().match(/^([A-D])(?:[).:\s]|$)/)?.[1];
+      if (Array.isArray(options) && answerLetter) {
+        const option = options['ABCD'.indexOf(answerLetter)];
+        if (option) return String(option).replace(/^[A-D][).:\s-]+/i, '').trim();
+      }
+
+      return String(
+        question.flashcard?.back || question.reference_answer || question.referenceAnswer ||
+        question.answer || question.resposta || question.resposta_correta ||
+        question.correctAnswerText || question.correct_answer || question.gabarito ||
+        question.explanation || question.justificativa || ''
+      ).trim();
+    }
+
     function isChallengeQuestionEligible(question) {
-      const score = getChallengeQuestionScore(question);
-      return Boolean(score && score.percent >= 85);
+      if (!question || typeof question !== 'object') return false;
+      const prompt = String(question.flashcard?.front || question.question || question.pergunta || question.prompt || question.enunciado || '').trim();
+      return Boolean(prompt && getChallengeQuestionAnswer(question));
     }
 
     const MedTutorChallengesService = {
@@ -27372,7 +27395,7 @@ function escapeHtmlText(str) {
           return;
         }
 
-        // Critério estrito: Questões existentes já respondidas corretamente no Flashcard
+        // Qualquer questão pronta (enunciado + gabarito) pode ser usada sem espera por acerto ou SRS.
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
           const matchesSubject = isExactStudySubject(q.subject || q.disciplina, targetSubject);
@@ -27393,10 +27416,10 @@ function escapeHtmlText(str) {
         if (eligible.length === 0) {
           container.innerHTML = `
             <div class="empty-state-notice">
-              <span class="icon">🔒</span>
-              <p>Nenhuma questão com pelo menos <strong>85% de acerto</strong> encontrada para <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''}.</p>
+              <span class="icon">📚</span>
+              <p>Nenhuma questão pronta para desafio encontrada em <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''}.</p>
               <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-secondary);">
-                Responda às questões no Quiz até alcançar 85% de acerto. Não é necessário concluir revisões de repetição espaçada.
+                Questões geradas com enunciado e gabarito ficam disponíveis imediatamente; não é necessário responder antes nem concluir revisões de repetição espaçada.
               </p>
               <button class="btn-outline-action primary" style="margin-top: 10px;" onclick="closeModals(); openSubjectInTab('${targetSubject.replace(/'/g, "\\'")}', 'flashcards');">
                 ⚡ Praticar Flashcards de ${targetSubject}
@@ -27409,7 +27432,7 @@ function escapeHtmlText(str) {
         container.innerHTML = eligible.map((q, idx) => {
           const score = getChallengeQuestionScore(q);
           const frontText = q.flashcard?.front || q.question || q.pergunta || 'Sem enunciado';
-          const backSnippet = (q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '').slice(0, 120);
+          const backSnippet = getChallengeQuestionAnswer(q).slice(0, 120);
           const safeId = String(q.id || `el-q-${idx}`).replace(/"/g, '&quot;');
           const diff = q.difficultyLevel || 'Intermediário';
 
@@ -27424,7 +27447,7 @@ function escapeHtmlText(str) {
                 <div class="eligible-question-stem eligible-q-text">${escapeHtmlText(frontText)}</div>
                 ${backSnippet ? `<div class="eligible-q-back-snippet" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"><strong>Gabarito:</strong> ${escapeHtmlText(backSnippet)}...</div>` : ''}
                 <div class="eligible-question-meta eligible-q-meta">
-                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Acerto no Quiz: ${score.percent.toFixed(0)}% (${score.correct}/${score.attempts})</span>
+                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">${score ? `📊 Desempenho no Quiz: ${score.percent.toFixed(0)}% (${score.correct}/${score.attempts})` : '✨ Pronta para desafio · sem tentativas necessárias'}</span>
                 </div>
               </div>
             </div>
@@ -27529,7 +27552,7 @@ function escapeHtmlText(str) {
           .map((q, idx) => ({
             id: String(q.id || `q_${Date.now()}_${idx}`),
             front: q.flashcard?.front || q.question || q.pergunta || '',
-            back: q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '',
+            back: getChallengeQuestionAnswer(q),
             explanation: q.flashcard?.explanation || q.explanation || q.clinicalPearl || '',
             title: q.flashcardTitle || q.topic || `Questão #${idx + 1}`,
             subject: q.subject || selectedSubject,
