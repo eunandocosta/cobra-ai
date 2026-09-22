@@ -473,10 +473,10 @@
                      <div id="aiEvaluationFeedback" class="ai-feedback-banner"></div>
                    </div>
  
-                   <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 10px;" id="flipHint">
-                     👆 Toque no botão abaixo ou no card para ver o verso
-                   </div>
-                 </div>
+                    <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 10px; cursor: pointer; user-select: none;" id="flipHint" onclick="flipCardManual()" title="Clique para virar o cartão">
+                      👆 Toque no botão abaixo ou no card para ver o verso
+                    </div>
+                  </div>
 
                 <!-- Verso -->
                 <div class="flashcard-side back">
@@ -512,24 +512,28 @@
             </div>
 
             <div class="study-review-actions" aria-label="Navegação e ações do flashcard">
-              <button id="fcPreviousButton" class="btn-outline-action" onclick="navigateFlashcardWithoutAnswer(-1)" title="Volta sem alterar o agendamento do cartão">
-                ◀ Voltar
-              </button>
-              <button class="btn-outline-action" onclick="flipCardManual()">
-                🔄 Virar Cartão
-              </button>
-              <button id="fcNextButton" class="btn-outline-action primary" onclick="navigateFlashcardWithoutAnswer(1)" title="Avança sem registrar resposta nem alterar o agendamento">
-                Próximo ▶
-              </button>
-              <button class="btn-outline-action" onclick="openQuestionDiscussionForCurrentFlashcard()">
-                💬 Perguntar sobre esta questão
-              </button>
-              <button class="btn-outline-action primary" onclick="openDerivedQuestionModalFromCurrentFlashcard()" title="Gerar nova pergunta a partir desta explicação com novos contextos">
-                ✨ Pergunta com Contexto
-              </button>
-              <button class="btn-outline-action danger" onclick="confirmDeleteCurrentCard()" title="Remove esta pergunta do Quiz, Flashcards e filas de revisão">
-                🗑️ Eliminar pergunta
-              </button>
+              <div class="study-review-nav-row">
+                <button id="fcPreviousButton" class="btn-outline-action" onclick="navigateFlashcardWithoutAnswer(-1)" title="Volta sem alterar o agendamento do cartão">
+                  ◀ Voltar
+                </button>
+                <button class="btn-outline-action" onclick="flipCardManual()">
+                  🔄 Virar Cartão
+                </button>
+                <button id="fcNextButton" class="btn-outline-action primary" onclick="navigateFlashcardWithoutAnswer(1)" title="Avança sem registrar resposta nem alterar o agendamento">
+                  Próximo ▶
+                </button>
+              </div>
+              <div class="study-review-tools-row">
+                <button class="btn-outline-action" onclick="openQuestionDiscussionForCurrentFlashcard()">
+                  💬 Perguntar sobre esta questão
+                </button>
+                <button class="btn-outline-action primary" onclick="openDerivedQuestionModalFromCurrentFlashcard()" title="Gerar nova pergunta a partir desta explicação com novos contextos">
+                  ✨ Pergunta com Contexto
+                </button>
+                <button class="btn-outline-action danger" onclick="confirmDeleteCurrentCard()" title="Remove esta pergunta do Quiz, Flashcards e filas de revisão">
+                  🗑️ Eliminar pergunta
+                </button>
+              </div>
             </div>
           </div>
         </section>

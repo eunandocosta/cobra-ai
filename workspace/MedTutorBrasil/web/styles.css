@@ -1,7 +1,12 @@
     /* =========================================================
        VARIÁVEIS DE TEMA: MATERIAL 3 + VERDE NEON (DARK & LIGHT)
        ========================================================= */
+    :root {
+      color-scheme: dark;
+    }
+
     :root[data-theme="dark"] {
+      color-scheme: dark;
       --bg-base: #080A09;
       --bg-surface: #101412;
       --bg-card: #151B18;
@@ -24,6 +29,7 @@
     }
 
     :root[data-theme="light"] {
+      color-scheme: light;
       --bg-base: #F6FAF8;
       --bg-surface: #FFFFFF;
       --bg-card: #FFFFFF;
@@ -1715,48 +1721,45 @@
 
     .flashcard-wrapper {
       perspective: 1000px;
-      max-width: 680px;
+      max-width: 720px;
       width: 100%;
-      margin: 0 auto 24px auto;
+      margin: 0 auto 16px auto;
     }
 
     .flashcard-flip-target {
       position: relative;
       width: 100%;
-      /* Mantém a proporção original do cartão e delimita sua área de leitura. */
-      height: min(560px, calc(100dvh - 250px));
-      min-height: 440px;
     }
 
-    /* Em Safari, uma face 3D invisível pode interceptar a rolagem da outra.
-       Alternamos as faces de verdade para manter a área de leitura utilizável. */
+    /* Alternamos as faces para manter a área de leitura e interação leves e sem sobreposição */
     .flashcard-wrapper:not(.flipped) .flashcard-side.back,
     .flashcard-wrapper.flipped .flashcard-side.front {
       display: none;
     }
 
     .flashcard-side {
-      position: absolute;
+      position: relative;
       width: 100%;
-      height: 100%;
+      min-height: 260px;
+      max-height: min(540px, calc(100dvh - 280px));
       box-sizing: border-box;
       border-radius: 20px;
       border: 1px solid var(--border);
       background: var(--bg-card);
-      padding: 24px 26px;
+      padding: 22px 24px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
       gap: 12px;
       overflow-x: hidden;
-      overflow-y: scroll;
+      overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
       scrollbar-width: thin;
       scrollbar-color: var(--border-accent) transparent;
-      scrollbar-gutter: stable;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      color-scheme: dark;
     }
 
     .flashcard-side > * {
@@ -1764,17 +1767,15 @@
     }
 
     .flashcard-side::-webkit-scrollbar {
-      width: 8px;
+      width: 6px;
     }
 
     .flashcard-side::-webkit-scrollbar-track {
       background: transparent;
-      margin: 12px 0;
     }
 
     .flashcard-side::-webkit-scrollbar-thumb {
       background: var(--border-accent);
-      border: 2px solid var(--bg-card);
       border-radius: 999px;
     }
 
@@ -1863,15 +1864,34 @@
 
     .study-review-actions {
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
-      max-width: 680px;
-      margin: -8px auto 0;
+      max-width: 720px;
+      margin: 14px auto 28px auto;
+      padding-bottom: 24px;
     }
 
-    .study-review-actions .btn-outline-action {
-      min-height: 38px;
+    .study-review-nav-row,
+    .study-review-tools-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .study-review-nav-row .btn-outline-action {
+      min-height: 40px;
+      padding: 8px 18px;
+      font-weight: 600;
+    }
+
+    .study-review-tools-row .btn-outline-action {
+      min-height: 36px;
+      padding: 6px 14px;
+      font-size: 12.5px;
     }
 
     /* Banner de Alerta de Redundância (>= 50%) */
@@ -6987,13 +7007,15 @@
       }
 
       .flashcard-flip-target {
-        height: clamp(440px, 67dvh, 620px);
+        height: auto;
       }
 
       .flashcard-side {
         border-radius: 16px;
         padding: 17px 16px;
         gap: 10px;
+        min-height: 230px;
+        max-height: clamp(380px, 66dvh, 540px);
       }
 
       .card-meta {
@@ -7035,10 +7057,17 @@
       }
 
       .study-review-actions {
+        margin: 12px auto 20px auto;
+        padding-bottom: 16px;
+      }
+
+      .study-review-nav-row,
+      .study-review-tools-row {
         justify-content: stretch;
       }
 
-      .study-review-actions .btn-outline-action {
+      .study-review-nav-row .btn-outline-action,
+      .study-review-tools-row .btn-outline-action {
         flex: 1 1 132px;
       }
 
@@ -7324,7 +7353,7 @@
       }
 
       .flashcard-flip-target {
-        height: clamp(410px, 64dvh, 560px);
+        height: auto;
       }
     }
 
