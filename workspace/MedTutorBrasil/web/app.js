@@ -5504,6 +5504,26 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         return requestId;
       },
 
+      startOperation(title, message, endpoint = 'operação local') {
+        const requestId = `OP-${Date.now().toString(36).toUpperCase()}-${(++this.sequence).toString().padStart(2, '0')}`;
+        this.active += 1;
+        this.last = { requestId, route: title, endpoint, method: 'LOCAL', status: 'em andamento', at: new Date().toISOString(), error: '' };
+        this.render({ state: 'working', title, message });
+        return requestId;
+      },
+
+      finishOperation(requestId, title, message) {
+        this.active = Math.max(0, this.active - 1);
+        this.last = { requestId, route: title, endpoint: 'operação local', method: 'LOCAL', status: 'concluída', at: new Date().toISOString(), error: '' };
+        if (this.active === 0) this.render({ state: 'success', title, message });
+      },
+
+      failOperation(requestId, title, error) {
+        this.active = Math.max(0, this.active - 1);
+        this.last = { requestId, route: title, endpoint: 'operação local', method: 'LOCAL', status: 'falhou', at: new Date().toISOString(), error: String(error?.message || error || 'Erro desconhecido').slice(0, 400) };
+        if (this.active === 0) this.render({ state: 'error', title: `Falha ao ${title.toLowerCase()}`, message: this.last.error, showSupport: true });
+      },
+
       finish(requestId, url, method, response) {
         this.active = Math.max(0, this.active - 1);
         const ok = Boolean(response?.ok);
@@ -15557,13 +15577,16 @@ Retorne EXCLUSIVAMENTE um JSON:
       const confirmed = confirm(`Deseja realmente excluir o conteúdo "${targetName}"${targetSubject ? ` da matéria "${targetSubject}"` : ''}?\n\nEsta ação removerá o slide, análises pedagógicas e relatórios acadêmicos associados.`);
       if (!confirmed) return;
 
-      if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterial === 'function') {
-        await MedTutorFirebaseService.deleteMaterial(materialIdOrName);
-      } else if (typeof chatDriveMaterials !== 'undefined') {
-        chatDriveMaterials = chatDriveMaterials.filter(m => m.id !== materialIdOrName && m.name !== materialIdOrName && m.originalFileName !== materialIdOrName);
-      }
+      const requestId = AppRequestFeedback.startOperation('Excluindo aula', `Removendo "${targetName}" do dispositivo e da nuvem...`);
+      try {
 
-      saveChatDriveMaterials();
+        if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterial === 'function') {
+          await MedTutorFirebaseService.deleteMaterial(materialIdOrName);
+        } else if (typeof chatDriveMaterials !== 'undefined') {
+          chatDriveMaterials = chatDriveMaterials.filter(m => m.id !== materialIdOrName && m.name !== materialIdOrName && m.originalFileName !== materialIdOrName);
+        }
+
+        saveChatDriveMaterials();
 
       if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
       if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
@@ -15586,7 +15609,13 @@ Retorne EXCLUSIVAMENTE um JSON:
         openSubjectDetailModal(targetSubject);
       }
 
-      showToast(`🗑️ Conteúdo "${targetName}" excluído com sucesso!`);
+        showToast(`🗑️ Conteúdo "${targetName}" excluído com sucesso!`);
+        AppRequestFeedback.finishOperation(requestId, 'Aula excluída', `"${targetName}" foi removido com sucesso.`);
+      } catch (error) {
+        console.error('[Materiais] Falha ao excluir aula:', error);
+        AppRequestFeedback.failOperation(requestId, 'excluir aula', error);
+        showToast('⚠️ Não foi possível excluir esta aula.');
+      }
     }
 
     async function removeExactMaterialDuplicates() {
@@ -15628,11 +15657,14 @@ Retorne EXCLUSIVAMENTE um JSON:
       const confirmed = confirm(`Deseja realmente excluir TODOS os ${mats.length} conteúdos/slides da matéria "${target}"?\n\nEsta ação liberará memória, cache e removerá os relatórios acadêmicos associados.`);
       if (!confirmed) return;
 
-      if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
-        await MedTutorFirebaseService.deleteMaterialsBySubject(target);
-      } else if (typeof chatDriveMaterials !== 'undefined') {
-        chatDriveMaterials = chatDriveMaterials.filter(m => !isSameCurriculumSubject(m.subject || m.disciplina, target));
-      }
+      const requestId = AppRequestFeedback.startOperation('Excluindo aulas', `Removendo ${mats.length} aula(s) de "${target}". Isso pode levar alguns instantes...`);
+      try {
+
+        if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
+          await MedTutorFirebaseService.deleteMaterialsBySubject(target);
+        } else if (typeof chatDriveMaterials !== 'undefined') {
+          chatDriveMaterials = chatDriveMaterials.filter(m => !isSameCurriculumSubject(m.subject || m.disciplina, target));
+        }
 
       if (typeof subjectGenerationStatus !== 'undefined') {
         Object.keys(subjectGenerationStatus)
@@ -15655,7 +15687,13 @@ Retorne EXCLUSIVAMENTE um JSON:
         openSubjectDetailModal(target);
       }
 
-      showToast(`🗑️ Todos os conteúdos da matéria "${target}" foram excluídos.`);
+        showToast(`🗑️ Todos os conteúdos da matéria "${target}" foram excluídos.`);
+        AppRequestFeedback.finishOperation(requestId, 'Aulas excluídas', `${mats.length} aula(s) de "${target}" foram removidas.`);
+      } catch (error) {
+        console.error('[Materiais] Falha ao excluir aulas da matéria:', error);
+        AppRequestFeedback.failOperation(requestId, 'excluir aulas', error);
+        showToast('⚠️ Não foi possível excluir todas as aulas desta matéria.');
+      }
     }
 
     async function deleteSubjectData(subjectName) {
