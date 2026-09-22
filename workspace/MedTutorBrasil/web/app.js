@@ -982,6 +982,7 @@
     // pertencem ao gerador, nunca ao estudante que vai ler o PDF.
     function normalizeMaterialMarkdownForReport(markdown) {
       return removeUnresolvedImageArtifacts(markdown)
+        .replace(/^\s*(?:[-*+•●▪]\s*)?(?:>\s*)?(?:\*\*)?(?:Disciplina|Eixo Curricular|Título da Aula|Autor|Instituição|Período|Data)(?:\*\*)?\s*:[^\n]*(?:\n|$)/gim, '')
         .replace(/^\s*>?\s*\*\*(?:Disciplina|Eixo Curricular|Título da Aula)\s*:\*\*[^\n]*(?:\n|$)/gim, '')
         .replace(/^\s*>?\s*(?:Disciplina|Eixo Curricular|Título da Aula)\s*:\s*[^\n]*(?:\n|$)/gim, '')
         .replace(/^\s*(?:\*{1,2}|_)?\s*Elabore\s+\d+\s+quest(?:ão|ões)\b[^\n]*(?:\*{1,2}|_)?\s*$/gim, '')
@@ -8351,7 +8352,13 @@ ${cleanText}
       });
 
       // 2. Limpar comandos LaTeX comuns de formatação de texto e estilos
-      s = s.replace(/\\(text|mathrm|mathbf|mathit|textbf|textit)\{([^}]+)\}/g, '$2');
+      s = s.replace(/\\(text|mathrm|mathbf|mathit|textbf|textit)\s*\{([^}]+)\}/g, '$2');
+      // Alguns modelos emitem o comando de texto sem chaves (p.ex. \textIFN-γ,
+      // \textTNF ou \textIL-1β). Remova o comando e preserve o token inteiro.
+      s = s.replace(/\\text(?=[A-Za-zα-ωΑ-Ω])([A-Za-zα-ωΑ-Ω][A-Za-zα-ωΑ-Ω0-9]*(?:[-/][A-Za-zα-ωΑ-Ω0-9]+)*)/g, '$1');
+      s = s.replace(/\{,\}/g, ',');
+      // Unidades de temperatura costumam vir sem espaço entre o comando e C/F.
+      s = s.replace(/\\circ\s*([CFK])\b/g, '°$1');
 
       // 3. Mapeamento exaustivo de letras gregas (minúsculas e maiúsculas)
       const greekMap = {
@@ -8395,6 +8402,9 @@ ${cleanText}
         const regex = new RegExp(escaped + '(?![a-zA-Z])', 'g');
         s = s.replace(regex, uni);
       }
+
+      // Reconhece também os formatos TeX comuns 38,3^°C e 38,3^{°}C.
+      s = s.replace(/\^\{°\}([CFK])/g, '°$1').replace(/\^°([CFK])/g, '°$1');
 
       // 5. Frações e Raízes
       s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1 / $2)');
@@ -23512,7 +23522,58 @@ Para cada material, retorne um objeto no JSON com:
     // Relatórios são impressos em A4. Preservamos tabelas concisas e consistentes;
     // tabelas largas ou desalinhadas viram itens rotulados para não transbordar.
     function normalizeReportMarkdownForA4(markdown) {
-      const lines = normalizeAsciiDiagramsForReading(markdown).split('\n');
+      const source = String(markdown || '')
+        // Blocos rotulados como texto/ASCII frequentemente contêm fluxogramas
+        // com bordas. Retire apenas a moldura de código; o conteúdo será
+        // reescrito abaixo como prosa/lista simples.
+        .replace(/```(?:text|txt|plaintext|plain|ascii|mermaid)(?:\s+diagram)?[^\n]*\n([\s\S]*?)```/gi, '$1')
+        // Corrige também cabeçalhos que o modelo prefixa incorretamente com
+        // marcador de lista, como "- ## 3. Mecanismos".
+        .replace(/^(\s*)(?:[-*+•●▪]\s+|\d+[.)]\s+)(#{1,6}\s+)/gm, '$1$2');
+      const rawLines = normalizeAsciiDiagramsForReading(source).split('\n');
+      const lines = [];
+      const arrowPattern = /(?:--?>|=>|→|↘|⟶|➜|←|⟵)/g;
+      const rewriteArrowFlow = value => {
+        const marker = String(value).match(/^(\s*[-*+]\s+)/);
+        const bullet = marker?.[0] || '';
+        const content = (bullet ? String(value).slice(bullet.length) : String(value))
+          .replace(/─{2,}|━{2,}/g, ' ')
+          .replace(/\[([^\]]+)\]/g, '$1')
+          .replace(/[│┌┐┘┴]/g, ' ')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        const flowParts = content.split(arrowPattern).map(part => part.trim()).filter(Boolean);
+        if (flowParts.length < 2) return value;
+        const phrase = flowParts.length === 2
+          ? `${flowParts[0]} leva a ${flowParts[1]}`
+          : `Sequência: ${flowParts[0]}; em seguida, ${flowParts.slice(1).join('; depois, ')}`;
+        return bullet + phrase;
+      };
+
+      for (let sourceIndex = 0; sourceIndex < rawLines.length; sourceIndex++) {
+        let line = rawLines[sourceIndex];
+        // Une uma linha quebrada logo após uma seta antes de convertê-la em prosa.
+        while (/(?:--?>|=>|→|↘|⟶|➜|←|⟵)\s*$/.test(line) && sourceIndex + 1 < rawLines.length) {
+          line += ' ' + rawLines[++sourceIndex].trim();
+        }
+
+        // Transforma árvores Unicode (├── / └──) em itens reais, não em texto
+        // colado ao título nem em caixas que escapam da folha.
+        const firstTreeBranch = line.search(/[├└][─━]{1,}/);
+        if (firstTreeBranch >= 0) {
+          const prefix = line.slice(0, firstTreeBranch).trim();
+          const treeBody = line.slice(firstTreeBranch);
+          const entries = treeBody.split(/[├└][─━]{1,}/)
+            .map(entry => entry.replace(/^[│\s─━]+/, '').replace(/[│┌┐┘┴]+/g, ' ').trim())
+            .filter(Boolean);
+          if (prefix) lines.push(rewriteArrowFlow(prefix));
+          entries.forEach(entry => lines.push(rewriteArrowFlow('- ' + entry)));
+          continue;
+        }
+
+        lines.push(rewriteArrowFlow(line));
+      }
+
       const output = [];
       const isPipeRow = line => /^\s*\|.+\|\s*$/.test(line);
       const isSeparator = line => /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
@@ -23658,6 +23719,9 @@ Para cada material, retorne um objeto no JSON com:
         sanitizedAsciiLines.push(curL);
       }
       md = sanitizedAsciiLines.join('\n');
+      // Cabeçalhos precedidos por marcadores de lista são um erro comum de
+      // geração ("- ## Seção"). Remova o marcador para que virem títulos HTML.
+      md = md.replace(/^(\s*)(?:[-*+•●▪]\s+|\d+[.)]\s+)(#{1,6}\s+)/gm, '$1$2');
       // Alguns modelos omitem o separador Markdown (|---|) e prefixam a primeira
       // célula com "1. |". Preserva a numeração como primeira coluna para que a
       // resposta continue renderizável como tabela, em vez de virar texto solto.
@@ -23691,7 +23755,13 @@ Para cada material, retorne um objeto no JSON com:
           continue;
         }
 
-        // 1. Títulos Markdown (H1 até H5)
+        // 1. Títulos Markdown (H1 até H6)
+        if (line.startsWith('###### ')) {
+          if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
+          html += '<h5 class="gemini-h5">' + formatInlineMd(line.slice(7)) + '</h5>';
+          i++;
+          continue;
+        }
         if (line.startsWith('##### ')) {
           if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
           html += '<h5 class="gemini-h5">' + formatInlineMd(line.slice(6)) + '</h5>';
