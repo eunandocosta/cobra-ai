@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { getFirebaseAdmin } = require('../../shared/firebase-admin');
+const { getFirebaseApp, getFirebaseAuth, getFirebaseFirestore } = require('../../shared/firebase-admin');
 
 const ACCESS_CLAIM_REQUIRED = 'medtutorAccessRequired';
 const ACCESS_CLAIM_GRANTED = 'medtutorAccess';
@@ -65,8 +65,7 @@ async function getStatus(decodedToken) {
   if (!isGateEnabled()) {
     if (decodedToken?.uid) {
       try {
-        const admin = getFirebaseAdmin();
-        await updateAccessClaims(admin.auth(), decodedToken.uid, false, { active: true, expiresAtMs: null });
+        await updateAccessClaims(getFirebaseAuth(), decodedToken.uid, false, { active: true, expiresAtMs: null });
       } catch (error) {
         // Access não está sendo cobrado/controlado; Admin não é requisito nesse modo.
       }
@@ -81,11 +80,11 @@ async function getStatus(decodedToken) {
   }
   getCouponConfig();
 
-  const admin = getFirebaseAdmin();
-  const db = admin.firestore();
+  getFirebaseApp();
+  const db = getFirebaseFirestore();
   const grantDoc = await db.collection('access_grants').doc(decodedToken.uid).get();
   const grant = accessSnapshot(grantDoc.exists ? grantDoc.data() : {});
-  await updateAccessClaims(admin.auth(), decodedToken.uid, true, grant);
+  await updateAccessClaims(getFirebaseAuth(), decodedToken.uid, true, grant);
   return {
     required: true,
     active: grant.active,
@@ -112,8 +111,8 @@ async function redeemCoupon(decodedToken, submittedCode) {
     throw error;
   }
 
-  const admin = getFirebaseAdmin();
-  const db = admin.firestore();
+  getFirebaseApp();
+  const db = getFirebaseFirestore();
   const couponHash = hashCoupon(coupon.code);
   const couponEpochHash = hashCoupon(`${couponHash}:${ACCESS_COUPON_VERSION}`);
   const grantRef = db.collection('access_grants').doc(decodedToken.uid);
@@ -162,7 +161,7 @@ async function redeemCoupon(decodedToken, submittedCode) {
   });
 
   const grant = { active: result.active, expiresAtMs: result.expiresAtMs };
-  await updateAccessClaims(admin.auth(), decodedToken.uid, true, grant);
+  await updateAccessClaims(getFirebaseAuth(), decodedToken.uid, true, grant);
   return {
     required: true,
     active: true,
@@ -181,8 +180,17 @@ async function verifyIdToken(idToken) {
   }
   let auth;
   try {
-    auth = getFirebaseAdmin().auth();
+    getFirebaseApp();
+    auth = getFirebaseAuth();
   } catch (cause) {
+    const serviceAccountJson = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+    const credentialsPath = String(process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim();
+    console.error('[Firebase Admin] Falha ao inicializar o SDK:', {
+      event: 'firebase_admin_initialization_failed',
+      code: cause?.code || 'firebase_admin_initialization_failed',
+      errorName: cause?.name || 'Error',
+      credentialSource: serviceAccountJson ? 'FIREBASE_SERVICE_ACCOUNT_JSON' : credentialsPath ? 'GOOGLE_APPLICATION_CREDENTIALS' : 'none'
+    });
     const error = new Error('A autenticação administrativa do Firebase não está configurada no servidor.');
     error.statusCode = 503;
     error.code = 'firebase_admin_not_configured';

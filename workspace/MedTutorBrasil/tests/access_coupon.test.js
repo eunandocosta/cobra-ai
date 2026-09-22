@@ -53,6 +53,30 @@ try {
   await requireAccess({ headers: { authorization: 'Bearer test-token' } }, {}, () => { passed = true; });
   assert.strictEqual(passed, true, 'a valid active entitlement must pass the gate');
   accessService.verifyIdToken = originalVerify;
+
+  const originalFirebaseConfig = {
+    serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+    credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS
+  };
+  const originalConsoleError = console.error;
+  const adminLogs = [];
+  delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  console.error = (...args) => adminLogs.push(args);
+  try {
+    await assert.rejects(accessService.verifyIdToken('test-token'), error =>
+      error.statusCode === 503 && error.code === 'firebase_admin_not_configured'
+    );
+  } finally {
+    console.error = originalConsoleError;
+    if (originalFirebaseConfig.serviceAccount == null) delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    else process.env.FIREBASE_SERVICE_ACCOUNT_JSON = originalFirebaseConfig.serviceAccount;
+    if (originalFirebaseConfig.credentialsPath == null) delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    else process.env.GOOGLE_APPLICATION_CREDENTIALS = originalFirebaseConfig.credentialsPath;
+  }
+  const serializedAdminLog = JSON.stringify(adminLogs);
+  assert(serializedAdminLog.includes('firebase_admin_credentials_missing'), 'Render diagnostics must identify missing Firebase Admin credentials');
+  assert(!serializedAdminLog.includes('private_key'), 'Firebase Admin diagnostics must not log private key material');
   console.log('✅ Testes de configuração do acesso por cupom aprovados.');
 } finally {
   for (const [key, value] of Object.entries({
