@@ -244,6 +244,13 @@ service cloud.firestore {
       }
     }
 
+    // Marcador administrativo do reset de dados de estudo. Cada aluno pode
+    // ler somente o próprio marcador; apenas o Admin SDK pode gravá-lo.
+    match /study_data_reset_markers/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
     // 7. Instituições e Ementas Canônicas
     match /instituicoes/{institutionId} {
       allow read: if isAuthenticated();

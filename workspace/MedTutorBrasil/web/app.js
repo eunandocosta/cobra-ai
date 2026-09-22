@@ -178,6 +178,21 @@
         });
       },
 
+      async remove(storeName, key) {
+        const db = await this.open();
+        if (!db) return false;
+        return new Promise((resolve) => {
+          try {
+            const tx = db.transaction(storeName, 'readwrite');
+            const req = tx.objectStore(storeName).delete(key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => resolve(false);
+          } catch (e) {
+            resolve(false);
+          }
+        });
+      },
+
       async getAll(storeName) {
         const db = await this.open();
         if (!db) return [];
@@ -999,6 +1014,8 @@
       try { localStorage.setItem(`medtutor_firestore_sync_${scope}_${uid}`, JSON.stringify(registry)); } catch (error) {}
     }
 
+    const verifiedStudyResetVersions = Object.create(null);
+
     function splitFirestoreText(value) {
       const text = String(value || '');
       const chunks = [];
@@ -1101,6 +1118,16 @@
         if (!Array.isArray(curriculumArray)) return;
         const uid = this.getUserId();
 
+        if (this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const resetState = await this.verifyStudyDataResetVersion(uid);
+            if (!resetState.allowed) return;
+          } catch (error) {
+            console.warn('[Firestore] Grade não sincronizada até confirmar a versão de reset dos dados.', error);
+            return;
+          }
+        }
+
         // 1. localStorage imediato + IndexedDB (Garante que nunca se perde no F5)
         try {
           localStorage.setItem('medtutor_saved_curriculum', JSON.stringify(curriculumArray));
@@ -1156,6 +1183,61 @@
         }, { merge: true });
         try { localStorage.setItem(this.getCloudDataRevisionKey(uid), revision); } catch (error) {}
         return revision;
+      },
+
+      async clearLocalStudyDataForReset(uid, resetVersion) {
+        await Promise.all([
+          MedTutorLocalDB.remove('materials', uid),
+          MedTutorLocalDB.remove('curriculum', uid),
+          MedTutorLocalDB.remove('questions', uid),
+          MedTutorLocalDB.remove('chats', uid)
+        ]);
+        [
+          'medtutor_chat_materials',
+          'medtutor_chat_materials_summary',
+          'medtutor_saved_curriculum',
+          'medtutor_shared_questions_v2',
+          'medtutor_custom_questions',
+          'medtutor_chat_sessions',
+          `medtutor_firestore_sync_materiais_${uid}`,
+          `medtutor_firestore_sync_questoes_${uid}`,
+          `medtutor_firestore_sync_chats_${uid}`,
+          this.getCloudDataRevisionKey(uid),
+          `medtutor_firestore_last_refresh_recovery_v2_${uid}`
+        ].forEach(key => {
+          try { localStorage.removeItem(key); } catch (error) {}
+        });
+        try {
+          localStorage.setItem(`medtutor_study_data_reset_version_${uid}`, resetVersion);
+        } catch (error) {}
+
+        chatDriveMaterials = [];
+        sharedQuestionsBank = [];
+        chatSessions = [];
+        currentChatSessionId = '';
+        universityCurriculum = [];
+        studyRouteSchedule = [];
+        subjectGenerationStatus = {};
+        currentStudySubject = '';
+        console.info('[Firestore] Cache local de materiais, chats, grade e questões removido após reset administrativo.', { uid });
+      },
+
+      async verifyStudyDataResetVersion(uid) {
+        if (!this.hasAuthenticatedCloudSession(uid)) return { allowed: true, version: '' };
+        if (Object.prototype.hasOwnProperty.call(verifiedStudyResetVersions, uid)) {
+          return { allowed: true, version: verifiedStudyResetVersions[uid] };
+        }
+
+        const markerDoc = await firestoreDb.collection('study_data_reset_markers').doc(uid).get();
+        const resetVersion = String(markerDoc.data()?.version || '');
+        const localVersion = String(localStorage.getItem(`medtutor_study_data_reset_version_${uid}`) || '');
+        if (resetVersion && resetVersion !== localVersion) {
+          await this.clearLocalStudyDataForReset(uid, resetVersion);
+          verifiedStudyResetVersions[uid] = resetVersion;
+          return { allowed: false, version: resetVersion };
+        }
+        verifiedStudyResetVersions[uid] = resetVersion;
+        return { allowed: true, version: resetVersion };
       },
 
       async writeMaterialTextChunks(docRef, markdown) {
@@ -1278,6 +1360,16 @@
       async saveAllMaterials(materialsArray) {
         if (!Array.isArray(materialsArray)) return;
         const uid = this.getUserId();
+
+        if (this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const resetState = await this.verifyStudyDataResetVersion(uid);
+            if (!resetState.allowed) return;
+          } catch (error) {
+            console.warn('[Firestore] Materiais não sincronizados até confirmar a versão de reset dos dados.', error);
+            return;
+          }
+        }
 
         // 1. Salva no IndexedDB (Suporta megabytes de Markdown e dados sem erro de cota)
         await MedTutorLocalDB.set('materials', uid, materialsArray);
@@ -1823,6 +1915,16 @@
         if (!Array.isArray(questionsArray)) return;
         const uid = this.getUserId();
 
+        if (this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const resetState = await this.verifyStudyDataResetVersion(uid);
+            if (!resetState.allowed) return;
+          } catch (error) {
+            console.warn('[Firestore] Questões não sincronizadas até confirmar a versão de reset dos dados.', error);
+            return;
+          }
+        }
+
         // 1. Salva no localStorage imediatamente e no IndexedDB
         try {
           localStorage.setItem('medtutor_shared_questions_v2', JSON.stringify(questionsArray));
@@ -1851,6 +1953,7 @@
                 distratores: q.options || q.quizOptions || [],
                 disciplina: q.subject || '',
                 materia: q.topic || q.subject || '',
+                nome_material: q.slideName || q.materialName || '',
                 doenca: q.disease || '',
                 foco_aprendizagem: q.learningFocus || '',
                 nivel_dificuldade: q.difficultyLevel || '',
@@ -1900,6 +2003,16 @@
       async saveChatSessions(sessionsArray) {
         if (!Array.isArray(sessionsArray)) return;
         const uid = this.getUserId();
+
+        if (this.hasAuthenticatedCloudSession(uid)) {
+          try {
+            const resetState = await this.verifyStudyDataResetVersion(uid);
+            if (!resetState.allowed) return;
+          } catch (error) {
+            console.warn('[Firestore] Chats não sincronizados até confirmar a versão de reset dos dados.', error);
+            return;
+          }
+        }
 
         // 1. IndexedDB + localStorage
         await MedTutorLocalDB.set('chats', uid, sessionsArray);
@@ -2037,9 +2150,21 @@
       // Carrega todo o estado persistido (Garantia de 100% Anti-F5)
       async loadAllDataFromPersistence() {
         const uid = this.getUserId();
+        let studyResetMarker = '';
+        let localResetStateVerified = !this.hasAuthenticatedCloudSession(uid);
+        if (!localResetStateVerified) {
+          try {
+            const resetState = await this.verifyStudyDataResetVersion(uid);
+            studyResetMarker = resetState.version;
+            localResetStateVerified = true;
+          } catch (resetError) {
+            console.warn('[Firestore] Cache de estudo local mantido fora da tela até validar a versão de reset.', resetError);
+          }
+        }
 
         // 1. Tenta carregar do IndexedDB
         try {
+          if (!localResetStateVerified) throw new Error('Não foi possível validar a versão remota de reset dos dados.');
           const loadedMaterials = await MedTutorLocalDB.get('materials', uid);
           if (Array.isArray(loadedMaterials) && loadedMaterials.length > 0) {
             chatDriveMaterials = mergeStudyMaterialsPreservingContent(loadedMaterials);
@@ -2195,7 +2320,7 @@
 
             // Se o estudante pertence à Universo e não possui ementa na nuvem/local, herda a ementa canônica oficial
             const userSchool = String(MedTutorAuthService.userProfile?.faculdade || '').toLowerCase();
-            if ((userSchool.includes('universo') || userSchool.includes('salgado de oliveira')) && (!universityCurriculum || universityCurriculum.length === 0)) {
+            if (!studyResetMarker && (userSchool.includes('universo') || userSchool.includes('salgado de oliveira')) && (!universityCurriculum || universityCurriculum.length === 0)) {
               if (typeof CANONICAL_UNIVERSO_CURRICULUM !== 'undefined') {
                 universityCurriculum = JSON.parse(JSON.stringify(CANONICAL_UNIVERSO_CURRICULUM));
                 await MedTutorLocalDB.set('curriculum', uid, universityCurriculum);
@@ -2224,6 +2349,8 @@
                   // funcionais em uma sessão/dispositivo sem cache local.
                   subject: q.subject || q.disciplina || '',
                   topic: q.topic || q.materia || '',
+                  slideName: q.slideName || q.nome_material || q.materialName || '',
+                  materialName: q.materialName || q.nome_material || q.slideName || '',
                   learningFocus,
                   difficultyLevel,
                   flashcardTitle: q.flashcardTitle || q.titulo_flashcard || q.flashcard?.title || '',
@@ -26846,6 +26973,12 @@ function escapeHtmlText(str) {
     function getTopicsForSubject(subjectName) {
       if (!subjectName) return [];
       const topicsSet = new Set();
+      const addTopic = value => {
+        const topic = String(value || '').trim();
+        if (topic.length < 2 || isExactStudySubject(topic, subjectName)) return;
+        const duplicate = Array.from(topicsSet).some(existing => isExactStudySubject(existing, topic));
+        if (!duplicate) topicsSet.add(topic);
+      };
 
       // 1. Matérias/Tópicos da ementa cadastrada (universityCurriculum ou CANONICAL_UNIVERSO_CURRICULUM)
       let periods = (typeof universityCurriculum !== 'undefined' && Array.isArray(universityCurriculum) && universityCurriculum.length > 0)
@@ -26859,9 +26992,7 @@ function escapeHtmlText(str) {
           if (isExactStudySubject(sName, subjectName)) {
             if (s && Array.isArray(s.topics)) {
               s.topics.forEach(t => {
-                if (t && typeof t === 'string' && t.trim() && !isExactStudySubject(t, subjectName)) {
-                  topicsSet.add(t.trim());
-                }
+                if (t && typeof t === 'string') addTopic(t);
               });
             }
           }
@@ -26873,12 +27004,9 @@ function escapeHtmlText(str) {
         sharedQuestionsBank.forEach(q => {
           if (!q) return;
           if (isExactStudySubject(q.subject || q.disciplina, subjectName)) {
-            // Só o campo de matéria/tópico deve criar uma opção. Título de
-            // arquivo, título do card e diagnóstico são conteúdo, não matérias.
-            const t = (q.topic || q.materia || '').trim();
-            if (t && t.length > 1 && !isExactStudySubject(t, subjectName)) {
-              topicsSet.add(t);
-            }
+            // Preserve os tópicos e o arquivo-fonte sem transformar cada
+            // título individual de flashcard/diagnóstico em uma opção.
+            [q.topic, q.materia, q.slideName, q.materialName, q.nome_material].forEach(addTopic);
           }
         });
       }
@@ -26888,10 +27016,9 @@ function escapeHtmlText(str) {
         chatDriveMaterials.forEach(m => {
           if (!m) return;
           if (isExactStudySubject(m.subject || m.disciplina, subjectName)) {
-            const t = (m.topic || '').trim();
-            if (t && t.length > 1 && !isExactStudySubject(t, subjectName)) {
-              topicsSet.add(t);
-            }
+            // Materiais enviados continuam visíveis, mas somente no filtro da
+            // disciplina à qual foram efetivamente associados.
+            [m.topic, m.name, m.originalFileName, m.title].forEach(addTopic);
           }
         });
       }
@@ -27198,7 +27325,7 @@ function escapeHtmlText(str) {
 
           // Filtro por Matéria / Tópico se selecionado
           if (targetTopic && targetTopic !== 'all') {
-            const matchesTopic = [q.topic, q.materia, q.flashcardTitle, q.titulo_flashcard, q.title, q.learningFocus, q.disease]
+            const matchesTopic = [q.topic, q.materia, q.slideName, q.materialName, q.nome_material, q.flashcardTitle, q.titulo_flashcard, q.title, q.learningFocus, q.disease]
               .some(value => isExactStudySubject(value, targetTopic));
             if (!matchesTopic) return false;
           }
@@ -28794,7 +28921,7 @@ function escapeHtmlText(str) {
 
           // Filtro por Matéria / Conteúdo
           if (targetTopic && targetTopic !== 'all') {
-            const matchesTopic = [q.topic, q.materia, q.flashcardTitle, q.titulo_flashcard, q.title, q.learningFocus, q.disease]
+            const matchesTopic = [q.topic, q.materia, q.slideName, q.materialName, q.nome_material, q.flashcardTitle, q.titulo_flashcard, q.title, q.learningFocus, q.disease]
               .some(value => isExactStudySubject(value, targetTopic));
             if (!matchesTopic) return false;
           }

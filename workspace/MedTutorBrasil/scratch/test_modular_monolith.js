@@ -48,8 +48,11 @@ assert(/topic:\s*q\.topic\s*\|\|\s*q\.materia/.test(appSource), 'questões remot
 const challengeTopicsHelper = appSource.match(/function getTopicsForSubject\(subjectName\) \{[\s\S]*?\n    \}/)?.[0] || '';
 assert(challengeTopicsHelper.includes('isExactStudySubject(q.subject || q.disciplina, subjectName)'), 'o filtro de tópicos deve aceitar apenas questões da disciplina exata');
 assert(!challengeTopicsHelper.includes('.includes(normSubject)'), 'o filtro de tópicos não deve ampliar a disciplina por correspondência parcial');
-assert(!challengeTopicsHelper.includes('q.flashcardTitle') && !challengeTopicsHelper.includes('m.title'), 'títulos de cards/arquivos não devem virar matérias no filtro');
-console.log('[PASS] Questões e matérias de Desafios normalizadas e limitadas à disciplina selecionada');
+assert(!challengeTopicsHelper.includes('q.flashcardTitle'), 'títulos individuais de cards não devem virar matéria no filtro');
+assert(challengeTopicsHelper.includes('m.name') && challengeTopicsHelper.includes('m.originalFileName') && challengeTopicsHelper.includes('m.title'), 'materiais enviados da disciplina devem continuar disponíveis no filtro');
+assert(/slideName:\s*q\.slideName\s*\|\|\s*q\.nome_material/.test(appSource), 'questões devem manter a associação com o arquivo de origem ao recarregar da nuvem');
+assert(/nome_material:\s*q\.slideName\s*\|\|\s*q\.materialName/.test(appSource), 'a associação da questão com o arquivo deve ser persistida no Firestore');
+console.log('[PASS] Questões e materiais enviados são preservados e limitados à disciplina selecionada');
 
 const challengeScoreFunction = appSource.match(/function getChallengeQuestionScore\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const challengeEligibilityFunction = appSource.match(/function isChallengeQuestionEligible\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
@@ -78,12 +81,25 @@ assert(indexContent.includes("'/pagamento'"), 'a rota /pagamento deve ser servid
 assert(appSource.includes("setAppRoute('/pagamento', { replace: true })"), 'contas sem acesso devem ser redirecionadas para /pagamento');
 const chatSaveMethod = appSource.match(/async saveChatSessions\(sessionsArray\)[\s\S]*?(?=\/\/ Upload de imagem)/)?.[0] || '';
 assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
-const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)[\s\S]*?\n      },/)?.[0] || '';
+const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';
 assert(cloudSessionMethod.includes('MedTutorAuthService.accessGranted === true'), 'leituras e escritas do Firestore devem aguardar a liberação do cupom');
 console.log('[PASS] Modal de ativação do cupom acessível e pronto para receber o código');
 
-const rulesVersion = '2026-09-22-v1';
 const firestoreRules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf-8');
+assert(appSource.includes('verifyStudyDataResetVersion(uid)'), 'a sincronização deve conferir a versão do reset antes de persistir dados antigos');
+assert(appSource.includes('medtutor_study_data_reset_version_'), 'o reset remoto deve invalidar caches locais de estudo por conta');
+assert(appSource.includes("collection('perfis_didaticos')"), 'os perfis didáticos devem permanecer em uma coleção distinta');
+const resetScript = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'admin', 'reset-study-data.js'), 'utf-8');
+['materiais_estudo', 'historico_chats', 'grade_curricular', 'banco_questoes'].forEach(name => {
+  assert(resetScript.includes(`'${name}'`), `o reset administrativo deve incluir ${name}`);
+});
+assert(resetScript.includes('perfis_didaticos') && resetScript.includes('Supabase Storage assets'), 'o reset deve preservar perfis didáticos e assets do Supabase');
+assert(resetScript.includes('--execute') && resetScript.includes('--confirm=RESET_ALL_STUDY_DATA'), 'a exclusão global deve exigir confirmação explícita');
+assert(resetScript.includes('study_data_reset_markers'), 'o marcador do reset deve ficar separado do perfil do usuário');
+assert(firestoreRules.includes('match /study_data_reset_markers/{userId}') && firestoreRules.includes('allow read: if isOwner(userId)'), 'o aluno pode ler apenas o próprio marcador administrativo');
+console.log('[PASS] Reset global limitado às quatro coleções solicitadas e compatível com caches antigos');
+
+const rulesVersion = '2026-09-22-v1';
 assert(firestoreRules.includes(rulesVersion), 'firestore.rules deve exigir a versão atual do cupom');
 console.log('[PASS] Firestore exige a versão atual da liberação por cupom');
 
