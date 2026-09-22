@@ -22727,22 +22727,99 @@ Para cada material, retorne um objeto no JSON com:
       }, 700);
     }
 
+    // O SCE não pode usar o texto livre salvo nas questões como chave de
+    // disciplina. Versões antigas gravaram variações como "M009...",
+    // "2º Semestre - M009..." e "Sistemas Humanos 2", que representavam a
+    // mesma matéria e apareciam como linhas duplicadas no painel.
+    function getSceCanonicalDisciplines() {
+      const candidates = getOfficialCurriculumDisciplineList();
+      const grouped = [];
+      candidates.forEach(candidate => {
+        if (!candidate?.name) return;
+        const equivalent = grouped.find(item => isSameCurriculumSubject(item.name, candidate.name));
+        if (!equivalent) {
+          grouped.push({ ...candidate });
+          return;
+        }
+        // Para aliases presentes na própria ementa, preserva o nome mais
+        // informativo (normalmente o que contém o código curricular M###).
+        const score = item => (/^M\d{3}\b/i.test(item?.name || '') ? 10000 : 0)
+          + (/(^|\s)M\d{3}\b/i.test(item?.name || '') ? 1000 : 0)
+          - String(item?.name || '').length
+          + (item?.period ? 10 : 0);
+        if (score(candidate) > score(equivalent)) Object.assign(equivalent, candidate);
+      });
+      return grouped;
+    }
+
+    function resolveSceQuestionDiscipline(question, canonicalDisciplines) {
+      const candidates = [
+        question?.canonicalSubject,
+        question?.curriculumSubject,
+        question?.subject,
+        question?.disciplina,
+        question?.evidence?.subject
+      ].filter(value => String(value || '').trim());
+
+      for (const value of candidates) {
+        const exact = canonicalDisciplines.find(item => isExactStudySubject(item.name, value)
+          || isExactStudySubject(item.fullName, value));
+        if (exact) return exact;
+        const alias = canonicalDisciplines.find(item => isSameCurriculumSubject(item.name, value)
+          || isSameCurriculumSubject(item.fullName, value));
+        if (alias) return alias;
+      }
+
+      // Questões antigas podem ter somente o slide de origem. Nessa situação,
+      // recuperamos a disciplina do material, sem inferir uma matéria por tema.
+      const materialIds = [question?.materialId, question?.material_id, question?.sourceMaterialId];
+      const slideKey = normalizeStudyComparisonText(question?.slideName || question?.materialName || '');
+      const sourceMaterial = (chatDriveMaterials || []).find(material => {
+        if (materialIds.filter(Boolean).some(id => String(material?.id || '') === String(id))) return true;
+        if (!slideKey) return false;
+        return [material?.name, material?.originalFileName, material?.id]
+          .some(value => normalizeStudyComparisonText(value) === slideKey);
+      });
+      if (!sourceMaterial) return null;
+
+      const materialSubject = sourceMaterial.subject || sourceMaterial.disciplina || '';
+      return canonicalDisciplines.find(item => isExactStudySubject(item.name, materialSubject)
+        || isSameCurriculumSubject(item.name, materialSubject)) || null;
+    }
+
     function renderSceBars() {
       const container = document.getElementById('sceDisciplineBars');
       if (!container) return;
 
       const subjectsMap = {};
+      const canonicalDisciplines = getSceCanonicalDisciplines();
       sharedQuestionsBank.forEach(q => {
-        const s = q.subject || 'Geral';
-        if (!subjectsMap[s]) {
-          subjectsMap[s] = { name: s, count: 0, diseases: new Set(), questions: [] };
+        const discipline = resolveSceQuestionDiscipline(q, canonicalDisciplines);
+        // Dados que não pertencem a nenhuma disciplina da ementa não são uma
+        // disciplina válida no SCE. Eles seguem preservados no banco, mas não
+        // poluem o painel nem entram no cálculo de maestria curricular.
+        if (!discipline) return;
+        const key = normalizeStudyComparisonText(discipline.name);
+        if (!subjectsMap[key]) {
+          subjectsMap[key] = {
+            name: discipline.name,
+            period: discipline.period || '',
+            count: 0,
+            diseases: new Set(),
+            questions: []
+          };
         }
-        subjectsMap[s].count++;
-        subjectsMap[s].questions.push(q);
-        if (q.disease) subjectsMap[s].diseases.add(q.disease);
+        subjectsMap[key].count++;
+        subjectsMap[key].questions.push(q);
+        if (q.disease) subjectsMap[key].diseases.add(q.disease);
       });
 
-      const subjectKeys = Object.keys(subjectsMap);
+      const subjectKeys = Object.keys(subjectsMap).sort((first, second) => {
+        const a = subjectsMap[first];
+        const b = subjectsMap[second];
+        const periodNumber = value => Number(String(value || '').match(/\d+/)?.[0] || 999);
+        return periodNumber(a.period) - periodNumber(b.period) || a.name.localeCompare(b.name, 'pt-BR');
+      });
 
       if (subjectKeys.length === 0) {
         container.innerHTML = `
@@ -22815,7 +22892,7 @@ Para cada material, retorne um objeto no JSON com:
           <div class="sce-subject-bar" onclick="openSubjectInTab('${safeItemName}', 'quizzes')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openSubjectInTab('${safeItemName}', 'quizzes');}" title="Clique para praticar questões de ${item.name}" role="button" tabindex="0">
             <div class="bar-labels">
               <span>
-                ${item.name} 
+                ${item.name}
                 <span style="color: var(--text-muted); font-size: 11px;">(${item.count} itens • ${item.diseases.size} afecções${diseaseListStr ? ': ' + diseaseListStr : ''})</span>
               </span>
               <span style="display: flex; align-items: center; gap: 8px;">
