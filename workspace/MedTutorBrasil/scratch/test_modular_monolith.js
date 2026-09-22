@@ -142,6 +142,15 @@ const accessCardMarkup = authMarkup.match(/<section[^>]*id="accessGateCard"[\s\S
 assert(accessCardMarkup.includes('MedTutorAuthService.signOut()'), 'a tela de pagamento deve permitir sair da conta');
 assert(indexContent.includes("'/pagamento'"), 'a rota /pagamento deve ser servida diretamente pelo servidor');
 assert(appSource.includes("setAppRoute('/pagamento', { replace: true })"), 'contas sem acesso devem ser redirecionadas para /pagamento');
+assert(authMarkup.includes('class="route-resolving" data-route="resolving"'), 'o documento deve iniciar numa tela neutra enquanto o Firebase restaura a sessão');
+assert(appSource.includes("setRoutePresentation('resolving')") && appSource.includes("this.setAuthScreenState('checking')"), 'o formulário de login não deve piscar antes da confirmação do Firebase Auth');
+assert(appSource.includes("pendingRoutePath = window.location.pathname || pendingRoutePath || '/login'"), 'a rota solicitada deve ser preservada enquanto o Auth está pendente');
+assert(authMarkup.includes('id="semesterRenameModal"') && authMarkup.includes('id="semesterRenameProgressTrack"'), 'a revisão de renomeação deve exibir modal e barra de progresso');
+assert(appSource.includes('function readMaterialTextDirectlyFromFirestore(doc)') && appSource.includes('readMaterialTextChunks(doc.ref'), 'a renomeação deve ler o conteúdo e os chunks diretamente do Firestore');
+assert(appSource.includes('async function analyzeSemesterSubjectNames(periodId)') && appSource.includes('classifyMaterialWithServerGemini(text, name, selectedCat.period)'), 'a análise por semestre deve classificar o conteúdo contra o catálogo oficial com Gemini');
+assert(appSource.includes('async function applySemesterSubjectRenameReview()') && appSource.includes("disciplina: item.newSubject") && appSource.includes("subject: item.newSubject"), 'a prévia confirmada deve atualizar os rótulos no mesmo documento sem recriá-lo');
+console.log('[PASS] Renomeação de matérias por semestre lê o Firestore, mostra progresso e grava somente após confirmação');
+console.log('[PASS] Recarregar preserva a rota solicitada e aguarda confirmação segura do Firebase Auth');
 const chatSaveMethod = appSource.match(/async saveChatSessions\(sessionsArray\)[\s\S]*?(?=\/\/ Upload de imagem)/)?.[0] || '';
 assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';

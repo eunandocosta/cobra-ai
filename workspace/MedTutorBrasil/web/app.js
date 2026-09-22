@@ -430,9 +430,9 @@
       },
 
       init() {
-        // Até o Firebase confirmar a sessão, a rota pública é sempre /login.
-        // Isso evita que o shell de estudo apareça durante a hidratação.
-        setRoutePresentation('login');
+        // Mantém uma tela neutra até o Firebase confirmar a identidade. Não
+        // troque a rota solicitada por /login durante a hidratação do Auth.
+        setRoutePresentation('resolving');
         // Carrega dados locais persistidos do usuário
         try {
           // A identidade nunca é restaurada visualmente do localStorage.
@@ -452,16 +452,18 @@
         // Atualiza a UI da topbar
         this.updateUserTopbarUI();
 
-        // Enquanto a confirmação assíncrona do Firebase não chega, mantém a
-        // interface do último usuário visível. A autenticação real continua
-        // sendo exigida por hasAuthenticatedCloudSession().
-        this.setAuthScreenState(this.currentUser ? 'checking' : 'login');
+        // Não derive a identidade de cache local: aguarde sempre o Firebase.
+        // Isso evita o flash do formulário de login ao recarregar uma sessão.
+        if (!this.authStateResolved) this.setAuthScreenState('checking');
+        else if (!this.currentUser) this.setAuthScreenState('login');
       },
 
       initFirebaseSDK() {
         if (typeof firebase === 'undefined') {
           console.log('[MedTutor Firebase] SDK não detectado no ambiente, operando em modo local resiliente.');
           this.authStateResolved = true;
+          setRoutePresentation('login');
+          this.setAuthScreenState('login');
           if (this.authMode === 'restoring') {
             this.currentUser = null;
             this.authMode = 'guest';
@@ -530,6 +532,10 @@
                 else switchAuthTab('login');
               }
             });
+          } else {
+            this.authStateResolved = true;
+            setRoutePresentation('login');
+            this.setAuthScreenState('login');
           }
 
           if (firebase.firestore) {
@@ -549,6 +555,9 @@
           this.updateFirebaseConfigModalUI();
         } catch (e) {
           console.warn('[MedTutor Firebase] Inicialização em modo local resiliente:', e);
+          this.authStateResolved = true;
+          setRoutePresentation('login');
+          this.setAuthScreenState('login');
         }
       },
 
@@ -2787,8 +2796,8 @@
 
     function setRoutePresentation(routeName) {
       if (typeof document === 'undefined') return;
-      document.body.classList.remove('route-login', 'route-payment', 'route-app');
-      const routeClass = routeName === 'payment' ? 'route-payment' : (routeName === 'login' ? 'route-login' : 'route-app');
+      document.body.classList.remove('route-login', 'route-payment', 'route-app', 'route-resolving');
+      const routeClass = routeName === 'payment' ? 'route-payment' : (routeName === 'login' ? 'route-login' : (routeName === 'resolving' ? 'route-resolving' : 'route-app'));
       document.body.classList.add(routeClass);
       document.body.dataset.route = routeName;
     }
@@ -2827,6 +2836,12 @@
     }
 
     function handleAppRouteChange() {
+      if (!MedTutorAuthService?.authStateResolved) {
+        pendingRoutePath = window.location.pathname || pendingRoutePath || '/login';
+        setRoutePresentation('resolving');
+        MedTutorAuthService?.setAuthScreenState('checking');
+        return;
+      }
       if (!MedTutorAuthService?.currentUser) {
         pendingRoutePath = window.location.pathname || '/login';
         setRoutePresentation('login');
@@ -2845,7 +2860,7 @@
 
     if (typeof window !== 'undefined') {
       window.addEventListener('popstate', handleAppRouteChange);
-      setRoutePresentation('login');
+      setRoutePresentation('resolving');
     }
 
     const viewTitles = {
@@ -21574,6 +21589,299 @@ Para cada material, retorne um objeto no JSON com:
       renderCurriculumGrid();
     }
 
+    let semesterSubjectRenameReview = null;
+
+    function setSemesterRenameProgress({ title, detail, progress = 0, loading = true } = {}) {
+      const titleEl = document.getElementById('semesterRenameStatusTitle');
+      const detailEl = document.getElementById('semesterRenameStatusDetail');
+      const bar = document.getElementById('semesterRenameProgressFill');
+      const barWrap = document.getElementById('semesterRenameProgressTrack');
+      const spinner = document.getElementById('semesterRenameSpinner');
+      if (titleEl && title) titleEl.textContent = title;
+      if (detailEl && detail !== undefined) detailEl.textContent = detail;
+      if (bar) bar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+      if (barWrap) barWrap.setAttribute('aria-valuenow', String(Math.round(progress)));
+      if (spinner) spinner.style.display = loading ? 'inline-block' : 'none';
+      const applyBtn = document.getElementById('btnApplySemesterRename');
+      const cancelBtn = document.getElementById('btnCancelSemesterRename');
+      if (applyBtn) applyBtn.disabled = loading;
+      if (cancelBtn) cancelBtn.disabled = loading;
+      const results = document.getElementById('semesterRenameResults');
+      if (results && loading) results.innerHTML = '';
+    }
+
+    function showSemesterRenameModal() {
+      const modal = document.getElementById('semesterRenameModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeSemesterRenameModal() {
+      if (semesterSubjectRenameReview?.loading) return;
+      document.getElementById('semesterRenameModal')?.classList.remove('active');
+      semesterSubjectRenameReview = null;
+    }
+
+    function handleSemesterRenameBackdrop(event) {
+      if (event?.target?.id === 'semesterRenameModal') closeSemesterRenameModal();
+    }
+
+    function periodNumberFromLabel(value) {
+      const text = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const numeric = text.match(/\b(1[0-2]|[1-9])\s*(?:º|ª|o)?\s*(?:semestre|periodo|fase|termo|etapa|ano)\b/);
+      if (numeric) return Number(numeric[1]);
+      const words = [
+        ['primeiro', 1], ['segundo', 2], ['terceiro', 3], ['quarto', 4], ['quinto', 5],
+        ['sexto', 6], ['setimo', 7], ['oitavo', 8], ['nono', 9], ['decimo', 10], ['decimo primeiro', 11], ['decimo segundo', 12]
+      ];
+      const explicitType = /\b(semestre|periodo|fase|termo|etapa|ano)\b/.test(text);
+      if (!explicitType) return null;
+      const found = words.find(([word]) => new RegExp(`\\b${word}\\b`).test(text));
+      return found?.[1] || null;
+    }
+
+    function getSemesterEvidenceForMaterial(data, selectedPeriod, allSubjects) {
+      const targetNumber = periodNumberFromLabel(selectedPeriod);
+      const explicitFields = [data.periodo, data.semestre, data.period, data.fullName, data.full_name];
+      const explicitNumbers = explicitFields.map(periodNumberFromLabel).filter(Number.isFinite);
+      const currentSubject = String(data.disciplina || data.subject || '').trim();
+      const knownSubject = (allSubjects || []).find(item => isSameCurriculumSubject(item.name, currentSubject));
+      const knownNumber = knownSubject ? periodNumberFromLabel(knownSubject.period || knownSubject.fullPeriod) : null;
+      const labelNumber = periodNumberFromLabel(currentSubject);
+      const evidence = explicitNumbers.length ? explicitNumbers : [knownNumber, labelNumber].filter(Number.isFinite);
+      if (targetNumber && evidence.some(number => number === targetNumber)) return 'selected-period';
+      if (evidence.some(number => targetNumber && number !== targetNumber)) return 'other-period';
+      if (knownSubject && knownNumber === targetNumber) return 'curriculum-match';
+      return 'unknown-period';
+    }
+
+    async function readMaterialTextDirectlyFromFirestore(doc) {
+      const data = doc.data() || {};
+      const candidates = [
+        data.material_md, data.materialMd, data.conteudo_md, data.conteudoMd,
+        data.markdownText, data.markdown, data.texto, data.text, data.conteudo,
+        data.content, data.corpo, data.body
+      ].filter(text => typeof text === 'string' && text.trim() && !isSyntheticDriveSummary(text));
+      if (data.conteudo_armazenamento === 'chunks_v1' || Number(data.conteudo_chunks) > 0) {
+        const chunkText = await MedTutorFirebaseService.readMaterialTextChunks(doc.ref, Number(data.conteudo_chunks) || 1000);
+        if (chunkText.trim()) candidates.push(chunkText);
+      }
+      candidates.sort((a, b) => b.length - a.length);
+      const contentText = String(candidates[0] || '').trim();
+      const visualEvidence = (Array.isArray(data.figuras_clinicas) ? data.figuras_clinicas : (Array.isArray(data.clinicalImages) ? data.clinicalImages : []))
+        .map(image => [
+          image?.title,
+          image?.clinicalLabel,
+          image?.visualAssociation,
+          Array.isArray(image?.visibleStructures) ? image.visibleStructures.join(', ') : '',
+          image?.studyQuestion
+        ].filter(Boolean).join(' — '))
+        .filter(Boolean)
+        .join('\n');
+      const supportingText = [
+        typeof data.sintese_pedagogica === 'string' ? data.sintese_pedagogica : '',
+        typeof data.descriptiveIndex === 'string' ? data.descriptiveIndex : (data.descriptiveIndex ? JSON.stringify(data.descriptiveIndex) : ''),
+        visualEvidence ? `Associações visuais registradas no Firestore:\n${visualEvidence}` : ''
+      ].filter(Boolean).join('\n\n').slice(0, 20000);
+      return [contentText, supportingText && supportingText !== contentText ? supportingText : ''].filter(Boolean).join('\n\n').trim();
+    }
+
+    function renderSemesterRenamePreview(review) {
+      const resultsEl = document.getElementById('semesterRenameResults');
+      if (!resultsEl) return;
+      const changes = review.items.filter(item => item.status === 'ready' || item.status === 'updated');
+      const pendingChanges = review.items.filter(item => item.status === 'ready');
+      const skipped = review.items.filter(item => item.status !== 'ready' && item.status !== 'updated');
+      resultsEl.innerHTML = [
+        ...changes.map(item => `
+          <div class="semester-rename-result">
+            <span><strong>${escapeHtml(item.name)}</strong><br>${escapeHtml(item.oldSubject)}${item.oldTopic ? ` · ${escapeHtml(item.oldTopic)}` : ''}</span>
+            <span aria-hidden="true" style="color:var(--neon);font-weight:800">→</span>
+            <span><strong style="color:var(--neon)">${escapeHtml(item.newSubject)}</strong><br>${escapeHtml(item.newTopic || item.oldTopic || 'Tema sem alteração')}${item.status === 'updated' ? '<br><small style="color:var(--neon-green,#00ff66)">Salvo no Firestore</small>' : ''}</span>
+          </div>`),
+        ...skipped.map(item => `
+          <div class="semester-rename-result" style="border-color:rgba(255,170,0,.28)">
+            <span><strong>${escapeHtml(item.name)}</strong><br>${escapeHtml(item.oldSubject || 'Disciplina não identificada')}</span>
+            <span style="color:var(--text-muted)">—</span>
+            <span style="color:var(--text-secondary)">${escapeHtml(item.reason || (item.status === 'unchanged' ? 'Nome já está coerente com o conteúdo.' : 'Não alterado; precisa de revisão'))}</span>
+          </div>`)
+      ].join('') || '<p style="color:var(--text-secondary);text-align:center">Nenhum material elegível foi encontrado neste semestre.</p>';
+
+      setSemesterRenameProgress({
+        title: review.error ? 'Análise interrompida' : 'Prévia da organização',
+        detail: review.error || review.message || (review.items.some(item => item.status === 'updated')
+          ? `${review.items.filter(item => item.status === 'updated').length} material(is) atualizado(s); ${pendingChanges.length} alteração(ões) ainda pendentes; ${skipped.length} ignorado(s).`
+          : `${changes.length} material(is) com sugestão segura; ${skipped.length} ignorado(s). Nada foi salvo ainda.`),
+        progress: 100,
+        loading: false
+      });
+      const applyBtn = document.getElementById('btnApplySemesterRename');
+      if (applyBtn) {
+        applyBtn.style.display = pendingChanges.length && !review.error ? 'inline-flex' : 'none';
+        applyBtn.textContent = `Aplicar ${pendingChanges.length} alteração(ões)`;
+      }
+    }
+
+    async function analyzeSemesterSubjectNames(periodId) {
+      const selectedCat = (universityCurriculum || []).find(period => period.id === periodId || period.period === periodId);
+      if (!selectedCat) return showToast('⚠️ Não encontrei o semestre selecionado na ementa.');
+      const uid = MedTutorAuthService.currentUser?.uid;
+      if (!MedTutorFirebaseService.hasAuthenticatedCloudSession(uid)) {
+        return showToast('⚠️ Entre com uma conta autorizada antes de analisar os materiais do Firestore.');
+      }
+      if (!firestoreDb || !isFirebaseCloudActive) return showToast('⚠️ O Firestore não está disponível nesta sessão.');
+
+      const allSubjects = getOfficialCurriculumDisciplineList();
+      const semesterCatalog = allSubjects.filter(subject => periodNumberFromLabel(subject.period || subject.fullPeriod) === periodNumberFromLabel(selectedCat.period));
+      if (!semesterCatalog.length) return showToast('⚠️ Não há disciplinas oficiais válidas para este semestre.');
+
+      semesterSubjectRenameReview = { loading: true, period: selectedCat.period, uid, items: [] };
+      showSemesterRenameModal();
+      setSemesterRenameProgress({ title: `Lendo o ${selectedCat.period} no Firestore`, detail: 'Buscando os materiais salvos e identificando os que pertencem a este semestre…', progress: 2, loading: true });
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      try {
+        const materialsRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+        const snapshot = await materialsRef.get();
+        const eligibleDocs = snapshot.docs.filter(doc => {
+          const data = doc.data() || {};
+          const evidence = getSemesterEvidenceForMaterial(data, selectedCat.period, allSubjects);
+          return evidence === 'selected-period' || evidence === 'curriculum-match';
+        });
+        const items = [];
+        const total = eligibleDocs.length;
+        if (!total) {
+          semesterSubjectRenameReview.loading = false;
+          semesterSubjectRenameReview.items = [];
+          semesterSubjectRenameReview.message = `Nenhum material do ${selectedCat.period} foi identificado com segurança entre ${snapshot.size} registros do Firestore.`;
+          renderSemesterRenamePreview(semesterSubjectRenameReview);
+          return;
+        }
+
+        for (let index = 0; index < eligibleDocs.length; index++) {
+          const doc = eligibleDocs[index];
+          const data = doc.data() || {};
+          const name = data.nome || data.name || data.originalFileName || doc.id;
+          setSemesterRenameProgress({
+            title: `Lendo materiais do ${selectedCat.period}`,
+            detail: `Material ${index + 1} de ${total}: ${name}`,
+            progress: 5 + Math.round((index / total) * 25),
+            loading: true
+          });
+          let text = '';
+          try { text = await readMaterialTextDirectlyFromFirestore(doc); }
+          catch (error) {
+            items.push({ id: doc.id, name, oldSubject: data.disciplina || data.subject || '', status: 'skipped', reason: `Falha ao ler o texto/chunks do Firestore: ${error.message}` });
+            continue;
+          }
+          if (text.length < 80) {
+            items.push({ id: doc.id, name, oldSubject: data.disciplina || data.subject || '', status: 'skipped', reason: 'O Firestore não contém texto suficiente para classificar com segurança.' });
+            continue;
+          }
+
+          setSemesterRenameProgress({
+            title: `Analisando conteúdo com Gemini`,
+            detail: `Material ${index + 1} de ${total}: ${name}`,
+            progress: 30 + Math.round((index / total) * 65),
+            loading: true
+          });
+          try {
+            const classification = await classifyMaterialWithServerGemini(text, name, selectedCat.period);
+            const validSubject = semesterCatalog.find(subject => subject.name === classification.matchedSubject);
+            const oldSubject = String(data.disciplina || data.subject || '').trim();
+            const oldTopic = String(data.materia || data.topic || '').trim();
+            const confidence = Number(classification.confidencePercent) || 0;
+            if (!validSubject) {
+              items.push({ id: doc.id, name, oldSubject, oldTopic, status: 'skipped', reason: `A sugestão não pertence ao catálogo do ${selectedCat.period}.` });
+              continue;
+            }
+            if (confidence < 60) {
+              items.push({ id: doc.id, name, oldSubject, oldTopic, status: 'skipped', reason: `Confiança baixa (${confidence}%). Nenhuma alteração automática sugerida.` });
+              continue;
+            }
+            const newTopic = String(classification.suggestedTitle || oldTopic).trim().slice(0, 200);
+            const changed = normalizeStudyComparisonText(oldSubject) !== normalizeStudyComparisonText(validSubject.name)
+              || (newTopic && normalizeStudyComparisonText(newTopic) !== normalizeStudyComparisonText(oldTopic));
+            items.push({ id: doc.id, name, oldSubject, oldTopic, newSubject: validSubject.name, newTopic, confidence, status: changed ? 'ready' : 'unchanged' });
+          } catch (error) {
+            items.push({ id: doc.id, name, oldSubject: data.disciplina || data.subject || '', oldTopic: data.materia || data.topic || '', status: 'skipped', reason: `Gemini não conseguiu classificar: ${error.message}` });
+          }
+        }
+
+        semesterSubjectRenameReview = { loading: false, period: selectedCat.period, uid, items };
+        renderSemesterRenamePreview(semesterSubjectRenameReview);
+      } catch (error) {
+        semesterSubjectRenameReview = { loading: false, period: selectedCat.period, uid, items: [], error: `Não foi possível concluir a leitura do Firestore: ${error.message}` };
+        renderSemesterRenamePreview(semesterSubjectRenameReview);
+      }
+    }
+
+    async function applySemesterSubjectRenameReview() {
+      const review = semesterSubjectRenameReview;
+      if (!review || review.loading || !MedTutorFirebaseService.hasAuthenticatedCloudSession(review.uid)) return;
+      const changes = review.items.filter(item => item.status === 'ready');
+      if (!changes.length) return;
+      const confirmed = window.confirm(`Aplicar ${changes.length} renomeação(ões) analisadas para ${review.period}? Os arquivos, chunks, imagens, relatórios e IDs serão preservados.`);
+      if (!confirmed) return;
+
+      review.loading = true;
+      setSemesterRenameProgress({ title: 'Salvando as alterações no Firestore', detail: `Gravando 0 de ${changes.length} materiais…`, progress: 2, loading: true });
+      const committedChanges = [];
+      try {
+        const ref = firestoreDb.collection('users').doc(review.uid).collection('materiais_estudo');
+        for (let start = 0; start < changes.length; start += 400) {
+          const batch = firestoreDb.batch();
+          const portion = changes.slice(start, start + 400);
+          portion.forEach(item => batch.update(ref.doc(item.id), {
+            disciplina: item.newSubject,
+            subject: item.newSubject,
+            materia: item.newTopic || item.oldTopic || item.name,
+            topic: item.newTopic || item.oldTopic || item.name,
+            atualizadoEm: new Date().toISOString()
+          }));
+          await batch.commit();
+          committedChanges.push(...portion);
+          const committedById = new Map(committedChanges.map(item => [item.id, item]));
+          chatDriveMaterials = (chatDriveMaterials || []).map(material => {
+            const change = committedById.get(material.id);
+            return change ? { ...material, subject: change.newSubject, disciplina: change.newSubject, topic: change.newTopic || change.oldTopic || material.topic, materia: change.newTopic || change.oldTopic || material.topic } : material;
+          });
+          await MedTutorLocalDB.set('materials', review.uid, chatDriveMaterials);
+          const written = Math.min(start + portion.length, changes.length);
+          setSemesterRenameProgress({ title: 'Salvando as alterações no Firestore', detail: `Gravado(s) ${written} de ${changes.length} materiais…`, progress: Math.round((written / changes.length) * 100), loading: true });
+        }
+
+        try { await MedTutorFirebaseService.markCloudDataRevision(review.uid); }
+        catch (revisionError) { console.warn('[Firestore] Renomeação salva; a marca de revisão remota não pôde ser atualizada:', revisionError); }
+        review.loading = false;
+        review.items = review.items.map(item => item.status === 'ready' ? { ...item, status: 'updated' } : item);
+        renderSemesterRenamePreview(review);
+        const titleEl = document.getElementById('semesterRenameStatusTitle');
+        const detailEl = document.getElementById('semesterRenameStatusDetail');
+        if (titleEl) titleEl.textContent = 'Renomeação concluída';
+        if (detailEl) detailEl.textContent = `${changes.length} material(is) atualizado(s) no Firestore. Nenhum arquivo, chunk, imagem, relatório ou questão foi excluído.`;
+        showToast(`✅ ${changes.length} material(is) do ${review.period} renomeado(s) com base no conteúdo do Firestore.`);
+        renderCurriculumGrid();
+        updateSubjectFilterMenus();
+      } catch (error) {
+        review.loading = false;
+        let failureTitle = 'Falha ao salvar';
+        let failureDetail = `O Firestore recusou a atualização: ${error.message}. Nenhuma alteração foi gravada.`;
+        if (committedChanges.length) {
+          const committedIds = new Set(committedChanges.map(item => item.id));
+          review.items = review.items.map(item => committedIds.has(item.id) ? { ...item, status: 'updated' } : item);
+          try { await MedTutorFirebaseService.markCloudDataRevision(review.uid); } catch (revisionError) {}
+          failureTitle = 'Salvamento parcial';
+          failureDetail = `${committedChanges.length} de ${changes.length} materiais foram salvos. As sugestões restantes continuam pendentes: ${error.message}`;
+        }
+        review.message = failureDetail;
+        renderSemesterRenamePreview(review);
+        setSemesterRenameProgress({ title: failureTitle, detail: failureDetail, progress: 100, loading: false });
+        showToast(committedChanges.length
+          ? `⚠️ ${committedChanges.length} de ${changes.length} renomeações foram salvas; revise os itens restantes.`
+          : '⚠️ Não foi possível salvar as renomeações no Firestore. Nenhuma alteração foi gravada.');
+      }
+    }
+
     let currentDetailedSubjectName = '';
 
     function openSubjectDetailModal(subjectName) {
@@ -21934,6 +22242,9 @@ Para cada material, retorne um objeto no JSON com:
                     ${catSubjCount} ${catSubjCount === 1 ? 'disciplina' : 'disciplinas'} neste período ${activeCountInPeriod > 0 ? `• <strong style="color: #00ff66;">${activeCountInPeriod} com aulas ativas</strong>` : ''}
                   </div>
                 </div>
+                <button class="btn-outline-action primary" type="button" onclick="analyzeSemesterSubjectNames('${escapedPeriodId}')" title="Ler os materiais deste semestre no Firestore e sugerir a disciplina correta com base no conteúdo">
+                  ✨ Organizar matérias pelo conteúdo
+                </button>
               </div>
 
               <div class="curriculum-detail-subjects-list">
