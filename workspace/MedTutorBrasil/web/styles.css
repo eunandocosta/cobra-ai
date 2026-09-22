@@ -5579,6 +5579,73 @@
       display: flex;
     }
 
+    .auth-screen-overlay.auth-access-mode .auth-card:not(#accessGateCard) {
+      display: none;
+    }
+
+    .auth-screen-overlay #accessGateCard {
+      display: none;
+    }
+
+    .auth-screen-overlay.auth-access-mode #accessGateCard {
+      display: flex !important;
+    }
+
+    .access-account-summary {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px 14px;
+      border: 1px solid var(--border-accent);
+      border-radius: 12px;
+      background: var(--neon-subtle);
+      min-width: 0;
+    }
+
+    .access-account-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      color: #06120b;
+      background: var(--neon);
+      font-weight: 800;
+    }
+
+    .access-account-summary div {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .access-account-summary strong { font-size: 12px; }
+    .access-account-summary small {
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    .access-gate-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .access-gate-actions button {
+      flex: 1;
+      justify-content: center;
+      min-height: 40px;
+    }
+
+    #accessCouponError:empty { display: none; }
+
+    @media (max-width: 480px) {
+      .auth-screen-overlay { padding: 14px; }
+      .auth-screen-overlay.auth-access-mode #accessGateCard { padding: 25px 20px; }
+      .access-gate-actions { flex-direction: column; }
+    }
+
     .auth-card {
       width: 100%;
       max-width: 440px;

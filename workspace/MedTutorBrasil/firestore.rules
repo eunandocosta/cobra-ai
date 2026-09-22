@@ -84,8 +84,17 @@ service cloud.firestore {
     // ===============================================================
     // Funções Auxiliares de Segurança e Validação
     // ===============================================================
+    // Aplique esta regra junto com a ativação do cupom no servidor. O Admin SDK
+    // define a custom claim somente depois de validar e registrar uma ativação.
+    function hasActiveStudyAccess() {
+      return request.auth != null &&
+        request.auth.token.medtutorAccess == true &&
+        (!('medtutorAccessExpiresAt' in request.auth.token) ||
+          request.auth.token.medtutorAccessExpiresAt > request.time.toMillis());
+    }
+
     function isAuthenticated() {
-      return request.auth != null;
+      return hasActiveStudyAccess();
     }
 
     function isOwner(userId) {

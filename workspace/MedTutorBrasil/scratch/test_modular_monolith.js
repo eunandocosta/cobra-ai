@@ -33,7 +33,7 @@ console.log('[PASS] index.js livre de regras de negócio acopladas');
 const modulesDir = path.join(__dirname, '..', 'src', 'modules');
 assert(fs.existsSync(modulesDir), 'Diretório src/modules deve existir');
 
-const requiredModules = ['auth', 'ementas', 'relatorios', 'quizzes', 'chat'];
+const requiredModules = ['auth', 'access', 'ementas', 'relatorios', 'quizzes', 'chat'];
 for (const mod of requiredModules) {
   const modPath = path.join(modulesDir, mod);
   assert(fs.existsSync(modPath), `Módulo '${mod}' deve existir em src/modules/`);
@@ -113,6 +113,17 @@ server.listen(TEST_PORT, async () => {
     assert.strictEqual(profile.statusCode, 200);
     assert.strictEqual(profile.body.email, 'aluno@medicina.uf.br');
     console.log(`[PASS] GET /api/auth/profile -> 200 OK (${profile.body.nome})`);
+
+    const accessStatus = await makeRequest('GET', '/api/access/status');
+    assert.strictEqual(accessStatus.statusCode, 200);
+    assert.strictEqual(accessStatus.body.required, false, 'coupon gate must remain off by default');
+    console.log('[PASS] GET /api/access/status -> 200 OK (gate desligado por padrão)');
+
+    process.env.ACCESS_GATE_ENABLED = 'true';
+    const blockedWithoutSession = await makeRequest('GET', '/api/ementas');
+    assert.strictEqual(blockedWithoutSession.statusCode, 401, 'study APIs must require a Firebase token when the coupon gate is enabled');
+    console.log('[PASS] GET /api/ementas sem token -> 401 quando o gate é ativado');
+    process.env.ACCESS_GATE_ENABLED = 'false';
 
     // Test 3: Ementas Module
     const ementas = await makeRequest('GET', '/api/ementas');

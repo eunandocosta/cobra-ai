@@ -23,6 +23,32 @@
     let supabaseStorageInitPromise = null;
     let disciplineQuestionBankCache = {};
 
+    // Quando o portão por cupom estiver ativo, as chamadas ao backend levam o
+    // token Firebase da sessão atual. Nenhum dado de credencial Admin chega ao browser.
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function' && !window.fetch.__medtutorAuthAware) {
+      const nativeFetch = window.fetch.bind(window);
+      const authAwareFetch = async (input, options = {}) => {
+        let requestUrl = '';
+        try {
+          const rawUrl = typeof input === 'string' ? input : input?.url;
+          requestUrl = new URL(rawUrl, window.location.href).href;
+          const parsedUrl = new URL(requestUrl);
+          if (parsedUrl.origin === window.location.origin && parsedUrl.pathname.startsWith('/api/') && firebaseAuth?.currentUser) {
+            const headers = new Headers(options.headers || (input instanceof Request ? input.headers : undefined));
+            if (!headers.has('Authorization')) {
+              headers.set('Authorization', `Bearer ${await firebaseAuth.currentUser.getIdToken()}`);
+            }
+            options = { ...options, headers };
+          }
+        } catch (error) {
+          // Mantém a chamada original; a rota protegida responderá se faltar sessão.
+        }
+        return nativeFetch(input, options);
+      };
+      authAwareFetch.__medtutorAuthAware = true;
+      window.fetch = authAwareFetch;
+    }
+
     // Ementa Canônica Oficial da Faculdade Universo (14 períodos, 104 matérias médicas)
     var CANONICAL_UNIVERSO_CURRICULUM = [{"id":"period_1__semestre","period":"1º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_i","name":"AC Atividades Complementares I","topics":["AC Atividades Complementares I"],"masteryXp":0,"studiedCount":0},{"id":"m001_habilidades_e_atitudes_profissionais_i","name":"M001 Habilidades e Atitudes Profissionais I","topics":["M001 Habilidades e Atitudes Profissionais I"],"masteryXp":0,"studiedCount":0},{"id":"m002_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_i","name":"M002 Ações Integrais em Saúde: Ensino, Serviço e Comunidade I","topics":["M002 Ações Integrais em Saúde: Ensino, Serviço e Comunidade I"],"masteryXp":0,"studiedCount":0},{"id":"m003_bases_moleculares_dos_seres_vivos","name":"M003 Bases Moleculares dos Seres Vivos","topics":["M003 Bases Moleculares dos Seres Vivos"],"masteryXp":0,"studiedCount":0},{"id":"m004_biologia_do_desenvolvimento","name":"M004 Biologia do Desenvolvimento","topics":["M004 Biologia do Desenvolvimento"],"masteryXp":0,"studiedCount":0},{"id":"m005_integra__o_de_sistemas_humanos_i__sistema_musculoesquel_tico_","name":"M005 Integração de Sistemas Humanos I (Sistema Musculoesquelético)","topics":["M005 Integração de Sistemas Humanos I (Sistema Musculoesquelético)"],"masteryXp":0,"studiedCount":0},{"id":"m006_forma__o_cidad__i__bio_tica__deontologia_e_direitos_humanos_","name":"M006 Formação Cidadã I (Bioética, Deontologia e Direitos Humanos)","topics":["M006 Formação Cidadã I (Bioética, Deontologia e Direitos Humanos)"],"masteryXp":0,"studiedCount":0},{"id":"m043_atividades_curriculares_de_extens_o_i","name":"M043 Atividades Curriculares de Extensão I","topics":["M043 Atividades Curriculares de Extensão I"],"masteryXp":0,"studiedCount":0}]},{"id":"period_2__semestre","period":"2º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_ii","name":"AC Atividades Complementares II","topics":["AC Atividades Complementares II"],"masteryXp":0,"studiedCount":0},{"id":"m007_habilidades_e_atitudes_profissionais_ii","name":"M007 Habilidades e Atitudes Profissionais II","topics":["M007 Habilidades e Atitudes Profissionais II"],"masteryXp":0,"studiedCount":0},{"id":"m008_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_ii","name":"M008 Ações Integrais em Saúde: Ensino, Serviço e Comunidade II","topics":["M008 Ações Integrais em Saúde: Ensino, Serviço e Comunidade II"],"masteryXp":0,"studiedCount":0},{"id":"m009_mecanismos_de_agress_o_e_defesa","name":"M009 Mecanismos de Agressão e Defesa","topics":["M009 Mecanismos de Agressão e Defesa"],"masteryXp":0,"studiedCount":0},{"id":"m010_integra__o_de_sistemas_humanos_ii__sistema_tegumentar_","name":"M010 Integração de Sistemas Humanos II (Sistema Tegumentar)","topics":["M010 Integração de Sistemas Humanos II (Sistema Tegumentar)"],"masteryXp":0,"studiedCount":0},{"id":"m011_integra__o_de_sistemas_humanos_iii__sistema_nervoso_","name":"M011 Integração de Sistemas Humanos III (Sistema Nervoso)","topics":["M011 Integração de Sistemas Humanos III (Sistema Nervoso)"],"masteryXp":0,"studiedCount":0},{"id":"m012_forma__o_cidad__ii__rela__es_de_diversidade_de_g_nero__rela__es__tnico_raci","name":"M012 Formação Cidadã II (Relações de Diversidade de Gênero, Relações Étnico-raciais, Cultura Afro-brasileira, Africana e Povos Originários)","topics":["M012 Formação Cidadã II (Relações de Diversidade de Gênero, Relações Étnico-raciais, Cultura Afro-brasileira, Africana e Povos Originários)"],"masteryXp":0,"studiedCount":0},{"id":"m044_atividades_curriculares_de_extens_o_ii","name":"M044 Atividades Curriculares de Extensão II","topics":["M044 Atividades Curriculares de Extensão II"],"masteryXp":0,"studiedCount":0}]},{"id":"period_3__semestre","period":"3º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_iii","name":"AC Atividades Complementares III","topics":["AC Atividades Complementares III"],"masteryXp":0,"studiedCount":0},{"id":"m013_habilidades_e_atitudes_profissionais_iii","name":"M013 Habilidades e Atitudes Profissionais III","topics":["M013 Habilidades e Atitudes Profissionais III"],"masteryXp":0,"studiedCount":0},{"id":"m014_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_iii","name":"M014 Ações Integrais em Saúde: Ensino, Serviço e Comunidade III","topics":["M014 Ações Integrais em Saúde: Ensino, Serviço e Comunidade III"],"masteryXp":0,"studiedCount":0},{"id":"m015_integra__o_de_sistemas_humanos_iv__sistema_cardiovascular_","name":"M015 Integração de Sistemas Humanos IV (Sistema Cardiovascular)","topics":["M015 Integração de Sistemas Humanos IV (Sistema Cardiovascular)"],"masteryXp":0,"studiedCount":0},{"id":"m016_integra__o_de_sistemas_humanos_v__sistema_respirat_rio_","name":"M016 Integração de Sistemas Humanos V (Sistema Respiratório)","topics":["M016 Integração de Sistemas Humanos V (Sistema Respiratório)"],"masteryXp":0,"studiedCount":0},{"id":"m017_forma__o_cidad__iii__direito_ambiental__sustentabilidade_e_condi__es_de_ace","name":"M017 Formação Cidadã III (Direito Ambiental, Sustentabilidade e Condições de acessibilidade para pessoas com deficiência ou mobilidade reduzida)","topics":["M017 Formação Cidadã III (Direito Ambiental, Sustentabilidade e Condições de acessibilidade para pessoas com deficiência ou mobilidade reduzida)"],"masteryXp":0,"studiedCount":0},{"id":"m045_atividades_curriculares_de_extens_o_iii","name":"M045 Atividades Curriculares de Extensão III","topics":["M045 Atividades Curriculares de Extensão III"],"masteryXp":0,"studiedCount":0}]},{"id":"period_4__semestre","period":"4º Semestre","cycle":"Ciclo Básico","cycleName":"Ciclo Básico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_iv","name":"AC Atividades Complementares IV","topics":["AC Atividades Complementares IV"],"masteryXp":0,"studiedCount":0},{"id":"m018_habilidades_e_atitudes_profissionais_iv","name":"M018 Habilidades e Atitudes Profissionais IV","topics":["M018 Habilidades e Atitudes Profissionais IV"],"masteryXp":0,"studiedCount":0},{"id":"m019_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_iv","name":"M019 Ações Integrais em Saúde: Ensino, Serviço e Comunidade IV","topics":["M019 Ações Integrais em Saúde: Ensino, Serviço e Comunidade IV"],"masteryXp":0,"studiedCount":0},{"id":"m020_integra__o_de_sistemas_humanos_vi__sistema_end_crino_","name":"M020 Integração de Sistemas Humanos VI (Sistema Endócrino)","topics":["M020 Integração de Sistemas Humanos VI (Sistema Endócrino)"],"masteryXp":0,"studiedCount":0},{"id":"m021_integra__o_de_sistemas_humanos_vii__sistema_hematopoi_tico_","name":"M021 Integração de Sistemas Humanos VII (Sistema Hematopoiético)","topics":["M021 Integração de Sistemas Humanos VII (Sistema Hematopoiético)"],"masteryXp":0,"studiedCount":0},{"id":"m022_integra__o_de_sistemas_humanos_viii__sistema_digest_rio_","name":"M022 Integração de Sistemas Humanos VIII (Sistema Digestório)","topics":["M022 Integração de Sistemas Humanos VIII (Sistema Digestório)"],"masteryXp":0,"studiedCount":0},{"id":"m023_empreendedorismo__planejamento__lideran_a_e_inova__o_em_sa_de","name":"M023 Empreendedorismo, Planejamento, Liderança e Inovação em Saúde","topics":["M023 Empreendedorismo, Planejamento, Liderança e Inovação em Saúde"],"masteryXp":0,"studiedCount":0},{"id":"m046_atividades_curriculares_de_extens_o_iv","name":"M046 Atividades Curriculares de Extensão IV","topics":["M046 Atividades Curriculares de Extensão IV"],"masteryXp":0,"studiedCount":0}]},{"id":"period_5__semestre","period":"5º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_v","name":"AC Atividades Complementares V","topics":["AC Atividades Complementares V"],"masteryXp":0,"studiedCount":0},{"id":"m024_habilidades_e_atitudes_profissionais_v","name":"M024 Habilidades e Atitudes Profissionais V","topics":["M024 Habilidades e Atitudes Profissionais V"],"masteryXp":0,"studiedCount":0},{"id":"m025_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_v","name":"M025 Ações Integrais em Saúde: Ensino, Serviço e Comunidade V","topics":["M025 Ações Integrais em Saúde: Ensino, Serviço e Comunidade V"],"masteryXp":0,"studiedCount":0},{"id":"m026_integra__o_de_sistemas_humanos_ix__sistema_reprodutor_masculino_e_feminino_","name":"M026 Integração de Sistemas Humanos IX (Sistema Reprodutor Masculino e Feminino)","topics":["M026 Integração de Sistemas Humanos IX (Sistema Reprodutor Masculino e Feminino)"],"masteryXp":0,"studiedCount":0},{"id":"m027_integra__o_de_sistemas_humanos_x__sistema_urin_rio_","name":"M027 Integração de Sistemas Humanos X (Sistema Urinário)","topics":["M027 Integração de Sistemas Humanos X (Sistema Urinário)"],"masteryXp":0,"studiedCount":0},{"id":"m047_atividades_curriculares_de_extens_o_v","name":"M047 Atividades Curriculares de Extensão V","topics":["M047 Atividades Curriculares de Extensão V"],"masteryXp":0,"studiedCount":0}]},{"id":"period_6__semestre","period":"6º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_vi","name":"AC Atividades Complementares VI","topics":["AC Atividades Complementares VI"],"masteryXp":0,"studiedCount":0},{"id":"m028_habilidades_e_atitudes_profissionais_vi","name":"M028 Habilidades e Atitudes Profissionais VI","topics":["M028 Habilidades e Atitudes Profissionais VI"],"masteryXp":0,"studiedCount":0},{"id":"m029_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_vi","name":"M029 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VI","topics":["M029 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VI"],"masteryXp":0,"studiedCount":0},{"id":"m030_sa_de_da_crian_a","name":"M030 Saúde da Criança","topics":["M030 Saúde da Criança"],"masteryXp":0,"studiedCount":0},{"id":"m031_sa_de_da_mulher","name":"M031 Saúde da Mulher","topics":["M031 Saúde da Mulher"],"masteryXp":0,"studiedCount":0},{"id":"m048_atividades_curriculares_de_extens_o_vi","name":"M048 Atividades Curriculares de Extensão VI","topics":["M048 Atividades Curriculares de Extensão VI"],"masteryXp":0,"studiedCount":0},{"id":"opt_optativa_i","name":"OPT Optativa I","topics":["OPT Optativa I"],"masteryXp":0,"studiedCount":0}]},{"id":"period_7__semestre","period":"7º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_vii","name":"AC Atividades Complementares VII","topics":["AC Atividades Complementares VII"],"masteryXp":0,"studiedCount":0},{"id":"m032_habilidades_e_atitudes_profissionais_vii","name":"M032 Habilidades e Atitudes Profissionais VII","topics":["M032 Habilidades e Atitudes Profissionais VII"],"masteryXp":0,"studiedCount":0},{"id":"m033_a__es_integrais_em_ensino__servi_o_e_comunidade_vii","name":"M033 Ações Integrais em Ensino, Serviço e Comunidade VII","topics":["M033 Ações Integrais em Ensino, Serviço e Comunidade VII"],"masteryXp":0,"studiedCount":0},{"id":"m034_sa_de_do_adulto","name":"M034 Saúde do Adulto","topics":["M034 Saúde do Adulto"],"masteryXp":0,"studiedCount":0},{"id":"m035_sa_de_da_pessoa_idosa","name":"M035 Saúde da Pessoa Idosa","topics":["M035 Saúde da Pessoa Idosa"],"masteryXp":0,"studiedCount":0},{"id":"m036_metodologia_cient_fica_e_medicina_baseada_em_evid_ncia","name":"M036 Metodologia Científica e Medicina Baseada em Evidência","topics":["M036 Metodologia Científica e Medicina Baseada em Evidência"],"masteryXp":0,"studiedCount":0},{"id":"m049_atividades_curriculares_de_extens_o_vii","name":"M049 Atividades Curriculares de Extensão VII","topics":["M049 Atividades Curriculares de Extensão VII"],"masteryXp":0,"studiedCount":0},{"id":"opt_optativa_ii","name":"OPT Optativa II","topics":["OPT Optativa II"],"masteryXp":0,"studiedCount":0}]},{"id":"period_8__semestre","period":"8º Semestre","cycle":"Ciclo Clínico","cycleName":"Ciclo Clínico","source":"gemini-upload","subjects":[{"id":"ac_atividades_complementares_viii","name":"AC Atividades Complementares VIII","topics":["AC Atividades Complementares VIII"],"masteryXp":0,"studiedCount":0},{"id":"m037_habilidades_e_atitudes_profissionais_viii","name":"M037 Habilidades e Atitudes Profissionais VIII","topics":["M037 Habilidades e Atitudes Profissionais VIII"],"masteryXp":0,"studiedCount":0},{"id":"m038_a__es_integrais_em_sa_de__ensino__servi_o_e_comunidade_viii","name":"M038 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VIII","topics":["M038 Ações Integrais em Saúde: Ensino, Serviço e Comunidade VIII"],"masteryXp":0,"studiedCount":0},{"id":"m039_sa_de_mental","name":"M039 Saúde Mental","topics":["M039 Saúde Mental"],"masteryXp":0,"studiedCount":0},{"id":"m040_cuidados_paliativos","name":"M040 Cuidados Paliativos","topics":["M040 Cuidados Paliativos"],"masteryXp":0,"studiedCount":0},{"id":"m041_epidemiologia_e_an_lise_de_dados","name":"M041 Epidemiologia e Análise de Dados","topics":["M041 Epidemiologia e Análise de Dados"],"masteryXp":0,"studiedCount":0},{"id":"m042_psicologia_m_dica","name":"M042 Psicologia Médica","topics":["M042 Psicologia Médica"],"masteryXp":0,"studiedCount":0},{"id":"m050_atividades_curriculares_de_extens_o_viii","name":"M050 Atividades Curriculares de Extensão VIII","topics":["M050 Atividades Curriculares de Extensão VIII"],"masteryXp":0,"studiedCount":0}]},{"id":"period_9__semestre__internato_","period":"9º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m051_internato_em_sa_de_da_crian_a_i__neonatologia_","name":"M051 Internato em Saúde da Criança I (Neonatologia)","topics":["M051 Internato em Saúde da Criança I (Neonatologia)"],"masteryXp":0,"studiedCount":0},{"id":"m051_internato_em_sa_de_da_crian_a_i__neonatologia___48_horas_na_aten__o_b_sica_","name":"M051 Internato em Saúde da Criança I (Neonatologia) (48 horas na Atenção Básica)","topics":["M051 Internato em Saúde da Criança I (Neonatologia) (48 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0},{"id":"m052_internato_em_sa_de_do_adulto_i__cl_nica_","name":"M052 Internato em Saúde do Adulto I (Clínica)","topics":["M052 Internato em Saúde do Adulto I (Clínica)"],"masteryXp":0,"studiedCount":0},{"id":"m052_internato_em_sa_de_do_adulto_i__cl_nica___48_horas_na_aten__o_b_sica_","name":"M052 Internato em Saúde do Adulto I (Clínica) (48 horas na Atenção Básica)","topics":["M052 Internato em Saúde do Adulto I (Clínica) (48 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0},{"id":"m053_internato_em_sa_de_da_mulher_i__obstetr_cia_","name":"M053 Internato em Saúde da Mulher I (Obstetrícia)","topics":["M053 Internato em Saúde da Mulher I (Obstetrícia)"],"masteryXp":0,"studiedCount":0},{"id":"m053_internato_em_sa_de_da_mulher_i__obstetr_cia___48_horas_na_aten__o_b_sica_","name":"M053 Internato em Saúde da Mulher I (Obstetrícia) (48 horas na Atenção Básica)","topics":["M053 Internato em Saúde da Mulher I (Obstetrícia) (48 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0}]},{"id":"period_10__semestre__internato_","period":"10º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m054_internato_em_urg_ncia_e_emerg_ncia_pr__hospitalar","name":"M054 Internato em Urgência e Emergência Pré-hospitalar","topics":["M054 Internato em Urgência e Emergência Pré-hospitalar"],"masteryXp":0,"studiedCount":0},{"id":"m054_internato_em_urg_ncia_e_emerg_ncia_pr__hospitalar__240_horas_em_urg_ncia_e_","name":"M054 Internato em Urgência e Emergência Pré-hospitalar (240 horas em Urgência e Emergência)","topics":["M054 Internato em Urgência e Emergência Pré-hospitalar (240 horas em Urgência e Emergência)"],"masteryXp":0,"studiedCount":0},{"id":"m055_internato_em_urg_ncia_e_emerg_ncia_hospitalar","name":"M055 Internato em Urgência e Emergência Hospitalar","topics":["M055 Internato em Urgência e Emergência Hospitalar"],"masteryXp":0,"studiedCount":0},{"id":"m055_internato_em_urg_ncia_e_emerg_ncia_hospitalar__240_horas_em_urg_ncia_e_emer","name":"M055 Internato em Urgência e Emergência Hospitalar (240 horas em Urgência e Emergência)","topics":["M055 Internato em Urgência e Emergência Hospitalar (240 horas em Urgência e Emergência)"],"masteryXp":0,"studiedCount":0},{"id":"m056_internato_em_sa_de_da_fam_lia_e_comunidade_i","name":"M056 Internato em Saúde da Família e Comunidade I","topics":["M056 Internato em Saúde da Família e Comunidade I"],"masteryXp":0,"studiedCount":0},{"id":"m056_internato_em_sa_de_da_fam_lia_e_comunidade_i__240_horas_na_aten__o_b_sica_","name":"M056 Internato em Saúde da Família e Comunidade I (240 horas na Atenção Básica)","topics":["M056 Internato em Saúde da Família e Comunidade I (240 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0}]},{"id":"period_11__semestre__internato_","period":"11º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m057_internato_em_sa_de_da_crian_a_ii__pediatria_","name":"M057 Internato em Saúde da Criança II (Pediatria)","topics":["M057 Internato em Saúde da Criança II (Pediatria)"],"masteryXp":0,"studiedCount":0},{"id":"m058_internato_em_sa_de_do_adulto_ii__cirurgia_","name":"M058 Internato em Saúde do Adulto II (Cirurgia)","topics":["M058 Internato em Saúde do Adulto II (Cirurgia)"],"masteryXp":0,"studiedCount":0},{"id":"m059_internato_em_sa_de_da_mulher_ii__ginecologia_","name":"M059 Internato em Saúde da Mulher II (Ginecologia)","topics":["M059 Internato em Saúde da Mulher II (Ginecologia)"],"masteryXp":0,"studiedCount":0}]},{"id":"period_12__semestre__internato_","period":"12º Semestre (Internato)","cycle":"Internato Médico","cycleName":"Internato Médico","source":"gemini-upload","subjects":[{"id":"m060_internato_em_sa_de_da_pessoa_idosa","name":"M060 Internato em Saúde da Pessoa Idosa","topics":["M060 Internato em Saúde da Pessoa Idosa"],"masteryXp":0,"studiedCount":0},{"id":"m061_internato_em_sa_de_mental","name":"M061 Internato em Saúde Mental","topics":["M061 Internato em Saúde Mental"],"masteryXp":0,"studiedCount":0},{"id":"m062_internato_em_sa_de_da_fam_lia_e_comunidade_ii_e_sa_de_coletiva","name":"M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva","topics":["M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva"],"masteryXp":0,"studiedCount":0},{"id":"m062_internato_em_sa_de_da_fam_lia_e_comunidade_ii_e_sa_de_coletiva__240_horas_n","name":"M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva (240 horas na Atenção Básica)","topics":["M062 Internato em Saúde da Família e Comunidade II e Saúde Coletiva (240 horas na Atenção Básica)"],"masteryXp":0,"studiedCount":0},{"id":"m063_trabalho_de_conclus_o_de_curso","name":"M063 Trabalho de Conclusão de Curso","topics":["M063 Trabalho de Conclusão de Curso"],"masteryXp":0,"studiedCount":0},{"id":"opt_internato_optativo","name":"OPT Internato Optativo","topics":["OPT Internato Optativo"],"masteryXp":0,"studiedCount":0}]},{"id":"period_optativas_i","period":"Optativas I","cycle":"Eletivo","cycleName":"Eletivo","source":"gemini-upload","subjects":[{"id":"m064_diagn_stico_por_imagem","name":"M064 Diagnóstico por Imagem","topics":["M064 Diagnóstico por Imagem"],"masteryXp":0,"studiedCount":0},{"id":"m065_m_todos_complementares_em_cardiologia","name":"M065 Métodos Complementares em Cardiologia","topics":["M065 Métodos Complementares em Cardiologia"],"masteryXp":0,"studiedCount":0},{"id":"m066_eletrocardiograma","name":"M066 Eletrocardiograma","topics":["M066 Eletrocardiograma"],"masteryXp":0,"studiedCount":0},{"id":"m067_neuroanatomia_integrada","name":"M067 Neuroanatomia Integrada","topics":["M067 Neuroanatomia Integrada"],"masteryXp":0,"studiedCount":0},{"id":"m068_farmacologia_aplicada___pr_tica_cl_nica","name":"M068 Farmacologia Aplicada à Prática Clínica","topics":["M068 Farmacologia Aplicada à Prática Clínica"],"masteryXp":0,"studiedCount":0},{"id":"m069_desenvolvimento_de_habilidades_cl_nicas","name":"M069 Desenvolvimento de Habilidades Clínicas","topics":["M069 Desenvolvimento de Habilidades Clínicas"],"masteryXp":0,"studiedCount":0},{"id":"m070_suporte_b_sico_inicial_ao_trauma","name":"M070 Suporte Básico Inicial ao Trauma","topics":["M070 Suporte Básico Inicial ao Trauma"],"masteryXp":0,"studiedCount":0},{"id":"m071_homeopatia","name":"M071 Homeopatia","topics":["M071 Homeopatia"],"masteryXp":0,"studiedCount":0},{"id":"m072_telemedicina","name":"M072 Telemedicina","topics":["M072 Telemedicina"],"masteryXp":0,"studiedCount":0},{"id":"m073_medicina_legal_e_forense","name":"M073 Medicina Legal e Forense","topics":["M073 Medicina Legal e Forense"],"masteryXp":0,"studiedCount":0}]},{"id":"period_optativas_ii","period":"Optativas II","cycle":"Eletivo","cycleName":"Eletivo","source":"gemini-upload","subjects":[{"id":"m074_l_ngua_brasileira_de_sinais","name":"M074 Língua Brasileira de Sinais","topics":["M074 Língua Brasileira de Sinais"],"masteryXp":0,"studiedCount":0},{"id":"m075_gest_o_de_pessoas","name":"M075 Gestão de Pessoas","topics":["M075 Gestão de Pessoas"],"masteryXp":0,"studiedCount":0},{"id":"m076_gest_o_de_projetos","name":"M076 Gestão de Projetos","topics":["M076 Gestão de Projetos"],"masteryXp":0,"studiedCount":0},{"id":"m077_inform_tica_m_dica","name":"M077 Informática Médica","topics":["M077 Informática Médica"],"masteryXp":0,"studiedCount":0},{"id":"m078_intelig_ncia_artificial_em_sa_de","name":"M078 Inteligência Artificial em Saúde","topics":["M078 Inteligência Artificial em Saúde"],"masteryXp":0,"studiedCount":0},{"id":"m079_prepara__o_para_a_vida_profissional","name":"M079 Preparação para a Vida Profissional","topics":["M079 Preparação para a Vida Profissional"],"masteryXp":0,"studiedCount":0},{"id":"m080_felici_ncia","name":"M080 Feliciência","topics":["M080 Feliciência"],"masteryXp":0,"studiedCount":0},{"id":"m081_pr_ticas_integrativas_e_complementares_em_sa_de__pics_","name":"M081 Práticas Integrativas e Complementares em Saúde (PICS)","topics":["M081 Práticas Integrativas e Complementares em Saúde (PICS)"],"masteryXp":0,"studiedCount":0},{"id":"m082_escrita_acad_mica","name":"M082 Escrita Acadêmica","topics":["M082 Escrita Acadêmica"],"masteryXp":0,"studiedCount":0},{"id":"m083_ingl_s_instrumental","name":"M083 Inglês Instrumental","topics":["M083 Inglês Instrumental"],"masteryXp":0,"studiedCount":0},{"id":"m084_l_ngua_portuguesa","name":"M084 Língua Portuguesa","topics":["M084 Língua Portuguesa"],"masteryXp":0,"studiedCount":0},{"id":"m085_humaniza__o_em_servi_os_de_sa_de","name":"M085 Humanização em Serviços de Saúde","topics":["M085 Humanização em Serviços de Saúde"],"masteryXp":0,"studiedCount":0},{"id":"m086_marketing_m_dico","name":"M086 Marketing Médico","topics":["M086 Marketing Médico"],"masteryXp":0,"studiedCount":0}]}];
 
@@ -174,6 +200,10 @@
       authMode: 'guest', // 'firebase' | 'guest'
       googleSignInInProgress: false,
       authStateResolved: false,
+      accessGranted: null,
+      accessResolvedUid: '',
+      accessResolvePromise: null,
+      accessResolveUid: '',
       cloudRefreshPromise: null,
       cloudRefreshUid: '',
 
@@ -181,10 +211,141 @@
         const authScreen = document.getElementById('authScreenContainer');
         if (!authScreen) return;
         const isChecking = state === 'checking';
-        const isVisible = isChecking || state === 'login';
+        const isAccess = state === 'access';
+        const isVisible = isChecking || state === 'login' || isAccess;
         authScreen.classList.toggle('active', isVisible);
         authScreen.classList.toggle('auth-state-resolving', isChecking);
+        authScreen.classList.toggle('auth-access-mode', isAccess);
         authScreen.setAttribute('aria-busy', String(isChecking));
+        const accessError = document.getElementById('accessCouponError');
+        if (accessError && state !== 'access') accessError.textContent = '';
+      },
+
+      async resolveAccessForUser(user, { force = false } = {}) {
+        if (!user?.uid) return false;
+        if (!force && this.accessResolvedUid === user.uid && typeof this.accessGranted === 'boolean') return this.accessGranted;
+        if (this.accessResolvePromise && this.accessResolveUid === user.uid) return this.accessResolvePromise;
+
+        this.accessResolveUid = user.uid;
+        this.accessResolvePromise = (async () => {
+          try {
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/access/status', { headers: { Authorization: `Bearer ${idToken}` } });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'Não foi possível validar seu acesso.');
+
+            this.accessGranted = result.required !== true || result.active === true;
+            this.accessResolvedUid = user.uid;
+            if (!this.accessGranted) {
+              // A API atualiza as custom claims antes de negar o acesso; renova
+              // o token para que as regras do Firestore também respeitem o bloqueio.
+              try { await user.getIdToken(true); } catch (e) {}
+              setRoutePresentation('login');
+              this.setAuthScreenState('access');
+              const account = document.getElementById('accessCouponAccount');
+              if (account) account.textContent = user.email || user.displayName || 'Conta autenticada';
+              return false;
+            }
+            if (result.required === true) {
+              try { await user.getIdToken(true); } catch (e) {}
+            }
+            return true;
+          } catch (error) {
+            this.accessGranted = false;
+            this.accessResolvedUid = '';
+            setRoutePresentation('login');
+            this.setAuthScreenState('access');
+            const accessError = document.getElementById('accessCouponError');
+            if (accessError) accessError.textContent = 'Não foi possível validar o cupom agora. Verifique a conexão ou procure o suporte.';
+            console.warn('[MedTutor Access] Falha na validação segura do acesso:', error?.message || 'erro desconhecido');
+            return false;
+          } finally {
+            this.accessResolvePromise = null;
+            this.accessResolveUid = '';
+          }
+        })();
+        return this.accessResolvePromise;
+      },
+
+      async continueWithAuthenticatedUser(user) {
+        if (!user?.uid) return false;
+        this.currentUser = {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || ''
+        };
+        this.authMode = 'firebase';
+        this.hydrateLocalProfileForUid(user.uid);
+        localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
+        this.updateUserTopbarUI();
+
+        if (!await this.resolveAccessForUser(user)) return false;
+
+        this.setAuthScreenState('hidden');
+        applyRouteFromLocation({ replace: true });
+        this.refreshCloudDataInBackground(user.uid);
+        if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
+        if (typeof renderDashboardView === 'function') renderDashboardView();
+        if (typeof renderCurriculumView === 'function') renderCurriculumView();
+        if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
+        if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+        return true;
+      },
+
+      async redeemAccessCoupon(event) {
+        event?.preventDefault?.();
+        const user = firebaseAuth?.currentUser;
+        const codeInput = document.getElementById('accessCouponInput');
+        const submitButton = document.getElementById('btnAccessCouponSubmit');
+        const errorEl = document.getElementById('accessCouponError');
+        const code = String(codeInput?.value || '').trim();
+        if (!user) {
+          if (errorEl) errorEl.textContent = 'Entre na sua conta antes de ativar o cupom.';
+          this.setAuthScreenState('login');
+          return false;
+        }
+        if (!code) {
+          if (errorEl) errorEl.textContent = 'Digite o código do cupom recebido.';
+          codeInput?.focus();
+          return false;
+        }
+        if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Validando cupom…'; }
+        if (errorEl) errorEl.textContent = '';
+        try {
+          const idToken = await user.getIdToken();
+          const response = await fetch('/api/access/redeem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({ code })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || 'Não foi possível ativar este cupom.');
+          if (result.required !== true || result.active !== true) throw new Error('A liberação por cupom ainda não está habilitada neste servidor.');
+
+          this.accessGranted = true;
+          this.accessResolvedUid = '';
+          await user.getIdToken(true);
+          const authorized = await this.resolveAccessForUser(user, { force: true });
+          if (!authorized) throw new Error('O acesso foi registrado, mas a sessão ainda não foi atualizada. Entre novamente.');
+          if (codeInput) codeInput.value = '';
+          showToast('✅ Cupom validado. Seu acesso ao MedTutor foi liberado.');
+          await this.continueWithAuthenticatedUser(user);
+          return true;
+        } catch (error) {
+          if (errorEl) errorEl.textContent = error.message || 'Falha ao validar o cupom. Tente novamente.';
+          return false;
+        } finally {
+          if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Ativar acesso'; }
+        }
+      },
+
+      async retryAccessValidation() {
+        this.accessResolvedUid = '';
+        const user = firebaseAuth?.currentUser;
+        const allowed = await this.resolveAccessForUser(user, { force: true });
+        if (allowed && user) await this.continueWithAuthenticatedUser(user);
+        return allowed;
       },
 
       hydrateLocalProfileForUid(uid) {
@@ -287,21 +448,8 @@
             if (firebaseAuth.getRedirectResult) {
               firebaseAuth.getRedirectResult().then(async (result) => {
                 if (result && result.user) {
-                  const user = result.user;
-                  this.currentUser = {
-                    uid: user.uid,
-                    email: user.email || '',
-                    displayName: user.displayName || '',
-                    photoURL: user.photoURL || ''
-                  };
-                  this.authMode = 'firebase';
-                  this.hydrateLocalProfileForUid(user.uid);
-                  localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-                  showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
-                  this.setAuthScreenState('hidden');
-                  applyRouteFromLocation({ replace: true });
-                  this.updateUserTopbarUI();
-                  this.refreshCloudDataInBackground(user.uid);
+                  const allowed = await this.continueWithAuthenticatedUser(result.user);
+                  if (allowed) showToast(`👋 Bem-vindo(a), ${result.user.displayName || 'estudante'}!`);
                 }
               }).catch((redirectErr) => {
                 console.warn('[MedTutor Redirect Auth]', redirectErr);
@@ -311,33 +459,16 @@
             firebaseAuth.onAuthStateChanged(async (user) => {
               this.authStateResolved = true;
               if (user) {
-                this.currentUser = {
-                  uid: user.uid,
-                  email: user.email || '',
-                  displayName: user.displayName || '',
-                  photoURL: user.photoURL || ''
-                };
-                this.authMode = 'firebase';
-                this.hydrateLocalProfileForUid(user.uid);
-                localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-                this.updateUserTopbarUI();
-                // A sessão autenticada libera o app imediatamente. Com a cota
-                // do Firestore em backoff, aguardar todo o conteúdo aqui poderia
-                // deixar a tela de entrada presa indefinidamente.
-                this.setAuthScreenState('hidden');
-                applyRouteFromLocation({ replace: true });
-                this.updateUserTopbarUI();
-                this.refreshCloudDataInBackground(user.uid);
-                if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
-                if (typeof renderDashboardView === 'function') renderDashboardView();
-                if (typeof renderCurriculumView === 'function') renderCurriculumView();
-                if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
-                if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+                await this.continueWithAuthenticatedUser(user);
               } else {
                 // Não mantenha um UID antigo apenas no localStorage: ele fazia a
                 // interface parecer conectada, mas as regras do Firestore o negavam.
                 this.currentUser = null;
                 this.authMode = 'guest';
+                this.accessGranted = null;
+                this.accessResolvedUid = '';
+                this.accessResolvePromise = null;
+                this.accessResolveUid = '';
                 localStorage.removeItem('medtutor_auth_user');
                 this.updateUserTopbarUI();
                 this.updateFirebaseConfigModalUI();
@@ -454,18 +585,8 @@
             }
 
             if (user) {
-              this.currentUser = {
-                uid: user.uid,
-                email: user.email || '',
-                displayName: user.displayName || '',
-                photoURL: user.photoURL || ''
-              };
-              this.authMode = 'firebase';
-              localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-              showToast(`👋 Bem-vindo(a), ${user.displayName || 'Doutor(a)'}!`);
-              this.setAuthScreenState('hidden');
-              this.updateUserTopbarUI();
-              this.refreshCloudDataInBackground(user.uid);
+              const allowed = await this.continueWithAuthenticatedUser(user);
+              if (allowed) showToast(`👋 Bem-vindo(a), ${user.displayName || 'estudante'}!`);
               return;
             }
           } catch (err) {
@@ -494,22 +615,8 @@
         if (firebaseAuth) {
           try {
             const cred = await firebaseAuth.signInWithEmailAndPassword(email, password);
-            this.currentUser = {
-              uid: cred.user.uid,
-              email: cred.user.email,
-              displayName: cred.user.displayName || ''
-            };
-            this.authMode = 'firebase';
-            localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-            showToast('✓ Login realizado com sucesso!');
-            this.setAuthScreenState('hidden');
-            this.updateUserTopbarUI();
-            this.refreshCloudDataInBackground(cred.user.uid);
-            if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
-            if (typeof renderDashboardView === 'function') renderDashboardView();
-            if (typeof renderCurriculumView === 'function') renderCurriculumView();
-            if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
-            if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+            const allowed = await this.continueWithAuthenticatedUser(cred.user);
+            if (allowed) showToast('✓ Login realizado com sucesso!');
             return true;
           } catch (err) {
             this.setAuthScreenState('login');
@@ -525,19 +632,16 @@
         if (firebaseAuth) {
           try {
             const cred = await firebaseAuth.createUserWithEmailAndPassword(email, password);
-            this.currentUser = {
-              uid: cred.user.uid,
-              email: cred.user.email,
-              displayName: ''
-            };
-            this.authMode = 'firebase';
-            localStorage.setItem('medtutor_auth_user', JSON.stringify(this.currentUser));
-            showToast('🎉 Conta criada com sucesso! Complete seu perfil médico.');
-            this.setAuthScreenState('hidden');
-            if (typeof checkMandatoryFacultyRedeclaration === 'function') {
-              setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
+            const allowed = await this.continueWithAuthenticatedUser(cred.user);
+            if (allowed) {
+              showToast('🎉 Conta criada com sucesso! Complete seu perfil médico.');
+              if (typeof checkMandatoryFacultyRedeclaration === 'function') {
+                setTimeout(() => { checkMandatoryFacultyRedeclaration(); }, 250);
+              } else {
+                openMedicalOnboardingModal(false);
+              }
             } else {
-              openMedicalOnboardingModal(false);
+              showToast('🎉 Conta criada. Insira o cupom para liberar o espaço de estudo.');
             }
             return true;
           } catch (err) {
@@ -557,6 +661,10 @@
         this.userProfile = null;
         this.authMode = 'guest';
         this.authStateResolved = true;
+        this.accessGranted = null;
+        this.accessResolvedUid = '';
+        this.accessResolvePromise = null;
+        this.accessResolveUid = '';
         localStorage.removeItem('medtutor_auth_user');
         localStorage.removeItem('medtutor_user_profile');
         const dropdown = document.getElementById('userProfileDropdown');
@@ -2245,10 +2353,9 @@
 
     function checkMandatoryFacultyRedeclaration() {
       // Nunca abra o onboarding durante a resolução da sessão ou para um
-      // visitante não autenticado. O cadastro deve começar somente após login
-      // real ou após a escolha explícita do modo demonstração.
+      // visitante sem sessão ou sem liberação válida por cupom.
       const authService = typeof MedTutorAuthService !== 'undefined' ? MedTutorAuthService : null;
-      if (!authService?.authStateResolved || !authService.currentUser) return false;
+      if (!authService?.authStateResolved || !authService.currentUser || authService.accessGranted !== true) return false;
 
       // Se a tela de login estiver visível (usuário deslogado), não abre para não bloquear a tela de auth
       const authScreen = document.getElementById('authScreen');
@@ -2472,6 +2579,11 @@
         MedTutorAuthService?.setAuthScreenState('login');
         return;
       }
+      if (MedTutorAuthService.accessGranted !== true) {
+        setRoutePresentation('login');
+        MedTutorAuthService.setAuthScreenState(MedTutorAuthService.accessGranted === false ? 'access' : 'checking');
+        return;
+      }
       applyRouteFromLocation({ replace: true });
     }
 
@@ -2517,6 +2629,11 @@
     };
 
     function navigateTab(tabId, btn, options = {}) {
+      if (MedTutorAuthService?.currentUser && MedTutorAuthService.accessGranted !== true) {
+        setRoutePresentation('login');
+        MedTutorAuthService.setAuthScreenState(MedTutorAuthService.accessGranted === false ? 'access' : 'checking');
+        return;
+      }
       const targetTab = document.getElementById('tab-' + tabId);
       if (!targetTab) return;
       currentTab = tabId;

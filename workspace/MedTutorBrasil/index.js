@@ -43,6 +43,7 @@ clientRoutes.forEach(route => {
 });
 
 app.use('/api/auth', require('./src/modules/auth/auth.routes'));
+app.use('/api/access', require('./src/modules/access/access.routes'));
 app.use('/api/ementas', require('./src/modules/ementas/ementas.routes'));
 app.use('/api/relatorios', require('./src/modules/relatorios/relatorios.routes'));
 app.use('/api/quizzes', require('./src/modules/quizzes/quizzes.routes'));
