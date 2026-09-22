@@ -29,6 +29,18 @@ for (const pattern of forbiddenPatterns) {
 }
 console.log('[PASS] index.js livre de regras de negócio acopladas');
 
+// O diretório de colegas deve vir de contas reais, nunca de perfis de demonstração.
+const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf-8');
+for (const fakeColleague of [
+  'mariana.costa@medicina.universo.br',
+  'lucas.silva@medicina.universo.br',
+  'beatriz.moraes@medicina.universo.br',
+  'gabriel.santos@medicina.universo.br'
+]) {
+  assert(!appSource.includes(fakeColleague), `o diretório não deve sugerir perfil fictício (${fakeColleague})`);
+}
+console.log('[PASS] Diretório de colegas sem perfis fictícios embutidos');
+
 // 2. Verificar Estrutura dos Módulos (src/modules)
 const modulesDir = path.join(__dirname, '..', 'src', 'modules');
 assert(fs.existsSync(modulesDir), 'Diretório src/modules deve existir');

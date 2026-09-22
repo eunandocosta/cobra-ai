@@ -27038,11 +27038,15 @@ function escapeHtmlText(str) {
 
         const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
         const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
-        const userSchool = (currentProfile.faculdade || 'Universo').trim();
+        const userSchool = String(currentProfile.faculdade || '').trim();
         const userEmail = (currentUser.email || '').toLowerCase();
+        const userUid = currentUser.uid || '';
 
         let classmates = [];
-        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+        chipsContainer.replaceChildren();
+        if (!userSchool) {
+          chipsContainer.textContent = 'Informe sua faculdade no perfil para ver colegas reais.';
+        } else if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
           try {
             const snap = await firestoreDb.collection('users')
               .where('faculdade', '==', userSchool)
@@ -27051,7 +27055,7 @@ function escapeHtmlText(str) {
             snap.forEach(doc => {
               const d = doc.data() || {};
               const email = (d.email || '').toLowerCase();
-              if (email && email !== userEmail && !classmates.includes(email)) {
+              if (doc.id && doc.id !== userUid && !doc.id.startsWith('usr_') && email && email !== userEmail && d.demo !== true && d.isDemo !== true && !classmates.some(c => c.email === email)) {
                 classmates.push({
                   email,
                   nome: d.nome || email.split('@')[0]
@@ -27060,25 +27064,26 @@ function escapeHtmlText(str) {
             });
           } catch (e) {
             console.warn('[Challenges] Falha ao buscar colegas no Firestore:', e);
+            chipsContainer.textContent = 'Não foi possível consultar colegas agora.';
           }
-        }
-
-        // Sugestões amigáveis de fallback para a turma Universo
-        if (classmates.length === 0) {
-          classmates = [
-            { email: 'mariana.costa@medicina.universo.br', nome: 'Mariana Costa' },
-            { email: 'lucas.silva@medicina.universo.br', nome: 'Lucas Silva' },
-            { email: 'beatriz.moraes@medicina.universo.br', nome: 'Beatriz Moraes' },
-            { email: 'gabriel.santos@medicina.universo.br', nome: 'Gabriel Santos' }
-          ];
+        } else {
+          chipsContainer.textContent = 'O diretório de colegas está indisponível sem conexão com o Firebase.';
         }
 
         this.classmatesCache = classmates;
-        chipsContainer.innerHTML = classmates.slice(0, 5).map(c => `
-          <button type="button" class="classmate-chip-btn" onclick="selectClassmateEmail('${c.email}')" title="Desafiar ${c.nome}">
-            👤 ${c.nome} <small style="opacity: 0.7;">(${c.email.split('@')[0]})</small>
-          </button>
-        `).join('');
+        if (classmates.length) {
+          chipsContainer.replaceChildren(...classmates.slice(0, 5).map(c => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'classmate-chip-btn';
+            button.title = `Desafiar ${c.nome}`;
+            button.textContent = `👤 ${c.nome} (${c.email.split('@')[0]})`;
+            button.addEventListener('click', () => this.selectClassmate(c.email));
+            return button;
+          }));
+        } else if (!chipsContainer.textContent) {
+          chipsContainer.textContent = 'Nenhum colega cadastrado nesta faculdade ainda.';
+        }
       },
 
       selectClassmate(email) {
@@ -28224,7 +28229,9 @@ function escapeHtmlText(str) {
       updateFabBadge() {
         const badge = document.getElementById('classmatesFabBadge');
         if (!badge) return;
-        const total = (this.allUsersCache.length > 0) ? this.allUsersCache.length : (this.addedClassmatesCache.length || 0);
+        // O badge reflete apenas pessoas encontradas no diretório remoto; itens
+        // antigos não verificados do armazenamento local não contam como colegas.
+        const total = this.allUsersCache.length;
         if (total > 0) {
           badge.textContent = total;
           badge.style.display = 'inline-block';
@@ -28290,28 +28297,40 @@ function escapeHtmlText(str) {
       async loadClassmates() {
         const currentProfile = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.userProfile) || {};
         const currentUser = (typeof MedTutorAuthService !== 'undefined' && MedTutorAuthService.currentUser) || {};
-        const userSchool = (currentProfile.faculdade || 'Universo').trim();
-        const userPeriod = (currentProfile.periodo_atual || '5º Período').trim();
+        this.allUsersCache = [];
+        const userSchool = String(currentProfile.faculdade || '').trim();
+        const userPeriod = String(currentProfile.periodo_atual || '').trim();
         const userEmail = (currentUser.email || '').toLowerCase();
+        const userUid = currentUser.uid || '';
 
         // Atualiza títulos do cabeçalho
         const subTitleEl = document.getElementById('classmatesModalSubtitle');
         if (subTitleEl) {
-          subTitleEl.textContent = `${userSchool} • Comunidade Médica • Seu Período: ${userPeriod}`;
+          subTitleEl.textContent = userSchool
+            ? `${userSchool} • Comunidade Médica${userPeriod ? ` • Seu Período: ${userPeriod}` : ''}`
+            : 'Informe sua faculdade no perfil para localizar colegas reais.';
         }
         const samePeriodHeading = document.getElementById('classmatesSamePeriodHeading');
         if (samePeriodHeading) {
-          samePeriodHeading.textContent = `Colegas do Meu Período (${userPeriod})`;
+          samePeriodHeading.textContent = userPeriod ? `Colegas do Meu Período (${userPeriod})` : 'Colegas do Meu Período';
         }
         const allFacultyHeading = document.getElementById('classmatesAllFacultyHeading');
         if (allFacultyHeading) {
-          allFacultyHeading.textContent = `Todos os Estudantes da Faculdade (${userSchool})`;
+          allFacultyHeading.textContent = userSchool ? `Todos os Estudantes da Faculdade (${userSchool})` : 'Estudantes da sua Faculdade';
         }
 
         let users = [];
+        let directoryMessage = '';
 
-        // 1. Busca usuários da instituição no Firestore
-        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
+        // Exibe somente perfis reais do Firestore; nunca inventa usuários para
+        // preencher o diretório quando ele está vazio, offline ou sem faculdade.
+        if (!userSchool) {
+          directoryMessage = 'Informe sua faculdade no perfil para localizar colegas reais.';
+        } else if (!currentUser.uid) {
+          directoryMessage = 'Entre na sua conta para consultar colegas cadastrados.';
+        } else if (!(typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive)) {
+          directoryMessage = 'O diretório de colegas está indisponível sem conexão com o Firebase.';
+        } else {
           try {
             const snap = await firestoreDb.collection('users')
               .where('faculdade', '==', userSchool)
@@ -28319,7 +28338,7 @@ function escapeHtmlText(str) {
             snap.forEach(doc => {
               const d = doc.data() || {};
               const email = (d.email || '').toLowerCase();
-              if (email && email !== userEmail) {
+              if (doc.id && doc.id !== userUid && !doc.id.startsWith('usr_') && email && email !== userEmail && d.demo !== true && d.isDemo !== true) {
                 users.push({
                   uid: doc.id,
                   email: email,
@@ -28334,73 +28353,8 @@ function escapeHtmlText(str) {
             });
           } catch (e) {
             console.warn('[Classmates] Falha ao buscar usuários no Firestore:', e);
+            directoryMessage = 'Não foi possível consultar o diretório agora. Tente novamente mais tarde.';
           }
-        }
-
-        // 2. Mock robusto de colegas da Faculdade Universo se estiver offline ou banco com poucos usuários
-        if (users.length === 0) {
-          users = [
-            {
-              uid: 'usr_mariana',
-              nome: 'Mariana Costa',
-              email: 'mariana.costa@medicina.universo.br',
-              faculdade: userSchool,
-              periodo_atual: userPeriod,
-              challengerThumbsUp: 15,
-              challengerThumbsDown: 1,
-              challengerScore: 14
-            },
-            {
-              uid: 'usr_lucas',
-              nome: 'Lucas Silva',
-              email: 'lucas.silva@medicina.universo.br',
-              faculdade: userSchool,
-              periodo_atual: userPeriod,
-              challengerThumbsUp: 9,
-              challengerThumbsDown: 1,
-              challengerScore: 8
-            },
-            {
-              uid: 'usr_beatriz',
-              nome: 'Beatriz Moraes',
-              email: 'beatriz.moraes@medicina.universo.br',
-              faculdade: userSchool,
-              periodo_atual: '3º Semestre',
-              challengerThumbsUp: 6,
-              challengerThumbsDown: 1,
-              challengerScore: 5
-            },
-            {
-              uid: 'usr_gabriel',
-              nome: 'Gabriel Santos',
-              email: 'gabriel.santos@medicina.universo.br',
-              faculdade: userSchool,
-              periodo_atual: '8º Semestre',
-              challengerThumbsUp: 2,
-              challengerThumbsDown: 5,
-              challengerScore: -3 // Escore negativo testado
-            },
-            {
-              uid: 'usr_camila',
-              nome: 'Camila Albuquerque',
-              email: 'camila.albuquerque@medicina.universo.br',
-              faculdade: userSchool,
-              periodo_atual: '10º Semestre (Internato)',
-              challengerThumbsUp: 19,
-              challengerThumbsDown: 1,
-              challengerScore: 18
-            },
-            {
-              uid: 'usr_rodrigo',
-              nome: 'Rodrigo Fagundes',
-              email: 'rodrigo.fagundes@medicina.universo.br',
-              faculdade: userSchool,
-              periodo_atual: '2º Semestre',
-              challengerThumbsUp: 0,
-              challengerThumbsDown: 0,
-              challengerScore: 0
-            }
-          ].filter(u => u.email.toLowerCase() !== userEmail);
         }
 
         // Aplica avaliações locais salvas no navegador
@@ -28427,30 +28381,32 @@ function escapeHtmlText(str) {
           const found = users.find(u => u.email.toLowerCase() === email);
           if (found) {
             addedUsers.push(found);
-          } else {
+          } else if (typeof item === 'object' && item.uid && !String(item.uid).startsWith('usr_')) {
+            // Contatos de outra instituição só aparecem se já foram resolvidos
+            // para um UID Firebase real ao serem adicionados.
             addedUsers.push({
-              uid: (typeof item === 'object' && item.uid) || `usr_${email.replace(/[^a-z0-9]/g, '_')}`,
-              nome: (typeof item === 'object' && item.nome) || email.split('@')[0],
+              uid: item.uid,
+              nome: item.nome || email.split('@')[0],
               email: email,
-              faculdade: (typeof item === 'object' && item.faculdade) || userSchool,
-              periodo_atual: (typeof item === 'object' && item.periodo_atual) || 'Adicionado',
-              challengerThumbsUp: 0,
-              challengerThumbsDown: 0,
-              challengerScore: 0
+              faculdade: item.faculdade || '',
+              periodo_atual: item.periodo_atual || 'Período não informado',
+              challengerThumbsUp: item.challengerThumbsUp || 0,
+              challengerThumbsDown: item.challengerThumbsDown || 0,
+              challengerScore: item.challengerScore || 0
             });
           }
         });
 
         // 4. Colegas do Mesmo Período
         const normUserPeriod = userPeriod.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const samePeriodUsers = users.filter(u => {
+        const samePeriodUsers = normUserPeriod ? users.filter(u => {
           const p = (u.periodo_atual || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return p === normUserPeriod || p.includes(normUserPeriod) || normUserPeriod.includes(p);
-        });
+          return p && (p === normUserPeriod || p.includes(normUserPeriod) || normUserPeriod.includes(p));
+        }) : [];
 
         // 5. Renderiza Seções
-        this.renderClassmatesGrid('classmatesSamePeriodList', samePeriodUsers, 'Nenhum colega cadastrado no seu período ainda.');
-        this.renderClassmatesGrid('classmatesAllFacultyList', users, 'Nenhum outro estudante encontrado nesta faculdade.');
+        this.renderClassmatesGrid('classmatesSamePeriodList', samePeriodUsers, directoryMessage || (userPeriod ? 'Nenhum colega cadastrado no seu período ainda.' : 'Informe seu período no perfil para filtrar colegas.'));
+        this.renderClassmatesGrid('classmatesAllFacultyList', users, directoryMessage || 'Nenhum outro estudante encontrado nesta faculdade.');
         this.renderClassmatesGrid('classmatesAddedList', addedUsers, 'Você ainda não adicionou nenhum colega por e-mail.');
 
         // 6. Atualiza contadores
@@ -28567,35 +28523,41 @@ function escapeHtmlText(str) {
           return;
         }
 
-        // Tenta buscar no Firestore para obter o nome real
-        let classmateObj = {
-          email: email,
-          nome: email.split('@')[0],
-          faculdade: currentProfile.faculdade || 'Universo',
-          periodo_atual: 'Colega Adicionado',
-          addedAt: new Date().toISOString()
-        };
+        // Só permite adicionar uma pessoa encontrada como conta real no Firebase.
+        if (!(currentUser.uid && typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive)) {
+          showFeedback('Não foi possível validar o cadastro do colega agora. Verifique sua conexão e tente novamente.', true);
+          return;
+        }
 
-        if (typeof firestoreDb !== 'undefined' && firestoreDb && typeof isFirebaseCloudActive !== 'undefined' && isFirebaseCloudActive) {
-          try {
-            const snap = await firestoreDb.collection('users').where('email', '==', email).limit(1).get();
-            if (!snap.empty) {
-              const d = snap.docs[0].data();
-              classmateObj.uid = snap.docs[0].id;
-              classmateObj.nome = d.nome || classmateObj.nome;
-              classmateObj.faculdade = d.faculdade || classmateObj.faculdade;
-              classmateObj.periodo_atual = d.periodo_atual || classmateObj.periodo_atual;
-            }
-
-            // Persiste no Firestore do usuário
-            if (currentUser.uid) {
-              const emailKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
-              await firestoreDb.collection('users').doc(currentUser.uid)
-                .collection('colegas').doc(emailKey).set(classmateObj, { merge: true });
-            }
-          } catch (e) {
-            console.warn('[Classmates] Erro ao salvar colega no Firestore:', e);
+        let classmateObj;
+        try {
+          const snap = await firestoreDb.collection('users').where('email', '==', email).limit(1).get();
+          if (snap.empty || !snap.docs[0]?.id || snap.docs[0].id.startsWith('usr_')) {
+            showFeedback('Não encontramos uma conta real do MedTutor com esse e-mail. Confira o endereço e tente novamente.', true);
+            return;
           }
+          const profileDoc = snap.docs[0];
+          const d = profileDoc.data() || {};
+          if (profileDoc.id === currentUser.uid || d.demo === true || d.isDemo === true) {
+            showFeedback('Esse e-mail não corresponde a outro estudante ativo.', true);
+            return;
+          }
+          classmateObj = {
+            uid: profileDoc.id,
+            email: String(d.email || email).toLowerCase(),
+            nome: String(d.nome || email.split('@')[0]),
+            faculdade: String(d.faculdade || ''),
+            periodo_atual: String(d.periodo_atual || 'Período não informado'),
+            addedAt: new Date().toISOString()
+          };
+
+          const emailKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
+          await firestoreDb.collection('users').doc(currentUser.uid)
+            .collection('colegas').doc(emailKey).set(classmateObj, { merge: true });
+        } catch (e) {
+          console.warn('[Classmates] Erro ao validar/salvar colega no Firestore:', e);
+          showFeedback('Não foi possível confirmar e salvar esse colega. Tente novamente mais tarde.', true);
+          return;
         }
 
         this.addedClassmatesCache.unshift(classmateObj);
