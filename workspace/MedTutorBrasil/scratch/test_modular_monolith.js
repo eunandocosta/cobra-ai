@@ -160,6 +160,7 @@ assert(appSource.includes("MedTutorAuthService?.currentUser?.uid"), 'a primeira 
 assert(authMarkup.includes('id="semesterRenameModal"') && authMarkup.includes('id="semesterRenameProgressTrack"'), 'a revisão de renomeação deve exibir modal e barra de progresso');
 assert(appSource.includes('function readMaterialTextDirectlyFromFirestore(doc)') && appSource.includes('readMaterialTextChunks(doc.ref'), 'a renomeação deve ler o conteúdo e os chunks diretamente do Firestore');
 assert(appSource.includes('async function analyzeSemesterSubjectNames(periodId)') && appSource.includes('classifyMaterialWithServerGemini(text, name, selectedCat.period)'), 'a análise por semestre deve classificar o conteúdo contra o catálogo oficial com Gemini');
+assert(appSource.includes('const escapedSelectedPeriodId = String(selectedCat.id || selectedCat.period || \'\')') && appSource.includes("analyzeSemesterSubjectNames('${escapedSelectedPeriodId}')"), 'o painel de ementa deve usar o identificador do período selecionado sem variável fora de escopo');
 assert(appSource.includes('async function applySemesterSubjectRenameReview()') && appSource.includes("disciplina: item.newSubject") && appSource.includes("subject: item.newSubject"), 'a prévia confirmada deve atualizar os rótulos no mesmo documento sem recriá-lo');
 console.log('[PASS] Renomeação de matérias por semestre lê o Firestore, mostra progresso e grava somente após confirmação');
 console.log('[PASS] Recarregar preserva a rota solicitada e aguarda confirmação segura do Firebase Auth');

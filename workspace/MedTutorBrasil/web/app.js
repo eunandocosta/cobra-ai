@@ -22294,6 +22294,10 @@ Para cada material, retorne um objeto no JSON com:
         // 2. PAINEL PRINCIPAL DETAIL (MATÉRIAS E DADOS DO SEMESTRE SELECIONADO)
         let detailHtml = '';
         if (selectedCat) {
+          // O identificador usado no botão do painel de detalhes pertence ao
+          // período selecionado, não ao escopo do `.map()` da barra lateral.
+          // Declará-lo aqui evita interromper toda a inicialização da SPA.
+          const escapedSelectedPeriodId = String(selectedCat.id || selectedCat.period || '').replace(/'/g, "\\'");
           const catSubjCount = (selectedCat.subjects || []).length;
           let activeCountInPeriod = 0;
           (selectedCat.subjects || []).forEach(s => {
@@ -22372,7 +22376,7 @@ Para cada material, retorne um objeto no JSON com:
                     ${catSubjCount} ${catSubjCount === 1 ? 'disciplina' : 'disciplinas'} neste período ${activeCountInPeriod > 0 ? `• <strong style="color: #00ff66;">${activeCountInPeriod} com aulas ativas</strong>` : ''}
                   </div>
                 </div>
-                <button class="btn-outline-action primary" type="button" onclick="analyzeSemesterSubjectNames('${escapedPeriodId}')" title="Ler os materiais deste semestre no Firestore e sugerir a disciplina correta com base no conteúdo">
+                <button class="btn-outline-action primary" type="button" onclick="analyzeSemesterSubjectNames('${escapedSelectedPeriodId}')" title="Ler os materiais deste semestre no Firestore e sugerir a disciplina correta com base no conteúdo">
                   ✨ Organizar matérias pelo conteúdo
                 </button>
               </div>
