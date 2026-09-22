@@ -23676,8 +23676,13 @@ Para cada material, retorne um objeto no JSON com:
         return token;
       });
 
-      text = text.replace(/\\(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u|sup|sub)\b)/gi, '');
+      text = text.replace(/&lt;(\\*\/?(?:h[1-6]|ul|ol|li|p|div|br)\b(?:(?!&lt;|&gt;)[\s\S])*?)&gt;/gi, (_, tag) => {
+        return '<' + tag.replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/\\/g, '') + '>';
+      });
+      text = text.replace(/\\+(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u|sup|sub)\b)/gi, '');
       text = text.replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi, (_, level, heading) => '\n' + '#'.repeat(Number(level)) + ' ' + heading.trim() + '\n');
+      text = text.replace(/<h([1-6])\b[^>]*>/gi, (_, level) => '\n' + '#'.repeat(Number(level)) + ' ')
+        .replace(/<\/h[1-6]\s*>/gi, '\n');
       const listToMarkdown = (body, ordered) => {
         let itemNumber = 0;
         const items = body.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => {
@@ -23688,8 +23693,8 @@ Para cada material, retorne um objeto no JSON com:
       };
       text = text.replace(/<ul\b[^>]*>([\s\S]*?)<\/ul\s*>/gi, (_, body) => listToMarkdown(body, false));
       text = text.replace(/<ol\b[^>]*>([\s\S]*?)<\/ol\s*>/gi, (_, body) => listToMarkdown(body, true));
-      text = text.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => '\n- ' + item.trim() + '\n');
-      text = text.replace(/<\/?(?:ul|ol|li)\b[^>]*>/gi, '\n')
+      text = text.replace(/<li\b[^>]*>/gi, '\n- ').replace(/<\/li\s*>/gi, '\n');
+      text = text.replace(/<\/?(?:ul|ol)\b[^>]*>/gi, '\n')
         .replace(/<br\b[^>]*\/?>/gi, '\n')
         .replace(/<\/?(?:p|div)\b[^>]*>/gi, '\n')
         .replace(/\n[ \t]*\n[ \t]*\n+/g, '\n\n');
@@ -23700,7 +23705,7 @@ Para cada material, retorne um objeto no JSON com:
     // FORMATAÇÃO AVANÇADA DE TEXTO DA IA PARA HTML LIMPO (MARKDOWN ROBUSTO & TABELAS)
     function formatAITextToHTML(text) {
       if (!text) return '';
-      let md = normalizeAsciiDiagramsForReading(reflowSlideText(text)).replace(/\r\n/g, '\n');
+      let md = normalizeGeneratedStructuralHtml(normalizeAsciiDiagramsForReading(reflowSlideText(text))).replace(/\r\n/g, '\n');
 
       // Limpeza profunda de artefatos de quebra e tags brutas da IA (<br>, <br></br>, <p>, <div>, etc.)
       md = md.replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')

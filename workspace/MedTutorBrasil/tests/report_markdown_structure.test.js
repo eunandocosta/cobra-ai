@@ -14,6 +14,15 @@ assert.match(normalized, /1\. Primeiro[\s\S]*2\. Segundo/);
 assert.doesNotMatch(normalized, /<\/?(?:h4|ul|ol|li)\b/i);
 assert.match(normalized, /<em>TIR-domain-containing adapter-inducing interferon-β<\/em>/);
 
+const doubleEscaped = String.raw`\\<h4>2. Via com escape duplo
+&lt;ul class=&quot;gemini-ul&quot;&gt;&lt;li&gt;Primeiro item&lt;/li&gt;&lt;li&gt;Segundo item&lt;/li&gt;&lt;/ul&gt;
+<h3>Seção sem fechamento`;
+const normalizedEscaped = normalizeGeneratedStructuralHtml(doubleEscaped);
+assert.match(normalizedEscaped, /#### 2\. Via com escape duplo/);
+assert.match(normalizedEscaped, /- Primeiro item[\s\S]*- Segundo item/);
+assert.match(normalizedEscaped, /### Seção sem fechamento/);
+assert.doesNotMatch(normalizedEscaped, /&lt;\/?(?:h[1-6]|ul|ol|li)\b|<\/?(?:h[1-6]|ul|ol|li)\b/i);
+
 const codeSample = '```html\n<h4>Não converter dentro do código</h4>\n<ul><li>Exemplo</li></ul>\n```';
 assert.equal(normalizeGeneratedStructuralHtml(codeSample), codeSample);
 

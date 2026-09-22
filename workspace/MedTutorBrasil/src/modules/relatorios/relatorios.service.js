@@ -62,8 +62,13 @@ function normalizeGeneratedStructuralHtml(markdown) {
     return token;
   });
 
-  text = text.replace(/\\(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u|sup|sub)\b)/gi, '');
+  text = text.replace(/&lt;(\\*\/?(?:h[1-6]|ul|ol|li|p|div|br)\b(?:(?!&lt;|&gt;)[\s\S])*?)&gt;/gi, (_, tag) => {
+    return '<' + tag.replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/\\/g, '') + '>';
+  });
+  text = text.replace(/\\+(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u|sup|sub)\b)/gi, '');
   text = text.replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi, (_, level, heading) => '\n' + '#'.repeat(Number(level)) + ' ' + heading.trim() + '\n');
+  text = text.replace(/<h([1-6])\b[^>]*>/gi, (_, level) => '\n' + '#'.repeat(Number(level)) + ' ')
+    .replace(/<\/h[1-6]\s*>/gi, '\n');
   const listToMarkdown = (body, ordered) => {
     let itemNumber = 0;
     const items = body.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => {
@@ -74,7 +79,7 @@ function normalizeGeneratedStructuralHtml(markdown) {
   };
   text = text.replace(/<ul\b[^>]*>([\s\S]*?)<\/ul\s*>/gi, (_, body) => listToMarkdown(body, false));
   text = text.replace(/<ol\b[^>]*>([\s\S]*?)<\/ol\s*>/gi, (_, body) => listToMarkdown(body, true));
-  text = text.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => '\n- ' + item.trim() + '\n');
+  text = text.replace(/<li\b[^>]*>/gi, '\n- ').replace(/<\/li\s*>/gi, '\n');
   text = text.replace(/<\/?(?:ul|ol|li)\b[^>]*>/gi, '\n')
     .replace(/<br\b[^>]*\/?>/gi, '\n')
     .replace(/<\/?(?:p|div)\b[^>]*>/gi, '\n')
