@@ -2219,6 +2219,11 @@
                   question: q.question || q.pergunta || '',
                   quizOptions: q.quizOptions || q.distratores || [],
                   answer: q.answer || q.resposta_correta || '',
+                  // O formato legado/remoto persiste esses campos em português.
+                  // Normalizá-los aqui mantém filtros de disciplina e matéria
+                  // funcionais em uma sessão/dispositivo sem cache local.
+                  subject: q.subject || q.disciplina || '',
+                  topic: q.topic || q.materia || '',
                   learningFocus,
                   difficultyLevel,
                   flashcardTitle: q.flashcardTitle || q.titulo_flashcard || q.flashcard?.title || '',
@@ -26840,7 +26845,6 @@ function escapeHtmlText(str) {
     // =========================================================
     function getTopicsForSubject(subjectName) {
       if (!subjectName) return [];
-      const normSubject = subjectName.trim().toLowerCase();
       const topicsSet = new Set();
 
       // 1. Matérias/Tópicos da ementa cadastrada (universityCurriculum ou CANONICAL_UNIVERSO_CURRICULUM)
@@ -26852,11 +26856,10 @@ function escapeHtmlText(str) {
         (p.subjects || []).forEach(s => {
           const sName = typeof s === 'string' ? s : s.name;
           if (!sName) return;
-          const normSName = sName.trim().toLowerCase();
-          if (normSName === normSubject || normSName.includes(normSubject) || normSubject.includes(normSName)) {
+          if (isExactStudySubject(sName, subjectName)) {
             if (s && Array.isArray(s.topics)) {
               s.topics.forEach(t => {
-                if (t && typeof t === 'string' && t.trim() && t.trim().toLowerCase() !== normSName) {
+                if (t && typeof t === 'string' && t.trim() && !isExactStudySubject(t, subjectName)) {
                   topicsSet.add(t.trim());
                 }
               });
@@ -26869,10 +26872,11 @@ function escapeHtmlText(str) {
       if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
         sharedQuestionsBank.forEach(q => {
           if (!q) return;
-          const qSubj = (q.subject || '').trim().toLowerCase();
-          if (qSubj === normSubject || qSubj.includes(normSubject) || normSubject.includes(qSubj)) {
-            const t = (q.topic || q.flashcardTitle || q.titulo_flashcard || q.disease || q.learningFocus || '').trim();
-            if (t && t.length > 1 && t.toLowerCase() !== normSubject) {
+          if (isExactStudySubject(q.subject || q.disciplina, subjectName)) {
+            // Só o campo de matéria/tópico deve criar uma opção. Título de
+            // arquivo, título do card e diagnóstico são conteúdo, não matérias.
+            const t = (q.topic || q.materia || '').trim();
+            if (t && t.length > 1 && !isExactStudySubject(t, subjectName)) {
               topicsSet.add(t);
             }
           }
@@ -26883,10 +26887,9 @@ function escapeHtmlText(str) {
       if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
         chatDriveMaterials.forEach(m => {
           if (!m) return;
-          const mSubj = (m.subject || '').trim().toLowerCase();
-          if (mSubj === normSubject || mSubj.includes(normSubject) || normSubject.includes(mSubj)) {
-            const t = (m.topic || m.learningFocus || m.title || '').trim();
-            if (t && t.length > 1 && t.toLowerCase() !== normSubject) {
+          if (isExactStudySubject(m.subject || m.disciplina, subjectName)) {
+            const t = (m.topic || '').trim();
+            if (t && t.length > 1 && !isExactStudySubject(t, subjectName)) {
               topicsSet.add(t);
             }
           }
@@ -26964,6 +26967,7 @@ function escapeHtmlText(str) {
           if (t === currentVal) opt.selected = true;
           topicSelect.appendChild(opt);
         });
+        if (currentVal !== 'all' && !topics.includes(currentVal)) topicSelect.value = 'all';
       },
 
       onSubjectChange() {
@@ -27164,26 +27168,16 @@ function escapeHtmlText(str) {
           return;
         }
 
-        const normTopic = targetTopic.toLowerCase();
-
         // Critério estrito: Questões existentes já respondidas corretamente no Flashcard
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
-          const matchesSubject = isExactStudySubject(q.subject, targetSubject);
+          const matchesSubject = isExactStudySubject(q.subject || q.disciplina, targetSubject);
           if (!matchesSubject) return false;
 
           // Filtro por Matéria / Tópico se selecionado
           if (targetTopic && targetTopic !== 'all') {
-            const qTopic = (q.topic || '').trim().toLowerCase();
-            const qTitle = (q.flashcardTitle || q.titulo_flashcard || q.title || '').trim().toLowerCase();
-            const qFocus = (q.learningFocus || q.disease || '').trim().toLowerCase();
-            const matchesTopic = (
-              qTopic === normTopic ||
-              qTitle === normTopic ||
-              qFocus === normTopic ||
-              (qTopic && (qTopic.includes(normTopic) || normTopic.includes(qTopic))) ||
-              (qTitle && (qTitle.includes(normTopic) || normTopic.includes(qTitle)))
-            );
+            const matchesTopic = [q.topic, q.materia, q.flashcardTitle, q.titulo_flashcard, q.title, q.learningFocus, q.disease]
+              .some(value => isExactStudySubject(value, targetTopic));
             if (!matchesTopic) return false;
           }
 
@@ -28730,6 +28724,7 @@ function escapeHtmlText(str) {
           if (t === currentVal) opt.selected = true;
           topicSelect.appendChild(opt);
         });
+        if (currentVal !== 'all' && !topics.includes(currentVal)) topicSelect.value = 'all';
       },
 
       onDirectDisciplineChange() {
@@ -28775,28 +28770,16 @@ function escapeHtmlText(str) {
           return;
         }
 
-        const normTarget = targetSubject.toLowerCase();
-        const normTopic = targetTopic.toLowerCase();
-
         // Critério do Usuário: Perguntas existentes já respondidas corretamente no Flashcard
         const eligible = sharedQuestionsBank.filter(q => {
           if (!q) return false;
-          const qSubj = (q.subject || '').trim().toLowerCase();
-          const matchesSubject = (qSubj === normTarget || qSubj.includes(normTarget) || normTarget.includes(qSubj));
+          const matchesSubject = isExactStudySubject(q.subject || q.disciplina, targetSubject);
           if (!matchesSubject) return false;
 
           // Filtro por Matéria / Conteúdo
           if (targetTopic && targetTopic !== 'all') {
-            const qTopic = (q.topic || '').trim().toLowerCase();
-            const qTitle = (q.flashcardTitle || q.titulo_flashcard || q.title || '').trim().toLowerCase();
-            const qFocus = (q.learningFocus || q.disease || '').trim().toLowerCase();
-            const matchesTopic = (
-              qTopic === normTopic ||
-              qTitle === normTopic ||
-              qFocus === normTopic ||
-              (qTopic && (qTopic.includes(normTopic) || normTopic.includes(qTopic))) ||
-              (qTitle && (qTitle.includes(normTopic) || normTopic.includes(qTitle)))
-            );
+            const matchesTopic = [q.topic, q.materia, q.flashcardTitle, q.titulo_flashcard, q.title, q.learningFocus, q.disease]
+              .some(value => isExactStudySubject(value, targetTopic));
             if (!matchesTopic) return false;
           }
 

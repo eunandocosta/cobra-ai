@@ -41,6 +41,16 @@ for (const fakeColleague of [
 }
 console.log('[PASS] Diretório de colegas sem perfis fictícios embutidos');
 
+// Questões vindas do Firestore usam chaves históricas em português; normalize-as
+// para que os filtros de Desafios funcionem também em aparelhos sem cache local.
+assert(/subject:\s*q\.subject\s*\|\|\s*q\.disciplina/.test(appSource), 'questões remotas devem mapear disciplina para subject');
+assert(/topic:\s*q\.topic\s*\|\|\s*q\.materia/.test(appSource), 'questões remotas devem mapear materia para topic');
+const challengeTopicsHelper = appSource.match(/function getTopicsForSubject\(subjectName\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(challengeTopicsHelper.includes('isExactStudySubject(q.subject || q.disciplina, subjectName)'), 'o filtro de tópicos deve aceitar apenas questões da disciplina exata');
+assert(!challengeTopicsHelper.includes('.includes(normSubject)'), 'o filtro de tópicos não deve ampliar a disciplina por correspondência parcial');
+assert(!challengeTopicsHelper.includes('q.flashcardTitle') && !challengeTopicsHelper.includes('m.title'), 'títulos de cards/arquivos não devem virar matérias no filtro');
+console.log('[PASS] Questões e matérias de Desafios normalizadas e limitadas à disciplina selecionada');
+
 const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
 assert(authMarkup.includes('id="paymentScreenContainer"'), 'a tela de cupom deve ter um container independente da tela de login');
 assert(/<\/div>\s*<\/div>\s*<div id="paymentScreenContainer"/.test(authMarkup), 'a tela de pagamento deve estar fora do container de login');
