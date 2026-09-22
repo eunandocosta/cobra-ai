@@ -59,15 +59,12 @@ app.get('/api/health', (req, res) => {
 app.get('/api/config', (req, res) => {
   const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
   const supabasePublishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || '').trim();
+  const hasSupabasePlaceholders = /your-project\.supabase\.co|sua_chave_publicavel/i.test(`${supabaseUrl} ${supabasePublishableKey}`);
+  const hasSupabaseStorageConfig = !!(supabaseUrl && supabasePublishableKey && !hasSupabasePlaceholders);
   res.json({
     geminiConfigured: !!process.env.GEMINI_API_KEY,
-    // A chave publicável é própria para o navegador. Chaves service_role e a
-    // senha PostgreSQL nunca são retornadas por esta rota.
-    supabaseStorage: supabaseUrl && supabasePublishableKey ? {
-      url: supabaseUrl,
-      publishableKey: supabasePublishableKey,
-      bucket: String(process.env.SUPABASE_STORAGE_BUCKET || 'materiais-estudo').trim()
-    } : null
+    // Apenas a chave publicável é enviada; service_role e senha nunca saem do servidor.
+    supabaseStorage: hasSupabaseStorageConfig ? { url: supabaseUrl, publishableKey: supabasePublishableKey, bucket: String(process.env.SUPABASE_STORAGE_BUCKET || 'materiais-estudo').trim() } : null
   });
 });
 
