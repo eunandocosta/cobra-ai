@@ -5650,7 +5650,14 @@
       width: 100%;
       margin-top: 4px;
     }
-    .auth-session-error-actions button { min-height: 44px; }
+    .auth-session-error-actions button,
+    .auth-session-error-actions a {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
 
     .auth-session-check .loader-spinner {
       width: 24px;

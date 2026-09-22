@@ -147,10 +147,11 @@ assert(appSource.includes("setRoutePresentation('resolving')") && appSource.incl
 assert(appSource.includes("pendingRoutePath = window.location.pathname || pendingRoutePath || '/login'"), 'a rota solicitada deve ser preservada enquanto o Auth está pendente');
 assert(appSource.includes('authStartupCompleted') && appSource.includes('setTimeout(() => {') && appSource.includes('}, 12000)'), 'a restauração e validação do Auth devem encerrar com limite de tempo');
 assert(appSource.includes('this.authSessionErrorMessage = this.authStateResolved') && appSource.includes('this.setAuthScreenState(\'error\')'), 'falha/timeout de autenticação deve apresentar estado recuperável');
-assert(authMarkup.includes('id="authSessionError"') && authMarkup.includes('retryAuthSessionResolution') && authMarkup.includes('openLoginAfterAuthResolutionError'), 'a tela de erro de sessão deve oferecer tentar novamente e ir ao login');
+assert(authMarkup.includes('id="authSessionError"') && authMarkup.includes('recover-session=1'), 'a tela de erro de sessão deve oferecer recuperação que não dependa do bundle com falha');
 assert(authMarkup.includes('__medTutorAuthBundleReady') && authMarkup.includes('}, 15000);'), 'falha no carregamento do bundle não pode deixar a tela de sessão permanente');
 assert(appSource.includes("window.__medTutorAuthBundleReady = true;") && appSource.indexOf('window.__medTutorAuthBundleReady = true;') < appSource.indexOf('const MedTutorAuthService'), 'o bundle deve sinalizar carregamento antes da inicialização pesada do app');
 assert(authMarkup.includes('__medTutorAuthBootFailure') && authMarkup.includes("window.addEventListener('error'"), 'erros reais do bundle devem exibir uma saída da tela de sessão');
+assert(authMarkup.includes('recoverAuthStaticCache') && authMarkup.includes("registration.unregister()") && authMarkup.includes("key.indexOf('medtutor-') === 0"), 'a recuperação de sessão deve limpar somente o cache estático do MedTutor');
 assert(appSource.includes("if (!item.disciplina || !Array.isArray(item.materias)) return;") && !appSource.includes("if (item.origem !== 'gemini-upload') return;"), 'ementas legadas válidas devem continuar visíveis mesmo sem metadado de origem');
 assert(appSource.includes("MedTutorAuthService?.currentUser?.uid"), 'a primeira sincronização não pode usar o UID provisório antes da autenticação');
 assert(authMarkup.includes('id="semesterRenameModal"') && authMarkup.includes('id="semesterRenameProgressTrack"'), 'a revisão de renomeação deve exibir modal e barra de progresso');
