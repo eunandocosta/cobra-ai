@@ -74,6 +74,16 @@
       display: none;
     }
 
+    body.route-payment {
+      background: #07100c;
+      display: block;
+      overflow: hidden;
+    }
+
+    body.route-payment .app-root {
+      display: none;
+    }
+
     body.route-app .app-root {
       display: flex;
     }

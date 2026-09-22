@@ -37,7 +37,7 @@ app.use(express.static(path.join(__dirname, 'web')));
 
 // Rotas do cliente são uma SPA: ao abrir um link diretamente, o servidor
 // precisa entregar o mesmo documento para o roteador do navegador.
-const clientRoutes = ['/login', '/cadastro', '/chat-ia', '/flashcards', '/quizzes', '/materias', '/sce', '/desafios'];
+const clientRoutes = ['/login', '/cadastro', '/pagamento', '/chat-ia', '/flashcards', '/quizzes', '/materias', '/sce', '/desafios'];
 clientRoutes.forEach(route => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
 });

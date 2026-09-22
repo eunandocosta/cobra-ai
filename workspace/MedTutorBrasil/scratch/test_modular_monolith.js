@@ -41,6 +41,18 @@ for (const fakeColleague of [
 }
 console.log('[PASS] Diretório de colegas sem perfis fictícios embutidos');
 
+const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
+assert(authMarkup.includes('id="accessGateCard" role="dialog" aria-modal="true"'), 'a solicitação de cupom deve ser um modal acessível');
+assert(authMarkup.includes('id="accessCouponInput"'), 'o modal deve conter o campo para inserir cupom');
+assert(appSource.includes('couponInput.focus()'), 'o campo de cupom deve receber foco ao abrir o modal');
+assert(authMarkup.includes('id="accessCouponInput"') && authMarkup.includes('id="btnAccessCouponSubmit"'), 'a tela de pagamento deve solicitar cupom com campo e botão de envio');
+const accessCardMarkup = authMarkup.match(/<section[^>]*id="accessGateCard"[\s\S]*?<\/section>/)?.[0] || '';
+assert(accessCardMarkup && !accessCardMarkup.includes('MedTutorAuthService.signOut()'), 'a tela de pagamento não deve oferecer ação para deslogar o usuário');
+assert(indexContent.includes("'/pagamento'"), 'a rota /pagamento deve ser servida diretamente pelo servidor');
+assert(appSource.includes("setAppRoute('/pagamento', { replace: true })"), 'contas sem acesso devem ser redirecionadas para /pagamento');
+assert(appSource.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
+console.log('[PASS] Modal de ativação do cupom acessível e pronto para receber o código');
+
 const rulesVersion = '2026-09-22-v1';
 const firestoreRules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf-8');
 assert(firestoreRules.includes(rulesVersion), 'firestore.rules deve exigir a versão atual do cupom');
@@ -119,6 +131,11 @@ server.listen(TEST_PORT, async () => {
     assert.strictEqual(health.statusCode, 200);
     assert.strictEqual(health.body.architecture, 'modular-monolith');
     console.log('[PASS] GET /api/health -> 200 OK (modular-monolith)');
+
+    const paymentPage = await makeRequest('GET', '/pagamento');
+    assert.strictEqual(paymentPage.statusCode, 200, 'a rota de pagamento/cupom precisa abrir diretamente');
+    assert(paymentPage.rawBody?.includes('accessCouponForm'), 'a rota /pagamento deve entregar o formulário do cupom');
+    console.log('[PASS] GET /pagamento -> tela dedicada de acesso por cupom');
 
     // Test 2: Auth Module
     const session = await makeRequest('POST', '/api/auth/session', { email: 'aluno@medicina.uf.br' });

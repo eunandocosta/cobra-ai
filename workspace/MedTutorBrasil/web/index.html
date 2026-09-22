@@ -2848,17 +2848,13 @@
       </form>
 
     </div>
-    <section class="auth-card auth-access-card" id="accessGateCard" aria-labelledby="accessGateTitle" style="display: none;">
+    <section class="auth-card auth-access-card" id="accessGateCard" role="dialog" aria-modal="true" aria-labelledby="accessGateTitle" aria-describedby="accessGateDescription" aria-hidden="true" style="display: none;">
       <div class="auth-brand">
         <div class="auth-logo-badge" aria-hidden="true">
           <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
         </div>
         <h1 id="accessGateTitle">Ative seu acesso</h1>
-        <p class="auth-subtitle">Sua conta está autenticada. Informe o cupom recebido para liberar o espaço de estudos.</p>
-      </div>
-      <div class="access-account-summary">
-        <span class="access-account-icon" aria-hidden="true">✓</span>
-        <div><strong>Conta conectada</strong><small id="accessCouponAccount">Estudante</small></div>
+        <p class="auth-subtitle" id="accessGateDescription">Sua conta está autenticada. Informe o cupom recebido para liberar o espaço de estudos.</p>
       </div>
       <form class="auth-form" id="accessCouponForm" onsubmit="MedTutorAuthService.redeemAccessCoupon(event)">
         <div class="auth-input-group">
@@ -2868,10 +2864,6 @@
         <div id="accessCouponError" class="auth-error-alert" role="alert" aria-live="polite"></div>
         <button type="submit" class="btn-auth-submit" id="btnAccessCouponSubmit">Ativar acesso</button>
       </form>
-      <div class="access-gate-actions">
-        <button class="btn-outline-action" type="button" onclick="MedTutorAuthService.retryAccessValidation()">Tentar novamente</button>
-        <button class="btn-outline-action" type="button" onclick="MedTutorAuthService.signOut()">Sair da conta</button>
-      </div>
     </section>
   </div>
 
@@ -3325,7 +3317,7 @@
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
-  <script defer src="/app.min.js?v=20260922-coupon-epoch-v1"></script>
+  <script defer src="/app.min.js?v=20260922-payment-coupon-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

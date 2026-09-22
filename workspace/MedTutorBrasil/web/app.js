@@ -217,8 +217,21 @@
         authScreen.classList.toggle('auth-state-resolving', isChecking);
         authScreen.classList.toggle('auth-access-mode', isAccess);
         authScreen.setAttribute('aria-busy', String(isChecking));
+        const accessCard = document.getElementById('accessGateCard');
+        const loginCard = authScreen.querySelector('.auth-card:not(#accessGateCard)');
+        if (accessCard) {
+          accessCard.style.display = isAccess ? 'flex' : 'none';
+          accessCard.setAttribute('aria-hidden', String(!isAccess));
+        }
+        if (loginCard) loginCard.setAttribute('aria-hidden', String(isAccess || isChecking));
         const accessError = document.getElementById('accessCouponError');
         if (accessError && state !== 'access') accessError.textContent = '';
+        if (isAccess) {
+          window.requestAnimationFrame(() => {
+            const couponInput = document.getElementById('accessCouponInput');
+            if (couponInput && authScreen.classList.contains('active')) couponInput.focus();
+          });
+        }
       },
 
       async resolveAccessForUser(user, { force = false } = {}) {
@@ -247,10 +260,8 @@
               // A API atualiza as custom claims antes de negar o acesso; renova
               // o token para que as regras do Firestore também respeitem o bloqueio.
               try { await user.getIdToken(true); } catch (e) {}
-              setRoutePresentation('login');
+              setPaymentRoute();
               this.setAuthScreenState('access');
-              const account = document.getElementById('accessCouponAccount');
-              if (account) account.textContent = user.email || user.displayName || 'Conta autenticada';
               return false;
             }
             if (result.required === true) {
@@ -260,7 +271,7 @@
           } catch (error) {
             this.accessGranted = false;
             this.accessResolvedUid = '';
-            setRoutePresentation('login');
+            setPaymentRoute();
             this.setAuthScreenState('access');
             const accessError = document.getElementById('accessCouponError');
             if (accessError) accessError.textContent = 'Não foi possível validar o cupom agora. Verifique a conexão ou procure o suporte.';
@@ -291,6 +302,7 @@
 
         this.setAuthScreenState('hidden');
         applyRouteFromLocation({ replace: true });
+        accessReturnPath = '';
         this.refreshCloudDataInBackground(user.uid);
         if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
         if (typeof renderDashboardView === 'function') renderDashboardView();
@@ -337,6 +349,7 @@
           if (!authorized) throw new Error('O acesso foi registrado, mas a sessão ainda não foi atualizada. Entre novamente.');
           if (codeInput) codeInput.value = '';
           showToast('✅ Cupom validado. Seu acesso ao MedTutor foi liberado.');
+          if (accessReturnPath && APP_TAB_BY_ROUTE[accessReturnPath]) pendingRoutePath = accessReturnPath;
           await this.continueWithAuthenticatedUser(user);
           return true;
         } catch (error) {
@@ -1072,7 +1085,7 @@
         localStorage.setItem('medtutor_user_profile', JSON.stringify(profileData));
 
         // 2. Persistência no Cloud Firestore se conectado
-        if (firestoreDb && isFirebaseCloudActive) {
+        if (firestoreDb && isFirebaseCloudActive && MedTutorAuthService.accessGranted === true) {
           try {
             await firestoreDb.collection('users').doc(uid).set(profileData, { merge: true });
           } catch (e) {
@@ -2482,6 +2495,10 @@
     });
 
     async function syncAllDataToFirebaseCloud(showNotification) {
+      if (MedTutorAuthService.accessGranted !== true) {
+        console.info('[Firestore] Sincronização ignorada: o acesso por cupom ainda não foi liberado.');
+        return false;
+      }
       if (showNotification) showToast('⚡ Sincronizando dados com o Firebase...');
       await MedTutorFirebaseService.saveCurriculum(universityCurriculum);
       await MedTutorFirebaseService.saveAllMaterials(chatDriveMaterials);
@@ -2489,6 +2506,7 @@
       await MedTutorFirebaseService.saveChatSessions(chatSessions);
       if (showNotification) showToast('☁️ 100% dos dados foram sincronizados na nuvem!');
       MedTutorAuthService.updateFirebaseConfigModalUI();
+      return true;
     }
 
     function saveCustomFirebaseConfig() {
@@ -2549,8 +2567,9 @@
 
     function setRoutePresentation(routeName) {
       if (typeof document === 'undefined') return;
-      document.body.classList.remove('route-login', 'route-app');
-      document.body.classList.add(routeName === 'login' ? 'route-login' : 'route-app');
+      document.body.classList.remove('route-login', 'route-payment', 'route-app');
+      const routeClass = routeName === 'payment' ? 'route-payment' : (routeName === 'login' ? 'route-login' : 'route-app');
+      document.body.classList.add(routeClass);
       document.body.dataset.route = routeName;
     }
 
@@ -2561,6 +2580,16 @@
         window.history[method]({ medtutorRoute: normalized }, '', normalized);
       }
       pendingRoutePath = normalized;
+    }
+
+    let accessReturnPath = '';
+
+    function setPaymentRoute() {
+      const currentPath = (typeof window !== 'undefined' && window.location.pathname) || '/login';
+      if (APP_TAB_BY_ROUTE[currentPath]) accessReturnPath = currentPath;
+      else if (!accessReturnPath && APP_TAB_BY_ROUTE[pendingRoutePath]) accessReturnPath = pendingRoutePath;
+      setAppRoute('/pagamento', { replace: true });
+      setRoutePresentation('payment');
     }
 
     function applyRouteFromLocation({ replace = false, forceDefault = false } = {}) {
@@ -2587,7 +2616,7 @@
         return;
       }
       if (MedTutorAuthService.accessGranted !== true) {
-        setRoutePresentation('login');
+        setPaymentRoute();
         MedTutorAuthService.setAuthScreenState(MedTutorAuthService.accessGranted === false ? 'access' : 'checking');
         return;
       }
