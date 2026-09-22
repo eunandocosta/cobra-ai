@@ -17831,17 +17831,9 @@ DIRETRIZES CIRÚRGICAS:
       renderChatDriveVerticalList();
       updateChatAttachedBar();
 
-      // Atualiza roteiro do Waze da Medicina
-      studyRouteSchedule.unshift({
-        day: 'Hoje',
-        date: 'Hoje',
-        topic: `${finalSubject}: ${finalDisease}`,
-        subject: finalSubject,
-        minutes: 30,
-        status: 'scheduled',
-        slideName: newMaterial.name,
-        disease: finalDisease
-      });
+      // O roteiro é derivado dos cartões e do SRS; alocar um arquivo não cria
+      // uma tarefa artificial antes de existirem cartões vinculados a ele.
+      rebuildStudyRouteSchedule();
 
       renderSharedStudyItems();
       renderSceBars();
@@ -22525,14 +22517,96 @@ Para cada material, retorne um objeto no JSON com:
     }
 
     // 9. SCE & WAZE DA MEDICINA (ROTEIRO DINÂMICO & RECÁLCULO)
-    let studyRouteSchedule = [
-      { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled', slideName: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf', disease: 'Semiologia das Lesões Elementares Cutâneas' },
-      { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled', slideName: 'Psoríase, liquen plano.pdf', disease: 'Psoríase Vulgar & Koebner' },
-      { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed', slideName: 'Dermatite Seborreica, Dermatite Atópica, Dermatite de Contato Alérgica...pdf', disease: 'Dermatite Atópica & Eczemas' }
-    ];
+    // O roteiro é sempre calculado da biblioteca real do estudante. Nunca use
+    // aulas demonstrativas como fallback: além de poluir a tela, elas podiam
+    // levar o aluno a uma matéria sem material ao clicar no card.
+    let studyRouteSchedule = [];
+
+    function findStudyMaterialForQuestion(question) {
+      const materialIds = [question?.materialId, question?.material_id, question?.sourceMaterialId]
+        .filter(Boolean).map(String);
+      const slideKey = normalizeStudyComparisonText(question?.slideName || question?.materialName || '');
+      return (chatDriveMaterials || []).find(material => {
+        if (materialIds.includes(String(material?.id || ''))) return true;
+        if (!slideKey) return false;
+        return [material?.name, material?.originalFileName, material?.id]
+          .some(value => normalizeStudyComparisonText(value) === slideKey);
+      }) || null;
+    }
+
+    function getSceTaskDate(question, today) {
+      const srs = question?.srs || {};
+      if (!srs.lastReviewed) {
+        const scheduled = srs.newScheduledDate ? new Date(`${srs.newScheduledDate}T12:00:00`) : today;
+        return Number.isNaN(scheduled.getTime()) ? today : getStartOfDay(scheduled);
+      }
+      const due = srs.dueDate ? new Date(srs.dueDate) : today;
+      return Number.isNaN(due.getTime()) ? today : getStartOfDay(due);
+    }
+
+    function getSceDayLabel(date, today) {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dateKey = getLocalDateKey(date);
+      if (dateKey === getLocalDateKey(today)) return { day: 'Hoje', date: 'Hoje' };
+      if (dateKey === getLocalDateKey(tomorrow)) return { day: 'Amanhã', date: 'Amanhã' };
+      const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long' }).format(date);
+      const formatted = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(date);
+      return { day: weekday.charAt(0).toUpperCase() + weekday.slice(1), date: formatted };
+    }
+
+    function rebuildStudyRouteSchedule() {
+      const today = getStartOfDay();
+      const canonicalDisciplines = typeof getSceCanonicalDisciplines === 'function'
+        ? getSceCanonicalDisciplines()
+        : [];
+      const groups = new Map();
+
+      (sharedQuestionsBank || []).forEach(question => {
+        const material = findStudyMaterialForQuestion(question);
+        const discipline = typeof resolveSceQuestionDiscipline === 'function'
+          ? resolveSceQuestionDiscipline(question, canonicalDisciplines)
+          : null;
+        // Um card do roteiro só existe quando temos as duas pontas verificáveis:
+        // uma disciplina da ementa e um material salvo naquela biblioteca.
+        if (!material || !discipline) return;
+
+        const taskDate = getSceTaskDate(question, today);
+        const status = taskDate < today ? 'delayed' : 'scheduled';
+        const key = [getLocalDateKey(taskDate), normalizeStudyComparisonText(discipline.name), material.id || material.name].join('::');
+        if (!groups.has(key)) {
+          const label = getSceDayLabel(taskDate, today);
+          groups.set(key, {
+            ...label,
+            topic: material.name || material.originalFileName || 'Material de estudo',
+            subject: discipline.name,
+            minutes: 0,
+            status,
+            slideName: material.name || material.originalFileName || '',
+            materialId: material.id || '',
+            taskDate: taskDate.getTime(),
+            questionIds: []
+          });
+        }
+        const task = groups.get(key);
+        task.questionIds.push(question.id);
+        if (status === 'delayed') task.status = 'delayed';
+      });
+
+      studyRouteSchedule = [...groups.values()]
+        .map(task => ({
+          ...task,
+          // Dois minutos por cartão é uma estimativa conservadora, limitada
+          // para que uma aula extensa não transforme a agenda em sobrecarga.
+          minutes: Math.max(10, Math.min(45, Math.ceil(task.questionIds.length * 2)))
+        }))
+        .sort((a, b) => a.taskDate - b.taskDate || a.subject.localeCompare(b.subject, 'pt-BR') || a.topic.localeCompare(b.topic, 'pt-BR'))
+        .slice(0, 7);
+      return studyRouteSchedule;
+    }
 
     function resolveScheduleTargetSubject(subjectHint) {
-      if (!subjectHint) return currentStudySubject || (typeof getAvailableStudySubjects === 'function' ? getAvailableStudySubjects()[0] : '') || '';
+      if (!subjectHint) return '';
       const available = typeof getAvailableStudySubjects === 'function' ? getAvailableStudySubjects() : [];
       if (available.includes(subjectHint)) return subjectHint;
 
@@ -22540,22 +22614,9 @@ Para cada material, retorne um objeto no JSON com:
       const exact = available.find(s => s.toLowerCase().trim() === hintLower);
       if (exact) return exact;
 
-      const partial = available.find(s => {
-        const sLower = s.toLowerCase();
-        return sLower.includes(hintLower) || hintLower.includes(sLower);
-      });
-      if (partial) return partial;
-
-      const hintTokens = hintLower.split(/[\s,()\-]+/).filter(t => t.length > 2);
-      if (hintTokens.length > 0) {
-        const tokenMatch = available.find(s => {
-          const sLower = s.toLowerCase();
-          return hintTokens.some(token => sLower.includes(token));
-        });
-        if (tokenMatch) return tokenMatch;
-      }
-
-      return available[0] || subjectHint;
+      // Busca parcial levava um card inválido à primeira disciplina disponível.
+      // Para o SCE, abrir a matéria errada é pior que informar indisponibilidade.
+      return available.find(subject => isSameCurriculumSubject(subject, subjectHint)) || '';
     }
 
     function openScheduleQuestions(taskIndex) {
@@ -22563,60 +22624,23 @@ Para cada material, retorne um objeto no JSON com:
       if (!task) return;
 
       const targetSubject = resolveScheduleTargetSubject(task.subject);
+      if (!targetSubject) {
+        showToast('⚠️ Esta tarefa não pertence mais a uma disciplina disponível. Recalcule o roteiro.');
+        return;
+      }
       selectStudySubject(targetSubject);
 
-      let targetSlide = task.slideName || null;
-      let targetDisease = task.disease || null;
-
-      // Se não houver slideName explícito, tenta localizar pelo nome dos materiais da matéria
-      if (!targetSlide && typeof getMaterialsForSubject === 'function') {
-        const materials = getMaterialsForSubject(targetSubject);
-        if (materials && materials.length > 0) {
-          const topicLower = (task.topic || '').toLowerCase();
-          const words = topicLower.split(/[:,\s\-()]+/).filter(w => w.length > 3);
-          const matchedMat = materials.find(m => {
-            const mName = (m.name || '').toLowerCase();
-            const mSubj = (m.clinicalSubject || '').toLowerCase();
-            return words.some(w => mName.includes(w) || mSubj.includes(w));
-          });
-          if (matchedMat) {
-            targetSlide = matchedMat.name;
-          }
-        }
+      const targetSlide = task.slideName || '';
+      if (!targetSlide) {
+        showToast('⚠️ O material desta tarefa não está mais disponível. Recalcule o roteiro.');
+        return;
       }
-
-      // Se ainda não achou slide, tenta localizar através do banco de questões
-      if (!targetSlide && Array.isArray(sharedQuestionsBank)) {
-        const topicLower = (task.topic || '').toLowerCase();
-        const words = topicLower.split(/[:,\s\-()]+/).filter(w => w.length > 3);
-        const matchedQ = sharedQuestionsBank.find(q => {
-          const qSubj = (q.subject || '').toLowerCase();
-          if (!qSubj.includes(targetSubject.toLowerCase()) && !targetSubject.toLowerCase().includes(qSubj)) return false;
-          const qDisease = (q.disease || '').toLowerCase();
-          const qTopic = (q.topic || '').toLowerCase();
-          return words.some(w => qDisease.includes(w) || qTopic.includes(w));
-        });
-        if (matchedQ) {
-          if (matchedQ.slideName) targetSlide = matchedQ.slideName;
-          if (!targetDisease && matchedQ.disease) targetDisease = matchedQ.disease;
-        }
-      }
-
-      // Aplica filtro de slide se encontrado
-      if (targetSlide) {
-        handleSlideSelectChange(targetSlide);
-      } else if (targetDisease) {
-        currentDiseaseFilter = targetDisease;
-        const diseaseSelect = document.getElementById('filterDisease');
-        if (diseaseSelect) diseaseSelect.value = targetDisease;
-        renderSharedStudyItems();
-        saveStudyNavigationState();
-      }
-
-      // Se o filtro de slide for tão restrito que não retorne nenhuma questão, abre a matéria completa
+      handleSlideSelectChange(targetSlide);
+      const taskQuestionIds = new Set(task.questionIds || []);
       const filtered = typeof getFilteredQuestions === 'function' ? getFilteredQuestions() : [];
-      if (filtered.length === 0 && targetSlide) {
-        handleSlideSelectChange('all');
+      if (!filtered.some(question => taskQuestionIds.has(question.id))) {
+        showToast('⚠️ Não foi possível localizar os cartões desta aula. Recalcule o roteiro.');
+        return;
       }
 
       navigateTab('flashcards');
@@ -22640,6 +22664,7 @@ Para cada material, retorne um objeto no JSON com:
       const container = document.getElementById('timelineSchedule');
       if (!container) return;
       container.innerHTML = '';
+      rebuildStudyRouteSchedule();
 
       if (studyRouteSchedule.length === 0) {
         container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px; width: 100%;">Nenhum roteiro agendado no momento. Conecte o Drive ou faça upload de aulas para traçar sua rota.</div>';
@@ -22686,9 +22711,9 @@ Para cada material, retorne um objeto no JSON com:
             <span>${task.day} (${task.date})</span>
             ${statusBadge}
           </div>
-          <div class="day-topic">${task.topic}</div>
+          <div class="day-topic">${escapeHtmlText(task.topic)}</div>
           <div class="day-meta">
-            <span>${task.subject}</span>
+            <span>${escapeHtmlText(task.subject)}</span>
             <span style="display: flex; align-items: center; gap: 8px;">
               <span>${task.minutes} min</span>
               <span style="color: var(--neon); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
@@ -22710,13 +22735,7 @@ Para cada material, retorne um objeto no JSON com:
       if (text) text.textContent = 'Otimizando roteiro...';
 
       setTimeout(() => {
-        // Redistribui as tarefas atrasadas pelos dias úteis seguintes
-        studyRouteSchedule.forEach(task => {
-          if (task.status === 'delayed') {
-            task.status = 'scheduled';
-            task.day += ' (Reajustado)';
-          }
-        });
+        rebuildStudyRouteSchedule();
 
         if (icon) icon.style.transform = 'none';
         if (text) text.textContent = 'Recalcular Rota Agora';
@@ -27734,11 +27753,7 @@ ${textSample}
 
       chatDriveMaterials = JSON.parse(JSON.stringify(DEFAULT_DRIVE_FOLDER_FILES));
       sharedQuestionsBank = JSON.parse(JSON.stringify(INITIAL_DEMO_QUESTIONS));
-      studyRouteSchedule = [
-        { day: 'Hoje', date: 'Hoje', topic: 'Dermatologia: Lesões Elementares e Semiologia Cutânea', subject: 'Sistemas Humanos 2', minutes: 30, status: 'scheduled', slideName: 'Lesoes-Elementares-em-Dermatologia - Aula 1 - 2026.2(1).pdf', disease: 'Semiologia das Lesões Elementares Cutâneas' },
-        { day: 'Amanhã', date: 'Amanhã', topic: 'Dermatologia: Psoríase, Auspitz e Líquen Plano', subject: 'Sistemas Humanos 2', minutes: 35, status: 'scheduled', slideName: 'Psoríase, liquen plano.pdf', disease: 'Psoríase Vulgar & Koebner' },
-        { day: 'Quarta-feira', date: '09/Set', topic: 'Eczemas: Dermatite Atópica vs Seborreica', subject: 'Sistemas Humanos 2', minutes: 25, status: 'delayed', slideName: 'Dermatite Seborreica, Dermatite Atópica, Dermatite de Contato Alérgica...pdf', disease: 'Dermatite Atópica & Eczemas' }
-      ];
+      studyRouteSchedule = [];
       universityCurriculum = [];
       currentStudySubject = 'Integração de Sistemas Humanos 2 (Dermatologia)';
       subjectGenerationStatus = {
