@@ -12090,7 +12090,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
               mso-footer-margin: 1.5cm;
             }
             div.Section1 { page: Section1; }
-            body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; color: #111827; margin: 2.0cm 2.0cm 2.0cm 2.0cm; }
+            * { box-sizing: border-box; max-width: 100%; }
+            body { font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; color: #111827; margin: 2.0cm 2.0cm 2.0cm 2.0cm; overflow-wrap: anywhere; word-wrap: break-word; }
+            .academic-article-container, .academic-body-content, p, li, blockquote, figcaption, td, th, h1, h2, h3, h4, h5, h6 { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; word-wrap: break-word; }
+            .academic-article-container h1, .academic-article-container h2, .academic-article-container h3, .academic-article-container h4, .academic-article-container h5, .academic-article-container h6, .academic-article-container .gemini-h1, .academic-article-container .gemini-h2, .academic-article-container .gemini-h3, .academic-article-container .gemini-h4, .academic-article-container .gemini-h5 { display: block; width: 100%; text-align: left; }
+            pre, code, .gemini-code-block { white-space: pre-wrap; overflow-wrap: anywhere; word-wrap: break-word; word-break: break-word; }
             p { font-size: 11pt; line-height: 1.5; text-align: justify; text-indent: 1.25cm; margin-bottom: 7pt; }
             h1 { font-size: 18pt; text-align: center; color: #0f172a; text-transform: uppercase; font-weight: bold; margin-bottom: 6pt; text-indent: 0; }
             h2 { font-size: 14pt; color: #1e3a8a; text-transform: uppercase; border-bottom: 1.5pt solid #1e3a8a; padding-bottom: 3pt; margin-top: 16pt; font-weight: bold; text-indent: 0; }
@@ -12103,7 +12107,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             td.abnt-col-right { padding-left: 12pt; }
             .abnt-meta-item { margin-bottom: 3pt; font-size: 9pt; color: #374151; }
             .abnt-meta-item strong { color: #0f172a; font-weight: bold; }
-            table:not(.abnt-header-table) { width: 100%; border-collapse: collapse; margin: 12pt 0; font-size: 9.5pt; }
+            table:not(.abnt-header-table) { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; margin: 12pt 0; font-size: 9.5pt; }
             th { border: 1pt solid #1e293b; padding: 6pt 8pt; font-size: 9pt; text-align: left; background-color: #1e293b; color: #ffffff; font-weight: bold; text-transform: uppercase; }
             td { border: 1pt solid #cbd5e1; padding: 6pt 8pt; font-size: 9pt; text-align: left; }
             tr:nth-child(even) td { background-color: #f8fafc; }

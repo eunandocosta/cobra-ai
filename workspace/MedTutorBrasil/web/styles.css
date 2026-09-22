@@ -3977,6 +3977,68 @@
         text-align: left !important;
       }
 
+      /* Na tela, alguns h2 são flex para alinhar ícones. Em impressão, o texto
+         do título vira um item flex anônimo e pode ultrapassar a caixa no
+         Safari/WebKit. Transforme toda a hierarquia em fluxo normal de bloco. */
+      #readerModalContent .academic-body-content h1,
+      #readerModalContent .academic-body-content h2,
+      #readerModalContent .academic-body-content h3,
+      #readerModalContent .academic-body-content h4,
+      #readerModalContent .academic-body-content h5,
+      #readerModalContent .academic-body-content h6,
+      #readerModalContent .academic-body-content .gemini-h1,
+      #readerModalContent .academic-body-content .gemini-h2,
+      #readerModalContent .academic-body-content .gemini-h3,
+      #readerModalContent .academic-body-content .gemini-h4,
+      #readerModalContent .academic-body-content .gemini-h5 {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        hyphens: auto !important;
+        text-align: left !important;
+      }
+
+      #readerModalContent .academic-body-content .doc-table-wrapper {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+      }
+
+      #readerModalContent .academic-body-content table {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+      }
+
+      #readerModalContent .academic-body-content th,
+      #readerModalContent .academic-body-content td {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        hyphens: auto !important;
+      }
+
+      #readerModalContent .academic-body-content pre,
+      #readerModalContent .academic-body-content code,
+      #readerModalContent .academic-body-content .gemini-code-block {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: pre-wrap !important;
+        overflow: visible !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
       html, body {
         background: #ffffff !important;
         color: #111827 !important;
