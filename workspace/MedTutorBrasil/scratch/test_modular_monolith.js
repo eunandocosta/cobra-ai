@@ -33,7 +33,8 @@ console.log('[PASS] index.js livre de regras de negócio acopladas');
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf-8');
 const curriculumSubjectAliases = appSource.match(/function getCurriculumSubjectAliases\(value\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const sameCurriculumSubject = appSource.match(/function isSameCurriculumSubject\(first, second\) \{[\s\S]*?\n    \}/)?.[0] || '';
-assert(curriculumSubjectAliases && sameCurriculumSubject, 'a grade deve resolver nomes legados de disciplinas sem correspondência parcial');
+const uniqueCurriculumDisciplines = appSource.match(/function getUniqueCurriculumDisciplines\(disciplines = \[\]\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(curriculumSubjectAliases && sameCurriculumSubject && uniqueCurriculumDisciplines, 'a grade deve resolver nomes legados e remover disciplinas curriculares duplicadas sem correspondência parcial');
 const areSameCurriculumSubjects = new Function(`
   const normalizeStudyComparisonText = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
   ${curriculumSubjectAliases}
@@ -43,7 +44,24 @@ const areSameCurriculumSubjects = new Function(`
 assert(areSameCurriculumSubjects('Integração de Sistemas Humanos 2 (Dermatologia Clínica)', 'M010 Integração de Sistemas Humanos II (Sistema Tegumentar)'), 'o material legado do módulo tegumentar deve aparecer na disciplina equivalente da ementa');
 assert(areSameCurriculumSubjects('Sistema Nervoso', 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'), 'o rótulo anatômico entre parênteses deve associar o material à disciplina correspondente');
 assert(!areSameCurriculumSubjects('Integração de Sistemas Humanos 2 (Dermatologia)', 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'), 'a resolução não pode misturar módulos diferentes');
-console.log('[PASS] Materiais são associados à disciplina curricular por aliases exatos e seguros');
+const getUniqueCurriculumDisciplines = new Function(`
+  const normalizeStudyComparisonText = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
+  ${curriculumSubjectAliases}
+  ${sameCurriculumSubject}
+  ${uniqueCurriculumDisciplines}
+  return getUniqueCurriculumDisciplines;
+`)();
+const uniqueCurriculumList = getUniqueCurriculumDisciplines([
+  { name: 'M010 Integração de Sistemas Humanos II (Sistema Tegumentar)', period: '2º Semestre' },
+  { name: 'Integração de Sistemas Humanos 2 (Dermatologia Clínica)', period: '2º Semestre' },
+  { name: 'M011 Integração de Sistemas Humanos III (Sistema Nervoso)', period: '2º Semestre' }
+]);
+assert.deepStrictEqual(uniqueCurriculumList.map(subject => subject.name), [
+  'M010 Integração de Sistemas Humanos II (Sistema Tegumentar)',
+  'M011 Integração de Sistemas Humanos III (Sistema Nervoso)'
+], 'aliases/cópias de disciplinas devem ser deduplicados, preservando o nome oficial da ementa');
+assert(!appSource.includes('extraSubs') && !appSource.includes('<optgroup label="Outras Disciplinas">'), 'o filtro de Flashcards não deve acrescentar matéria crua fora da ementa ao selecionar todos os períodos');
+console.log('[PASS] Filtro curricular de Flashcards usa nomes oficiais e elimina cópias por alias');
 
 const persistenceLoader = appSource.match(/async loadAllDataFromPersistence\(\) \{[\s\S]*?\n      \}\n    \};/)?.[0] || '';
 assert(persistenceLoader.includes('!materialsCacheHydrated && !hasLocalMaterialsCache'), 'cache local vazio não deve impedir a primeira leitura de materiais no Firestore');

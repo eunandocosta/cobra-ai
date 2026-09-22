@@ -7868,16 +7868,28 @@ ${cleanText}
       return firstAliases.some(alias => secondAliases.has(alias));
     }
 
+    function getUniqueCurriculumDisciplines(disciplines = []) {
+      const unique = [];
+      (Array.isArray(disciplines) ? disciplines : []).forEach(discipline => {
+        const name = String(typeof discipline === 'string' ? discipline : discipline?.name || '').trim();
+        if (!name || unique.some(existing => isSameCurriculumSubject(existing.name, name))) return;
+        unique.push(typeof discipline === 'string' ? { name } : { ...discipline, name });
+      });
+      return unique;
+    }
+
     function findExactSubjectKey(subjectName, candidates = []) {
       const targetKey = normalizeStudyComparisonText(subjectName);
       return (candidates || []).find(candidate => normalizeStudyComparisonText(candidate) === targetKey) || '';
     }
 
     function ensureCurrentSubjectValid() {
-      const list = getAvailableStudySubjects();
-      if (!currentStudySubject || !list.includes(currentStudySubject)) {
-        currentStudySubject = list[0] || '';
-      }
+      const disciplines = getDisciplinesForPeriod(currentStudyPeriodFilter);
+      const canonicalMatch = currentStudySubject
+        ? disciplines.find(discipline => isSameCurriculumSubject(discipline.name, currentStudySubject))
+        : null;
+      if (canonicalMatch) currentStudySubject = canonicalMatch.name;
+      else currentStudySubject = disciplines[0]?.name || '';
     }
 
     function selectStudySubject(subjectName) {
@@ -8100,7 +8112,9 @@ ${cleanText}
     }
 
     function getDisciplinesForPeriod(periodVal) {
-      const all = (typeof getAllCurriculumSubjects === 'function') ? getAllCurriculumSubjects() : [];
+      const all = (typeof getAllCurriculumSubjects === 'function')
+        ? getUniqueCurriculumDisciplines(getAllCurriculumSubjects())
+        : [];
       if (!periodVal || periodVal === 'all') {
         if (all.length > 0) return all;
         return getAvailableStudySubjects().map(name => ({ name, period: 'Disciplinas da Ementa', cycleName: 'Ciclo Universitário' }));
@@ -8195,11 +8209,14 @@ ${cleanText}
       let discOptionsHtml = '';
 
       if (currentStudyPeriodFilter === 'all' && typeof universityCurriculum !== 'undefined' && universityCurriculum.length > 0) {
+        const curriculumDisciplines = getUniqueCurriculumDisciplines(getAllCurriculumSubjects());
         universityCurriculum.forEach(p => {
-          if (Array.isArray(p.subjects) && p.subjects.length > 0) {
+          const periodSubjects = curriculumDisciplines.filter(discipline => discipline.period === p.period);
+          if (periodSubjects.length > 0) {
             discOptionsHtml += `<optgroup label="${p.period}">`;
-            p.subjects.forEach(s => {
-              const sName = typeof s === 'string' ? s : s.name;
+            periodSubjects.forEach(s => {
+              const sName = s.name;
+              if (!sName) return;
               const isSel = sName === currentStudySubject || (sName && sName.toLowerCase() === (currentStudySubject || '').toLowerCase());
               const mCount = getMaterialsForSubject(sName).length;
               const qCount = sharedQuestionsBank.filter(q => q.subject === sName).length;
@@ -8209,18 +8226,6 @@ ${cleanText}
             discOptionsHtml += `</optgroup>`;
           }
         });
-
-        const currNames = getAllCurriculumSubjects().map(s => s.name.toLowerCase());
-        const extraSubs = getAvailableStudySubjects().filter(s => !currNames.includes(s.toLowerCase()));
-        if (extraSubs.length > 0) {
-          discOptionsHtml += `<optgroup label="Outras Disciplinas">`;
-          extraSubs.forEach(sName => {
-            const isSel = sName === currentStudySubject;
-            const mCount = getMaterialsForSubject(sName).length;
-            discOptionsHtml += `<option value="${sName.replace(/"/g, '&quot;')}" ${isSel ? 'selected' : ''}>${sName} (${mCount} aulas)</option>`;
-          });
-          discOptionsHtml += `</optgroup>`;
-        }
       } else {
         disciplinesInScope.forEach(d => {
           const sName = d.name;
