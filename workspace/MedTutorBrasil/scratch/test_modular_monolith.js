@@ -179,6 +179,7 @@ const resetScript = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'admin
   assert(resetScript.includes(`'${name}'`), `o reset administrativo deve incluir ${name}`);
 });
 assert(resetScript.includes('perfis_didaticos') && resetScript.includes('Supabase Storage assets'), 'o reset deve preservar perfis didáticos e assets do Supabase');
+assert(appSource.includes('supabaseStorageUnavailableUntil') && appSource.includes('clinicalImageStorageCircuitUntil'), 'upload de imagens precisa abrir circuito após falha para evitar uma tempestade de requisições');
 assert(resetScript.includes('--execute') && resetScript.includes('--confirm=RESET_ALL_STUDY_DATA'), 'a exclusão global deve exigir confirmação explícita');
 assert(resetScript.includes('study_data_reset_markers'), 'o marcador do reset deve ficar separado do perfil do usuário');
 assert(firestoreRules.includes('match /study_data_reset_markers/{userId}') && firestoreRules.includes('allow read: if isOwner(userId)'), 'o aluno pode ler apenas o próprio marcador administrativo');

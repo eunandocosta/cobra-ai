@@ -26,6 +26,9 @@
     let supabaseStorageClient = null;
     let supabaseStorageConfig = null;
     let supabaseStorageInitPromise = null;
+    let supabaseStorageUnavailableUntil = 0;
+    let supabaseStorageUnavailableReason = '';
+    const firestoreSyncIssueCooldowns = new Map();
     let disciplineQuestionBankCache = {};
 
     // Quando o portão por cupom estiver ativo, as chamadas ao backend levam o
@@ -60,6 +63,10 @@
     async function getSupabaseStorageClient() {
       if (supabaseStorageClient && supabaseStorageConfig) return { client: supabaseStorageClient, config: supabaseStorageConfig };
       if (supabaseStorageInitPromise) return supabaseStorageInitPromise;
+      if (Date.now() < supabaseStorageUnavailableUntil) {
+        const remainingSeconds = Math.max(1, Math.ceil((supabaseStorageUnavailableUntil - Date.now()) / 1000));
+        throw new Error(`Supabase Storage temporariamente indisponível. Nova tentativa automática em ${remainingSeconds}s. ${supabaseStorageUnavailableReason}`.trim());
+      }
 
       supabaseStorageInitPromise = (async () => {
         if (!window.supabase?.createClient) throw new Error('Biblioteca do Supabase não foi carregada. Recarregue a página.');
@@ -87,7 +94,16 @@
       })();
 
       try {
-        return await supabaseStorageInitPromise;
+        const readyStorage = await supabaseStorageInitPromise;
+        supabaseStorageUnavailableUntil = 0;
+        supabaseStorageUnavailableReason = '';
+        return readyStorage;
+      } catch (error) {
+        // Um PDF extenso não deve solicitar a mesma configuração dezenas de
+        // vezes se o servidor já respondeu que ela está indisponível.
+        supabaseStorageUnavailableUntil = Date.now() + 60_000;
+        supabaseStorageUnavailableReason = String(error?.message || '').slice(0, 220);
+        throw error;
       } finally {
         supabaseStorageInitPromise = null;
       }
@@ -1224,6 +1240,16 @@
         materials: Number(details.materials) || 0,
         contentChars: Number(details.contentChars) || 0
       };
+      const fingerprint = [payload.event, payload.code, payload.message, payload.uid].join('|');
+      const now = Date.now();
+      const retryAt = firestoreSyncIssueCooldowns.get(fingerprint) || 0;
+      if (now < retryAt) return;
+      firestoreSyncIssueCooldowns.set(fingerprint, now + 60_000);
+      if (firestoreSyncIssueCooldowns.size > 100) {
+        for (const [key, expiresAt] of firestoreSyncIssueCooldowns) {
+          if (expiresAt <= now) firestoreSyncIssueCooldowns.delete(key);
+        }
+      }
       console.error('[Firestore Sync]', payload);
       if (typeof fetch !== 'function') return;
       fetch('/api/diagnostics/firebase-sync', {
@@ -2267,6 +2293,8 @@
       async uploadClinicalImage(imageSource, materialId, imgIndex) {
         const uid = this.getUserId();
         this.lastClinicalImageStorageProvider = null;
+        this.lastClinicalImageStorageError = '';
+        if (Date.now() < Number(this.clinicalImageStorageCircuitUntil || 0)) return null;
         const imageMime = typeof imageSource === 'string' && imageSource.startsWith('data:')
           ? (imageSource.match(/^data:([^;,]+)/i)?.[1] || 'image/webp')
           : (imageSource?.type || 'image/webp');
@@ -2312,6 +2340,7 @@
           throw lastError || new Error('Supabase não concluiu o envio da imagem.');
         } catch (supabaseError) {
           console.warn('[Supabase Storage] Falha ao persistir imagem; tentando Firebase como contingência:', supabaseError);
+          this.lastClinicalImageStorageError = String(supabaseError?.message || 'Falha no Supabase Storage.');
           reportFirestoreSyncIssue('supabase_storage_upload_failed', {
             code: supabaseError?.code || 'supabase/storage-upload-failed',
             message: supabaseError?.message || 'Falha desconhecida ao enviar imagem ao Supabase Storage.',
@@ -2329,7 +2358,9 @@
             uid,
             authenticatedUid: firebaseAuth?.currentUser?.uid || null
           });
-          return imageSource;
+          this.lastClinicalImageStorageError = 'Não há sessão Firebase compatível para usar o armazenamento de contingência.';
+          this.clinicalImageStorageCircuitUntil = Date.now() + 60_000;
+          return null;
         }
 
         if (firebaseStorage && isFirebaseCloudActive) {
@@ -2339,6 +2370,7 @@
             const snapshot = await storageRef.put(uploadBlob, { contentType: imageMime });
             const downloadUrl = await snapshot.ref.getDownloadURL();
             this.lastClinicalImageStorageProvider = 'Firebase Storage';
+            this.clinicalImageStorageCircuitUntil = 0;
             console.log(`[Firebase Storage] Imagem clínica salva em ${storagePath} -> ${downloadUrl}`);
             return downloadUrl;
           } catch (e) {
@@ -2349,11 +2381,14 @@
               uid,
               authenticatedUid: firebaseAuth?.currentUser?.uid || null
             });
+            this.lastClinicalImageStorageError = String(e?.message || this.lastClinicalImageStorageError || 'Falha no Firebase Storage.');
           }
         }
 
-        // Fallback local caso offline ou Storage não configurado
-        return imageSource;
+        // Interrompe o lote por um minuto após a primeira falha dos dois
+        // provedores: evita centenas de tentativas e milhares de mensagens.
+        this.clinicalImageStorageCircuitUntil = Date.now() + 60_000;
+        return null;
       },
 
       // Carrega todo o estado persistido (Garantia de 100% Anti-F5)
@@ -5037,10 +5072,17 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       if (!selectedImages.length) return;
       const uploadedImages = [];
       const storageProviders = new Set();
+      let persistenceStoppedEarly = false;
       for (let index = 0; index < selectedImages.length; index++) {
         const image = selectedImages[index];
         const url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
-        if (!/^https?:\/\//i.test(url || '')) continue; // Nunca grava Base64 no Markdown/Firestore
+        if (!/^https?:\/\//i.test(url || '')) {
+          if (Date.now() < Number(MedTutorFirebaseService.clinicalImageStorageCircuitUntil || 0)) {
+            persistenceStoppedEarly = true;
+            break;
+          }
+          continue; // Nunca grava Base64 no Markdown/Firestore
+        }
         if (MedTutorFirebaseService.lastClinicalImageStorageProvider) {
           storageProviders.add(MedTutorFirebaseService.lastClinicalImageStorageProvider);
         }
@@ -5061,7 +5103,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         });
       }
       if (!uploadedImages.length) {
-        material.imagePersistenceError = `${selectedImages.length} imagem(ns) extraída(s), mas nenhuma recebeu URL persistida no Supabase Storage nem no Firebase Storage.`;
+        const stoppedMessage = persistenceStoppedEarly ? ' A tentativa foi interrompida para evitar repetição de requisições.' : '';
+        const providerMessage = MedTutorFirebaseService.lastClinicalImageStorageError ? ` Motivo: ${MedTutorFirebaseService.lastClinicalImageStorageError}` : '';
+        material.imagePersistenceError = `${selectedImages.length} imagem(ns) extraída(s), mas nenhuma recebeu URL persistida no Supabase Storage nem no Firebase Storage.${stoppedMessage}${providerMessage}`;
         console.warn('[Imagens do material]', material.imagePersistenceError);
         return;
       }
