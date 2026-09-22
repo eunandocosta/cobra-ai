@@ -133,7 +133,7 @@ console.log('[PASS] Cards diários do SCE navegam para Flashcards');
 
 const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
 assert(authMarkup.includes('id="paymentScreenContainer"'), 'a tela de cupom deve ter um container independente da tela de login');
-assert(/<\/div>\s*<\/div>\s*<div id="paymentScreenContainer"/.test(authMarkup), 'a tela de pagamento deve estar fora do container de login');
+assert(/<\/div>\s*<\/div>\s*(?:<script[\s\S]*?<\/script>\s*)?<div id="paymentScreenContainer"/.test(authMarkup), 'a tela de pagamento deve estar fora do container de login');
 assert(authMarkup.includes('id="accessGateCard" role="dialog" aria-modal="true"'), 'a solicitação de cupom deve ser um modal acessível');
 assert(authMarkup.includes('id="accessCouponInput"'), 'o modal deve conter o campo para inserir cupom');
 assert(appSource.includes('couponInput.focus()'), 'o campo de cupom deve receber foco ao abrir o modal');
@@ -147,7 +147,10 @@ assert(appSource.includes("setRoutePresentation('resolving')") && appSource.incl
 assert(appSource.includes("pendingRoutePath = window.location.pathname || pendingRoutePath || '/login'"), 'a rota solicitada deve ser preservada enquanto o Auth está pendente');
 assert(appSource.includes('authStartupCompleted') && appSource.includes('setTimeout(() => {') && appSource.includes('}, 12000)'), 'a restauração e validação do Auth devem encerrar com limite de tempo');
 assert(appSource.includes('this.authSessionErrorMessage = this.authStateResolved') && appSource.includes('this.setAuthScreenState(\'error\')'), 'falha/timeout de autenticação deve apresentar estado recuperável');
-assert(authMarkup.includes('id="authSessionError"') && authMarkup.includes('retryAuthSessionResolution()') && authMarkup.includes('openLoginAfterAuthResolutionError()'), 'a tela de erro de sessão deve oferecer tentar novamente e ir ao login');
+assert(authMarkup.includes('id="authSessionError"') && authMarkup.includes('retryAuthSessionResolution') && authMarkup.includes('openLoginAfterAuthResolutionError'), 'a tela de erro de sessão deve oferecer tentar novamente e ir ao login');
+assert(authMarkup.includes('__medTutorAuthBundleReady') && authMarkup.includes('}, 15000);'), 'falha no carregamento do bundle não pode deixar a tela de sessão permanente');
+assert(appSource.includes("if (!item.disciplina || !Array.isArray(item.materias)) return;") && !appSource.includes("if (item.origem !== 'gemini-upload') return;"), 'ementas legadas válidas devem continuar visíveis mesmo sem metadado de origem');
+assert(appSource.includes("MedTutorAuthService?.currentUser?.uid"), 'a primeira sincronização não pode usar o UID provisório antes da autenticação');
 assert(authMarkup.includes('id="semesterRenameModal"') && authMarkup.includes('id="semesterRenameProgressTrack"'), 'a revisão de renomeação deve exibir modal e barra de progresso');
 assert(appSource.includes('function readMaterialTextDirectlyFromFirestore(doc)') && appSource.includes('readMaterialTextChunks(doc.ref'), 'a renomeação deve ler o conteúdo e os chunks diretamente do Firestore');
 assert(appSource.includes('async function analyzeSemesterSubjectNames(periodId)') && appSource.includes('classifyMaterialWithServerGemini(text, name, selectedCat.period)'), 'a análise por semestre deve classificar o conteúdo contra o catálogo oficial com Gemini');

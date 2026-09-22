@@ -531,6 +531,10 @@
       },
 
       init() {
+        // Sinaliza ao vigia mínimo do HTML que o bundle principal foi carregado.
+        // Se este código nem chegar a executar, o HTML ainda oferece saída da
+        // tela de espera em vez de deixar o estudante preso indefinidamente.
+        if (typeof window !== 'undefined') window.__medTutorAuthBundleReady = true;
         // Mantém uma tela neutra até o Firebase confirmar a identidade. Não
         // troque a rota solicitada por /login durante a hidratação do Auth.
         setRoutePresentation('resolving');
@@ -2502,9 +2506,11 @@
               const periodMap = new Map();
               currSnap.forEach(d => {
                 const item = d.data();
-                // Somente reidrata disciplinas criadas pela análise Gemini de
-                // uma ementa enviada pelo aluno; legados não são usados.
-                if (item.origem !== 'gemini-upload') return;
+                // Ementas já existentes podem ter sido gravadas antes do campo
+                // `origem`. Elas continuam sendo dados válidos do estudante e
+                // não podem desaparecer apenas por não ter esse metadado novo.
+                // Ignora somente documentos que não têm a forma de disciplina.
+                if (!item.disciplina || !Array.isArray(item.materias)) return;
                 const p = item.periodo || 'Período Curricular';
                 if (!periodMap.has(p)) {
                   periodMap.set(p, {
@@ -30014,7 +30020,10 @@ function escapeHtmlText(str) {
     if (typeof MedTutorAuthService !== 'undefined') {
       MedTutorAuthService.init();
     }
-    if (typeof MedTutorFirebaseService !== 'undefined') {
+    // A sincronização da nuvem só pode começar após o Firebase confirmar o
+    // usuário. Antes disso o UID provisório "aluno_medtutor_local" poderia
+    // renderizar uma biblioteca vazia e mascarar os dados da conta real.
+    if (typeof MedTutorFirebaseService !== 'undefined' && MedTutorAuthService?.currentUser?.uid) {
       MedTutorFirebaseService.loadAllDataFromPersistence();
     }
 
