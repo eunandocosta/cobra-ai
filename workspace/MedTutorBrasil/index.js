@@ -29,6 +29,10 @@ app.get('/app.min.js', (req, res) => {
   return res.sendFile(path.join(__dirname, 'web', 'app.js'));
 });
 
+// A página raiz é uma apresentação pública; a aplicação autenticada continua
+// disponível nas rotas explícitas /login, /cadastro e nas telas de estudo.
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'landing.html')));
+
 app.use(express.static(path.join(__dirname, 'web')));
 
 // Rotas do cliente são uma SPA: ao abrir um link diretamente, o servidor

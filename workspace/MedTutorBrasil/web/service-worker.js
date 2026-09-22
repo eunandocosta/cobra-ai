@@ -1,9 +1,11 @@
-const CACHE_NAME = 'medtutor-static-v50';
+const CACHE_NAME = 'medtutor-static-v51';
 const APP_SHELL = [
   '/',
   '/index.html',
+  '/landing.html',
+  '/landing.css?v=20260922-landing-v1',
   '/styles.css?v=20260922-empty-state-icon-v1',
-  '/app.min.js?v=20260921-rotas-login-v1',
+  '/app.min.js?v=20260922-cadastro-route-v1',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
 ];
@@ -31,7 +33,7 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html'))
+      fetch(request).catch(async () => (await caches.match(request)) || caches.match('/index.html'))
     );
     return;
   }

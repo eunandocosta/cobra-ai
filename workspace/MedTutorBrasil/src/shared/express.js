@@ -91,6 +91,7 @@ if (realExpress) {
 
       res.sendFile = function(filePath) {
         if (fs.existsSync(filePath)) {
+          res.__miniResponseStarted = true;
           const ext = path.extname(filePath).toLowerCase();
           const mimeTypes = {
             '.html': 'text/html; charset=utf-8',
@@ -127,6 +128,7 @@ if (realExpress) {
         for (const mw of globalMiddlewares) {
           try { mw(req, res, () => {}); } catch (e) {}
         }
+        if (res.__miniResponseStarted || res.writableEnded) return;
 
         // Roteamento
         for (const mount of mounts) {
@@ -196,7 +198,9 @@ if (realExpress) {
 
   createApplication.static = function(staticPath) {
     return (req, res, next) => {
-      const filePath = path.join(staticPath, req.pathname === '/' ? 'index.html' : req.pathname);
+      const landingPath = path.join(staticPath, 'landing.html');
+      const rootFile = req.pathname === '/' && fs.existsSync(landingPath) ? 'landing.html' : 'index.html';
+      const filePath = path.join(staticPath, req.pathname === '/' ? rootFile : req.pathname);
       if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
         res.sendFile(filePath);
       } else if (next) {

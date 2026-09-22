@@ -239,6 +239,7 @@
 
         // Tenta inicializar Firebase SDK
         this.initFirebaseSDK();
+        if (window.location.pathname === '/cadastro') switchAuthTab('register');
 
         // Atualiza a UI da topbar
         this.updateUserTopbarUI();
@@ -340,9 +341,15 @@
                 localStorage.removeItem('medtutor_auth_user');
                 this.updateUserTopbarUI();
                 this.updateFirebaseConfigModalUI();
-                setAppRoute('/login', { replace: true });
+                const currentPath = window.location.pathname || '/login';
+                if (currentPath !== '/cadastro' && !APP_TAB_BY_ROUTE[currentPath]) {
+                  setAppRoute('/login', { replace: true });
+                  pendingRoutePath = '/login';
+                }
                 setRoutePresentation('login');
                 this.setAuthScreenState('login');
+                if (window.location.pathname === '/cadastro') switchAuthTab('register');
+                else switchAuthTab('login');
               }
             });
           }
@@ -2445,10 +2452,11 @@
     function applyRouteFromLocation({ replace = false, forceDefault = false } = {}) {
       const currentPath = (typeof window !== 'undefined' && window.location.pathname) || '/login';
       const requestedTab = APP_TAB_BY_ROUTE[currentPath];
+      const isAuthRoute = currentPath === '/login' || currentPath === '/cadastro';
       const savedTab = (() => {
         try { return JSON.parse(localStorage.getItem(STUDY_NAVIGATION_STORAGE_KEY) || 'null')?.tabId; } catch (e) { return null; }
       })();
-      const tabId = requestedTab || (!forceDefault && APP_TAB_BY_ROUTE[pendingRoutePath]) || savedTab || 'chat';
+      const tabId = requestedTab || (!forceDefault && APP_TAB_BY_ROUTE[pendingRoutePath]) || (isAuthRoute ? 'chat' : savedTab) || 'chat';
       const route = APP_ROUTE_BY_TAB[tabId] || APP_ROUTE_BY_TAB.chat;
       setAppRoute(route, { replace });
       setRoutePresentation('app');
@@ -2459,6 +2467,9 @@
       if (!MedTutorAuthService?.currentUser) {
         pendingRoutePath = window.location.pathname || '/login';
         setRoutePresentation('login');
+        if (pendingRoutePath === '/cadastro') switchAuthTab('register');
+        else if (pendingRoutePath === '/login') switchAuthTab('login');
+        MedTutorAuthService?.setAuthScreenState('login');
         return;
       }
       applyRouteFromLocation({ replace: true });
