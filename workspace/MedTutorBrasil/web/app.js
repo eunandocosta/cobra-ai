@@ -234,6 +234,13 @@
             const result = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(result.error || 'Não foi possível validar seu acesso.');
 
+            console.info('[MedTutor Access] Validação da conta:', {
+              uid: user.uid,
+              required: result.required === true,
+              active: result.active === true,
+              access: result.access || 'unknown'
+            });
+
             this.accessGranted = result.required !== true || result.active === true;
             this.accessResolvedUid = user.uid;
             if (!this.accessGranted) {

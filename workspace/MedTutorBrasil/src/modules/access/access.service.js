@@ -4,6 +4,10 @@ const { getFirebaseAdmin } = require('../../shared/firebase-admin');
 const ACCESS_CLAIM_REQUIRED = 'medtutorAccessRequired';
 const ACCESS_CLAIM_GRANTED = 'medtutorAccess';
 const ACCESS_CLAIM_EXPIRES_AT = 'medtutorAccessExpiresAt';
+const ACCESS_CLAIM_VERSION = 'medtutorAccessVersion';
+// Uma nova versão invalida liberações de testes ou de campanhas anteriores.
+// Alterar esta versão força todas as contas a declararem o cupom novamente.
+const ACCESS_COUPON_VERSION = '2026-09-22-v1';
 
 function isGateEnabled() {
   return String(process.env.ACCESS_GATE_ENABLED || '').trim().toLowerCase() === 'true';
@@ -36,7 +40,8 @@ function timingSafeCouponMatch(submitted, configured) {
 
 function accessSnapshot(grantData = {}) {
   const expiresAtMs = grantData.expiresAtMs == null ? null : Number(grantData.expiresAtMs);
-  const active = grantData.active === true && (expiresAtMs == null || expiresAtMs > Date.now());
+  const active = grantData.active === true && grantData.couponVersion === ACCESS_COUPON_VERSION &&
+    (expiresAtMs == null || expiresAtMs > Date.now());
   return { active, expiresAtMs: active ? expiresAtMs : null };
 }
 
@@ -45,10 +50,13 @@ async function updateAccessClaims(auth, uid, required, grant) {
   const claims = { ...(user.customClaims || {}) };
   claims[ACCESS_CLAIM_REQUIRED] = required;
   claims[ACCESS_CLAIM_GRANTED] = grant.active;
+  if (grant.active) claims[ACCESS_CLAIM_VERSION] = ACCESS_COUPON_VERSION;
+  else delete claims[ACCESS_CLAIM_VERSION];
   if (grant.active && grant.expiresAtMs != null) claims[ACCESS_CLAIM_EXPIRES_AT] = grant.expiresAtMs;
   else delete claims[ACCESS_CLAIM_EXPIRES_AT];
   const unchanged = claims[ACCESS_CLAIM_REQUIRED] === user.customClaims?.[ACCESS_CLAIM_REQUIRED] &&
     claims[ACCESS_CLAIM_GRANTED] === user.customClaims?.[ACCESS_CLAIM_GRANTED] &&
+    claims[ACCESS_CLAIM_VERSION] === user.customClaims?.[ACCESS_CLAIM_VERSION] &&
     claims[ACCESS_CLAIM_EXPIRES_AT] === user.customClaims?.[ACCESS_CLAIM_EXPIRES_AT];
   if (!unchanged) await auth.setCustomUserClaims(uid, claims);
 }
@@ -107,9 +115,10 @@ async function redeemCoupon(decodedToken, submittedCode) {
   const admin = getFirebaseAdmin();
   const db = admin.firestore();
   const couponHash = hashCoupon(coupon.code);
+  const couponEpochHash = hashCoupon(`${couponHash}:${ACCESS_COUPON_VERSION}`);
   const grantRef = db.collection('access_grants').doc(decodedToken.uid);
-  const usageRef = db.collection('access_coupon_usage').doc(couponHash);
-  const redemptionRef = db.collection('access_coupon_redemptions').doc(`${couponHash}_${decodedToken.uid}`);
+  const usageRef = db.collection('access_coupon_usage').doc(couponEpochHash);
+  const redemptionRef = db.collection('access_coupon_redemptions').doc(`${couponEpochHash}_${decodedToken.uid}`);
   const now = Date.now();
   const expiresAtMs = coupon.accessDays > 0 ? now + coupon.accessDays * 24 * 60 * 60 * 1000 : null;
 
@@ -138,6 +147,7 @@ async function redeemCoupon(decodedToken, submittedCode) {
       uid: decodedToken.uid,
       active: true,
       couponHash,
+      couponVersion: ACCESS_COUPON_VERSION,
       grantedAtMs: now,
       expiresAtMs
     };
@@ -194,7 +204,10 @@ module.exports = {
   isGateEnabled,
   redeemCoupon,
   verifyIdToken,
+  accessSnapshot,
   getCouponConfig,
   ACCESS_CLAIM_GRANTED,
-  ACCESS_CLAIM_EXPIRES_AT
+  ACCESS_CLAIM_EXPIRES_AT,
+  ACCESS_CLAIM_VERSION,
+  ACCESS_COUPON_VERSION
 };

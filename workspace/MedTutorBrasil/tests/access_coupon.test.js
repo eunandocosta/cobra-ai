@@ -1,6 +1,6 @@
 const assert = require('assert');
 const accessService = require('../src/modules/access/access.service');
-const { getCouponConfig, isGateEnabled } = accessService;
+const { getCouponConfig, isGateEnabled, accessSnapshot, ACCESS_COUPON_VERSION } = accessService;
 const { requireAccess } = require('../src/shared/access.middleware');
 
 const original = {
@@ -20,6 +20,9 @@ try {
   process.env.ACCESS_COUPON_MAX_REDEMPTIONS = '0';
   process.env.ACCESS_COUPON_ACCESS_DAYS = '0';
   assert.deepStrictEqual(getCouponConfig(), { code: 'BETA-2026', maxRedemptions: 0, accessDays: 0 });
+  assert.strictEqual(accessSnapshot({ active: true }).active, false, 'old grants without a version must be revalidated');
+  assert.strictEqual(accessSnapshot({ active: true, couponVersion: 'previous-version' }).active, false, 'old coupon versions must be revalidated');
+  assert.strictEqual(accessSnapshot({ active: true, couponVersion: ACCESS_COUPON_VERSION }).active, true, 'the current coupon version remains active');
 
   process.env.ACCESS_COUPON_MAX_REDEMPTIONS = '25';
   assert.deepStrictEqual(getCouponConfig(), { code: 'BETA-2026', maxRedemptions: 25, accessDays: 0 });
@@ -37,7 +40,15 @@ try {
   }, () => assert.fail('an account without an entitlement must not pass'));
   assert.strictEqual(deniedStatus, 403, 'valid Firebase accounts without an active entitlement are denied');
 
-  accessService.verifyIdToken = async () => ({ uid: 'student-test', medtutorAccess: true });
+  accessService.verifyIdToken = async () => ({ uid: 'student-test', medtutorAccess: true, medtutorAccessVersion: 'previous-version' });
+  let staleVersionStatus = 0;
+  await requireAccess({ headers: { authorization: 'Bearer test-token' } }, {
+    status(code) { staleVersionStatus = code; return this; },
+    json() { return this; }
+  }, () => assert.fail('an entitlement from an older coupon version must not pass'));
+  assert.strictEqual(staleVersionStatus, 403, 'older access grants must be forced to redeem the current coupon');
+
+  accessService.verifyIdToken = async () => ({ uid: 'student-test', medtutorAccess: true, medtutorAccessVersion: ACCESS_COUPON_VERSION });
   let passed = false;
   await requireAccess({ headers: { authorization: 'Bearer test-token' } }, {}, () => { passed = true; });
   assert.strictEqual(passed, true, 'a valid active entitlement must pass the gate');

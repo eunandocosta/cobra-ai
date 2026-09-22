@@ -89,6 +89,8 @@ service cloud.firestore {
     function hasActiveStudyAccess() {
       return request.auth != null &&
         request.auth.token.medtutorAccess == true &&
+        ('medtutorAccessVersion' in request.auth.token) &&
+        request.auth.token.medtutorAccessVersion == '2026-09-22-v1' &&
         (!('medtutorAccessExpiresAt' in request.auth.token) ||
           request.auth.token.medtutorAccessExpiresAt > request.time.toMillis());
     }

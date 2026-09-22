@@ -1,6 +1,6 @@
 # Liberação de acesso por cupom
 
-O fluxo de cupom é independente de cobrança: toda conta Firebase, antiga ou nova, precisa informar o código antes de acessar o espaço de estudos. A conta é validada por UID, então usuários já cadastrados sem uma concessão ativa também verão a tela do cupom. Depois do resgate, a pessoa recebe liberação permanente (ou pelo prazo opcional configurado). O código é validado somente no servidor, nunca enviado no bundle web.
+O fluxo de cupom é independente de cobrança: toda conta Firebase, antiga ou nova, precisa informar o código antes de acessar o espaço de estudos. A conta é validada por UID e pela versão da concessão. A versão atual é `2026-09-22-v1`; concessões anteriores, inclusive as que não registravam versão, voltam a exigir o cupom uma vez. Depois do resgate, a pessoa recebe liberação permanente (ou pelo prazo opcional configurado). O código é validado somente no servidor, nunca enviado no bundle web.
 
 ## Configuração necessária no Render
 
@@ -17,7 +17,7 @@ O usuário precisa estar autenticado antes de resgatar. O resgate é atômico no
 
 ## Regras do Firestore
 
-`firestore.rules` agora exige a custom claim `medtutorAccess` para as operações de estudo. Publique as regras no Firebase Console no mesmo momento em que o gate for ativado no Render. Os endpoints de IA também verificam o token e a claim no servidor; a ausência de cupom resulta em bloqueio. O endpoint de status registra a claim necessária para a conta autenticada e sincroniza a concessão persistida.
+`firestore.rules` exige as custom claims `medtutorAccess` e `medtutorAccessVersion` para as operações de estudo. Publique as regras atualizadas no Firebase Console para que concessões antigas também sejam invalidadas no acesso direto. Os endpoints de IA verificam as duas claims no servidor; versões antigas são bloqueadas. O endpoint de status registra a versão necessária para a conta autenticada e sincroniza a concessão persistida. O armazenamento de arquivos é feito pelo Supabase e não é controlado por `storage.rules` do Firebase.
 
 Antes de ativar em produção, confirme que a conta de serviço tem acesso de escrita ao Firestore e que o serviço está apontando para o projeto `cobra-ai-6549d`. Se o segredo Admin ou o cupom não estiver configurado, o app falha fechado quando `ACCESS_GATE_ENABLED=true`, em vez de liberar acesso por erro.
 

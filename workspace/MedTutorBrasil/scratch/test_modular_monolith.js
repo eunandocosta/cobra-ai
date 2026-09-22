@@ -41,6 +41,11 @@ for (const fakeColleague of [
 }
 console.log('[PASS] Diretório de colegas sem perfis fictícios embutidos');
 
+const rulesVersion = '2026-09-22-v1';
+const firestoreRules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf-8');
+assert(firestoreRules.includes(rulesVersion), 'firestore.rules deve exigir a versão atual do cupom');
+console.log('[PASS] Firestore exige a versão atual da liberação por cupom');
+
 // 2. Verificar Estrutura dos Módulos (src/modules)
 const modulesDir = path.join(__dirname, '..', 'src', 'modules');
 assert(fs.existsSync(modulesDir), 'Diretório src/modules deve existir');

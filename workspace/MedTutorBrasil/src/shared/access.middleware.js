@@ -7,7 +7,9 @@ async function requireAccess(req, res, next) {
   try {
     const decoded = await accessService.verifyIdToken(match?.[1] || '');
     const expiresAtMs = Number(decoded[accessService.ACCESS_CLAIM_EXPIRES_AT] || 0);
-    const hasActiveAccess = decoded[accessService.ACCESS_CLAIM_GRANTED] === true && (!expiresAtMs || expiresAtMs > Date.now());
+    const hasActiveAccess = decoded[accessService.ACCESS_CLAIM_GRANTED] === true &&
+      decoded[accessService.ACCESS_CLAIM_VERSION] === accessService.ACCESS_COUPON_VERSION &&
+      (!expiresAtMs || expiresAtMs > Date.now());
     if (!hasActiveAccess) return res.status(403).json({ error: 'Ative um cupom válido para usar o MedTutor.', code: 'access_required' });
     req.authenticatedUser = decoded;
     return next();
