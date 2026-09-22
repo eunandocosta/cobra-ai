@@ -54,8 +54,37 @@ function canTryNextGeminiModel(error) {
   return status === 404 || /model(?:s)?\/.+not found|model.+not found|not supported for generatecontent|unsupported model/.test(message);
 }
 
+function normalizeGeneratedStructuralHtml(markdown) {
+  const protectedBlocks = [];
+  let text = String(markdown || '').replace(/\x60{3}[\s\S]*?\x60{3}|\x60[^\x60\n]*\x60/g, block => {
+    const token = 'MEDTUTOR_PROTECTED_BLOCK_' + protectedBlocks.length + '_END';
+    protectedBlocks.push(block);
+    return token;
+  });
+
+  text = text.replace(/\\(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u|sup|sub)\b)/gi, '');
+  text = text.replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi, (_, level, heading) => '\n' + '#'.repeat(Number(level)) + ' ' + heading.trim() + '\n');
+  const listToMarkdown = (body, ordered) => {
+    let itemNumber = 0;
+    const items = body.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => {
+      itemNumber += 1;
+      return '\n' + (ordered ? itemNumber + '.' : '-') + ' ' + item.trim() + '\n';
+    });
+    return '\n' + items.replace(/<\/?li\b[^>]*>/gi, '\n') + '\n';
+  };
+  text = text.replace(/<ul\b[^>]*>([\s\S]*?)<\/ul\s*>/gi, (_, body) => listToMarkdown(body, false));
+  text = text.replace(/<ol\b[^>]*>([\s\S]*?)<\/ol\s*>/gi, (_, body) => listToMarkdown(body, true));
+  text = text.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => '\n- ' + item.trim() + '\n');
+  text = text.replace(/<\/?(?:ul|ol|li)\b[^>]*>/gi, '\n')
+    .replace(/<br\b[^>]*\/?>/gi, '\n')
+    .replace(/<\/?(?:p|div)\b[^>]*>/gi, '\n')
+    .replace(/\n[ \t]*\n[ \t]*\n+/g, '\n\n');
+
+  return text.replace(/MEDTUTOR_PROTECTED_BLOCK_(\d+)_END/g, (_, index) => protectedBlocks[Number(index)] || '');
+}
+
 function normalizeReportMarkdownForPrint(markdown) {
-  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+  const lines = normalizeGeneratedStructuralHtml(markdown).replace(/\r\n/g, '\n').split('\n');
   const output = [];
   const splitCells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '')
     .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
@@ -264,6 +293,7 @@ DIRETRIZES FUNDAMENTAIS DE CONTEÚDO:
 7. FECHAMENTO DIDÁTICO: finalize com um caso clínico autossuficiente que exija explicar estrutura, mecanismo e consequência, seguido de 3 a 5 pérolas de prova.
 
 DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
+0. FORMATO DE SAÍDA: Retorne somente Markdown, nunca use HTML estrutural. Não escreva tags como <h4>, <ul>, <ol>, <li> ou <div>; use títulos Markdown (#, ##, ###) e listas com - ou 1. Não envolva o relatório em blocos de código.
 1. DIAGRAMAÇÃO SEGURA PARA A4:
    - Não gere diagramas, fluxogramas, mapas conceituais, Mermaid, esquemas ASCII, caixas de caracteres nem sequências visuais de setas.
    - Tabelas são permitidas quando forem a forma mais clara de comparar dados. Limite a 4 colunas, use cabeçalhos curtos e consistentes e mantenha cada célula concisa (preferencialmente uma frase curta ou até 30 palavras). Não coloque parágrafos, listas longas ou subtítulos dentro das células.
@@ -511,3 +541,4 @@ module.exports.RelatoriosService = RelatoriosService;
 module.exports.default = relatoriosServiceInstance;
 module.exports.getReportEngineLabel = getReportEngineLabel;
 module.exports.getGeminiReportCandidateModels = getGeminiReportCandidateModels;
+module.exports.normalizeGeneratedStructuralHtml = normalizeGeneratedStructuralHtml;

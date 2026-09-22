@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npx esbuild web/app.js --minify --target=es2020 --outfile=web/app.min.js",
     "start": "node index.js",
-    "test": "node scratch/test_modular_monolith.js && node tests/access_coupon.test.js && node tests/derived_question.test.js"
+    "test": "node scratch/test_modular_monolith.js && node tests/access_coupon.test.js && node tests/derived_question.test.js && node tests/report_markdown_structure.test.js"
   },
   "keywords": [
     "medicina",

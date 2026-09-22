@@ -23668,6 +23668,35 @@ Para cada material, retorne um objeto no JSON com:
         .replace(/\n{3,}/g, '\n\n').trim();
     }
 
+    function normalizeGeneratedStructuralHtml(markdown) {
+      const protectedBlocks = [];
+      let text = String(markdown || '').replace(/\x60{3}[\s\S]*?\x60{3}|\x60[^\x60\n]*\x60/g, block => {
+        const token = 'MEDTUTOR_PROTECTED_BLOCK_' + protectedBlocks.length + '_END';
+        protectedBlocks.push(block);
+        return token;
+      });
+
+      text = text.replace(/\\(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u|sup|sub)\b)/gi, '');
+      text = text.replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi, (_, level, heading) => '\n' + '#'.repeat(Number(level)) + ' ' + heading.trim() + '\n');
+      const listToMarkdown = (body, ordered) => {
+        let itemNumber = 0;
+        const items = body.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => {
+          itemNumber += 1;
+          return '\n' + (ordered ? itemNumber + '.' : '-') + ' ' + item.trim() + '\n';
+        });
+        return '\n' + items.replace(/<\/?li\b[^>]*>/gi, '\n') + '\n';
+      };
+      text = text.replace(/<ul\b[^>]*>([\s\S]*?)<\/ul\s*>/gi, (_, body) => listToMarkdown(body, false));
+      text = text.replace(/<ol\b[^>]*>([\s\S]*?)<\/ol\s*>/gi, (_, body) => listToMarkdown(body, true));
+      text = text.replace(/<li\b[^>]*>([\s\S]*?)<\/li\s*>/gi, (_, item) => '\n- ' + item.trim() + '\n');
+      text = text.replace(/<\/?(?:ul|ol|li)\b[^>]*>/gi, '\n')
+        .replace(/<br\b[^>]*\/?>/gi, '\n')
+        .replace(/<\/?(?:p|div)\b[^>]*>/gi, '\n')
+        .replace(/\n[ \t]*\n[ \t]*\n+/g, '\n\n');
+
+      return text.replace(/MEDTUTOR_PROTECTED_BLOCK_(\d+)_END/g, (_, index) => protectedBlocks[Number(index)] || '');
+    }
+
     // FORMATAÇÃO AVANÇADA DE TEXTO DA IA PARA HTML LIMPO (MARKDOWN ROBUSTO & TABELAS)
     function formatAITextToHTML(text) {
       if (!text) return '';
@@ -23684,6 +23713,7 @@ Para cada material, retorne um objeto no JSON com:
       md = md.replace(/```([\s\S]*?)```/g, (m, code) => {
         return '<pre class="gemini-code-block"><code>' + escapeHtml(code.trim()) + '</code></pre>';
       });
+      md = normalizeGeneratedStructuralHtml(md);
 
       // Sanitização profunda de tabelas e caixas desenhadas em ASCII (+---+ e | ... |)
       const preLines = md.split('\n');
