@@ -28633,6 +28633,8 @@ function escapeHtmlText(str) {
         if (topicEl) topicEl.textContent = q.title || q.subject || 'Caso Clínico';
         if (qTextEl) qTextEl.innerHTML = escapeHtmlText(q.front).replace(/\n/g, '<br>');
 
+        this.activeChallengeAnswerSubmitted = false;
+
         if (cardBox) cardBox.style.display = 'block';
         if (writtenArea) writtenArea.style.display = 'grid';
         if (answerInput) {
@@ -28649,6 +28651,7 @@ function escapeHtmlText(str) {
         }
         if (submitAnswerButton) {
           submitAnswerButton.disabled = false;
+          submitAnswerButton.style.display = '';
           submitAnswerButton.innerHTML = '✨ Corrigir com IA e ver gabarito';
         }
         if (flipPrompt) flipPrompt.style.display = 'none';
