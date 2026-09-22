@@ -361,6 +361,115 @@
       flex: 0 0 auto;
     }
 
+    .learning-gap-panel {
+      margin: -4px 0 14px;
+      padding: 11px 13px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .learning-gap-heading,
+    .learning-gap-card-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .learning-gap-heading > div {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .learning-gap-heading strong {
+      color: var(--text-primary);
+      font-size: 12px;
+    }
+
+    .learning-gap-heading span,
+    .learning-gap-card-heading span,
+    .learning-gap-note,
+    .learning-gap-attempts,
+    .learning-gap-empty {
+      color: var(--text-muted);
+      font-size: 10.5px;
+    }
+
+    .learning-gap-due {
+      flex: 0 0 auto;
+      color: var(--text-secondary) !important;
+      font-size: 10.5px;
+    }
+
+    .learning-gap-note {
+      margin: 5px 0 9px;
+      line-height: 1.45;
+    }
+
+    .learning-gap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+      gap: 9px;
+    }
+
+    .learning-gap-card {
+      min-width: 0;
+      padding: 10px 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .learning-gap-card-heading strong {
+      color: var(--text-primary);
+      font-size: 11.5px;
+    }
+
+    .learning-gap-score {
+      margin-top: 6px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .learning-gap-attempts {
+      margin-top: 2px;
+    }
+
+    .learning-gap-progress {
+      height: 5px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--bg-surface);
+    }
+
+    .learning-gap-progress span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+    }
+
+    .learning-gap-srs {
+      display: grid;
+      gap: 3px;
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 10px;
+    }
+
+    .learning-gap-srs b {
+      color: var(--text-primary);
+    }
+
+    .learning-gap-empty {
+      margin: 8px 0 0;
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
@@ -3837,6 +3946,9 @@
       #readerModal *::after {
         box-sizing: border-box !important;
         min-width: 0 !important;
+        max-width: 100% !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
       }
 
       html, body {
@@ -3921,12 +4033,26 @@
       #readerModalContent {
         overflow: visible !important;
         padding: 0 !important;
-        width: auto !important;
+        width: 100% !important;
         max-width: 100% !important;
         color: #111827 !important;
         font-size: 11pt !important;
         line-height: 1.5 !important;
         font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+      }
+
+      #readerModalContent pre,
+      #readerModalContent code {
+        max-width: 100% !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      #readerModalContent img {
+        max-width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
       }
 
       .academic-article-container {
@@ -3936,7 +4062,7 @@
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        width: auto !important;
+        width: 100% !important;
         font-size: 11pt !important;
         line-height: 1.5 !important;
         max-width: 100% !important;
@@ -3952,8 +4078,9 @@
       .doc-pearl-box,
       .doc-warning-box,
       .doc-note-box {
-        width: auto !important;
+        width: 100% !important;
         max-width: 100% !important;
+        overflow-wrap: anywhere !important;
       }
 
       .academic-header-block, .abnt-header-block {
@@ -4193,13 +4320,14 @@
       }
 
       .doc-table-wrapper {
-        overflow: hidden !important;
+        overflow: visible !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 6pt 0 10pt 0 !important;
         border: 0.5pt solid #cbd5e1 !important;
         box-shadow: none !important;
-        page-break-inside: avoid !important;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
       }
 
       .academic-article-container .doc-table,
@@ -4212,8 +4340,22 @@
         margin: 0 !important;
         font-size: 8pt !important;
         line-height: 1.25 !important;
-        page-break-inside: avoid !important;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
         background: #ffffff !important;
+      }
+
+      .academic-body-content thead {
+        display: table-header-group !important;
+      }
+
+      .academic-body-content tfoot {
+        display: table-footer-group !important;
+      }
+
+      .academic-body-content tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
       }
 
       /* Se uma tabela importada tiver somente uma célula útil, ela é texto de
@@ -4239,6 +4381,9 @@
         border-bottom: 1.5pt solid #1e3a8a !important;
         text-align: left !important;
         text-indent: 0 !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        hyphens: auto !important;
       }
 
       .academic-article-container .doc-table td,
@@ -4253,6 +4398,7 @@
         text-indent: 0 !important;
         word-break: normal !important;
         overflow-wrap: anywhere !important;
+        hyphens: auto !important;
       }
 
       .academic-article-container .doc-table tr:nth-child(even) td,

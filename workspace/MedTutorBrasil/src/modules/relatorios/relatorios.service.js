@@ -54,6 +54,114 @@ function canTryNextGeminiModel(error) {
   return status === 404 || /model(?:s)?\/.+not found|model.+not found|not supported for generatecontent|unsupported model/.test(message);
 }
 
+function normalizeReportMarkdownForPrint(markdown) {
+  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+  const output = [];
+  const splitCells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '')
+    .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
+  const isPipeRow = line => /^\s*\|.+\|\s*$/.test(line);
+  const isSeparator = line => /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+  const tableNeedsReflow = (headers, rows, hasHeader) => {
+    const width = headers.length || rows[0]?.length || 0;
+    return !hasHeader || width < 2 || width > 4 || rows.some(row => row.length !== width)
+      || [...headers, ...rows.flat()].some(cell => cell.length > 240)
+      || rows.some(row => row.reduce((sum, cell) => sum + cell.length, 0) > 640);
+  };
+  const rowsToBullets = (headers, rows) => rows.map((row, rowIndex) => {
+    const firstHeading = headers[0] && headers[0] !== '##' ? headers[0] : '';
+    const label = row[0]
+      ? (firstHeading ? '**' + firstHeading + ':** ' + row[0] : row[0])
+      : (firstHeading || 'Item ' + (rowIndex + 1));
+    const details = row.slice(1).map((value, columnIndex) => {
+      if (!value) return '';
+      const heading = headers[columnIndex + 1];
+      return heading ? '**' + heading + ':** ' + value : value;
+    }).filter(Boolean);
+    return '- **' + label + ':** ' + (details.length ? details.join('; ') : row.slice(1).filter(Boolean).join('; '));
+  }).join('\n');
+
+  for (let index = 0; index < lines.length;) {
+    if (!isPipeRow(lines[index])) {
+      output.push(lines[index++]);
+      continue;
+    }
+
+    const hasHeader = isPipeRow(lines[index]) && isSeparator(lines[index + 1] || '');
+    const rawRows = [];
+    let cursor = index;
+    while (cursor < lines.length) {
+      if (isSeparator(lines[cursor])) {
+        cursor++;
+        continue;
+      }
+      if (!isPipeRow(lines[cursor])) break;
+      rawRows.push(splitCells(lines[cursor]));
+      cursor++;
+    }
+
+    if (rawRows.length < 2) {
+      output.push(lines[index++]);
+      continue;
+    }
+
+    const headers = hasHeader ? rawRows.shift() : [];
+    if (tableNeedsReflow(headers, rawRows, hasHeader)) {
+      output.push(rowsToBullets(headers, rawRows));
+      output.push('');
+    } else {
+      output.push(lines.slice(index, cursor).join('\n'));
+    }
+    index = cursor;
+  }
+
+  return output.join('\n')
+    .replace(/```(?:mermaid|(?:ascii|text)\s+diagram)[^\n]*\n([\s\S]*?)```/gi, (_, body) => {
+      const labels = [...new Set(String(body).split('\n').map(line => {
+        const match = line.match(/(?:\w+\s*)?\[([^\]]+)\]|(?:\w+\s*)?\(([^)]+)\)/);
+        return (match?.[1] || match?.[2] || line.replace(/^[\s\w-]+--?>\s*/, '').replace(/[|+┌┐└┘├┤┬┴─═]+/g, ' ').trim()).trim();
+      }).filter(label => label.length > 2))];
+      return labels.map(label => '- ' + label).join('\n');
+    })
+    .replace(/<table\b[\s\S]*?<\/table>/gi, table => {
+      const rows = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+      const matrix = rows.map(([, row]) => {
+        return [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+          .map(([, cell]) => cell.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+      }).filter(row => row.length);
+      const width = matrix[0]?.length || 0;
+      const hasHeader = /<th\b/i.test(rows[0]?.[1] || '');
+      const isReadable = hasHeader && width >= 2 && width <= 4 && matrix.every(row => row.length === width)
+        && matrix.flat().every(cell => cell.length <= 240)
+        && matrix.slice(1).every(row => row.reduce((sum, cell) => sum + cell.length, 0) <= 640);
+      if (isReadable) return table;
+      const headers = hasHeader ? (matrix[0] || []) : [];
+      const dataRows = hasHeader ? matrix.slice(1) : matrix;
+      return dataRows.map((row, rowIndex) => {
+        const fields = row.map((cell, columnIndex) => {
+          if (!cell) return '';
+          const heading = headers[columnIndex] || (columnIndex === 0 ? 'Item ' + (rowIndex + 1) : 'Coluna ' + (columnIndex + 1));
+          return heading ? '**' + heading + ':** ' + cell : cell;
+        }).filter(Boolean);
+        return fields.length ? '- ' + fields.join('; ') : '';
+      }).filter(Boolean).join('\n');
+    })
+    // Converte apenas linhas isoladas de caixa ASCII; linhas Markdown com
+    // múltiplas células devem permanecer como tabelas renderizáveis.
+    .replace(/^\s*[|│]\s*([^|│\n]*?)\s*[|│]\s*$/gm, (_, content) => {
+      const text = String(content).replace(/\s*[|│]\s*/g, ' — ').trim();
+      return text ? '- ' + text : '';
+    })
+    .replace(/^\s*(.+?)\s*(?:--?>|={3,}|-{3,}|>{2,})\s*(.+?)\s*$/gm, (line, from, to) => {
+      if (/^\s*\|?(?:\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/.test(line)) return line;
+      const left = from.replace(/[\[\](){}]/g, '').trim();
+      const right = to.replace(/[\[\](){}]/g, '').trim();
+      return left && right ? '- ' + left + '\n- ' + right : left || right;
+    })
+    .replace(/^\s*[+┌┐└┘├┤┬┴][+\-=═─┌┐└┘├┤┬┴\s]*[+┐┘┤┴]\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 class RelatoriosService {
   /**
    * @param {Object} options
@@ -149,18 +257,18 @@ Sua missão é sintetizar materiais médicos em um Tratado Acadêmico formal, ap
 DIRETRIZES FUNDAMENTAIS DE CONTEÚDO:
 1. FUNDAMENTOS EM CAMADAS: para cada estrutura, conceito, via ou fenômeno, ensine nesta ordem: o que é e onde está; partes e relações; função; mecanismo; alteração/lesão; consequência. A aplicação clínica vem depois, como confirmação da compreensão.
 2. DISTRIBUIÇÃO DE ÊNFASE: priorize estrutura, localização, componentes, função, relações e mecanismos (cerca de 65%); depois consequências e correlações clínico-fisiopatológicas (25%); por último conduta, farmacologia e prova (10%), exceto quando o material for explicitamente clínico.
-3. TABELA DE ANCORAGEM: em cada bloco, use uma tabela com Estrutura ou conceito | Onde está / relações | Função | Mecanismo | Se alterada, o que acontece.
+3. ANCORAGEM DIDÁTICA: organize cada bloco com subtítulos curtos e listas; para cada item, identifique estrutura/conceito, localização/relações, função, mecanismo e consequência quando pertinente. Use tabela somente quando facilitar uma comparação real.
 4. RECUPERAÇÃO ATIVA: encerre cada bloco com duas perguntas curtas, uma de recordação e uma de comparação/consequência; apresente as respostas sob o subtítulo "Resposta comentada".
 5. FIDELIDADE CONCEITUAL: Todo o embasamento teórico deve vir do material fornecido. Não invente afirmações incompatíveis com a fonte.
 6. DIRETRIZES NACIONAIS: Correlacione condutas com os consensos vigentes do SUS e protocolos clínicos (PCDT), apenas após consolidar os fundamentos.
 7. FECHAMENTO DIDÁTICO: finalize com um caso clínico autossuficiente que exija explicar estrutura, mecanismo e consequência, seguido de 3 a 5 pérolas de prova.
 
 DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
-1. PROIBIÇÃO ABSOLUTA DE DIAGRAMAS EM TEXTO OU ASCII:
-   - É ESTRITAMENTE PROIBIDO desenhar esquemas usando setas de texto ("--->"), sinais de igual repetidos, colchetes, caixas de caracteres ASCII, barras verticais decorativas ou fluxogramas Mermaid improvisados.
-   - Nunca escreva linhas como "+-----+", "| texto |", "[estrutura] =====>" ou qualquer quadro feito com caracteres.
-   - Para comparação, use EXCLUSIVAMENTE tabelas Markdown válidas com cabeçalho e linha separadora (| Parâmetro | Achado |; | --- | --- |).
-   - Para organização espacial ou sequência causal, use uma lista numerada curta, com uma ideia por item, e explique a relação em frase completa. Não tente desenhar um diagrama em texto.
+1. DIAGRAMAÇÃO SEGURA PARA A4:
+   - Não gere diagramas, fluxogramas, mapas conceituais, Mermaid, esquemas ASCII, caixas de caracteres nem sequências visuais de setas.
+   - Tabelas são permitidas quando forem a forma mais clara de comparar dados. Limite a 4 colunas, use cabeçalhos curtos e consistentes e mantenha cada célula concisa (preferencialmente uma frase curta ou até 30 palavras). Não coloque parágrafos, listas longas ou subtítulos dentro das células.
+   - Se uma comparação ficar larga ou exigir explicações extensas, divida-a em tabelas menores ou apresente-a como lista rotulada. Cada tabela deve ter cabeçalho semântico, linhas alinhadas e informação suficiente para ser entendida sem depender de cor.
+   - Apresente relações causais em frases ou listas numeradas curtas, não em setas ou diagramas.
 2. INTEGRAÇÃO DE ILUSTRAÇÕES MÉDICAS:
    - Você tem acesso a um catálogo de figuras do material.
    - Quando explicar um corte anatômico, ECG, radiografia ou mecanismo correspondente a uma dessas figuras, insira-a imediatamente após o parágrafo explicativo:
@@ -289,6 +397,8 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
       } else {
         generatedMarkdown = await generateWithGemini();
       }
+
+      generatedMarkdown = normalizeReportMarkdownForPrint(generatedMarkdown);
 
       // Monta os nomes de arquivo sanitizados para download
       const filenameBase = { title: cleanTitle, subject: cleanSubject };

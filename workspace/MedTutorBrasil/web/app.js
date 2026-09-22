@@ -9587,12 +9587,12 @@ DISTRIBUIÇÃO DE ÊNFASE: aproximadamente 65% do relatório deve cobrir estrutu
 
 FORMATO DE CADA BLOCO DE APRENDIZAGEM:
 1. Comece com uma definição simples e precisa, seguida de localização/organização espacial quando aplicável.
-2. Use uma tabela curta com as colunas: Estrutura ou conceito | Onde está / relações | Função | Mecanismo | Se alterada, o que acontece.
+2. Use uma lista curta com rótulos explícitos para estrutura/conceito, localização/relações, função, mecanismo e consequência. Tabelas comparativas são permitidas quando ajudarem a compreensão: no máximo 4 colunas, cabeçalhos curtos, linhas consistentes e células concisas (sem parágrafos ou listas longas). Se não couber nesse formato, prefira listas rotuladas.
 3. Explique causa → mecanismo → consequência em texto curto, conectando explicitamente os elos.
 4. Termine o bloco com duas perguntas de recuperação ativa: uma de recordação (sem alternativas) e outra de comparação ou consequência. Mostre a resposta somente após um separador "Resposta comentada".
 
 OUTRAS DIRETRIZES:
-1. Escreva em Markdown fluido, com títulos, tabelas e exemplos. Não use JSON, diagramas ASCII nem nomenclaturas vazias como "Mapeamento Prévio".
+1. Escreva em Markdown fluido, com títulos, listas e exemplos. Pode usar tabelas comparativas legíveis (até 4 colunas, cabeçalhos claros e células concisas); não gere diagramas, fluxogramas, Mermaid, caixas ASCII ou JSON.
 2. FIDELIDADE AO CONTEÚDO: Baseie-se estritamente no conteúdo real do material enviado. Explique os tópicos presentes no arquivo com profundidade e clareza, evitando qualquer alucinação ou extrapolação alheia.
 3. EMBASAMENTO CIENTÍFICO NAS BASES INDEXADAS & CITAÇÕES PRECISAS NO TRECHO:
    Fundamente todas as afirmações nas evidências das bases indexadas (PubMed, SciELO, BVS, Cochrane, Elsevier) e em diretrizes oficiais (PCDT, CFM, SBC, SBD, SBP).
@@ -9801,7 +9801,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         else if (isPed) guidelinesOrg = 'Sociedade Brasileira de Pediatria (SBP)';
 
         // Limpeza rigorosa de artefatos de quebra e cabeçalhos redundantes gerados pela IA no início do texto
-        let cleanMd = normalizeMaterialMarkdownForReport(markdownText)
+        let cleanMd = normalizeReportMarkdownForA4(normalizeMaterialMarkdownForReport(markdownText))
           .replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')
           .replace(/<\/?br\s*[/]?>/gi, '\n')
           .replace(/<p\s*[/]?>/gi, '\n')
@@ -13500,20 +13500,75 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       });
     }
 
+    function getLearningMapAxis(item) {
+      const axis = String(item?.learningAxis || item?.eixo_aprendizagem || '').trim().toLowerCase();
+      if (['base', 'reconhecimento', 'tratamento'].includes(axis)) return axis;
+
+      // Compatibilidade com rótulos legados apenas quando a equivalência é clara.
+      // "Aplicação clínica" pode significar reconhecimento ou tratamento, então
+      // não é reclassificada automaticamente.
+      const focus = String(item?.learningFocus || item?.foco_aprendizagem || '').trim().toLowerCase();
+      if (['material_base', 'fundamentos', 'mecanismo_consequencia', 'base'].includes(focus)) return 'base';
+      if (['reconhecimento', 'recognition'].includes(focus)) return 'reconhecimento';
+      if (['tratamento', 'treatment'].includes(focus)) return 'tratamento';
+      return 'unclassified';
+    }
+
     function renderLearningGapPanel(baseList) {
       const panel = document.getElementById('learningGapPanel');
       if (!panel) return;
-      const focusDefinitions = [['material_base', 'Conteúdo do material']];
-      const dueNow = (baseList || []).filter(item => getFlashcardQueueKey(item) === 'due').length;
-      panel.innerHTML = `<div style="font-size: 11px; font-weight: 800; color: var(--text-primary); margin-bottom: 7px;">🧭 Mapa de aprendizagem da matéria <span style="color: var(--text-muted); font-weight: 600;">• ${dueNow} revisão(ões) pendente(s) hoje</span></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px;">${focusDefinitions.map(([key, label]) => {
-        const items = (baseList || []).filter(item => (item.learningFocus || 'material_base') === key);
-        const attempts = items.reduce((sum, item) => sum + (item.quizStats?.attempts || 0), 0);
-        const correct = items.reduce((sum, item) => sum + (item.quizStats?.correct || 0), 0);
-        const lapses = items.reduce((sum, item) => sum + (item.srs?.lapses || 0), 0);
-        const rate = attempts ? Math.round((correct / attempts) * 100) : null;
-        const color = rate === null ? 'var(--text-muted)' : (rate >= 80 ? '#00ff66' : (rate >= 55 ? '#ffaa00' : '#ff6666'));
-        return `<div style="padding: 7px 8px; border: 1px solid var(--border); border-radius: 7px; background: rgba(255,255,255,0.025); font-size: 10.5px;"><strong>${label}</strong><div style="margin-top: 3px; color: ${color}; font-weight: 800;">${rate === null ? 'Sem respostas ainda' : `${rate}% de acerto`}</div><div style="margin-top: 2px; color: var(--text-muted);">${items.length} cartões • ${lapses} erro(s) SRS</div></div>`;
-      }).join('')}</div>`;
+
+      const list = Array.isArray(baseList) ? baseList : [];
+      const definitions = [
+        ['base', 'Aprendizagem de base'],
+        ['reconhecimento', 'Reconhecimento'],
+        ['tratamento', 'Tratamento'],
+        ['unclassified', 'Sem classificação']
+      ];
+      const dueNow = list.filter(item => getFlashcardQueueKey(item) === 'due').length;
+      const groups = definitions.map(([key, label]) => ({
+        key,
+        label,
+        items: list.filter(item => getLearningMapAxis(item) === key)
+      })).filter(group => group.items.length > 0);
+
+      panel.className = 'learning-gap-panel';
+      panel.innerHTML = `
+        <div class="learning-gap-heading">
+          <div>
+            <strong>🧭 Progresso por eixo de aprendizagem</strong>
+            <span>${list.length} cartões nos filtros atuais</span>
+          </div>
+          <span class="learning-gap-due">${dueNow} revisão(ões) vencida(s) hoje</span>
+        </div>
+        <p class="learning-gap-note">Acerto considera somente tentativas respondidas no quiz. Revisões SRS são mostradas separadamente; não representam nota de acerto.</p>
+        ${groups.length ? `<div class="learning-gap-grid">${groups.map(({ key, label, items }) => {
+          const attempts = items.reduce((sum, item) => sum + Math.max(0, Number(item?.quizStats?.attempts) || 0), 0);
+          const correct = items.reduce((sum, item) => sum + Math.max(0, Number(item?.quizStats?.correct) || 0), 0);
+          const safeCorrect = Math.min(correct, attempts);
+          const rate = attempts ? Math.round((safeCorrect / attempts) * 100) : null;
+          const due = items.filter(item => getFlashcardQueueKey(item) === 'due').length;
+          const reviewed = items.filter(item => !!item?.srs?.lastReviewed).length;
+          const withLapses = items.filter(item => (Number(item?.srs?.lapses) || 0) > 0).length;
+          const consolidated = items.filter(item => item?.srs?.state === 'mastered' || (Number(item?.srs?.interval) || 0) >= 21).length;
+          const color = rate === null ? 'var(--text-muted)' : (rate >= 80 ? '#00ff66' : (rate >= 55 ? '#ffaa00' : '#ff6666'));
+          const progress = rate === null ? '' : `<div class="learning-gap-progress" role="progressbar" aria-label="Acerto em quizzes: ${rate}%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${rate}"><span style="width:${rate}%; background:${color};"></span></div>`;
+          const statsLabel = rate === null ? 'Sem tentativas no quiz' : `${rate}% de acerto no quiz`;
+          const attemptsLabel = attempts ? `${safeCorrect} acerto(s) em ${attempts} tentativa(s)` : 'Ainda sem amostra de quiz';
+          return `<article class="learning-gap-card">
+            <div class="learning-gap-card-heading"><strong>${label}</strong><span>${items.length} cartão(ões)</span></div>
+            <div class="learning-gap-score" style="color:${color};">${statsLabel}</div>
+            <div class="learning-gap-attempts">${attemptsLabel}</div>
+            ${progress}
+            <div class="learning-gap-srs" aria-label="Indicadores de repetição espaçada">
+              <span>Hoje: <b>${due}</b></span>
+              <span>Já revisados no SRS: <b>${reviewed}</b></span>
+              <span>Já precisaram de “Repetir”: <b>${withLapses}</b></span>
+              <span>Consolidados (intervalo ≥ 21 dias): <b>${consolidated}</b></span>
+            </div>
+          </article>`;
+        }).join('')}</div>` : '<p class="learning-gap-empty">Nenhum cartão neste filtro para resumir.</p>'}
+      `;
     }
 
     function renderSrsQueueNavigation(baseList) {
@@ -23452,6 +23507,100 @@ Para cada material, retorne um objeto no JSON com:
       }
       if (inBox || diagramParts.length) flush();
       return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    // Relatórios são impressos em A4. Preservamos tabelas concisas e consistentes;
+    // tabelas largas ou desalinhadas viram itens rotulados para não transbordar.
+    function normalizeReportMarkdownForA4(markdown) {
+      const lines = normalizeAsciiDiagramsForReading(markdown).split('\n');
+      const output = [];
+      const isPipeRow = line => /^\s*\|.+\|\s*$/.test(line);
+      const isSeparator = line => /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+      const cellsOf = line => line.trim().replace(/^\|/, '').replace(/\|$/, '')
+        .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
+      const tableNeedsReflow = (headers, rows, hasHeader) => {
+        const width = headers.length || rows[0]?.length || 0;
+        return !hasHeader || width < 2 || width > 4 || rows.some(row => row.length !== width)
+          || [...headers, ...rows.flat()].some(cell => cell.length > 240)
+          || rows.some(row => row.reduce((sum, cell) => sum + cell.length, 0) > 640);
+      };
+      const rowsToBullets = (headers, rows) => rows.map((row, rowIndex) => {
+        const firstHeading = headers[0] || '';
+        const label = row[0]
+          ? (firstHeading ? '**' + firstHeading + ':** ' + row[0] : row[0])
+          : 'Item ' + (rowIndex + 1);
+        const details = row.slice(1).map((value, columnIndex) => {
+          if (!value) return '';
+          const heading = headers[columnIndex + 1];
+          return heading ? '**' + heading + ':** ' + value : value;
+        }).filter(Boolean);
+        return '- **' + label + ':** ' + details.join('; ');
+      }).join('\n');
+
+      for (let index = 0; index < lines.length;) {
+        const arrowDiagram = lines[index].match(/^\s*(.+?)\s*(?:--?>|={3,}|-{3,}|>{2,})\s*(.+?)\s*$/);
+        if (arrowDiagram) {
+          output.push('- ' + arrowDiagram[1].replace(/[\[\](){}]/g, '').trim());
+          output.push('- ' + arrowDiagram[2].replace(/[\[\](){}]/g, '').trim());
+          index++;
+          continue;
+        }
+        if (!isPipeRow(lines[index])) {
+          output.push(lines[index++]);
+          continue;
+        }
+        const hasHeader = isSeparator(lines[index + 1] || '');
+        const rows = [];
+        let cursor = index;
+        while (cursor < lines.length) {
+          if (isSeparator(lines[cursor])) {
+            cursor++;
+            continue;
+          }
+          if (!isPipeRow(lines[cursor])) break;
+          rows.push(cellsOf(lines[cursor++]));
+        }
+        if (rows.length < 2) {
+          output.push(lines[index++]);
+          continue;
+        }
+        const headers = hasHeader ? rows.shift() : [];
+        if (tableNeedsReflow(headers, rows, hasHeader)) {
+          output.push(rowsToBullets(headers, rows));
+          output.push('');
+        } else {
+          output.push(lines.slice(index, cursor).join('\n'));
+        }
+        index = cursor;
+      }
+
+      return output.join('\n')
+        .replace(/<table\b[\s\S]*?<\/table>/gi, table => {
+          const rows = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+          const matrix = rows.map(([, row]) => {
+            const cells = [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+              .map(([, cell]) => cell.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+            return cells;
+          }).filter(row => row.length);
+          const width = matrix[0]?.length || 0;
+          const hasHeader = /<th\b/i.test(rows[0]?.[1] || '');
+          const isReadable = hasHeader && width >= 2 && width <= 4 && matrix.every(row => row.length === width)
+            && matrix.flat().every(cell => cell.length <= 240)
+            && matrix.slice(1).every(row => row.reduce((sum, cell) => sum + cell.length, 0) <= 640);
+          if (isReadable) return table;
+          const headers = hasHeader ? (matrix[0] || []) : [];
+          const dataRows = hasHeader ? matrix.slice(1) : matrix;
+          return dataRows.map((row, rowIndex) => {
+            const fields = row.map((cell, columnIndex) => {
+              if (!cell) return '';
+              const heading = headers[columnIndex] || (columnIndex === 0 ? 'Item ' + (rowIndex + 1) : 'Coluna ' + (columnIndex + 1));
+              return heading ? '**' + heading + ':** ' + cell : cell;
+            }).filter(Boolean);
+            return fields.length ? '- ' + fields.join('; ') : '';
+          }).filter(Boolean).join('\n');
+        })
+        .replace(/\x60{3}(?:mermaid|(?:ascii|text)\s+diagram)[^\n]*\n[\s\S]*?\x60{3}/gi, '')
+        .replace(/\n{3,}/g, '\n\n').trim();
     }
 
     // FORMATAÇÃO AVANÇADA DE TEXTO DA IA PARA HTML LIMPO (MARKDOWN ROBUSTO & TABELAS)
