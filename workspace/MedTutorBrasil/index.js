@@ -29,15 +29,16 @@ app.get('/app.min.js', (req, res) => {
   return res.sendFile(path.join(__dirname, 'web', 'app.js'));
 });
 
-// A página raiz é uma apresentação pública; a aplicação autenticada continua
-// disponível nas rotas explícitas /login, /cadastro e nas telas de estudo.
+// A página raiz é pública; o login usa documento próprio para sobreviver a falhas da SPA.
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'landing.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'web', 'login.html')));
+app.get('/cadastro', (req, res) => res.sendFile(path.join(__dirname, 'web', 'login.html')));
 
 app.use(express.static(path.join(__dirname, 'web')));
 
 // Rotas do cliente são uma SPA: ao abrir um link diretamente, o servidor
 // precisa entregar o mesmo documento para o roteador do navegador.
-const clientRoutes = ['/login', '/cadastro', '/pagamento', '/chat-ia', '/flashcards', '/quizzes', '/materias', '/sce', '/desafios'];
+const clientRoutes = ['/pagamento', '/chat-ia', '/flashcards', '/quizzes', '/materias', '/sce', '/desafios'];
 clientRoutes.forEach(route => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
 });

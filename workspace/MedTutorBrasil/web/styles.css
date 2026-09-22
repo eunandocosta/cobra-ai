@@ -5658,6 +5658,18 @@
       justify-content: center;
       text-decoration: none;
     }
+    .auth-session-error-actions .btn-primary,
+    .auth-session-error-actions .btn-secondary {
+      border: 1px solid var(--border-accent);
+      border-radius: 10px;
+      padding: 0 12px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .auth-session-error-actions .btn-primary { color: #04140a; background: var(--neon); }
+    .auth-session-error-actions .btn-secondary { color: var(--text-primary); background: var(--surface-2); }
 
     .auth-session-check .loader-spinner {
       width: 24px;

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#062015">
+  <title>Entrar | MedTutor Brasil</title>
+  <link rel="icon" href="/icons/medtutor-icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <style>
+    :root { color-scheme: dark; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #06110b; color: #f5fff8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% -15%, rgba(0, 214, 107, .16), transparent 39%), #06110b; }
+    main { width: min(100%, 420px); padding: 34px 30px 28px; border: 1px solid rgba(132, 190, 153, .2); border-radius: 22px; background: #101913; box-shadow: 0 28px 80px rgba(0, 0, 0, .42); }
+    .brand { display: grid; justify-items: center; text-align: center; gap: 9px; margin-bottom: 24px; }
+    .mark { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid rgba(0, 255, 102, .5); border-radius: 17px; color: #00ef70; background: rgba(0, 214, 107, .07); font-size: 30px; font-weight: 800; }
+    h1 { margin: 4px 0 0; font-size: 23px; letter-spacing: -.7px; } p { margin: 0; color: #9bad9f; font-size: 13px; line-height: 1.5; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; gap: 3px; border-radius: 11px; background: #08110c; border: 1px solid rgba(132, 190, 153, .12); margin: 22px 0 18px; }
+    .tab { border: 0; border-radius: 8px; padding: 10px; background: transparent; color: #a6b8ac; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }.tab.active { color: #00f077; background: #15231b; }
+    form { display: grid; gap: 13px; }.field { display: grid; gap: 6px; text-align: left; }.field label { font-size: 12px; color: #b2c2b7; font-weight: 700; }.field input { width: 100%; min-height: 45px; padding: 0 13px; border-radius: 10px; border: 1px solid rgba(132, 190, 153, .2); outline: 0; color: #f5fff8; background: #09120d; font: inherit; font-size: 13px; }.field input:focus { border-color: #00d66b; box-shadow: 0 0 0 3px rgba(0, 214, 107, .1); }
+    button, .back { min-height: 46px; border: 0; border-radius: 10px; font: inherit; font-weight: 800; cursor: pointer; }.submit { background: #00e66f; color: #031007; margin-top: 2px; }.google { width: 100%; color: #edf7ef; background: #0a130e; border: 1px solid rgba(132, 190, 153, .2); margin-bottom: 14px; }.divider { display: flex; align-items: center; gap: 10px; color: #687a6e; font-size: 11px; margin: 2px 0 14px; }.divider:before, .divider:after { content: ''; height: 1px; flex: 1; background: rgba(132, 190, 153, .13); }
+    .message { min-height: 19px; color: #ffbd69; font-size: 12px; line-height: 1.4; }.message.error { color: #ff8d8d; }.back { display: grid; place-items: center; margin-top: 17px; color: #94ab9b; text-decoration: none; font-size: 12px; background: transparent; }.back:hover { color: #00ef70; }
+    .logout-note { margin: -5px 0 16px; padding: 10px 12px; color: #c6d7cb; background: rgba(0, 214, 107, .08); border: 1px solid rgba(0, 214, 107, .2); border-radius: 10px; font-size: 12px; line-height: 1.45; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="brand"><div class="mark">⌁</div><h1>MedTutor Brasil</h1><p>Entre para acessar seu espaço de estudos.</p></header>
+    <div id="logoutNote" class="logout-note" hidden>Encerrando a sessão anterior…</div>
+    <div class="tabs"><button class="tab active" type="button" data-mode="login">Entrar</button><button class="tab" type="button" data-mode="register">Cadastrar</button></div>
+    <button id="googleButton" class="google" type="button">Continuar com o Google</button>
+    <div class="divider">ou com e-mail</div>
+    <form id="authForm"><div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" placeholder="aluno@medicina.uf.br" required></div><div class="field"><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" placeholder="Mínimo 6 caracteres" minlength="6" required></div><div id="message" class="message" role="alert" aria-live="polite"></div><button id="submitButton" class="submit" type="submit">Acessar o MedTutor</button></form>
+    <a class="back" href="/">← Voltar para a apresentação</a>
+  </main>
+  <script>
+    (function () {
+      const config = { apiKey: 'AIzaSyBoqV_J-QDapbAGfisZ-vmxCMOxWkq9ZUs', authDomain: 'cobra-ai-6549d.firebaseapp.com', projectId: 'cobra-ai-6549d', storageBucket: 'cobra-ai-6549d.firebasestorage.app', messagingSenderId: '275562725419', appId: '1:275562725419:web:015ed34d8e933ef64bea6e' };
+      const params = new URLSearchParams(location.search);
+      const shouldLogout = params.get('logout') === '1';
+      const note = document.getElementById('logoutNote');
+      const message = document.getElementById('message');
+      const form = document.getElementById('authForm');
+      const submit = document.getElementById('submitButton');
+      let mode = location.pathname === '/cadastro' ? 'register' : 'login';
+      const show = (text, error) => { message.textContent = text || ''; message.classList.toggle('error', !!error); };
+      const setBusy = (busy, text) => { submit.disabled = busy; document.getElementById('googleButton').disabled = busy; if (text) submit.textContent = text; };
+      const setMode = (next) => { mode = next; document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.mode === mode)); submit.textContent = mode === 'register' ? 'Criar conta' : 'Acessar o MedTutor'; document.getElementById('password').autocomplete = mode === 'register' ? 'new-password' : 'current-password'; show(''); };
+      document.querySelectorAll('.tab').forEach(el => el.addEventListener('click', () => setMode(el.dataset.mode)));
+      setMode(mode);
+      if (typeof firebase === 'undefined') { show('Não foi possível carregar a autenticação. Verifique sua conexão e tente novamente.', true); return; }
+      try { if (!firebase.apps.length) firebase.initializeApp(config); } catch (error) { show('Não foi possível iniciar a autenticação.', true); return; }
+      const auth = firebase.auth();
+      const finishLogout = () => { note.hidden = false; note.textContent = 'Sessão anterior encerrada. Entre novamente para continuar.'; };
+      if (shouldLogout) {
+        note.hidden = false;
+        auth.signOut().then(finishLogout).catch(() => { note.textContent = 'A sessão local foi removida. Entre novamente para continuar.'; });
+        try { localStorage.removeItem('medtutor_auth_user'); localStorage.removeItem('medtutor_user_profile'); } catch (_) {}
+      } else {
+        auth.onAuthStateChanged(user => { if (user) location.replace('/chat-ia'); });
+      }
+      document.getElementById('googleButton').addEventListener('click', async () => {
+        setBusy(true); show('Abrindo autenticação do Google…');
+        try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); location.replace('/chat-ia'); }
+        catch (error) { if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') { await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); return; } show(error.message || 'Não foi possível entrar com Google.', true); }
+        finally { setBusy(false); setMode(mode); }
+      });
+      form.addEventListener('submit', async event => {
+        event.preventDefault(); setBusy(true, mode === 'register' ? 'Criando conta…' : 'Entrando…'); show('');
+        try { const email = document.getElementById('email').value.trim(); const password = document.getElementById('password').value; if (mode === 'register') await auth.createUserWithEmailAndPassword(email, password); else await auth.signInWithEmailAndPassword(email, password); location.replace('/chat-ia'); }
+        catch (error) { show(error.message || 'Não foi possível autenticar sua conta.', true); }
+        finally { setBusy(false); setMode(mode); }
+      });
+    })();
+  </script>
+</body>
+</html>
