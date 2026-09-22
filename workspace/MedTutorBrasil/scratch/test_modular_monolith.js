@@ -51,6 +51,20 @@ assert(!challengeTopicsHelper.includes('.includes(normSubject)'), 'o filtro de t
 assert(!challengeTopicsHelper.includes('q.flashcardTitle') && !challengeTopicsHelper.includes('m.title'), 'títulos de cards/arquivos não devem virar matérias no filtro');
 console.log('[PASS] Questões e matérias de Desafios normalizadas e limitadas à disciplina selecionada');
 
+const challengeScoreFunction = appSource.match(/function getChallengeQuestionScore\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
+const challengeEligibilityFunction = appSource.match(/function isChallengeQuestionEligible\(question\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(challengeScoreFunction && challengeEligibilityFunction, 'os desafios devem calcular elegibilidade pelo score do quiz');
+const isChallengeQuestionEligible = new Function(`${challengeScoreFunction}\n${challengeEligibilityFunction}\nreturn isChallengeQuestionEligible;`)();
+assert(isChallengeQuestionEligible({ quizStats: { attempts: 20, correct: 17 } }), '85% de acerto deve liberar a questão');
+assert(!isChallengeQuestionEligible({ quizStats: { attempts: 20, correct: 16 } }), '80% de acerto não deve liberar a questão');
+assert(!isChallengeQuestionEligible({ srs: { reps: 8, state: 'mastered' }, quizStats: { attempts: 0, correct: 0 } }), 'SRS sozinho não deve liberar a questão');
+assert(!isChallengeQuestionEligible({ quizStats: { attempts: 0, correct: 0 } }), 'questões sem tentativas não devem receber score presumido');
+console.log('[PASS] Elegibilidade de desafios exige score de quiz >= 85%, sem requisito de SRS');
+const openScheduleQuestions = appSource.match(/function openScheduleQuestions\(taskIndex\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(openScheduleQuestions.includes("navigateTab('flashcards')"), 'cards diários do SCE devem abrir Flashcards');
+assert(!openScheduleQuestions.includes("navigateTab('quizzes')"), 'cards diários do SCE não devem abrir Quizzes');
+console.log('[PASS] Cards diários do SCE navegam para Flashcards');
+
 const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
 assert(authMarkup.includes('id="paymentScreenContainer"'), 'a tela de cupom deve ter um container independente da tela de login');
 assert(/<\/div>\s*<\/div>\s*<div id="paymentScreenContainer"/.test(authMarkup), 'a tela de pagamento deve estar fora do container de login');

@@ -21766,16 +21766,16 @@ Para cada material, retorne um objeto no JSON com:
         handleSlideSelectChange('all');
       }
 
-      navigateTab('quizzes');
+      navigateTab('flashcards');
 
       setTimeout(() => {
-        const deck = document.getElementById('quizDeck') || document.getElementById('tab-quizzes');
+        const deck = document.getElementById('flashcardDeck') || document.getElementById('tab-flashcards');
         if (deck) {
           deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }, 100);
 
-      showToast(`🧭 Waze da Medicina: Abrindo questões de "${task.topic}" (${targetSubject})`);
+      showToast(`🧭 Waze da Medicina: Abrindo flashcards de "${task.topic}" (${targetSubject})`);
     }
 
     if (typeof window !== 'undefined') {
@@ -21814,7 +21814,7 @@ Para cada material, retorne um objeto no JSON com:
         card.className = `timeline-day-card ${task.status === 'delayed' ? 'delayed-day' : ''} ${task.date === 'Hoje' ? 'active-day' : ''}`;
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
-        card.title = `Clique para abrir as questões de: ${task.topic}`;
+        card.title = `Clique para abrir os flashcards de: ${task.topic}`;
         card.onclick = () => openScheduleQuestions(idx);
         card.onkeydown = (e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -21839,7 +21839,7 @@ Para cada material, retorne um objeto no JSON com:
             <span style="display: flex; align-items: center; gap: 8px;">
               <span>${task.minutes} min</span>
               <span style="color: var(--neon); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
-                📝 Questões →
+                🗂️ Flashcards →
               </span>
             </span>
           </div>
@@ -26899,6 +26899,28 @@ function escapeHtmlText(str) {
       return Array.from(topicsSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     }
 
+    // Elegibilidade para desafios baseada no desempenho objetivo em quizzes,
+    // sem exigir estado/revisões do SRS. Sem tentativas registradas, a questão
+    // ainda não tem score suficiente para ser liberada.
+    function getChallengeQuestionScore(question) {
+      const stats = question?.quizStats || {};
+      const attempts = Number(stats.attempts);
+      const correct = Number(stats.correct);
+      if (!Number.isFinite(attempts) || !Number.isFinite(correct) || attempts < 1 || correct < 0 || correct > attempts) {
+        return null;
+      }
+      return {
+        attempts,
+        correct,
+        percent: (correct / attempts) * 100
+      };
+    }
+
+    function isChallengeQuestionEligible(question) {
+      const score = getChallengeQuestionScore(question);
+      return Boolean(score && score.percent >= 85);
+    }
+
     const MedTutorChallengesService = {
       activeChallenge: null,
       activeChallengeIndex: 0,
@@ -27181,13 +27203,7 @@ function escapeHtmlText(str) {
             if (!matchesTopic) return false;
           }
 
-          const isMasteredInSRS = Boolean(
-            (q.srs && typeof q.srs.reps === 'number' && q.srs.reps > 0) ||
-            (q.srs && Array.isArray(q.srs.history) && q.srs.history.some(h => Number(h.rating) >= 2)) ||
-            (q.srs && (q.srs.state === 'review' || q.srs.state === 'mastered')) ||
-            (q.quizStats && typeof q.quizStats.correct === 'number' && q.quizStats.correct > 0)
-          );
-          return isMasteredInSRS;
+          return isChallengeQuestionEligible(q);
         });
 
         this.eligibleQuestionsCache = eligible;
@@ -27196,9 +27212,9 @@ function escapeHtmlText(str) {
           container.innerHTML = `
             <div class="empty-state-notice">
               <span class="icon">🔒</span>
-              <p>Nenhuma questão dominada encontrada para <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''}.</p>
+              <p>Nenhuma questão com pelo menos <strong>85% de acerto</strong> encontrada para <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''}.</p>
               <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-secondary);">
-                Apenas perguntas que você <strong>já acertou na repetição espaçada (SRS)</strong> podem ser enviadas em desafios.
+                Responda às questões no Quiz até alcançar 85% de acerto. Não é necessário concluir revisões de repetição espaçada.
               </p>
               <button class="btn-outline-action primary" style="margin-top: 10px;" onclick="closeModals(); openSubjectInTab('${targetSubject.replace(/'/g, "\\'")}', 'flashcards');">
                 ⚡ Praticar Flashcards de ${targetSubject}
@@ -27209,7 +27225,7 @@ function escapeHtmlText(str) {
         }
 
         container.innerHTML = eligible.map((q, idx) => {
-          const reps = (q.srs && q.srs.reps) || 1;
+          const score = getChallengeQuestionScore(q);
           const frontText = q.flashcard?.front || q.question || q.pergunta || 'Sem enunciado';
           const backSnippet = (q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '').slice(0, 120);
           const safeId = String(q.id || `el-q-${idx}`).replace(/"/g, '&quot;');
@@ -27226,7 +27242,7 @@ function escapeHtmlText(str) {
                 <div class="eligible-question-stem eligible-q-text">${escapeHtmlText(frontText)}</div>
                 ${backSnippet ? `<div class="eligible-q-back-snippet" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"><strong>Gabarito:</strong> ${escapeHtmlText(backSnippet)}...</div>` : ''}
                 <div class="eligible-question-meta eligible-q-meta">
-                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Dominado no Flashcard (${reps} ${reps === 1 ? 'repetição' : 'repetições'})</span>
+                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Acerto no Quiz: ${score.percent.toFixed(0)}% (${score.correct}/${score.attempts})</span>
                 </div>
               </div>
             </div>
@@ -28783,13 +28799,7 @@ function escapeHtmlText(str) {
             if (!matchesTopic) return false;
           }
 
-          const isMasteredInSRS = Boolean(
-            (q.srs && typeof q.srs.reps === 'number' && q.srs.reps > 0) ||
-            (q.srs && Array.isArray(q.srs.history) && q.srs.history.some(h => Number(h.rating) >= 2)) ||
-            (q.srs && (q.srs.state === 'review' || q.srs.state === 'mastered')) ||
-            (q.quizStats && typeof q.quizStats.correct === 'number' && q.quizStats.correct > 0)
-          );
-          return isMasteredInSRS;
+          return isChallengeQuestionEligible(q);
         });
 
         this.directEligibleQuestionsCache = eligible;
@@ -28798,9 +28808,9 @@ function escapeHtmlText(str) {
           container.innerHTML = `
             <div class="empty-state-notice">
               <span class="icon">🔒</span>
-              <p>Você ainda não dominou perguntas de <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''} em Flashcard.</p>
+              <p>Nenhuma questão de <strong>"${targetSubject}"</strong>${targetTopic !== 'all' ? ` (matéria: ${targetTopic})` : ''} atingiu 85% de acerto no Quiz.</p>
               <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
-                Estude e acerte os cartões desta matéria para desbloqueá-las nos desafios.
+                Responda às questões no Quiz até alcançar 85% de acerto. Não é necessário concluir revisões de repetição espaçada.
               </p>
               <button class="btn-outline-action primary" style="margin-top: 8px; font-size: 11px;" onclick="closeModals(); openSubjectInTab('${targetSubject.replace(/'/g, "\\'")}', 'flashcards');">
                 ⚡ Estudar Flashcards desta Matéria
@@ -28811,7 +28821,7 @@ function escapeHtmlText(str) {
         }
 
         container.innerHTML = eligible.map((q, idx) => {
-          const reps = (q.srs && q.srs.reps) || 1;
+          const score = getChallengeQuestionScore(q);
           const frontText = q.flashcard?.front || q.question || q.pergunta || 'Sem enunciado';
           const backSnippet = (q.flashcard?.back || q.reference_answer || q.answer || q.resposta || '').slice(0, 110);
           const safeId = String(q.id || `dq-${idx}`).replace(/"/g, '&quot;');
@@ -28828,7 +28838,7 @@ function escapeHtmlText(str) {
                 <div class="eligible-question-stem eligible-q-text">${escapeHtmlText(frontText)}</div>
                 ${backSnippet ? `<div class="eligible-q-back-snippet" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"><strong>Gabarito:</strong> ${escapeHtmlText(backSnippet)}...</div>` : ''}
                 <div class="eligible-question-meta eligible-q-meta">
-                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Dominado no Flashcard (${reps} ${reps === 1 ? 'repetição' : 'repetições'})</span>
+                  <span class="srs-success-tag" style="color: var(--neon); font-weight: 600;">✅ Acerto no Quiz: ${score.percent.toFixed(0)}% (${score.correct}/${score.attempts})</span>
                 </div>
               </div>
             </div>
