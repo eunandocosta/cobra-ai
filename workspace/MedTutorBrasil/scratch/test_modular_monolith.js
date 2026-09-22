@@ -181,6 +181,7 @@ const resetScript = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'admin
 assert(resetScript.includes('perfis_didaticos') && resetScript.includes('Supabase Storage assets'), 'o reset deve preservar perfis didáticos e assets do Supabase');
 assert(appSource.includes('supabaseStorageUnavailableUntil') && appSource.includes('clinicalImageStorageCircuitUntil'), 'upload de imagens precisa abrir circuito após falha para evitar uma tempestade de requisições');
 assert(appSource.includes('startOperation') && appSource.includes("AppRequestFeedback.startOperation('Excluindo aulas'"), 'exclusões demoradas precisam exibir cartão de processamento ao estudante');
+assert(appSource.includes('Deseja continuar processando?') && appSource.includes('return await taskPromise'), 'extrações demoradas precisam permitir que o estudante continue aguardando sem limite de tempo');
 assert(indexContent.includes('hasSupabasePlaceholders'), 'valores de exemplo do Supabase não podem ser enviados ao navegador como configuração válida');
 assert(resetScript.includes('--execute') && resetScript.includes('--confirm=RESET_ALL_STUDY_DATA'), 'a exclusão global deve exigir confirmação explícita');
 assert(resetScript.includes('study_data_reset_markers'), 'o marcador do reset deve ficar separado do perfil do usuário');

@@ -3172,12 +3172,14 @@
     }
     window.updateUploadProgress = updateUploadProgress;
 
-    // Cada leitura local precisa ser observável: mantém a interface e o
-    // terminal atualizados e encerra a espera caso uma biblioteca/arquivo
-    // bloqueie a extração indefinidamente.
+    // Cada leitura local precisa ser observável. Ao ultrapassar o tempo de
+    // referência, o estudante escolhe entre cancelar ou continuar aguardando
+    // a mesma extração, sem reiniciar nem impor novo limite.
     async function runUploadStepWithFeedback(task, { fileName, label, progress = 20, timeoutMs = 35_000 }) {
       const startedAt = Date.now();
       let heartbeat = null;
+      let timeoutId = null;
+      const timeoutSignal = Symbol('upload-timeout');
       const emitHeartbeat = () => {
         const elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
         updateUploadProgress('1. Lendo arquivo...', `${label} (${elapsed}s). O processamento continua ativo...`, progress);
@@ -3191,12 +3193,29 @@
       };
       heartbeat = setInterval(emitHeartbeat, 5_000);
       try {
-        return await Promise.race([
-          Promise.resolve().then(task),
-          new Promise((_, reject) => setTimeout(() => reject(new Error(`Tempo limite de ${Math.round(timeoutMs / 1000)}s durante ${label}.`)), timeoutMs))
+        const taskPromise = Promise.resolve().then(task);
+        const firstResult = await Promise.race([
+          taskPromise,
+          new Promise(resolve => { timeoutId = setTimeout(() => resolve(timeoutSignal), timeoutMs); })
         ]);
+        if (firstResult !== timeoutSignal) return firstResult;
+
+        const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+        updateUploadProgress('1. Lendo arquivo...', `A leitura de "${fileName}" ultrapassou ${elapsedSeconds}s. Aguardando sua decisão...`, progress);
+        const keepProcessing = window.confirm(`O arquivo "${fileName}" está levando mais tempo que o esperado para ${label}.\n\nDeseja continuar processando?\n\nSe você continuar, o MedTutor aguardará esta mesma leitura terminar, sem limite de tempo.`);
+        if (!keepProcessing) {
+          // APIs de leitura de PDF/PPTX nem sempre permitem abortar a tarefa
+          // nativa; consome eventual rejeição para não gerar erro não tratado.
+          taskPromise.catch(error => console.info('[Upload MedTutor] Extração encerrada pela escolha do estudante:', error));
+          const cancelledError = new Error(`Leitura cancelada pelo estudante após ${elapsedSeconds}s durante ${label}.`);
+          cancelledError.code = 'upload/extraction-cancelled-by-user';
+          throw cancelledError;
+        }
+        updateUploadProgress('1. Lendo arquivo...', `Continuando a leitura de "${fileName}" sem limite de tempo (${elapsedSeconds}s decorridos)...`, progress);
+        return await taskPromise;
       } finally {
         clearInterval(heartbeat);
+        if (timeoutId) clearTimeout(timeoutId);
       }
     }
 
@@ -15586,6 +15605,24 @@ Retorne EXCLUSIVAMENTE um JSON:
           chatDriveMaterials = chatDriveMaterials.filter(m => m.id !== materialIdOrName && m.name !== materialIdOrName && m.originalFileName !== materialIdOrName);
         }
 
+        if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
+          sharedQuestionsBank = sharedQuestionsBank.filter(q => {
+            if (!q) return false;
+            const matchesMaterial = (
+              (targetName && (q.slideName === targetName || q.materialName === targetName || q.nome_material === targetName)) ||
+              (materialIdOrName && (q.materialId === materialIdOrName || q.slideName === materialIdOrName || q.materialName === materialIdOrName || q.nome_material === materialIdOrName))
+            );
+            if (matchesMaterial) {
+              if (targetSubject && (q.subject || q.disciplina)) {
+                return !isSameCurriculumSubject(q.subject || q.disciplina, targetSubject);
+              }
+              return false;
+            }
+            return true;
+          });
+          saveSharedQuestionsBank();
+        }
+
         saveChatDriveMaterials();
 
       if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
@@ -15664,6 +15701,11 @@ Retorne EXCLUSIVAMENTE um JSON:
           await MedTutorFirebaseService.deleteMaterialsBySubject(target);
         } else if (typeof chatDriveMaterials !== 'undefined') {
           chatDriveMaterials = chatDriveMaterials.filter(m => !isSameCurriculumSubject(m.subject || m.disciplina, target));
+        }
+
+        if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
+          sharedQuestionsBank = sharedQuestionsBank.filter(q => !isSameCurriculumSubject(q.subject || q.disciplina, target));
+          saveSharedQuestionsBank();
         }
 
       if (typeof subjectGenerationStatus !== 'undefined') {
@@ -18029,12 +18071,12 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
             console.warn('Erro na extração de texto do arquivo:', f.name, e);
             reportUploadDiagnostic({
               originalFileName: f.name,
-              aiEngine: `Leitura local interrompida: ${e.message || 'erro desconhecido'}`,
+              aiEngine: `${e?.code === 'upload/extraction-cancelled-by-user' ? 'Leitura cancelada pelo estudante' : 'Leitura local interrompida'}: ${e.message || 'erro desconhecido'}`,
               uploadInputChars: 0,
               markdownText: '',
               clinicalImages: []
-            }, 'timeout');
-            showToast(`⚠️ A leitura de "${f.name}" foi interrompida: ${e.message || 'erro desconhecido'}`, 6500);
+            }, e?.code === 'upload/extraction-cancelled-by-user' ? 'cancelado' : 'timeout');
+            showToast(`${e?.code === 'upload/extraction-cancelled-by-user' ? 'ℹ️' : '⚠️'} A leitura de "${f.name}" foi interrompida: ${e.message || 'erro desconhecido'}`, 6500);
           }
 
           // Em apresentações visualmente orientadas, a ausência de texto não é
@@ -27012,6 +27054,20 @@ ${textSample}
       } else {
         chatDriveMaterials = chatDriveMaterials.filter(m => !m.selected);
       }
+
+      if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
+        const deletedNames = new Set(toDelete.map(m => (m.name || m.title || '').trim().toLowerCase()).filter(Boolean));
+        const deletedIds = new Set(toDelete.map(m => m.id).filter(Boolean));
+        sharedQuestionsBank = sharedQuestionsBank.filter(q => {
+          if (!q) return false;
+          if (q.materialId && deletedIds.has(q.materialId)) return false;
+          const sName = (q.slideName || q.materialName || q.nome_material || '').trim().toLowerCase();
+          if (sName && deletedNames.has(sName)) return false;
+          return true;
+        });
+        saveSharedQuestionsBank();
+      }
+
       saveChatDriveMaterials();
       if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
       if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
@@ -27654,7 +27710,7 @@ function escapeHtmlText(str) {
       const topicsSet = new Set();
       const addTopic = value => {
         const topic = String(value || '').trim();
-        if (topic.length < 2 || isExactStudySubject(topic, subjectName)) return;
+        if (topic.length < 2 || isExactStudySubject(topic, subjectName) || isSameCurriculumSubject(topic, subjectName)) return;
         const duplicate = Array.from(topicsSet).some(existing => isExactStudySubject(existing, topic));
         if (!duplicate) topicsSet.add(topic);
       };
@@ -27668,36 +27724,54 @@ function escapeHtmlText(str) {
         (p.subjects || []).forEach(s => {
           const sName = typeof s === 'string' ? s : s.name;
           if (!sName) return;
-          if (isExactStudySubject(sName, subjectName)) {
+          if (isExactStudySubject(sName, subjectName) || isSameCurriculumSubject(sName, subjectName)) {
             if (s && Array.isArray(s.topics)) {
               s.topics.forEach(t => {
-                if (t && typeof t === 'string') addTopic(t);
+                if (t && typeof t === 'string' && !isSameCurriculumSubject(t, subjectName)) addTopic(t);
               });
             }
           }
         });
       });
 
-      // 2. Matérias/Tópicos das questões dos Flashcards (sharedQuestionsBank)
-      if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
-        sharedQuestionsBank.forEach(q => {
-          if (!q) return;
-          if (isSameCurriculumSubject(q.subject || q.disciplina, subjectName)) {
-            // Preserve os tópicos e o arquivo-fonte sem transformar cada
-            // título individual de flashcard/diagnóstico em uma opção.
-            [q.topic, q.materia, q.slideName, q.materialName, q.nome_material].forEach(addTopic);
-          }
-        });
-      }
-
-      // 3. Matérias/Tópicos dos materiais de estudo do ChatDrive
+      // 2. Matérias/Tópicos dos materiais de estudo ativos do ChatDrive
+      const activeMaterialNames = new Set();
       if (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials)) {
         chatDriveMaterials.forEach(m => {
           if (!m) return;
           if (isSameCurriculumSubject(m.subject || m.disciplina, subjectName)) {
+            [m.name, m.originalFileName, m.title].forEach(val => {
+              if (val) activeMaterialNames.add(String(val).trim().toLowerCase());
+            });
             // Materiais enviados continuam visíveis, mas somente no filtro da
             // disciplina à qual foram efetivamente associados.
             [m.topic, m.name, m.originalFileName, m.title].forEach(addTopic);
+          }
+        });
+      }
+
+      // 3. Matérias/Tópicos das questões dos Flashcards (sharedQuestionsBank)
+      if (typeof sharedQuestionsBank !== 'undefined' && Array.isArray(sharedQuestionsBank)) {
+        sharedQuestionsBank.forEach(q => {
+          if (!q) return;
+          if (isSameCurriculumSubject(q.subject || q.disciplina, subjectName)) {
+            const sName = (q.slideName || q.materialName || q.nome_material || '').trim();
+            const hasActiveDriveMaterials = activeMaterialNames.size > 0;
+            // Se a questão aponta para um slide específico que foi excluído do Drive da disciplina, ignore-a por completo
+            if (sName && hasActiveDriveMaterials && !activeMaterialNames.has(sName.toLowerCase())) {
+              return;
+            }
+
+            // Preserve os tópicos sem transformar cada título individual em opção
+            [q.topic, q.materia].forEach(addTopic);
+
+            // Nomes de arquivo/aula de questões só entram se o material ainda existir
+            // no ChatDrive, ou se a disciplina ainda não tiver materiais anexados no Drive.
+            if (sName) {
+              if (!hasActiveDriveMaterials || activeMaterialNames.has(sName.toLowerCase())) {
+                addTopic(sName);
+              }
+            }
           }
         });
       }
@@ -27761,7 +27835,48 @@ function escapeHtmlText(str) {
       communityQuestionsCache: [],
       currentSubtab: 'create',
 
+      pruneOrphanedQuestions() {
+        if (typeof sharedQuestionsBank === 'undefined' || !Array.isArray(sharedQuestionsBank) || sharedQuestionsBank.length === 0) return;
+        if (typeof chatDriveMaterials === 'undefined' || !Array.isArray(chatDriveMaterials)) return;
+
+        const activeMaterialsBySubj = new Map();
+        chatDriveMaterials.forEach(m => {
+          const subj = m.subject || m.disciplina;
+          if (!subj) return;
+          const key = normalizeStudyComparisonText(subj);
+          if (!activeMaterialsBySubj.has(key)) activeMaterialsBySubj.set(key, new Set());
+          const set = activeMaterialsBySubj.get(key);
+          if (m.name) set.add(String(m.name).trim().toLowerCase());
+          if (m.originalFileName) set.add(String(m.originalFileName).trim().toLowerCase());
+          if (m.title) set.add(String(m.title).trim().toLowerCase());
+          if (m.id) set.add(String(m.id).toLowerCase());
+        });
+
+        const initialLength = sharedQuestionsBank.length;
+        sharedQuestionsBank = sharedQuestionsBank.filter(q => {
+          if (!q) return false;
+          const qSubj = q.subject || q.disciplina;
+          if (!qSubj) return true;
+          const key = normalizeStudyComparisonText(qSubj);
+          const activeSet = activeMaterialsBySubj.get(key);
+          if (activeSet && activeSet.size > 0) {
+            const sName = (q.slideName || q.materialName || q.nome_material || '').trim().toLowerCase();
+            const mId = q.materialId ? String(q.materialId).toLowerCase() : '';
+            if (sName || mId) {
+              const matches = (sName && activeSet.has(sName)) || (mId && activeSet.has(mId));
+              if (!matches) return false;
+            }
+          }
+          return true;
+        });
+
+        if (sharedQuestionsBank.length < initialLength) {
+          saveSharedQuestionsBank();
+        }
+      },
+
       initChallengesTab() {
+        this.pruneOrphanedQuestions();
         this.populateSubjectSelects();
         this.fetchClassmates();
         this.updateReceivedBadge();
