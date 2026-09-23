@@ -9237,7 +9237,7 @@
       color: #222;
       text-align: left;
       text-indent: 0;
-      line-height: 1.35;
+      line-height: 1.5;
       overflow-wrap: anywhere;
       break-after: avoid;
       page-break-after: avoid;
@@ -9253,6 +9253,7 @@
     .academic-article-container .report-heading-secondary {
       font-size: 12pt;
       font-weight: 700;
+      text-transform: uppercase;
       border: 0;
     }
 
@@ -9276,8 +9277,8 @@
       padding-left: 0.12cm;
       text-indent: 0;
       overflow-wrap: anywhere;
-      break-inside: avoid;
-      page-break-inside: avoid;
+      break-inside: auto;
+      page-break-inside: auto;
     }
 
     .academic-article-container .report-list-alineas { list-style-type: lower-alpha; }
@@ -9290,10 +9291,13 @@
     }
 
     .academic-article-container .report-list-subalineas > li {
-      display: grid;
-      grid-template-columns: 0.45cm minmax(0, 1fr);
-      gap: 0.12cm;
+      display: list-item;
+      list-style: none;
       margin-bottom: 2pt;
+    }
+
+    .academic-article-container .report-list-subalineas > li::before {
+      content: "— ";
     }
 
     .academic-article-container .academic-report-table {
@@ -9323,7 +9327,7 @@
     }
 
     .academic-article-container .academic-report-table th {
-      background: #f2f2f2;
+      background: #fff;
       font-weight: 700;
     }
 
@@ -9375,4 +9379,353 @@
         word-break: normal !important;
       }
       .academic-article-container .academic-report-table { table-layout: fixed !important; }
+    }
+
+    /* Apresentação editorial do artigo: identidade textual MedTutor, sem ornamentos. */
+    .academic-article-container {
+      box-sizing: border-box;
+      width: min(100%, 21cm);
+      max-width: 21cm;
+      margin: 0 auto;
+      padding: 2.5cm 2cm 2cm 3cm;
+      background: #fff;
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.5;
+    }
+
+    .academic-report-container {
+      box-sizing: border-box;
+      width: min(100%, 21cm);
+      max-width: 21cm;
+      margin: 0 auto;
+      padding: 2.5cm 2cm 2cm 3cm;
+      background: #fff;
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.5;
+    }
+
+    .academic-article-container,
+    .academic-article-container * {
+      font-family: "Times New Roman", Times, serif;
+    }
+
+    .academic-article-container .academic-header-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 0 0 16pt;
+      padding: 0;
+      border: 0;
+      background: #fff;
+      color: #000;
+      text-align: center;
+    }
+
+    .academic-article-container .academic-institution,
+    .academic-report-container .academic-institution {
+      order: 0;
+      display: block;
+      margin: 0 0 16pt;
+      padding: 0;
+      min-height: 0;
+      background: transparent;
+      color: #000;
+      font-size: 12pt;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-align: center;
+      text-transform: none;
+    }
+
+    .academic-article-container .academic-title {
+      order: 1;
+      margin: 0 0 12pt;
+      color: #000;
+      font-size: 14pt;
+      font-weight: 400;
+      line-height: 1.5;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .academic-article-container .academic-subtitle-badge {
+      display: none !important;
+    }
+
+    .academic-article-container .academic-header-columns-table {
+      order: 2;
+      width: 100%;
+      margin: 0 0 12pt;
+      border: 0;
+      border-collapse: collapse;
+      background: transparent;
+      color: #000;
+    }
+
+    .academic-article-container .academic-header-columns-table tr,
+    .academic-article-container .academic-header-columns-table td {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      color: #000;
+      text-align: right;
+      vertical-align: top;
+    }
+
+    .academic-article-container .abnt-meta-item,
+    .academic-article-container .abnt-meta-item strong {
+      margin: 0;
+      color: #000;
+      font-size: 10pt;
+      font-weight: 400;
+      line-height: 1.5;
+    }
+
+    .academic-article-container .abnt-meta-item strong {
+      font-weight: 700;
+    }
+
+    .academic-article-container .academic-report-paragraph,
+    .academic-article-container p {
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.5;
+      text-align: justify;
+      text-indent: 1.25cm;
+    }
+
+    .academic-article-container .academic-report-heading {
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: left;
+      text-indent: 0;
+      hyphens: none;
+      overflow-wrap: break-word;
+      word-break: normal;
+    }
+
+    .academic-article-container .academic-report-list {
+      margin: 4pt 0 9pt 1.25cm;
+      padding-left: 0.65cm;
+      color: #000;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.5;
+      text-align: justify;
+      text-indent: 0;
+    }
+
+    .academic-article-container .academic-report-list > li {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .academic-report-print-footer {
+      display: none;
+    }
+
+    @media print {
+      @page { size: A4 portrait; margin: 3cm 2cm 2cm 3cm; }
+
+      .academic-article-container,
+      .academic-report-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 12pt !important;
+        line-height: 1.5 !important;
+      }
+
+      .academic-article-container .academic-header-block,
+      .academic-report-container .academic-header-block {
+        border: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        color: #000 !important;
+      }
+
+      .academic-article-container .academic-institution,
+      .academic-report-container .academic-institution {
+        margin: 0 0 16pt !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        background: transparent !important;
+        color: #000 !important;
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 12pt !important;
+        font-weight: 400 !important;
+        letter-spacing: 0 !important;
+        text-align: center !important;
+        text-transform: none !important;
+        break-after: avoid-page;
+        page-break-after: avoid;
+      }
+
+      .academic-article-container .academic-title,
+      .academic-report-container .academic-title {
+        color: #000 !important;
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 14pt !important;
+        font-weight: 400 !important;
+        text-align: center !important;
+        text-transform: uppercase !important;
+      }
+
+      .academic-article-container .academic-header-columns-table,
+      .academic-article-container .abnt-header-table,
+      .academic-report-container .academic-header-columns-table,
+      .academic-report-container .abnt-header-table {
+        border: 0 !important;
+        background: transparent !important;
+      }
+
+      .academic-article-container .academic-header-columns-table td,
+      .academic-report-container .academic-header-columns-table td {
+        background: transparent !important;
+        color: #000 !important;
+      }
+
+      .academic-article-container .abnt-meta-item,
+      .academic-report-container .abnt-meta-item,
+      .academic-article-container .abnt-meta-item strong,
+      .academic-report-container .abnt-meta-item strong {
+        color: #000 !important;
+      }
+
+      /* Faixas, cores de status e caixas decorativas não integram o artigo impresso. */
+      .academic-article-container .academic-checkpoint-box,
+      .academic-article-container .checkpoint-box-body,
+      .academic-article-container .checkpoint-recall-part,
+      .academic-article-container .tdah-fixation-container,
+      .academic-article-container .tdah-stage-card,
+      .academic-article-container .academic-case-box,
+      .academic-article-container .doc-pearl-box,
+      .academic-article-container .doc-warning-box,
+      .academic-article-container .doc-note-box,
+      .academic-article-container .academic-abstract-box,
+      .academic-article-container .academic-report-quote,
+      .academic-report-container .academic-checkpoint-box,
+      .academic-report-container .checkpoint-box-body,
+      .academic-report-container .checkpoint-recall-part,
+      .academic-report-container .tdah-fixation-container,
+      .academic-report-container .tdah-stage-card,
+      .academic-report-container .academic-case-box,
+      .academic-report-container .doc-pearl-box,
+      .academic-report-container .doc-warning-box,
+      .academic-report-container .doc-note-box,
+      .academic-report-container .academic-abstract-box,
+      .academic-report-container .academic-report-quote {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        color: #000 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .academic-article-container h1,
+      .academic-article-container h2,
+      .academic-article-container h3,
+      .academic-article-container h4,
+      .academic-article-container h5,
+      .academic-article-container h6,
+      .academic-report-container h1,
+      .academic-report-container h2,
+      .academic-report-container h3,
+      .academic-report-container h4,
+      .academic-report-container h5,
+      .academic-report-container h6 {
+        border: 0 !important;
+        box-shadow: none !important;
+        color: #000 !important;
+      }
+
+      .academic-article-container table:not(.academic-header-columns-table) th,
+      .academic-article-container table:not(.academic-header-columns-table) td,
+      .academic-report-container table:not(.academic-header-columns-table) th,
+      .academic-report-container table:not(.academic-header-columns-table) td {
+        background: #fff !important;
+        color: #000 !important;
+      }
+
+      .academic-report-print-footer {
+        display: flex !important;
+        position: fixed !important;
+        z-index: 9999 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: -1.35cm !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 12pt !important;
+        min-height: 0.5cm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
+        text-align: left !important;
+        text-indent: 0 !important;
+      }
+
+      .academic-report-print-footer a {
+        color: #000 !important;
+        text-decoration: none !important;
+      }
+
+      .academic-report-page-number span::after {
+        content: counter(page) !important;
+      }
+
+      .academic-article-container .academic-report-list > li,
+      .academic-article-container .report-list-subalineas > li {
+        display: list-item !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+      }
+
+      .academic-article-container .academic-report-paragraph,
+      .academic-article-container p {
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 12pt !important;
+        line-height: 1.5 !important;
+        text-align: justify !important;
+        text-indent: 1.25cm !important;
+      }
+
+      .academic-article-container .academic-report-heading {
+        font-family: "Times New Roman", Times, serif !important;
+        font-size: 12pt !important;
+        line-height: 1.5 !important;
+        hyphens: none !important;
+        word-break: normal !important;
+        overflow-wrap: break-word !important;
+        break-after: avoid-page !important;
+      }
+
+      .academic-article-container .academic-report-table,
+      .academic-article-container .academic-report-table th,
+      .academic-article-container .academic-report-table td {
+        font-family: "Times New Roman", Times, serif !important;
+      }
+
+      .academic-article-container .report-list-subalineas > li::before {
+        content: "— " !important;
+      }
     }

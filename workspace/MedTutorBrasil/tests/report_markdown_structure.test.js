@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
 const {
   normalizeGeneratedStructuralHtml,
   normalizeReportTextArtifacts,
@@ -79,6 +80,7 @@ assert.match(reportHtml, /class="academic-report-heading report-heading-primary"
 assert.match(reportHtml, /Texto de relatório que continua na linha seguinte sem depender de br\./);
 assert.match(reportHtml, /class="academic-report-list report-list-alineas"/);
 assert.match(reportHtml, /report-list-subalineas/);
+assert.match(reportHtml, /report-list-subalineas"><li>Subalínea descritiva<\/li>/);
 assert.match(reportHtml, /class="academic-report-table"/);
 assert.match(reportNormalized, /\*\*Explicação:\*\* descrição muito longa/);
 assert.match(serverNormalizedReport, /\*\*Explicação:\*\* descrição muito longa/);
@@ -89,5 +91,23 @@ assert.match(reportHtml, /<figure class="academic-report-figure"><img src="https
 assert.doesNotMatch(AcademicReportRenderer.render(reportMarkdown, { allowedImageUrls: [] }), /<figure class="academic-report-figure"/);
 assert.doesNotMatch(reportHtml, /<h4 class="gemini-h4"|<ul><li>|<script|graph TD|<br\b/i);
 
+const reportStyles = readFileSync(require.resolve('../web/styles.css'), 'utf8');
+const appSource = readFileSync(require.resolve('../web/app.js'), 'utf8');
+assert.match(reportStyles, /\.academic-article-container \.report-list-subalineas > li\s*\{\s*display:\s*list-item;/);
+assert.match(reportStyles, /\.academic-article-container \.academic-report-list > li\s*\{[^}]*break-inside:\s*auto;/s);
+assert.doesNotMatch(reportStyles, /\.academic-article-container \.report-list-subalineas > li\s*\{[^}]*display:\s*grid/s);
+assert.match(reportStyles, /@page \{ size: A4 portrait; margin: 3cm 2cm 2cm 3cm; \}/);
+assert.match(reportStyles, /\.academic-article-container \.academic-report-paragraph,\s*\.academic-article-container p\s*\{[^}]*font-family: "Times New Roman", Times, serif;/s);
+assert.match(appSource, /function getMedTutorReportPrintFooterHtml\(\)/);
+assert.match(appSource, /class="academic-report-print-footer"/);
+assert.match(appSource, /MedTutor Brasil ·/);
+assert.match(reportStyles, /\.academic-report-container \.academic-institution[\s\S]*?background:\s*transparent/);
+assert.match(reportStyles, /\.academic-report-print-footer\s*\{[\s\S]*?position:\s*fixed/s);
+assert.match(reportStyles, /\.academic-report-page-number span::after\s*\{\s*content:\s*counter\(page\)/);
+assert.doesNotMatch(reportStyles, /\.academic-institution\s*\{[^}]*background:\s*#7f1d1d/s);
+assert.doesNotMatch(appSource, /\.academic-institution\s*\{ background:\s*#7f1d1d/);
+assert.match(appSource, /mso-footer:\s*medtutorFooter/);
+
 console.log('Normalização de estrutura, cifrões, parênteses e Markdown validada.');
 console.log('Renderizador dedicado de relatórios, listas e limites de tabela A4 validado.');
+console.log('Padrão tipográfico do artigo, cabeçalho MedTutor e rodapés paginados validados.');

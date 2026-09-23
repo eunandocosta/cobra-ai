@@ -1,12 +1,12 @@
-const CACHE_NAME = 'medtutor-static-v75';
+const CACHE_NAME = 'medtutor-static-v77';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/landing.html',
   '/landing.css?v=20260922-landing-v1',
-  '/styles.css?v=20260922-report-renderer-v1',
-  '/academic-report-renderer.js?v=20260922-report-renderer-v1',
-  '/app.min.js?v=20260922-report-renderer-v1',
+  '/styles.css?v=20260922-report-print-v3',
+  '/academic-report-renderer.js?v=20260922-report-print-v3',
+  '/app.min.js?v=20260922-report-print-v3',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
 ];

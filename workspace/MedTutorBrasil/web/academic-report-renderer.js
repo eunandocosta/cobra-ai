@@ -192,7 +192,7 @@
     roots.forEach((root, index) => {
       html += `<li>${inline(root.text, options)}`;
       const children = subs.filter(child => child.parentIndex === index);
-      if (children.length) html += `<ul class="academic-report-list report-list-subalineas">${children.map(child => `<li><span aria-hidden="true">—</span>${inline(child.text, options)}</li>`).join('')}</ul>`;
+      if (children.length) html += `<ul class="academic-report-list report-list-subalineas">${children.map(child => `<li>${inline(child.text, options)}</li>`).join('')}</ul>`;
       html += '</li>';
     });
     return { html: `${html}</ol>`, next: i };

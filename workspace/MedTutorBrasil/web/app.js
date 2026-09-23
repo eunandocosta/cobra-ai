@@ -8335,6 +8335,22 @@ ${cleanText}
         .replace(/"/g, '&quot;');
     }
 
+    function getMedTutorReportSiteUrl() {
+      const hostname = String(window.location?.hostname || '').toLowerCase();
+      if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'https://cobra-ai-qnpf.onrender.com/';
+      }
+      return `${window.location.origin}/`;
+    }
+
+    function getMedTutorReportPrintFooterHtml() {
+      const siteUrl = getMedTutorReportSiteUrl();
+      return `<footer class="academic-report-print-footer" aria-label="Rodapé do relatório">
+        <a href="${escapeHtml(siteUrl)}">MedTutor Brasil · ${escapeHtml(siteUrl.replace(/^https?:\/\//i, '').replace(/\/$/, ''))}</a>
+        <span class="academic-report-page-number">Página <span aria-hidden="true"></span></span>
+      </footer>`;
+    }
+
     // CONVERSOR UNIVERSAL DE NOTAÇÃO MATEMÁTICA / LATEX E SÍMBOLOS MÉDICOS PARA UNICODE E HTML
     function renderMedicalMathAndSymbols(text) {
       if (!text || typeof text !== 'string') return '';
@@ -9927,7 +9943,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const fullHtml = `
           <div class="academic-article-container" id="academicArticlePrintArea">
             <div class="academic-header-block abnt-header-block">
-              <div class="academic-institution abnt-institution">🏛️ ${escapeHtml(medicalSchool).toUpperCase()} • CURSO DE GRADUAÇÃO EM MEDICINA</div>
+              <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
               
               <table class="academic-header-columns-table abnt-header-table">
                 <tbody>
@@ -9955,6 +9971,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             <div class="academic-body-content">
               ${bodyHtml}
             </div>
+            ${getMedTutorReportPrintFooterHtml()}
           </div>
         `;
 
@@ -11891,7 +11908,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const fullHtml = `
           <div class="academic-article-container" id="academicArticlePrintArea">
             <div class="academic-header-block abnt-header-block">
-              <div class="academic-institution abnt-institution">🏛️ ${escapeHtml(medicalSchool).toUpperCase()} • CURSO DE GRADUAÇÃO EM MEDICINA</div>
+              <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
               
               <table class="academic-header-columns-table abnt-header-table">
                 <tbody>
@@ -11920,6 +11937,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
               ${sectionsHtml}
               ${referencesHtml}
             </div>
+            ${getMedTutorReportPrintFooterHtml()}
           </div>
         `;
 
@@ -12083,6 +12101,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     function exportReportToWord(reportTitle, reportHtml) {
       const cleanTitle = (reportTitle || 'Tratado_Academico_MedTutor').replace(/[^\w\s-]/gi, '').replace(/\s+/g, '_');
+      const wordSiteUrl = getMedTutorReportSiteUrl();
+      const wordBodyHtml = String(reportHtml || '').replace(/<footer\s+class="academic-report-print-footer"[\s\S]*?<\/footer>/i, '');
       const wordDocument = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
@@ -12095,8 +12115,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
               mso-page-orientation: portrait;
               mso-header-margin: 1.5cm;
               mso-footer-margin: 1.5cm;
+              mso-footer: medtutorFooter;
             }
             div.Section1 { page: Section1; }
+            div#medtutorFooter { mso-element: footer; }
+            p.MsoFooter { margin: 0; font-family: 'Times New Roman', Times, serif; font-size: 8pt; color: #000; }
             * { box-sizing: border-box; max-width: 100%; }
             body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #111111; margin: 0; overflow-wrap: anywhere; word-wrap: break-word; }
             .academic-article-container, .academic-article-container * { font-family: 'Times New Roman', Times, serif !important; }
@@ -12150,11 +12173,29 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             .doc-warning-box { background: transparent; border: none; border-left: 3pt solid #dc2626; padding: 4pt 8pt; color: #991b1b; font-size: 10pt; }
             .doc-note-box { background: transparent; border: none; border-left: 3pt solid #2563eb; padding: 4pt 8pt; color: #1e40af; font-size: 10pt; }
             .academic-case-box { background: transparent; border: none; border-left: 3pt solid #1e40af; padding: 4pt 8pt; margin: 8pt 0; }
+            /* Cabeçalho textual MedTutor, sem faixa ou logotipo decorativo. */
+            .academic-article-container { color: #000; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; }
+            .academic-institution { background: transparent; color: #000; text-align: center; text-transform: none; padding: 0; min-height: 0; font-size: 12pt; font-weight: normal; }
+            .academic-header-block { display: flex; flex-direction: column; border: 0; text-align: center; }
+            .academic-title { order: 1; font-family: 'Times New Roman', Times, serif; font-size: 14pt; font-weight: bold; line-height: 1.5; text-align: center; text-transform: uppercase; }
+            .academic-header-columns-table { order: 2; border: 0; background: transparent; }
+            .academic-header-columns-table tr, .academic-header-columns-table td { display: block; width: 100%; border: 0; padding: 0; text-align: right; }
+            .academic-subtitle-badge { display: none; }
+            .academic-report-paragraph, p { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; text-indent: 1.25cm; }
+            .academic-report-heading, h2, h3, h4 { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; font-weight: bold; text-align: left; text-indent: 0; }
+            .report-heading-primary, .report-heading-secondary { text-transform: uppercase; }
+            .academic-report-list { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; }
+            .report-list-subalineas > li { display: list-item !important; break-inside: auto; page-break-inside: auto; }
+            .report-list-subalineas > li::before { content: '— '; }
+            .academic-report-table th, .academic-report-table td { font-family: 'Times New Roman', Times, serif; background: #fff; }
           </style>
         </head>
         <body>
           <div class="Section1">
-            ${reportHtml}
+            ${wordBodyHtml}
+          </div>
+          <div id="medtutorFooter" style="mso-element:footer">
+            <p class="MsoFooter"><a href="${escapeHtml(wordSiteUrl)}" style="color:#000;text-decoration:none">MedTutor Brasil · ${escapeHtml(wordSiteUrl.replace(/^https?:\/\//i, '').replace(/\/$/, ''))}</a><span style="float:right">Página <span style="mso-field-code:' PAGE '"></span></span></p>
           </div>
         </body>
         </html>
@@ -25298,43 +25339,28 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
 
       const interleavedBodyHtml = interleaveFiguresIntoReportHtml(bodyHtml, imagesToRender);
 
-      // Estruturação Formal de Folha de Rosto & Cabeçalho Acadêmico A4
+      // Folha de rosto textual: identidade MedTutor sem faixas, logotipos ou adereços.
       content.innerHTML = `
-        <div class="academic-report-container" style="padding: 2.5cm 2cm 2cm 2cm; max-width: 820px; margin: 0 auto; color: #111827; background: #ffffff;">
-          <!-- CABEÇALHO INSTITUCIONAL -->
-          <div style="text-align: center; border-bottom: 2pt solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px;">
-            <div style="font-size: 10pt; font-weight: 700; letter-spacing: 1.5px; color: #1e3a8a; text-transform: uppercase;">Faculdade de Medicina • MedTutor Brasil</div>
-            <div style="font-size: 8pt; color: #64748b; margin-top: 2px;">SISTEMA INTELIGENTE DE FORMAÇÃO MÉDICA E DIRETRIZES CLÍNICAS</div>
-            <h1 style="font-size: 16pt; font-weight: 800; color: #0f172a; margin: 12px 0 6px 0; text-transform: uppercase; line-height: 1.3;">${escapeHtml(title)}</h1>
-            <div style="font-size: 9.5pt; color: #475569; font-weight: 600;">Eixo Curricular: ${escapeHtml(subject)}</div>
+        <div class="academic-article-container academic-report-container" style="padding: 0; max-width: 100%; margin: 0 auto; color: #000; background: #fff;">
+          <div class="academic-header-block abnt-header-block">
+            <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
+            <h1 class="academic-title">${escapeHtml(title)}</h1>
+            <table class="academic-header-columns-table abnt-header-table">
+              <tbody><tr>
+                <td class="abnt-header-col abnt-col-left">
+                  <div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subject)}</span></div>
+                </td>
+                <td class="abnt-header-col abnt-col-right">
+                  <div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div>
+                  <div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${escapeHtml(currentDate)}</span></div>
+                </td>
+              </tr></tbody>
+            </table>
           </div>
-
-          <!-- TABELA DE METADADOS OFICIAIS -->
-          <table class="abnt-header-table" style="width: 100%; border-collapse: collapse; border-top: 1.5pt solid #1e3a8a; border-bottom: 1.5pt solid #1e3a8a; margin-bottom: 24px; background: #f8fafc; font-size: 9pt;">
-            <tr>
-              <td style="width: 50%; padding: 8px 12px; border-right: 1pt solid #cbd5e1; vertical-align: top;">
-                <div style="margin-bottom: 3px;"><strong>Acadêmico(a):</strong> ${escapeHtml(studentName)}</div>
-                <div style="margin-bottom: 3px;"><strong>Tipo de Documento:</strong> Relatório Clínico-Acadêmico</div>
-                <div><strong>Emissão:</strong> ${currentDate}</div>
-              </td>
-              <td style="width: 50%; padding: 8px 12px; vertical-align: top;">
-                <div style="margin-bottom: 3px;"><strong>Referencial:</strong> PCDT / Ministério da Saúde / CFM</div>
-                <div style="margin-bottom: 3px;"><strong>Evidências:</strong> PubMed • SciELO • BVS • Cochrane</div>
-                <div><strong>Formato de Impressão:</strong> Papel A4 Normalizado (ABNT)</div>
-              </td>
-            </tr>
-          </table>
-
-          <!-- CORPO DO RELATÓRIO COM FIGURAS INTERCALADAS NAS RESPECTIVAS SEÇÕES -->
-          <div class="report-body-content" style="font-size: 11pt; line-height: 1.6; text-align: justify;">
+          <div class="academic-body-content report-body-content">
             ${interleavedBodyHtml}
           </div>
-
-          <!-- RODAPÉ FORMAL -->
-          <div style="margin-top: 40px; padding-top: 14px; border-top: 1pt solid #cbd5e1; font-size: 8pt; color: #64748b; display: flex; justify-content: space-between;">
-            <span>MedTutor Brasil - Módulo de Assistência e Relatórios Médicos</span>
-            <span>Página de Consulta Acadêmica - Impresso via MedTutor</span>
-          </div>
+          ${getMedTutorReportPrintFooterHtml()}
         </div>
       `;
 
@@ -25371,10 +25397,20 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
 
       const readerBodyWithFigures = interleaveFiguresIntoReportHtml(bodyHtml, imagesToRender);
 
+      const studentName = (typeof currentUser !== 'undefined' && currentUser?.name) ? currentUser.name : 'Estudante de Medicina';
+      const currentDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
       content.innerHTML = `
-        <div style="padding: 24px; max-width: 820px; margin: 0 auto; font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6;">
-          <h2 style="font-size: 16pt; color: #1e3a8a; border-bottom: 1.5pt solid #1e3a8a; padding-bottom: 6px; margin-bottom: 16px;">${escapeHtml(title)}</h2>
+        <div class="academic-article-container academic-report-container">
+          <div class="academic-header-block abnt-header-block">
+            <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
+            <h1 class="academic-title">${escapeHtml(title)}</h1>
+            <table class="academic-header-columns-table abnt-header-table"><tbody><tr>
+              <td class="abnt-header-col abnt-col-left"><div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subject)}</span></div></td>
+              <td class="abnt-header-col abnt-col-right"><div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div><div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${escapeHtml(currentDate)}</span></div></td>
+            </tr></tbody></table>
+          </div>
           ${readerBodyWithFigures}
+          ${getMedTutorReportPrintFooterHtml()}
         </div>
       `;
       modal.classList.add('active');
