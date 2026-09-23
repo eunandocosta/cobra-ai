@@ -9621,6 +9621,7 @@ FORMATO DE CADA BLOCO DE APRENDIZAGEM:
 4. Termine o bloco com duas perguntas de recuperação ativa: uma de recordação (sem alternativas) e outra de comparação ou consequência. Mostre a resposta somente após um separador "Resposta comentada".
 
 OUTRAS DIRETRIZES:
+0. TÍTULO EDITORIAL: comece a resposta com um único H1 original, conciso e específico, sintetizado a partir do conteúdo médico real. O nome do arquivo e os metadados identificam somente a fonte: nunca os copie para o título nem inclua códigos, número de aula ou revisão.
 1. Escreva em Markdown fluido, com títulos, listas e exemplos. Pode usar tabelas comparativas legíveis (até 4 colunas, cabeçalhos claros e células concisas); não gere diagramas, fluxogramas, Mermaid, caixas ASCII ou JSON.
 2. FIDELIDADE AO CONTEÚDO: Baseie-se estritamente no conteúdo real do material enviado. Explique os tópicos presentes no arquivo com profundidade e clareza, evitando qualquer alucinação ou extrapolação alheia.
 3. EMBASAMENTO CIENTÍFICO NAS BASES INDEXADAS & CITAÇÕES PRECISAS NO TRECHO:
@@ -9640,7 +9641,9 @@ OUTRAS DIRETRIZES:
    Apresentando as referências em padrão biomédico com links diretos clicáveis e indicando alternativas de leitura para aprofundamento nas bases indexadas.
 ${UserStudyPreferences.buildSystemPromptContext()}`;
 
-              const userPromptText = `FONTE EXCLUSIVA DESTE RELATÓRIO (não misture com outros arquivos):
+              const userPromptText = `TÍTULO DO RELATÓRIO: gere um título editorial novo a partir do conteúdo abaixo. Não reutilize o nome do arquivo, o título que identificava o material no Firebase, códigos de disciplina/aula ou números de revisão. A primeira linha da resposta deve ser # <título baseado no conteúdo>.
+
+FONTE EXCLUSIVA DESTE RELATÓRIO (não misture com outros arquivos; estes dados servem apenas para rastrear a fonte, não para nomear o relatório):
 ${sourceIdentity}
 
 CONTEÚDO DO MATERIAL PARA REVISÃO/RELATÓRIO (${effectiveTitle} - ${effectiveSubject}):
@@ -9817,7 +9820,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       // Formata o artigo Markdown gerado pelo Gemini em HTML acadêmico no padrão ABNT
       formatAiArticleToHtml(markdownText, subjectName, materialName, studentName, medicalSchool, periodStr, cycleStr, reportFigures = []) {
         const cleanTitle = materialName.replace(/\.[^/.]+$/, '');
-        const title = `Tratado Acadêmico: ${cleanTitle} • ${subjectName}`;
+        const contentTitle = window.AcademicReportRenderer?.extractReportTitle(markdownText, cleanTitle, subjectName)
+          || `${subjectName}: síntese dos conceitos centrais`;
+        const title = contentTitle;
         const cleanDate = new Date().toLocaleDateString('pt-BR');
 
         const isDermato = subjectName.toLowerCase().includes('dermat') || subjectName.toLowerCase().includes('tegument') || cleanTitle.toLowerCase().includes('pele') || cleanTitle.toLowerCase().includes('epiderm');
@@ -9962,7 +9967,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 </tbody>
               </table>
 
-              <h1 class="academic-title abnt-title">${escapeHtml(typeof renderMedicalMathAndSymbols === 'function' ? renderMedicalMathAndSymbols(cleanTitle) : cleanTitle)}: Artigo científico e tratado acadêmico de medicina</h1>
+              <h1 class="academic-title abnt-title">${escapeHtml(typeof renderMedicalMathAndSymbols === 'function' ? renderMedicalMathAndSymbols(contentTitle) : contentTitle)}</h1>
               <div class="academic-subtitle-badge abnt-nature-badge">
                 DOCUMENTO FORMAL DE ESTUDO & CONDUTA CLÍNICA (DIRETRIZES SUS / CFM / ENARE / PADRÃO ABNT NBR 14724)
               </div>
@@ -9988,6 +9993,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       // Gerador Acadêmico Local Autônomo com Tratado Médico Completo e Estrutura Progressiva TDAH
       generateLocalAcademicReport(subjectName, materialName, diseaseTopic, studentName, medicalSchool, periodStr, cycleStr, materialContent) {
         const cleanTitle = materialName.replace(/\.[^/.]+$/, '');
+        const contentTitle = window.AcademicReportRenderer?.extractReportTitle(materialContent, cleanTitle, diseaseTopic || subjectName)
+          || `${subjectName}: síntese dos conceitos centrais`;
         const cleanDate = new Date().toLocaleDateString('pt-BR');
 
         const isDermato = subjectName.toLowerCase().includes('dermat') || subjectName.toLowerCase().includes('tegument') || diseaseTopic.toLowerCase().includes('pele') || diseaseTopic.toLowerCase().includes('epiderm') || diseaseTopic.toLowerCase().includes('anexo');
@@ -11927,7 +11934,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 </tbody>
               </table>
 
-              <h1 class="academic-title abnt-title">${escapeHtml(cleanTitle)}: Fundamentos em camadas — estrutura, função e consequência</h1>
+              <h1 class="academic-title abnt-title">${escapeHtml(contentTitle)}</h1>
               <div class="academic-subtitle-badge abnt-nature-badge">
                 DOCUMENTO DE ESTUDO: FUNDAMENTOS → MECANISMOS → CONSEQUÊNCIAS → APLICAÇÃO CLÍNICA
               </div>
@@ -11946,11 +11953,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           : null;
 
         return {
-          title: `Tratado Acadêmico: ${cleanTitle} • ${subjectName}`,
+          title: contentTitle,
           subject: subjectName,
           materialName,
           html: fullHtml,
-          markdown: `# Tratado Acadêmico: ${cleanTitle}\n\nDisciplina: ${subjectName}\nAluno: ${studentName}\nInstituição: ${medicalSchool}\nData: ${cleanDate}\n\n${materialContent}`,
+          markdown: `# ${contentTitle}\n\nDisciplina: ${subjectName}\nAluno: ${studentName}\nInstituição: ${medicalSchool}\nData: ${cleanDate}\n\n${materialContent}`,
           pedagogicalData: localPedagogical,
           pedagogicalSynthesis: localPedagogical,
           createdAt: new Date().toISOString()
@@ -25422,6 +25429,10 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
         showToast('⚠️ Relatório não encontrado.');
         return;
       }
+      const title = String(rep.title || 'Relatório Clínico e Acadêmico');
+      const subject = String(rep.subject || currentStudySubject || 'Medicina');
+      const studentName = (typeof currentUser !== 'undefined' && currentUser?.name) ? currentUser.name : 'Estudante de Medicina';
+      const currentDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
       let imagesToRender = (rep && Array.isArray(rep.images) && rep.images.length > 0)
         ? rep.images
         : (rep && rep.image ? [rep.image] : []);
@@ -25430,8 +25441,22 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
         imagesToRender = window.lastCuratedImagesList;
       }
 
-      const docHtml = interleaveFiguresIntoReportHtml(rep.contentHtml, imagesToRender);
-      exportReportToWord(rep.title, docHtml);
+      const reportBody = interleaveFiguresIntoReportHtml(rep.contentHtml, imagesToRender);
+      const docHtml = `
+        <div class="academic-article-container academic-report-container">
+          <div class="academic-header-block abnt-header-block">
+            <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
+            <h1 class="academic-title">${escapeHtml(title)}</h1>
+            <table class="academic-header-columns-table abnt-header-table"><tbody><tr>
+              <td class="abnt-header-col abnt-col-left"><div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subject)}</span></div></td>
+              <td class="abnt-header-col abnt-col-right"><div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div><div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${escapeHtml(currentDate)}</span></div></td>
+            </tr></tbody></table>
+          </div>
+          <div class="academic-body-content">${reportBody}</div>
+          ${getMedTutorReportPrintFooterHtml()}
+        </div>
+      `;
+      exportReportToWord(title, docHtml);
       showToast('📥 Documento Word (.doc) gerado com sucesso!');
     }
 

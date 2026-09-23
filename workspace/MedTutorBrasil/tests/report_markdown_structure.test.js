@@ -91,8 +91,29 @@ assert.match(reportHtml, /<figure class="academic-report-figure"><img src="https
 assert.doesNotMatch(AcademicReportRenderer.render(reportMarkdown, { allowedImageUrls: [] }), /<figure class="academic-report-figure"/);
 assert.doesNotMatch(reportHtml, /<h4 class="gemini-h4"|<ul><li>|<script|graph TD|<br\b/i);
 
+const sourceFileTitle = 'ORGANIZAÇÃO MORFOFUNCIONAL DO SISTEMA IMUNOLÓGICO OK 2 - ARTIGO CIENTÍFICO & TRATADO ACADÊMICO DE MEDICINA.pdf';
+const reportWithEditorialTitle = `# Organização e função do sistema imunológico\n\nDisciplina: Imunologia\n\n## 1 INTRODUÇÃO\nTexto introdutório.\n\n## 2 Organização morfofuncional do sistema imune\nO sistema imune é formado por órgãos linfoides e células especializadas.`;
+assert.equal(
+  AcademicReportRenderer.extractReportTitle(reportWithEditorialTitle, sourceFileTitle, 'Imunologia'),
+  'Organização e função do sistema imunológico'
+);
+assert.equal(
+  AcademicReportRenderer.extractReportTitle(`# ${sourceFileTitle}\n\n## 1 INTRODUÇÃO\nTexto introdutório.\n\n## 2 Arquitetura dos órgãos linfoides e circulação celular\nDescrição.`, sourceFileTitle, 'Imunologia'),
+  'Arquitetura dos órgãos linfoides e circulação celular'
+);
+assert.doesNotMatch(
+  AcademicReportRenderer.extractReportTitle('A composição dos órgãos linfoides determina como as células imunes encontram antígenos.', sourceFileTitle, 'Imunologia'),
+  /ORGANIZAÇÃO MORFOFUNCIONAL|ARTIGO CIENTÍFICO|\.pdf/i
+);
+
 const reportStyles = readFileSync(require.resolve('../web/styles.css'), 'utf8');
 const appSource = readFileSync(require.resolve('../web/app.js'), 'utf8');
+const reportService = readFileSync(require.resolve('../src/modules/relatorios/relatorios.service.js'), 'utf8');
+assert.match(appSource, /const contentTitle = window\.AcademicReportRenderer\?\.extractReportTitle\(markdownText, cleanTitle, subjectName\)/);
+assert.match(appSource, /<h1 class="academic-title abnt-title">\$\{escapeHtml\(typeof renderMedicalMathAndSymbols === 'function' \? renderMedicalMathAndSymbols\(contentTitle\) : contentTitle\)\}<\/h1>/);
+assert.match(appSource, /title: contentTitle,[\s\S]*?markdown: `# \$\{contentTitle\}/);
+assert.match(reportService, /TÍTULO EDITORIAL:[\s\S]*?Não copie o nome do arquivo/);
+assert.match(reportService, /title: generatedTitle/);
 assert.match(reportStyles, /\.academic-article-container \.report-list-subalineas > li\s*\{\s*display:\s*list-item;/);
 assert.match(reportStyles, /\.academic-article-container \.academic-report-list > li\s*\{[^}]*break-inside:\s*auto;/s);
 assert.doesNotMatch(reportStyles, /\.academic-article-container \.report-list-subalineas > li\s*\{[^}]*display:\s*grid/s);
@@ -107,7 +128,10 @@ assert.match(reportStyles, /\.academic-report-page-number span::after\s*\{\s*con
 assert.doesNotMatch(reportStyles, /\.academic-institution\s*\{[^}]*background:\s*#7f1d1d/s);
 assert.doesNotMatch(appSource, /\.academic-institution\s*\{ background:\s*#7f1d1d/);
 assert.match(appSource, /mso-footer:\s*medtutorFooter/);
+const chatWordExport = appSource.slice(appSource.indexOf('function downloadChatReportWord'), appSource.indexOf('function emitMessageAsPdf'));
+assert.match(chatWordExport, /<h1 class="academic-title">\$\{escapeHtml\(title\)\}<\/h1>/);
+assert.match(chatWordExport, /<div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil<\/div>/);
 
 console.log('Normalização de estrutura, cifrões, parênteses e Markdown validada.');
 console.log('Renderizador dedicado de relatórios, listas e limites de tabela A4 validado.');
-console.log('Padrão tipográfico do artigo, cabeçalho MedTutor e rodapés paginados validados.');
+console.log('Padrão tipográfico, cabeçalho MedTutor, títulos no Word e rodapés paginados validados.');

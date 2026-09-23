@@ -23,6 +23,59 @@
       .replace(/\s+/g, ' ').trim();
   }
 
+  function cleanReportTitleCandidate(value) {
+    return inlineText(String(value || '')
+      .replace(/^\s*#{1,6}\s*/, '')
+      .replace(/!{0,1}\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/\*\*|__|`|~~/g, '')
+      .replace(/^\s*\d+(?:\.\d+)*[.)\s:-]+/, '')
+      .replace(/^(?:t[ií]tulo|tema central|tema principal)\s*:\s*/i, ''))
+      .replace(/^[\s:;,.–—-]+|[\s:;,.–—-]+$/g, '')
+      .slice(0, 120);
+  }
+
+  function reportTitleKey(value) {
+    return cleanReportTitleCandidate(value)
+      .replace(/\.[a-z0-9]{2,5}$/i, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\b(?:artigo cientifico|tratado academico(?: de medicina)?|revisao|aula|slide|slides|documento|arquivo|pdf|pptx|ppt|docx?)\b/g, ' ')
+      .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+  }
+
+  function isGenericReportHeading(value) {
+    const key = reportTitleKey(value);
+    return !key || /^(?:introducao|objetivos?|sumario|resumo|abstract|fundamentos|fundamentos em camadas|componentes e relacoes|mecanismos?|recuperacao ativa|aplicacao clinica|caso clinico|conclusao|referencias bibliograficas|referencias|tratado academico|relatorio academico|artigo cientifico)$/.test(key);
+  }
+
+  function extractReportTitle(markdown, sourceTitle = '', subject = '') {
+    const text = normalize(markdown);
+    const sourceKey = reportTitleKey(sourceTitle);
+    const headings = [...text.matchAll(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/gm)]
+      .map(match => ({ level: match[1].length, title: cleanReportTitleCandidate(match[2]) }))
+      .filter(item => item.title);
+    const usefulHeading = headings.find(item => {
+      const candidateKey = reportTitleKey(item.title);
+      return !isGenericReportHeading(item.title) && candidateKey !== sourceKey;
+    });
+    if (usefulHeading) return usefulHeading.title;
+
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const paragraph = cleanReportTitleCandidate(line
+        .replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '')
+        .replace(/^\*\*[^*]+:\*\*\s*/, ''));
+      if (paragraph.length < 18 || /^(?:disciplina|autor|instituicao|per[ií]odo|data|arquivo|nome original)\s*:/i.test(paragraph)) continue;
+      const sentence = paragraph.split(/(?<=[.!?])\s+/)[0].replace(/[.!?]+$/, '').trim();
+      if (sentence.length < 18 || reportTitleKey(sentence) === sourceKey) continue;
+      const words = sentence.split(/\s+/);
+      return words.length > 12 ? words.slice(0, 12).join(' ') : sentence;
+    }
+
+    const cleanSubject = cleanReportTitleCandidate(subject);
+    return cleanSubject ? `${cleanSubject}: síntese dos conceitos centrais` : 'Síntese dos conceitos centrais';
+  }
+
   function legacyHtmlToMarkdown(input) {
     let text = decodeEntities(input).replace(/\\(?=<\/?(?:h[1-6]|ul|ol|li|p|div|br|strong|b|em|i|u)\b)/gi, '');
     text = text.replace(/<table\b[^>]*>([\s\S]*?)<\/table\s*>/gi, (_, body) => {
@@ -245,5 +298,5 @@
     return html.join('\n');
   }
 
-  return { normalize, render, tableFitsA4 };
+  return { normalize, render, tableFitsA4, extractReportTitle };
 });

@@ -349,6 +349,7 @@ Você é um preceptor médico sênior da MedTutor Brasil e editor-chefe de trata
 Sua missão é sintetizar materiais médicos em um Tratado Acadêmico formal, aprofundado e diagramado em Markdown.
 
 DIRETRIZES FUNDAMENTAIS DE CONTEÚDO:
+0. TÍTULO EDITORIAL: crie, a partir do conteúdo médico real, um título conciso e específico para este relatório (preferencialmente até 12 palavras). Não copie o nome do arquivo, o título da aula, códigos, números de revisão ou metadados. O primeiro elemento da resposta deve ser um H1 com esse título.
 1. FUNDAMENTOS EM CAMADAS: para cada estrutura, conceito, via ou fenômeno, ensine nesta ordem: o que é e onde está; partes e relações; função; mecanismo; alteração/lesão; consequência. A aplicação clínica vem depois, como confirmação da compreensão.
 2. DISTRIBUIÇÃO DE ÊNFASE: priorize estrutura, localização, componentes, função, relações e mecanismos (cerca de 65%); depois consequências e correlações clínico-fisiopatológicas (25%); por último conduta, farmacologia e prova (10%), exceto quando o material for explicitamente clínico.
 3. ANCORAGEM DIDÁTICA: organize cada bloco com subtítulos curtos e listas; para cada item, identifique estrutura/conceito, localização/relações, função, mecanismo e consequência quando pertinente. Use tabela somente quando facilitar uma comparação real.
@@ -376,7 +377,7 @@ DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
     // 3. Montagem do prompt contextualizado
     const prompt = `
 METADADOS DO DOCUMENTO:
-- TÍTULO: ${cleanTitle}
+- RÓTULO DO ARQUIVO-FONTE (apenas para rastreabilidade; não usar como título): ${cleanTitle}
 - DISCIPLINA: ${cleanSubject}
 - AUTOR: ${author}
 - INSTITUIÇÃO: ${institution}
@@ -389,9 +390,8 @@ ${content}
 --- FIM DO MATERIAL ---
 
 INSTRUÇÕES DE ESCRITA:
-Escreva o Tratado Acadêmico completo em Markdown. Inicie diretamente com o título H1 e metadados, desenvolvendo as seguintes seções de forma detalhada e técnica. Não avance para clínica ou tratamento antes de consolidar as três primeiras seções:
+Escreva o Tratado Acadêmico completo em Markdown. Antes de tudo, sintetize o eixo conceitual que realmente domina o conteúdo e crie um título original que o descreva; o título do arquivo acima serve somente para identificar a fonte. Não repita esse nome, códigos de turma/aula, “PDF”, número de revisão ou rótulo administrativo. Inicie diretamente com um H1 no formato # título editorial baseado no conteúdo e depois os metadados, desenvolvendo as seções abaixo. Não avance para clínica ou tratamento antes de consolidar as três primeiras seções:
 
-# ${cleanTitle}
 **Disciplina:** ${cleanSubject} | **Autor:** ${author} | **Instituição:** ${institution}
 
 ## 1. Fundamentos: definição, localização e organização
@@ -495,9 +495,10 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
       }
 
       generatedMarkdown = normalizeReportMarkdownForPrint(generatedMarkdown);
+      const generatedTitle = AcademicReportRenderer.extractReportTitle(generatedMarkdown, cleanTitle, cleanSubject);
 
       // Monta os nomes de arquivo sanitizados para download
-      const filenameBase = { title: cleanTitle, subject: cleanSubject };
+      const filenameBase = { title: generatedTitle, subject: cleanSubject };
       const filenames = {
         markdown: this._generateSafeFilename({ ...filenameBase, extension: 'md' }),
         pdf: this._generateSafeFilename({ ...filenameBase, extension: 'pdf' })
@@ -506,7 +507,7 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
       const reportData = {
         id: `rel_${Date.now()}`,
         materialId: materialId || `mat_${Date.now()}`,
-        title: cleanTitle,
+        title: generatedTitle,
         subject: cleanSubject,
         author,
         institution,
