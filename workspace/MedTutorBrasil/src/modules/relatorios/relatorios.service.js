@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
+const AcademicReportRenderer = require('../../../web/academic-report-renderer');
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -144,6 +145,10 @@ function normalizeReportTextArtifacts(markdown) {
 }
 
 function normalizeReportMarkdownForPrint(markdown) {
+  return normalizeReportTextArtifacts(AcademicReportRenderer.normalize(markdown));
+}
+
+function normalizeReportMarkdownForPrintLegacy(markdown) {
   const lines = normalizeReportTextArtifacts(normalizeGeneratedStructuralHtml(markdown)).replace(/\r\n/g, '\n').split('\n');
   const output = [];
   const splitCells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '')
@@ -604,3 +609,4 @@ module.exports.getReportEngineLabel = getReportEngineLabel;
 module.exports.getGeminiReportCandidateModels = getGeminiReportCandidateModels;
 module.exports.normalizeGeneratedStructuralHtml = normalizeGeneratedStructuralHtml;
 module.exports.normalizeReportTextArtifacts = normalizeReportTextArtifacts;
+module.exports.normalizeReportMarkdownForPrint = normalizeReportMarkdownForPrint;

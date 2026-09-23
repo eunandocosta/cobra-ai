@@ -9748,7 +9748,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
         // Se offline ou fallback da IA: gera tratado científico estruturado local com custo R$ 0,00
         const reportData = aiGeneratedArticle
-          ? this.formatAiArticleToHtml(aiGeneratedArticle, effectiveSubject, effectiveTitle, studentName, medicalSchool, periodStr, cycleStr)
+          ? this.formatAiArticleToHtml(aiGeneratedArticle, effectiveSubject, effectiveTitle, studentName, medicalSchool, periodStr, cycleStr, reportFigures)
           : this.generateLocalAcademicReport(effectiveSubject, effectiveTitle, diseaseTopic, studentName, medicalSchool, periodStr, cycleStr, materialContent);
 
         // A figura é parte do material de estudo, não uma sugestão opcional do
@@ -9799,7 +9799,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       },
 
       // Formata o artigo Markdown gerado pelo Gemini em HTML acadêmico no padrão ABNT
-      formatAiArticleToHtml(markdownText, subjectName, materialName, studentName, medicalSchool, periodStr, cycleStr) {
+      formatAiArticleToHtml(markdownText, subjectName, materialName, studentName, medicalSchool, periodStr, cycleStr, reportFigures = []) {
         const cleanTitle = materialName.replace(/\.[^/.]+$/, '');
         const title = `Tratado Acadêmico: ${cleanTitle} • ${subjectName}`;
         const cleanDate = new Date().toLocaleDateString('pt-BR');
@@ -9814,19 +9814,22 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         else if (isPed) guidelinesOrg = 'Sociedade Brasileira de Pediatria (SBP)';
 
         // Limpeza rigorosa de artefatos de quebra e cabeçalhos redundantes gerados pela IA no início do texto
-        let cleanMd = normalizeReportMarkdownForA4(normalizeMaterialMarkdownForReport(markdownText))
-          .replace(/<br\s*[/]?>\s*<\/br>/gi, '\n')
-          .replace(/<\/?br\s*[/]?>/gi, '\n')
-          .replace(/<p\s*[/]?>/gi, '\n')
-          .replace(/<\/p>/gi, '\n')
+        const cleanMd = normalizeMaterialMarkdownForReport(markdownText)
           .replace(/^#\s+[^\n]+\n*/g, '')
           .replace(/^\*\*(Autor|Disciplina|Instituição|Período|Data)[\s\S]*?---\s*\n*/gi, '')
           .replace(/^---\s*\n*/g, '')
           .trim();
 
-        // Formata o markdown com parser completo de tabelas e títulos
-        let bodyHtml = (typeof formatAITextToHTML === 'function') ? formatAITextToHTML(cleanMd) : cleanMd;
+        // Este caminho só formata o Markdown recebido; não chama o motor de IA.
+        let bodyHtml = window.AcademicReportRenderer
+          ? window.AcademicReportRenderer.render(cleanMd, {
+              allowedImageUrls: (Array.isArray(reportFigures) ? reportFigures : [])
+                .map(figure => String(figure?.imageUrl || figure?.thumbnailUrl || figure?.url || '').trim())
+                .filter(url => /^https?:\/\//i.test(url))
+            })
+          : `<p class="academic-report-paragraph">${escapeHtml(cleanMd)}</p>`;
 
+        if (false) { // Blocos legados de formatação, preservados temporariamente; não executados.
         // Formatação refinada dos Blocos de Recuperação Ativa e Checkpoints Intercalados.
         // O gerador usa tanto "Bloco de Recuperação Ativa" quanto "Bloco 1".
         // Ambos devem se tornar cartões de estudo, e não parágrafos indistintos.
@@ -9892,6 +9895,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             <div class="essay-exam-line"><span class="exam-line-num">03</span><span class="exam-line-rule"></span></div>
           </div>
         `);
+        }
 
         // Barra de Acesso e Busca em Bases Científicas Indexadas (PubMed, SciELO, BVS/LILACS, Cochrane)
         const scientificToolbarHtml = `
@@ -12101,6 +12105,21 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             .academic-article-container h1, .academic-article-container h2, .academic-article-container h3, .academic-article-container h4, .academic-article-container h5, .academic-article-container h6, .academic-article-container .gemini-h1, .academic-article-container .gemini-h2, .academic-article-container .gemini-h3, .academic-article-container .gemini-h4, .academic-article-container .gemini-h5 { display: block; width: 100%; text-align: left; }
             pre, code, .gemini-code-block { white-space: pre-wrap; overflow-wrap: anywhere; word-wrap: break-word; word-break: break-word; }
             p { font-size: 12pt; line-height: 1.5; text-align: justify; text-indent: 1.25cm; margin-bottom: 7pt; }
+            .academic-report-paragraph { margin: 0 0 7pt; text-indent: 1.25cm; line-height: 1.5; text-align: justify; }
+            .academic-report-heading { display: block; width: 100%; text-align: left; text-indent: 0; margin: 12pt 0 6pt; line-height: 1.35; page-break-after: avoid; }
+            .report-heading-primary { font-size: 12pt; font-weight: bold; text-transform: uppercase; }
+            .report-heading-secondary { font-size: 12pt; font-weight: bold; }
+            .report-heading-tertiary { font-size: 12pt; font-style: italic; font-weight: normal; }
+            .academic-report-list { margin: 4pt 0 8pt 1.25cm; padding-left: 0.55cm; font-size: 12pt; line-height: 1.5; text-align: justify; }
+            .report-list-alineas { list-style-type: lower-alpha; }
+            .report-list-numbered { list-style-type: decimal; }
+            .report-list-subalineas { list-style: none; margin: 2pt 0 2pt 0.6cm; padding: 0; }
+            .academic-report-table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; margin: 8pt 0; font-size: 9pt; line-height: 1.3; }
+            .academic-report-table th, .academic-report-table td { padding: 4pt 5pt; border: 0.6pt solid #737373; vertical-align: top; text-indent: 0; white-space: normal; overflow-wrap: anywhere; word-break: normal; }
+            .academic-report-table th { font-weight: bold; background: #f2f2f2; }
+            .academic-report-figure { max-width: 100%; margin: 8pt auto; text-align: center; page-break-inside: avoid; }
+            .academic-report-figure img { max-width: 100%; max-height: 17cm; height: auto; }
+            .academic-report-figure figcaption { margin-top: 4pt; font-size: 10pt; text-align: center; }
             li p, td p, th p, blockquote p { text-indent: 0; }
             h1 { font-size: 14pt; text-align: center; color: #222222; text-transform: none; font-weight: 600; margin-bottom: 6pt; text-indent: 0; }
             h2 { font-size: 12pt; color: #111111; text-transform: none; border-bottom: 0.75pt solid #555555; padding-bottom: 3pt; margin-top: 16pt; font-weight: 600; text-indent: 0; }

@@ -9218,3 +9218,161 @@
     #modalMedicalOnboarding {
       z-index: 100005 !important;
     }
+
+    /* Blocos semânticos usados apenas pelo novo renderizador dos relatórios. */
+    .academic-article-container .academic-report-paragraph {
+      margin: 0 0 10pt;
+      text-indent: 1.25cm;
+      line-height: 1.5;
+      text-align: justify;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+
+    .academic-article-container .academic-report-heading {
+      display: block;
+      width: 100%;
+      margin: 16pt 0 7pt;
+      color: #222;
+      text-align: left;
+      text-indent: 0;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    .academic-article-container .report-heading-primary {
+      font-size: 12pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      border: 0;
+    }
+
+    .academic-article-container .report-heading-secondary {
+      font-size: 12pt;
+      font-weight: 700;
+      border: 0;
+    }
+
+    .academic-article-container .report-heading-tertiary {
+      font-size: 12pt;
+      font-weight: 400;
+      font-style: italic;
+      border: 0;
+    }
+
+    .academic-article-container .academic-report-list {
+      margin: 4pt 0 9pt 1.25cm;
+      padding-left: 0.55cm;
+      font-size: 12pt;
+      line-height: 1.5;
+      text-align: justify;
+    }
+
+    .academic-article-container .academic-report-list > li {
+      margin: 0 0 3pt;
+      padding-left: 0.12cm;
+      text-indent: 0;
+      overflow-wrap: anywhere;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .academic-article-container .report-list-alineas { list-style-type: lower-alpha; }
+    .academic-article-container .report-list-numbered { list-style-type: decimal; }
+
+    .academic-article-container .academic-report-list.report-list-subalineas {
+      list-style: none;
+      margin: 2pt 0 2pt 0.6cm;
+      padding: 0;
+    }
+
+    .academic-article-container .report-list-subalineas > li {
+      display: grid;
+      grid-template-columns: 0.45cm minmax(0, 1fr);
+      gap: 0.12cm;
+      margin-bottom: 2pt;
+    }
+
+    .academic-article-container .academic-report-table {
+      width: 100%;
+      max-width: 100%;
+      margin: 10pt 0;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 9.5pt;
+      line-height: 1.3;
+      text-align: left;
+      overflow-wrap: anywhere;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .academic-article-container .academic-report-table th,
+    .academic-article-container .academic-report-table td {
+      min-width: 0;
+      max-width: 100%;
+      padding: 5pt 6pt;
+      border: 0.6pt solid #737373;
+      vertical-align: top;
+      text-indent: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .academic-article-container .academic-report-table th {
+      background: #f2f2f2;
+      font-weight: 700;
+    }
+
+    .academic-article-container .academic-report-figure {
+      max-width: 100%;
+      margin: 10pt auto;
+      text-align: center;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .academic-article-container .academic-report-figure img {
+      display: block;
+      max-width: 100%;
+      max-height: 17cm;
+      height: auto;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+
+    .academic-article-container .academic-report-figure figcaption {
+      margin-top: 4pt;
+      font-size: 10pt;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    .academic-article-container .academic-report-quote {
+      margin: 8pt 0 8pt 1.25cm;
+      padding: 0;
+      border: 0;
+      font-size: 11pt;
+      line-height: 1.5;
+      text-align: justify;
+    }
+
+    @media print {
+      .academic-article-container .academic-report-paragraph,
+      .academic-article-container .academic-report-list,
+      .academic-article-container .academic-report-table,
+      .academic-article-container .academic-report-table th,
+      .academic-article-container .academic-report-table td,
+      .academic-article-container .academic-report-figure,
+      .academic-article-container .academic-report-quote {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+      }
+      .academic-article-container .academic-report-table { table-layout: fixed !important; }
+    }

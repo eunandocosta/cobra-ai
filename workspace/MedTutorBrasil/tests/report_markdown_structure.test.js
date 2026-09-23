@@ -1,8 +1,10 @@
 const assert = require('node:assert/strict');
 const {
   normalizeGeneratedStructuralHtml,
-  normalizeReportTextArtifacts
+  normalizeReportTextArtifacts,
+  normalizeReportMarkdownForPrint
 } = require('../src/modules/relatorios/relatorios.service');
+const AcademicReportRenderer = require('../web/academic-report-renderer');
 
 const generated = String.raw`\<h4 class="gemini-h4">2. Via Dependente de TRIF (<em>TIR-domain-containing adapter-inducing interferon-β</em>)</h4>
 \<ul class="gemini-ul">\<li>\<strong>Receptores envolvidos:</strong> TLR3 e TLR4.</li>\<li>\<strong>Cascata:</strong> O adaptador TRIF recruta TBK1.</li>\</ul>
@@ -45,4 +47,47 @@ assert.equal(incompleteParenthesis, 'A resposta envolve reconhecimento de estrut
 const untouchedCode = 'Exemplo `custo $10 (valor)` e bloco:\n\n```txt\n$39,2°C (sem alteração\n```';
 assert.equal(normalizeReportTextArtifacts(untouchedCode), untouchedCode);
 
+const reportMarkdown = String.raw`## 1 INTRODUÇÃO
+Texto de relatório que continua
+na linha seguinte sem depender de br.
+
+### 1.1 Organização
+- Primeiro elemento
+  - Subalínea descritiva
+- Segundo elemento
+
+## 2 COMPARAÇÃO
+| Estrutura | Região | Função |
+| --- | --- | --- |
+| TLR3 | Endossomo | Reconhece RNA viral |
+| TLR4 | Membrana | Reconhece componentes bacterianos |
+
+| Campo extenso | Explicação |
+| --- | --- |
+| A | ${'descrição muito longa '.repeat(12)} |
+
+\<h4 class="gemini-h4">2.1.1 Via TRIF (<em>interna</em>)</h4>
+\<ul><li><strong>Receptores:</strong> TLR3 e TLR4.</li></ul>
+Conclusão A → conclusão B.
+\<script>alert(1)</script>
+
+![Figura](https://storage.example.org/material/figura.png)`;
+const reportHtml = AcademicReportRenderer.render(reportMarkdown, { allowedImageUrls: ['https://storage.example.org/material/figura.png'] });
+const reportNormalized = AcademicReportRenderer.normalize(reportMarkdown);
+const serverNormalizedReport = normalizeReportMarkdownForPrint(reportMarkdown);
+assert.match(reportHtml, /class="academic-report-heading report-heading-primary">1 INTRODUÇÃO<\/h2>/);
+assert.match(reportHtml, /Texto de relatório que continua na linha seguinte sem depender de br\./);
+assert.match(reportHtml, /class="academic-report-list report-list-alineas"/);
+assert.match(reportHtml, /report-list-subalineas/);
+assert.match(reportHtml, /class="academic-report-table"/);
+assert.match(reportNormalized, /\*\*Explicação:\*\* descrição muito longa/);
+assert.match(serverNormalizedReport, /\*\*Explicação:\*\* descrição muito longa/);
+assert.match(reportHtml, /2\.1\.1 Via TRIF \(<em>interna<\/em>\)/);
+assert.match(reportHtml, /TLR3 e TLR4/);
+assert.match(reportHtml, /Conclusão A leva a conclusão B\./);
+assert.match(reportHtml, /<figure class="academic-report-figure"><img src="https:\/\/storage\.example\.org\/material\/figura\.png"/);
+assert.doesNotMatch(AcademicReportRenderer.render(reportMarkdown, { allowedImageUrls: [] }), /<figure class="academic-report-figure"/);
+assert.doesNotMatch(reportHtml, /<h4 class="gemini-h4"|<ul><li>|<script|graph TD|<br\b/i);
+
 console.log('Normalização de estrutura, cifrões, parênteses e Markdown validada.');
+console.log('Renderizador dedicado de relatórios, listas e limites de tabela A4 validado.');
