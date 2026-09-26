@@ -711,6 +711,7 @@
             const doc = await firestoreDb.collection('users').doc(uid).get();
             if (doc.exists) {
               this.userProfile = doc.data();
+              if (typeof hydrateExamPlanFromProfile === 'function') hydrateExamPlanFromProfile(this.userProfile);
               localStorage.setItem('medtutor_user_profile', JSON.stringify(this.userProfile));
               this.updateUserTopbarUI();
               return;
@@ -2462,6 +2463,7 @@
               || (!materialsCacheHydrated && !hasLocalMaterialsCache);
             if (userDoc.exists) {
               MedTutorAuthService.userProfile = userDoc.data();
+              if (typeof hydrateExamPlanFromProfile === 'function') hydrateExamPlanFromProfile(MedTutorAuthService.userProfile);
               MedTutorAuthService.updateUserTopbarUI();
             }
 
@@ -12643,12 +12645,15 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       };
     }
 
-    function openReaderModalForMaterial(materialName) {
+    function openReaderModalForMaterial(materialName, materialId = '', focusSection = '') {
       const modal = document.getElementById('readerModal');
       const content = document.getElementById('readerModalContent');
       if (!modal || !content) return;
 
-      let mat = (chatDriveMaterials || []).find(m => m.name === materialName || m.name.replace(/\.[^/.]+$/, '') === (materialName || '').replace(/\.[^/.]+$/, '') || m.originalFileName === materialName);
+      let mat = materialId
+        ? (chatDriveMaterials || []).find(m => String(m.id) === String(materialId))
+        : null;
+      if (!mat) mat = (chatDriveMaterials || []).find(m => m.name === materialName || m.name.replace(/\.[^/.]+$/, '') === (materialName || '').replace(/\.[^/.]+$/, '') || m.originalFileName === materialName);
       if (!mat) {
         mat = { name: materialName || currentStudySubject, subject: currentStudySubject, topic: materialName ? materialName.replace(/\.[^/.]+$/, '') : currentStudySubject };
       }
@@ -12665,6 +12670,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       content.innerHTML = temp.innerHTML;
       modal.classList.add('active');
+      if (focusSection) {
+        const focusTitle = String(focusSection).split(' · ')[0].trim().toLocaleLowerCase('pt-BR');
+        setTimeout(() => {
+          const heading = [...content.querySelectorAll('h1,h2,h3,h4,h5,h6')].find(node =>
+            node.textContent.trim().toLocaleLowerCase('pt-BR').includes(focusTitle));
+          heading?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+      }
     }
 
     function openActiveReadingDoc() {
@@ -22663,6 +22676,551 @@ Para cada material, retorne um objeto no JSON com:
     // aulas demonstrativas como fallback: além de poluir a tela, elas podiam
     // levar o aluno a uma matéria sem material ao clicar no card.
     let studyRouteSchedule = [];
+    let examStudyPlan = null;
+    let examPlanSelectedMaterialIds = new Set();
+    let examPlanLoadedOwner = '';
+    let examPlanLocalUpdatedAt = 0;
+    const EXAM_PLAN_STORAGE_PREFIX = 'medtutor_exam_study_plan_v1_';
+
+    function getExamPlanOwner() {
+      return String(MedTutorAuthService?.currentUser?.uid || MedTutorAuthService?.userProfile?.uid || 'local');
+    }
+
+    function getExamPlanLocalStorageKey(owner = getExamPlanOwner()) {
+      return `${EXAM_PLAN_STORAGE_PREFIX}${owner}`;
+    }
+
+    function readExamPlanLocalState(owner = getExamPlanOwner()) {
+      try {
+        const raw = localStorage.getItem(getExamPlanLocalStorageKey(owner));
+        const state = raw ? JSON.parse(raw) : null;
+        return state && typeof state === 'object' ? state : null;
+      } catch (error) {
+        console.warn('[Planejamento de prova] Cópia local inválida; mantendo a versão em memória.', error);
+        return null;
+      }
+    }
+
+    function hydrateExamPlanFromProfile(profile = MedTutorAuthService?.userProfile) {
+      const owner = getExamPlanOwner();
+      const localState = readExamPlanLocalState(owner);
+      const cloudState = profile?.uid === owner ? profile.examStudyPlanner : null;
+      const localUpdatedAt = Date.parse(localState?.updatedAt || '') || 0;
+      const cloudUpdatedAt = Date.parse(cloudState?.updatedAt || '') || 0;
+      const state = cloudUpdatedAt > localUpdatedAt ? cloudState : (localState || cloudState);
+      if (owner !== examPlanLoadedOwner || localUpdatedAt !== examPlanLocalUpdatedAt) {
+        examPlanLoadedOwner = owner;
+        examPlanLocalUpdatedAt = localUpdatedAt;
+        examStudyPlan = state?.plan && typeof state.plan === 'object' ? state.plan : null;
+        examPlanSelectedMaterialIds = new Set((state?.selectedMaterialIds || examStudyPlan?.materials || [])
+          .map(item => String(typeof item === 'object' ? item.id : item)).filter(Boolean));
+      } else if (cloudUpdatedAt > localUpdatedAt) {
+        examPlanLocalUpdatedAt = cloudUpdatedAt;
+        examStudyPlan = cloudState?.plan && typeof cloudState.plan === 'object' ? cloudState.plan : null;
+        examPlanSelectedMaterialIds = new Set((cloudState?.selectedMaterialIds || examStudyPlan?.materials || [])
+          .map(item => String(typeof item === 'object' ? item.id : item)).filter(Boolean));
+      }
+      return state;
+    }
+
+    function persistExamStudyPlan() {
+      const owner = getExamPlanOwner();
+      const state = {
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        plan: examStudyPlan,
+        selectedMaterialIds: [...examPlanSelectedMaterialIds]
+      };
+      examPlanLoadedOwner = owner;
+      examPlanLocalUpdatedAt = Date.parse(state.updatedAt);
+      try {
+        localStorage.setItem(getExamPlanLocalStorageKey(owner), JSON.stringify(state));
+      } catch (error) {
+        console.warn('[Planejamento de prova] Não foi possível salvar a cópia local.', error);
+      }
+      if (typeof MedTutorLocalDB !== 'undefined') {
+        MedTutorLocalDB.set('exam_study_plan', owner, state).catch(error => {
+          console.warn('[Planejamento de prova] Não foi possível atualizar o cache local.', error);
+        });
+      }
+
+      const status = document.getElementById('examPlanSyncStatus');
+      const hasCloud = typeof MedTutorFirebaseService !== 'undefined'
+        && MedTutorFirebaseService.hasAuthenticatedCloudSession?.(owner);
+      if (status) status.textContent = hasCloud ? 'Salvando na nuvem…' : 'Salvo neste dispositivo';
+      if (hasCloud) {
+        firestoreDb.collection('users').doc(owner).set({ examStudyPlanner: state }, { merge: true })
+          .then(() => {
+            const currentStatus = document.getElementById('examPlanSyncStatus');
+            if (currentStatus && getExamPlanOwner() === owner) currentStatus.textContent = 'Sincronizado na nuvem';
+            if (MedTutorAuthService.userProfile?.uid === owner) {
+              MedTutorAuthService.userProfile = { ...MedTutorAuthService.userProfile, examStudyPlanner: state };
+              try { localStorage.setItem('medtutor_user_profile', JSON.stringify(MedTutorAuthService.userProfile)); } catch (error) {}
+            }
+          })
+          .catch(error => {
+            console.warn('[Planejamento de prova] Falha ao sincronizar com Firestore; a cópia local foi mantida.', error);
+            const currentStatus = document.getElementById('examPlanSyncStatus');
+            if (currentStatus && getExamPlanOwner() === owner) currentStatus.textContent = 'Salvo localmente · sincronização pendente';
+          });
+      }
+      return state;
+    }
+
+    function normalizeExamPeriodLabel(value) {
+      return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/º|°/g, 'o').replace(/\s+/g, ' ').trim();
+    }
+
+    function getMaterialsForExamPickerSubject(subjectName, periodName) {
+      const curriculum = universityCurriculum || [];
+      const matchingPeriods = curriculum.filter(period => (period.subjects || []).some(item => {
+        const name = typeof item === 'string' ? item : item?.name;
+        return name && isSameCurriculumSubject(name, subjectName);
+      }));
+      const targetPeriod = normalizeExamPeriodLabel(periodName);
+      return getMaterialsForSubject(subjectName).filter(material => {
+        const explicitPeriod = material.period || material.periodo || material.semestre || material.studyPeriod
+          || material.curricularPeriod || material.periodName || material.period_label
+          || String(material.subject || material.disciplina || '').match(/^(\d+\s*[º°o]?\s*(?:semestre|per[ií]odo))\s*[-–:·]/i)?.[1];
+        if (explicitPeriod) return normalizeExamPeriodLabel(explicitPeriod) === targetPeriod;
+        // Materiais antigos sem metadado de período só podem ser atribuídos com
+        // segurança quando a disciplina existe em um único período da ementa.
+        return matchingPeriods.length === 1
+          && normalizeExamPeriodLabel(matchingPeriods[0].period) === targetPeriod;
+      });
+    }
+
+    function listExamPickerPeriods() {
+      return (universityCurriculum || []).map(period => {
+        const subjects = (period.subjects || []).map(item => typeof item === 'string' ? { name: item } : item)
+          .filter(subject => subject?.name && getMaterialsForExamPickerSubject(subject.name, period.period).length > 0);
+        return { ...period, subjects };
+      }).filter(period => period.period && period.subjects.length > 0);
+    }
+
+    function populateExamPickerPeriods() {
+      const periodSelect = document.getElementById('examPickerPeriod');
+      const periods = listExamPickerPeriods();
+      if (!periodSelect) return periods;
+      periodSelect.innerHTML = '';
+      periods.forEach(period => {
+        const option = document.createElement('option');
+        option.value = period.id || period.period;
+        option.textContent = period.period;
+        periodSelect.appendChild(option);
+      });
+      if (!periods.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Nenhum período com materiais enviados';
+        periodSelect.appendChild(option);
+      }
+      return periods;
+    }
+
+    function renderExamPickerSubjects() {
+      const periodSelect = document.getElementById('examPickerPeriod');
+      const subjectSelect = document.getElementById('examPickerSubject');
+      const periods = listExamPickerPeriods();
+      const selectedPeriod = periods.find(period => (period.id || period.period) === periodSelect?.value) || periods[0];
+      if (!subjectSelect) return;
+      const previous = subjectSelect.value;
+      subjectSelect.innerHTML = '';
+      (selectedPeriod?.subjects || []).forEach(subject => {
+        const option = document.createElement('option');
+        option.value = subject.name;
+        option.textContent = `${subject.name} (${getMaterialsForExamPickerSubject(subject.name, selectedPeriod?.period).length})`;
+        subjectSelect.appendChild(option);
+      });
+      if (previous && (selectedPeriod?.subjects || []).some(subject => subject.name === previous)) subjectSelect.value = previous;
+      renderExamPickerMaterials();
+    }
+
+    function renderExamPickerMaterials() {
+      const subjectSelect = document.getElementById('examPickerSubject');
+      const list = document.getElementById('examPickerMaterials');
+      const selectAll = document.getElementById('examPickerSelectAll');
+      if (!list || !subjectSelect) return;
+      const subjectName = subjectSelect.value;
+      const selectedPeriod = (universityCurriculum || []).find(period => (period.id || period.period) === document.getElementById('examPickerPeriod')?.value);
+      const materials = subjectName ? getMaterialsForExamPickerSubject(subjectName, selectedPeriod?.period) : [];
+      const selectableMaterials = materials.filter(material => {
+        const normalized = normalizeMaterial(material);
+        return String(normalized.material_md || '').trim().length > 0 || getExamPlanCardCount(normalized) > 0;
+      });
+      list.innerHTML = '';
+      materials.forEach(material => {
+        const normalized = normalizeMaterial(material);
+        const label = document.createElement('label');
+        label.className = 'exam-picker-material-option';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        const cardCount = getExamPlanCardCount(normalized);
+        const textLength = String(normalized.material_md || '').trim().length;
+        const canStudy = cardCount > 0 || textLength > 0;
+        checkbox.checked = canStudy && examPlanSelectedMaterialIds.has(String(normalized.id));
+        checkbox.disabled = !canStudy;
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) examPlanSelectedMaterialIds.add(String(normalized.id));
+          else examPlanSelectedMaterialIds.delete(String(normalized.id));
+          updateExamPickerSelectionUI();
+        });
+        const copy = document.createElement('span');
+        copy.textContent = normalized.name;
+        const meta = document.createElement('small');
+        meta.textContent = canStudy
+          ? `${cardCount ? `${cardCount} cartões disponíveis` : 'Sem cartões gerados'} · ${textLength} caracteres extraídos`
+          : 'Sem texto ou questões disponíveis para estudar';
+        copy.appendChild(meta);
+        label.append(checkbox, copy);
+        list.appendChild(label);
+      });
+      if (!materials.length) {
+        list.innerHTML = '<div class="exam-picker-empty">Esta disciplina não possui materiais disponíveis em Matérias Curriculares.</div>';
+      }
+      if (selectAll) selectAll.checked = selectableMaterials.length > 0 && selectableMaterials.every(material => examPlanSelectedMaterialIds.has(String(material.id)));
+      if (selectAll) selectAll.onchange = () => {
+        selectableMaterials.forEach(material => {
+          if (selectAll.checked) examPlanSelectedMaterialIds.add(String(material.id));
+          else examPlanSelectedMaterialIds.delete(String(material.id));
+        });
+        renderExamPickerMaterials();
+      };
+      updateExamPickerSelectionUI();
+    }
+
+    function updateExamPickerSelectionUI() {
+      const subjectSelect = document.getElementById('examPickerSubject');
+      const counter = document.getElementById('examPickerSelectedCount');
+      const selectAll = document.getElementById('examPickerSelectAll');
+      const selectedPeriod = (universityCurriculum || []).find(period => (period.id || period.period) === document.getElementById('examPickerPeriod')?.value);
+      const currentMaterials = subjectSelect?.value ? getMaterialsForExamPickerSubject(subjectSelect.value, selectedPeriod?.period).filter(material => {
+        const normalized = normalizeMaterial(material);
+        return String(normalized.material_md || '').trim().length > 0 || getExamPlanCardCount(normalized) > 0;
+      }) : [];
+      if (selectAll) selectAll.checked = currentMaterials.length > 0 && currentMaterials.every(material => examPlanSelectedMaterialIds.has(String(material.id)));
+      const selectedCount = getSelectedExamMaterials().length;
+      if (counter) counter.textContent = `${selectedCount} ${selectedCount === 1 ? 'material selecionado' : 'materiais selecionados'}`;
+    }
+
+    function openExamMaterialPicker() {
+      hydrateExamPlanFromProfile();
+      const modal = document.getElementById('examMaterialPickerModal');
+      const periods = populateExamPickerPeriods();
+      if (!periods.length) {
+        showToast('⚠️ Primeiro envie materiais em Matérias Curriculares e confirme a ementa da disciplina.');
+        return;
+      }
+      renderExamPickerSubjects();
+      modal?.classList.add('active');
+      modal?.setAttribute('aria-hidden', 'false');
+      document.getElementById('examPickerPeriod')?.focus();
+    }
+
+    function closeExamMaterialPicker() {
+      const modal = document.getElementById('examMaterialPickerModal');
+      modal?.classList.remove('active');
+      modal?.setAttribute('aria-hidden', 'true');
+    }
+
+    function confirmExamMaterialSelection() {
+      closeExamMaterialPicker();
+      persistExamStudyPlan();
+      renderExamPlanFormSummary();
+    }
+
+    function getExamPlanCardCount(material) {
+      return (sharedQuestionsBank || []).filter(question => findStudyMaterialForQuestion(question)?.id === material?.id).length;
+    }
+
+    function getExamMaterialSections(material) {
+      const source = `${String(material.material_md || '')}\n${String(material.readingDocHtml || '')}`;
+      const candidates = [];
+      for (const match of source.matchAll(/^\s{0,3}#{1,4}\s+(.+?)\s*#*\s*$/gm)) candidates.push(match[1]);
+      for (const match of source.matchAll(/<h[1-4]\b[^>]*>([\s\S]*?)<\/h[1-4]>/gi)) candidates.push(match[1].replace(/<[^>]+>/g, ' '));
+      const seen = new Set();
+      return candidates.map(title => String(title).replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&')
+        .replace(/\s+/g, ' ').replace(/[*_`]/g, '').trim())
+        .filter(title => title.length >= 5 && title.length <= 120)
+        .filter(title => {
+          const key = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 24);
+    }
+
+    function getSelectedExamMaterials() {
+      const periods = listExamPickerPeriods();
+      const periodByMaterialId = new Map();
+      periods.forEach(period => (period.subjects || []).forEach(subject => {
+        getMaterialsForExamPickerSubject(subject.name, period.period).forEach(material => {
+          periodByMaterialId.set(String(material.id), period.period);
+        });
+      }));
+      return (chatDriveMaterials || []).map(normalizeMaterial)
+        .filter(material => examPlanSelectedMaterialIds.has(String(material.id)))
+        .filter(material => periodByMaterialId.has(String(material.id)))
+        .filter(material => String(material.material_md || '').trim().length > 0 || getExamPlanCardCount(material) > 0)
+        .map(material => ({
+          id: String(material.id), name: material.name,
+          subject: resolveCanonicalCurriculumSubjectName(material.subject || material.disciplina),
+          period: periodByMaterialId.get(String(material.id)) || '',
+          textLength: String(material.material_md || '').length,
+          cardCount: getExamPlanCardCount(material),
+          sections: getExamMaterialSections(material)
+        }));
+    }
+
+    function renderExamPlanFormSummary() {
+      const count = document.getElementById('examPlanSelectedCount');
+      const list = document.getElementById('examPlanSelectedList');
+      const materials = getSelectedExamMaterials();
+      if (count) count.textContent = `${materials.length} ${materials.length === 1 ? 'material selecionado' : 'materiais selecionados'}`;
+      if (list) list.textContent = materials.length
+        ? materials.map(material => `${material.period ? `${material.period} · ` : ''}${material.subject}: ${material.name}`).join('  •  ')
+        : 'Selecione os materiais navegando pela ementa.';
+    }
+
+    function showExamPlanFeedback(message, kind = 'success') {
+      const feedback = document.getElementById('examPlanFeedback');
+      if (!feedback) return;
+      feedback.textContent = message;
+      feedback.className = `exam-plan-feedback is-visible is-${kind}`;
+    }
+
+    function formatExamPlanDate(dateValue, options = { weekday: 'long', day: 'numeric', month: 'long' }) {
+      const date = ExamStudyPlanner?.parseLocalDate(dateValue);
+      return date ? new Intl.DateTimeFormat('pt-BR', options).format(date) : String(dateValue || '');
+    }
+
+    function escapeExamPlannerText(value) {
+      return typeof escapeHtmlText === 'function' ? escapeHtmlText(String(value || '')) : String(value || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function renderExamPlanTask(task) {
+      const completed = Boolean(task.completed);
+      const title = task.kind === 'study'
+        ? `${task.materialName}${task.focusSection ? ` · ${task.focusSection}` : (task.parts > 1 ? ` · Parte ${task.part} de ${task.parts}` : '')}`
+        : task.materialName;
+      const typeLabel = task.kind === 'study' ? 'Estudo do material'
+        : (task.kind === 'final-review' ? 'Revisão final · todos os materiais' : 'Recuperação espaçada');
+      const subjectLabel = task.kind === 'study' ? [task.period, task.subject].filter(Boolean).join(' · ')
+        : `${task.materialIds?.length || 0} materiais para revisar`;
+      const openButtons = task.kind === 'study'
+        ? `<button class="btn-outline-action" type="button" data-exam-open-material="${escapeExamPlannerText(task.materialIds?.[0] || '')}" data-exam-open-mode="study" data-exam-focus="${escapeExamPlannerText(task.focusSection || '')}">📖 Estudar</button>`
+        : `<button class="btn-outline-action" type="button" data-exam-open-materials="${escapeExamPlannerText((task.materialIds || []).join('|'))}" data-exam-open-mode="review">🗂️ Abrir revisão</button>`;
+      return `<div class="exam-plan-task-row ${completed ? 'is-complete' : ''}">
+        <label class="exam-plan-task-copy"><input type="checkbox" data-exam-task-complete="${escapeExamPlannerText(task.id)}" ${completed ? 'checked' : ''} aria-label="Marcar como concluída: ${escapeExamPlannerText(title)}">
+          <span class="exam-plan-task-name">${escapeExamPlannerText(title)} <small>${typeLabel} · ${escapeExamPlannerText(subjectLabel)}</small></span>
+        </label>
+        <div class="exam-plan-task-actions">${openButtons}<span class="exam-plan-day-load">${Number(task.minutes) || 0} min</span></div>
+      </div>`;
+    }
+
+    function renderExamPlanRoute() {
+      const route = document.getElementById('examPlanRoute');
+      const recalcButton = document.getElementById('examPlanRecalculateBtn');
+      if (!route) return;
+      hydrateExamPlanFromProfile();
+      renderExamPlanFormSummary();
+      if (recalcButton) recalcButton.style.display = examStudyPlan ? 'inline-flex' : 'none';
+      if (!examStudyPlan || !Array.isArray(examStudyPlan.tasks)) {
+        route.innerHTML = '';
+        return;
+      }
+
+      const tasksByDate = new Map();
+      examStudyPlan.tasks.forEach(task => {
+        if (!tasksByDate.has(task.date)) tasksByDate.set(task.date, []);
+        tasksByDate.get(task.date).push(task);
+      });
+      const allDays = [...tasksByDate.entries()].sort(([a], [b]) => a.localeCompare(b));
+      const completedCount = examStudyPlan.tasks.filter(task => task.completed).length;
+      const totalCount = examStudyPlan.tasks.length;
+      const studyHours = (Number(examStudyPlan.totalStudyMinutes) || 0) / 60;
+      const overdueCount = examStudyPlan.tasks.filter(task => !task.completed && task.date < ExamStudyPlanner.dateKey(new Date())).length;
+      const todayKey = ExamStudyPlanner.dateKey(new Date());
+      const nextWeekDate = new Date(); nextWeekDate.setDate(nextWeekDate.getDate() + 6);
+      const nextWeekKey = ExamStudyPlanner.dateKey(nextWeekDate);
+      const finalReviewKey = examStudyPlan.tasks.find(task => task.kind === 'final-review')?.date;
+      const visibleDays = allDays.filter(([date]) => date <= nextWeekKey || date === finalReviewKey);
+      const hiddenDays = allDays.filter(([date]) => !visibleDays.some(([visible]) => visible === date));
+      const makeDayHtml = ([date, tasks]) => {
+        const total = tasks.reduce((sum, task) => sum + (Number(task.minutes) || 0), 0);
+        const isOver = total > (Number(examStudyPlan.dailyMinutes) || 60);
+        const dateLabel = date === todayKey ? 'Hoje' : formatExamPlanDate(date);
+        return `<article class="exam-plan-day ${isOver ? 'is-over-cap' : ''}">
+          <div class="exam-plan-day-heading"><span>${escapeExamPlannerText(dateLabel)}</span><span class="exam-plan-day-load">${total} min${isOver ? ' · acima da meta diária' : ''}</span></div>
+          <div class="exam-plan-task-list">${tasks.map(renderExamPlanTask).join('')}</div>
+        </article>`;
+      };
+      const overloadMessage = examStudyPlan.overloadedDays?.length
+        ? `Há ${examStudyPlan.overloadedDays.length} dia(s) acima da disponibilidade diária informada. O roteiro mostra a carga estimada para você poder ajustar o tempo ou rever a seleção.`
+        : '';
+      route.innerHTML = `<div class="exam-plan-overview">
+        <div class="exam-plan-stat"><strong>${examStudyPlan.materials?.length || 0}</strong><span>materiais na prova</span></div>
+        <div class="exam-plan-stat"><strong>${Math.max(1, allDays.length)}</strong><span>dias com atividades</span></div>
+        <div class="exam-plan-stat"><strong>${studyHours.toFixed(1).replace('.', ',')} h</strong><span>estudo estimado</span></div>
+        <div class="exam-plan-stat"><strong>${completedCount}/${totalCount}</strong><span>atividades concluídas</span></div>
+      </div>
+      ${overdueCount ? `<div class="exam-plan-feedback is-visible is-warning">Você tem ${overdueCount} atividade(s) com data passada. Use “Recalcular tarefas pendentes” para redistribuí-las até a véspera.</div>` : ''}
+      ${overloadMessage ? `<div class="exam-plan-feedback is-visible is-warning">${escapeExamPlannerText(overloadMessage)}</div>` : ''}
+      <div class="exam-plan-route-list">${visibleDays.map(makeDayHtml).join('')}</div>
+      ${hiddenDays.length ? `<details class="exam-plan-all-days"><summary>Ver os outros ${hiddenDays.length} dia(s) do roteiro completo</summary><div class="exam-plan-route-list">${hiddenDays.map(makeDayHtml).join('')}</div></details>` : ''}
+      <p class="exam-plan-method-note">Prova: ${escapeExamPlannerText(formatExamPlanDate(examStudyPlan.examDate, { day: 'numeric', month: 'long', year: 'numeric' }))}. A primeira passada é distribuída até a prova; há revisões cumulativas a cada poucos dias e uma revisão geral na véspera. O tempo é uma estimativa e pode ser recalculado quando houver atraso.</p>`;
+
+      route.querySelectorAll('[data-exam-task-complete]').forEach(input => input.addEventListener('change', () => {
+        setExamPlanTaskCompleted(input.dataset.examTaskComplete, input.checked);
+      }));
+      route.querySelectorAll('[data-exam-open-material]').forEach(button => button.addEventListener('click', () => {
+        openExamPlanMaterial(button.dataset.examOpenMaterial, button.dataset.examOpenMode, button.dataset.examFocus || '');
+      }));
+      route.querySelectorAll('[data-exam-open-materials]').forEach(button => button.addEventListener('click', () => {
+        const ids = String(button.dataset.examOpenMaterials || '').split('|').filter(Boolean);
+        if (ids.length === 1) openExamPlanMaterial(ids[0], button.dataset.examOpenMode);
+        else openExamPlanReviewPicker(ids);
+      }));
+    }
+
+    function renderExamStudyPlanner() {
+      hydrateExamPlanFromProfile();
+      const dateInput = document.getElementById('examPlanExamDate');
+      const minutesInput = document.getElementById('examPlanDailyMinutes');
+      const periodSelect = document.getElementById('examPickerPeriod');
+      const subjectSelect = document.getElementById('examPickerSubject');
+      if (periodSelect) periodSelect.onchange = renderExamPickerSubjects;
+      if (subjectSelect) subjectSelect.onchange = renderExamPickerMaterials;
+      if (dateInput) {
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        dateInput.min = ExamStudyPlanner.dateKey(tomorrow);
+        if (!dateInput.value) dateInput.value = examStudyPlan?.examDate || dateInput.min;
+      }
+      if (minutesInput && examStudyPlan) minutesInput.value = String(examStudyPlan.dailyMinutes || 60);
+      renderExamPlanRoute();
+    }
+
+    function createExamStudyPlan() {
+      const dateInput = document.getElementById('examPlanExamDate');
+      const minutesInput = document.getElementById('examPlanDailyMinutes');
+      const materials = getSelectedExamMaterials();
+      const result = ExamStudyPlanner.buildSchedule({
+        materials,
+        examDate: dateInput?.value,
+        dailyMinutes: minutesInput?.value || 60
+      });
+      if (!result.ok) {
+        showExamPlanFeedback(result.error, 'error');
+        return;
+      }
+      if (examStudyPlan && !window.confirm('Criar este roteiro substituirá o planejamento de prova atual. Continuar?')) return;
+      examStudyPlan = { ...result, id: `exam_${Date.now()}` };
+      dateInput.value = result.examDate;
+      examPlanSelectedMaterialIds = new Set(result.materials.map(material => material.id));
+      persistExamStudyPlan();
+      renderExamPlanRoute();
+      showExamPlanFeedback('Roteiro criado. A primeira passada, revisões cumulativas e revisão final já estão distribuídas até a véspera da prova.', 'success');
+      document.getElementById('examPlanRoute')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setExamPlanTaskCompleted(taskId, completed) {
+      if (!examStudyPlan) return;
+      const task = examStudyPlan.tasks.find(item => item.id === taskId);
+      if (!task) return;
+      task.completed = Boolean(completed);
+      task.completedAt = task.completed ? new Date().toISOString() : null;
+      persistExamStudyPlan();
+      renderExamPlanRoute();
+    }
+
+    function recalculateExamStudyPlanNow() {
+      if (!examStudyPlan) return;
+      const completedTaskIds = examStudyPlan.tasks.filter(task => task.completed).map(task => task.id);
+      const materials = getSelectedExamMaterials().length ? getSelectedExamMaterials() : examStudyPlan.materials;
+      const result = ExamStudyPlanner.buildSchedule({
+        materials,
+        examDate: document.getElementById('examPlanExamDate')?.value || examStudyPlan.examDate,
+        dailyMinutes: document.getElementById('examPlanDailyMinutes')?.value || examStudyPlan.dailyMinutes,
+        completedTaskIds
+      });
+      if (!result.ok) {
+        showExamPlanFeedback(result.error, 'error');
+        return;
+      }
+      examStudyPlan = ExamStudyPlanner.rescheduleIncompleteTasks({ ...result, id: examStudyPlan.id });
+      examPlanSelectedMaterialIds = new Set(examStudyPlan.materials.map(material => String(material.id)));
+      persistExamStudyPlan();
+      renderExamPlanRoute();
+      showExamPlanFeedback('Tarefas não concluídas com data passada foram redistribuídas nos dias disponíveis antes da prova. Atividades concluídas foram preservadas.', 'success');
+    }
+
+    function openExamPlanMaterial(materialId, mode = 'study', focusSection = '') {
+      const material = (chatDriveMaterials || []).find(item => String(item.id) === String(materialId));
+      if (!material) {
+        showToast('⚠️ Este material não está mais disponível em Matérias Curriculares. Atualize a seleção do planejamento.');
+        return;
+      }
+      const normalized = normalizeMaterial(material);
+      const subject = resolveCanonicalCurriculumSubjectName(normalized.subject || normalized.disciplina);
+      if (!subject) {
+        showToast('⚠️ A disciplina deste material não está mais na ementa. Refaça o planejamento.');
+        return;
+      }
+      selectStudySubject(subject);
+      const matchingQuestions = (sharedQuestionsBank || []).filter(question => findStudyMaterialForQuestion(question)?.id === normalized.id);
+      if (mode === 'review' && matchingQuestions.length) {
+        handleSlideSelectChange(normalized.name);
+        navigateTab('flashcards');
+        setTimeout(() => document.getElementById('flashcardDeck')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+        showToast(`🗂️ Revisão de flashcards: ${normalized.name}`);
+        return;
+      }
+      openReaderModalForMaterial(normalized.name, normalized.id, focusSection);
+      showToast(`📖 Estudo do material: ${normalized.name}`);
+    }
+
+    function openExamPlanReviewPicker(materialIds = []) {
+      const materials = (chatDriveMaterials || []).filter(item => materialIds.includes(String(item.id)));
+      if (!materials.length) {
+        showToast('⚠️ Os materiais desta revisão não estão mais disponíveis. Recalcule o planejamento.');
+        return;
+      }
+      const modal = document.getElementById('examPlanReviewModal');
+      const list = document.getElementById('examPlanReviewMaterials');
+      if (!modal || !list) return;
+      list.innerHTML = '';
+      materials.forEach(material => {
+        const button = document.createElement('button');
+        button.className = 'btn-outline-action';
+        button.type = 'button';
+        button.textContent = material.name || material.originalFileName || 'Material';
+        button.addEventListener('click', () => {
+          closeExamPlanReviewPicker();
+          openExamPlanMaterial(material.id, 'review');
+        });
+        list.appendChild(button);
+      });
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeExamPlanReviewPicker() {
+      const modal = document.getElementById('examPlanReviewModal');
+      modal?.classList.remove('active');
+      modal?.setAttribute('aria-hidden', 'true');
+    }
+
+    if (typeof window !== 'undefined') {
+      window.openExamMaterialPicker = openExamMaterialPicker;
+      window.closeExamMaterialPicker = closeExamMaterialPicker;
+      window.closeExamPlanReviewPicker = closeExamPlanReviewPicker;
+      window.confirmExamMaterialSelection = confirmExamMaterialSelection;
+      window.createExamStudyPlan = createExamStudyPlan;
+      window.recalculateExamStudyPlanNow = recalculateExamStudyPlanNow;
+      window.hydrateExamPlanFromProfile = hydrateExamPlanFromProfile;
+    }
 
     function findStudyMaterialForQuestion(question) {
       const materialIds = [question?.materialId, question?.material_id, question?.sourceMaterialId]
@@ -22803,6 +23361,7 @@ Para cada material, retorne um objeto no JSON com:
     }
 
     function renderSceTimeline() {
+      renderExamStudyPlanner();
       const container = document.getElementById('timelineSchedule');
       if (!container) return;
       container.innerHTML = '';
@@ -22875,6 +23434,7 @@ Para cada material, retorne um objeto no JSON com:
       
       if (icon) icon.style.transform = 'rotate(360deg)';
       if (text) text.textContent = 'Otimizando roteiro...';
+      recalculateExamStudyPlanNow();
 
       setTimeout(() => {
         rebuildStudyRouteSchedule();

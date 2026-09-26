@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260922-report-print-v5">
+  <link rel="stylesheet" href="/styles.css?v=20260926-exam-plan-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -786,6 +786,44 @@
             </div>
           </div>
 
+          <section class="exam-planner-card" aria-labelledby="examPlannerTitle">
+            <div class="exam-planner-heading">
+              <div>
+                <h3 id="examPlannerTitle">📅 Planejamento para prova</h3>
+                <p>Escolha a data e os materiais da ementa. O SCE distribui o estudo e reserva revisões cumulativas até a véspera.</p>
+              </div>
+              <span class="exam-plan-sync-status" id="examPlanSyncStatus" aria-live="polite">Salvo neste dispositivo</span>
+            </div>
+            <div class="exam-planner-controls">
+              <label>Data da prova
+                <input type="date" id="examPlanExamDate" aria-label="Data da prova">
+              </label>
+              <label>Tempo disponível por dia
+                <select id="examPlanDailyMinutes" aria-label="Tempo de estudo disponível por dia">
+                  <option value="30">30 minutos</option>
+                  <option value="45">45 minutos</option>
+                  <option value="60" selected>1 hora</option>
+                  <option value="90">1h30</option>
+                  <option value="120">2 horas</option>
+                  <option value="180">3 horas</option>
+                </select>
+              </label>
+            </div>
+            <div class="exam-planner-selection-row">
+              <div>
+                <strong id="examPlanSelectedCount">Nenhum material selecionado</strong>
+                <div class="exam-plan-selected-list" id="examPlanSelectedList">Selecione os materiais navegando pela ementa.</div>
+              </div>
+              <button class="btn-outline-action" type="button" onclick="openExamMaterialPicker()">📚 Selecionar materiais</button>
+            </div>
+            <div class="exam-planner-actions">
+              <button class="btn-outline-action primary" id="examPlanGenerateBtn" type="button" onclick="createExamStudyPlan()">🧭 Criar roteiro até a prova</button>
+              <button class="btn-outline-action" id="examPlanRecalculateBtn" type="button" onclick="recalculateExamStudyPlanNow()" style="display:none">🔄 Recalcular tarefas pendentes</button>
+            </div>
+            <div id="examPlanFeedback" class="exam-plan-feedback" role="status" aria-live="polite"></div>
+            <div id="examPlanRoute" class="exam-plan-route"></div>
+          </section>
+
           <!-- CRONOGRAMA SEMANAL (TIMELINE) -->
           <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
             <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -806,6 +844,46 @@
             <div id="sceDisciplineBars"></div>
           </div>
 
+          <div class="modal-overlay exam-material-picker-overlay" id="examMaterialPickerModal" aria-hidden="true">
+            <div class="modal-window exam-material-picker" role="dialog" aria-modal="true" aria-labelledby="examMaterialPickerTitle">
+              <div class="modal-head">
+                <div>
+                  <h3 id="examMaterialPickerTitle" style="margin:0">Materiais para a prova</h3>
+                  <p style="margin:5px 0 0;color:var(--text-secondary);font-size:13px">Navegue pelo período e disciplina; selecione arquivos individuais ou todos os materiais da disciplina.</p>
+                </div>
+                <button class="btn-icon" type="button" onclick="closeExamMaterialPicker()" aria-label="Fechar seleção">×</button>
+              </div>
+              <div class="exam-picker-selectors">
+                <label>1. Período
+                  <select id="examPickerPeriod" aria-label="Selecionar período"></select>
+                </label>
+                <label>2. Disciplina
+                  <select id="examPickerSubject" aria-label="Selecionar disciplina"></select>
+                </label>
+              </div>
+              <label class="exam-picker-select-all"><input type="checkbox" id="examPickerSelectAll"> <span>Selecionar todos os materiais desta disciplina</span></label>
+              <div class="exam-picker-materials" id="examPickerMaterials" role="group" aria-label="Materiais disponíveis"></div>
+              <div class="exam-picker-footer">
+                <span id="examPickerSelectedCount" aria-live="polite">0 materiais selecionados</span>
+                <div>
+                  <button class="btn-outline-action" type="button" onclick="closeExamMaterialPicker()">Cancelar</button>
+                  <button class="btn-outline-action primary" type="button" onclick="confirmExamMaterialSelection()">Concluir seleção</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-overlay exam-material-picker-overlay" id="examPlanReviewModal" aria-hidden="true">
+            <div class="modal-window exam-material-picker" role="dialog" aria-modal="true" aria-labelledby="examPlanReviewTitle">
+              <div class="modal-head">
+                <div>
+                  <h3 id="examPlanReviewTitle" style="margin:0">Revisão cumulativa</h3>
+                  <p style="margin:5px 0 0;color:var(--text-secondary);font-size:13px">Escolha o material para revisar. Se houver flashcards, abriremos o deck correspondente.</p>
+                </div>
+                <button class="btn-icon" type="button" onclick="closeExamPlanReviewPicker()" aria-label="Fechar revisão">×</button>
+              </div>
+              <div class="exam-review-material-list" id="examPlanReviewMaterials"></div>
+            </div>
+          </div>
         </section>
 
         <!-- =========================================================
@@ -3423,7 +3501,8 @@
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
-  <script defer src="/app.min.js?v=20260922-report-print-v5"></script>
+  <script defer src="/exam-study-planner.js?v=20260926-exam-plan-v1"></script>
+  <script defer src="/app.min.js?v=20260926-exam-plan-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

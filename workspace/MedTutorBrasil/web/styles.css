@@ -7787,6 +7787,106 @@
       transform: translateY(-1px);
     }
 
+    /* Planejamento da prova integrado ao SCE. */
+    .exam-planner-card {
+      margin: 0 0 24px;
+      padding: 20px;
+      border: 1px solid var(--border-accent);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(0, 255, 102, .07), var(--bg-card) 62%);
+      display: grid;
+      gap: 16px;
+    }
+    .exam-planner-heading,
+    .exam-planner-selection-row,
+    .exam-picker-footer,
+    .exam-plan-day-heading,
+    .exam-plan-task-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .exam-planner-heading h3 { margin: 0 0 5px; font-size: 16px; }
+    .exam-planner-heading p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+    .exam-plan-sync-status { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+    .exam-planner-controls,
+    .exam-picker-selectors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .exam-planner-controls label,
+    .exam-picker-selectors label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+    .exam-planner-controls input,
+    .exam-planner-controls select,
+    .exam-picker-selectors select {
+      min-width: 0; width: 100%; min-height: 42px; padding: 9px 12px;
+      color: var(--text-primary); background: var(--bg-input, var(--bg-surface));
+      border: 1px solid var(--border); border-radius: 10px;
+    }
+    .exam-planner-selection-row { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(0,0,0,.12); }
+    .exam-planner-selection-row > div { min-width: 0; }
+    .exam-planner-selection-row strong { font-size: 13px; }
+    .exam-plan-selected-list { margin-top: 4px; color: var(--text-secondary); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+    .exam-planner-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .exam-plan-feedback { display: none; padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.5; }
+    .exam-plan-feedback.is-visible { display: block; }
+    .exam-plan-feedback.is-error { color: var(--danger); border: 1px solid var(--danger); background: var(--danger-bg); }
+    .exam-plan-feedback.is-warning { color: #ffd166; border: 1px solid rgba(255, 209, 102, .4); background: rgba(255, 209, 102, .08); }
+    .exam-plan-feedback.is-success { color: var(--neon); border: 1px solid var(--border-accent); background: var(--neon-subtle); }
+    .exam-plan-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .exam-plan-stat { padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: rgba(0,0,0,.12); }
+    .exam-plan-stat strong { display: block; color: var(--neon); font-size: 16px; }
+    .exam-plan-stat span { color: var(--text-secondary); font-size: 11px; }
+    .exam-plan-route-list { display: grid; gap: 10px; margin-top: 12px; }
+    .exam-plan-day { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); }
+    .exam-plan-day.is-over-cap { border-color: rgba(255, 209, 102, .5); }
+    .exam-plan-day-heading { margin-bottom: 8px; font-size: 12px; font-weight: 700; }
+    .exam-plan-day-heading time { color: var(--text-secondary); font-weight: 500; }
+    .exam-plan-day-load { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+    .exam-plan-task-list { display: grid; gap: 7px; }
+    .exam-plan-task-row { align-items: flex-start; padding: 8px 9px; border-radius: 9px; background: rgba(0,0,0,.14); }
+    .exam-plan-task-row.is-complete { opacity: .65; }
+    .exam-plan-task-copy { display: flex; gap: 8px; min-width: 0; align-items: flex-start; }
+    .exam-plan-task-copy input { margin: 3px 0 0; accent-color: var(--neon); flex: 0 0 auto; }
+    .exam-plan-task-name { min-width: 0; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+    .exam-plan-task-name small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 10px; }
+    .exam-plan-task-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; flex: 0 0 auto; }
+    .exam-plan-task-actions button { min-height: 32px; padding: 5px 8px; font-size: 10px; }
+    .exam-plan-all-days { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .exam-plan-all-days > summary { color: var(--neon); cursor: pointer; font-size: 12px; font-weight: 650; }
+    .exam-plan-completed { color: var(--neon); }
+    .exam-material-picker-overlay { z-index: 110000 !important; }
+    .exam-material-picker { max-width: 680px; }
+    .exam-picker-select-all { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-accent); border-radius: 10px; color: var(--text-primary); font-size: 12px; }
+    .exam-picker-select-all input { accent-color: var(--neon); width: 17px; height: 17px; }
+    .exam-picker-materials { display: grid; gap: 7px; max-height: min(42dvh, 420px); min-height: 100px; overflow: auto; padding: 2px; overscroll-behavior: contain; }
+    .exam-picker-material-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: rgba(0,0,0,.12); cursor: pointer; }
+    .exam-picker-material-option input { margin: 2px 0 0; accent-color: var(--neon); flex: 0 0 auto; }
+    .exam-picker-material-option span { min-width: 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
+    .exam-picker-material-option small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+    .exam-picker-material-option input:disabled { opacity: .45; cursor: not-allowed; }
+    .exam-picker-empty { padding: 18px; color: var(--text-muted); text-align: center; font-size: 12px; }
+    .exam-review-material-list { display: grid; gap: 8px; max-height: min(55dvh, 520px); overflow: auto; padding: 12px 0 2px; }
+    .exam-review-material-list button { justify-content: flex-start; text-align: left; overflow-wrap: anywhere; }
+    .exam-picker-footer { border-top: 1px solid var(--border); padding-top: 12px; color: var(--text-secondary); font-size: 12px; }
+    .exam-picker-footer > div { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+    @media (max-width: 640px) {
+      .exam-planner-card { padding: 14px; gap: 12px; }
+      .exam-planner-heading,
+      .exam-planner-selection-row,
+      .exam-picker-footer { align-items: stretch; flex-direction: column; }
+      .exam-plan-sync-status { white-space: normal; }
+      .exam-planner-controls,
+      .exam-picker-selectors { grid-template-columns: 1fr; }
+      .exam-planner-selection-row > button,
+      .exam-planner-actions > button { width: 100%; justify-content: center; }
+      .exam-plan-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .exam-plan-task-row { flex-direction: column; }
+      .exam-plan-task-actions { width: 100%; justify-content: flex-start; }
+      .exam-plan-task-actions button { flex: 1 1 auto; }
+      .exam-picker-footer > div { width: 100%; }
+      .exam-picker-footer > div button { flex: 1 1 0; }
+    }
+
     .subnav-badge {
       display: inline-flex;
       align-items: center;
