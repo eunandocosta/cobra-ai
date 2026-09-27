@@ -14032,22 +14032,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const item = list[currentCardIndex];
       if (!item) return;
 
-      item.srs = calculateSrsNext(item.srs, rating);
-      saveSharedQuestionsBank();
-
-      const ratingNames = { 1: 'Repetir', 2: 'Difícil', 3: 'Bom', 4: 'Fácil' };
-      showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.`);
-
-      // Registra ação de estudo no controle de custos (Free Tier / Local)
-      if (typeof AppExpenseTracker !== 'undefined') {
-        AppExpenseTracker.recordAction({
-          actionName: `Revisão Flashcard SRS (${ratingNames[rating] || 'Card'}): ${item.disease || 'Caso'}`,
-          model: 'local-heuristic',
-          inputTokens: 85,
-          outputTokens: 45,
-          isLocal: true
-        });
-      }
+      applyFlashcardSrsRating(item, rating);
 
       currentCardIndex = (currentCardIndex + 1) % list.length;
       updateCardDisplay(baseList);
@@ -23650,7 +23635,7 @@ Para cada material, retorne um objeto no JSON com:
       const image = typeof renderStudySupportImage === 'function' ? renderStudySupportImage(question) : '';
       const formattedFront = typeof formatStudyRichText === 'function' ? formatStudyRichText(front) : escapeHtmlText(front);
       const formattedAnswer = typeof formatStudyRichText === 'function' ? formatStudyRichText(answer) : escapeHtmlText(answer);
-      return `<article class="sce-review-flashcard ${card.overdue ? 'is-overdue' : 'is-upcoming'}" style="--sce-review-card-index:${index}">
+      return `<article class="sce-review-flashcard sce-review-deck-card ${card.overdue ? 'is-overdue' : 'is-upcoming'}" style="--sce-review-card-index:${index}">
         <header class="sce-review-flashcard-header">
           <div><span class="sce-review-flashcard-subject">${escapeHtmlText(card.subject)}</span><h4>${escapeHtmlText(title)}</h4></div>
           <span class="sce-review-due-label">${escapeHtmlText(dateLabel)}</span>
@@ -23659,38 +23644,138 @@ Para cada material, retorne um objeto no JSON com:
         <div class="sce-review-flashcard-front study-rich-text">${formattedFront}</div>
         <div class="sce-review-answer" hidden><span class="sce-review-answer-label">Resposta</span><div class="study-rich-text">${formattedAnswer || '<p>Este card não possui resposta registrada.</p>'}${image}</div></div>
         <button class="btn-outline-action sce-review-reveal-button" type="button" data-sce-review-reveal aria-expanded="false">Mostrar resposta</button>
+        <div class="sce-review-rating-actions" aria-label="Avalie sua lembrança">
+          <button class="btn-outline-action danger" type="button" data-sce-review-rate="1" disabled>Repetir</button>
+          <button class="btn-outline-action" type="button" data-sce-review-rate="2" disabled>Difícil</button>
+          <button class="btn-outline-action" type="button" data-sce-review-rate="3" disabled>Bom</button>
+          <button class="btn-outline-action primary" type="button" data-sce-review-rate="4" disabled>Fácil</button>
+        </div>
       </article>`;
     }
 
     let sceReviewEscapeHandler = null;
+    let sceReviewState = null;
 
-    function openSceReviewModal(bucketId) {
-      const bucket = getSceReviewBucketData()[bucketId];
-      const modal = document.getElementById('sceReviewModal');
-      const title = document.getElementById('sceReviewModalTitle');
-      const subtitle = document.getElementById('sceReviewModalSubtitle');
-      const list = document.getElementById('sceReviewCards');
-      if (!bucket || !modal || !list) return;
-      const subjectGroups = new Map();
-      bucket.cards.forEach(card => {
-        if (!subjectGroups.has(card.subject)) subjectGroups.set(card.subject, []);
-        subjectGroups.get(card.subject).push(card);
-      });
-      if (title) title.textContent = `Flashcards · ${bucket.label}`;
-      if (subtitle) subtitle.textContent = `${bucket.cards.length} card(s) · ${new Set(bucket.cards.map(card => card.subject)).size} matéria(s). Cards vencidos ficam destacados em vermelho.`;
-      list.innerHTML = bucket.cards.length
-        ? [...subjectGroups.entries()].map(([subject, cards]) => `<section class="sce-review-subject-group">
-            <h4>${escapeHtmlText(subject)} <span>${cards.length} card(s)</span></h4>
-            <div class="sce-review-flashcard-grid">${cards.map((card, index) => renderSceReviewCard(card, index)).join('')}</div>
-          </section>`).join('')
-        : '<div class="sce-review-empty">Nenhum flashcard está previsto para este prazo.</div>';
-      list.querySelectorAll('[data-sce-review-reveal]').forEach(button => button.addEventListener('click', () => {
-        const answerPanel = button.closest('.sce-review-flashcard')?.querySelector('.sce-review-answer');
+    function bindSceReviewRevealButtons(root) {
+      root.querySelectorAll('[data-sce-review-reveal]').forEach(button => button.addEventListener('click', () => {
+        const card = button.closest('.sce-review-flashcard');
+        const answerPanel = card?.querySelector('.sce-review-answer');
         if (!answerPanel) return;
         answerPanel.hidden = !answerPanel.hidden;
         button.setAttribute('aria-expanded', answerPanel.hidden ? 'false' : 'true');
         button.textContent = answerPanel.hidden ? 'Mostrar resposta' : 'Ocultar resposta';
+        if (!answerPanel.hidden && card.dataset.sceReviewLocked !== 'true') card.querySelectorAll('[data-sce-review-rate]').forEach(ratingButton => { ratingButton.disabled = false; });
       }));
+    }
+
+    function renderSceReviewSubjects() {
+      if (!sceReviewState) return;
+      const { bucketId } = sceReviewState;
+      const bucket = getSceReviewBucketData()[bucketId];
+      const title = document.getElementById('sceReviewModalTitle');
+      const subtitle = document.getElementById('sceReviewModalSubtitle');
+      const list = document.getElementById('sceReviewCards');
+      const backButton = document.getElementById('sceReviewBackButton');
+      if (!bucket || !list) return;
+
+      const grouped = new Map();
+      bucket.cards.forEach(card => {
+        if (!grouped.has(card.subject)) grouped.set(card.subject, []);
+        grouped.get(card.subject).push(card);
+      });
+      if (title) title.textContent = `Flashcards · ${bucket.label}`;
+      if (subtitle) subtitle.textContent = 'Escolha uma disciplina para revisar todos os cards do prazo em um único deck.';
+      if (backButton) backButton.hidden = true;
+      list.innerHTML = grouped.size ? `<div class="sce-review-subject-list">${[...grouped.entries()].map(([subject, cards]) => {
+        const overdue = cards.filter(card => card.overdue).length;
+        const materials = new Set(cards.map(card => String(card.material.id || card.material.name || card.material.originalFileName || ''))).size;
+        return `<button class="sce-review-subject-option ${overdue ? 'has-overdue' : ''}" type="button" data-sce-review-subject="${escapeHtmlText(subject)}">
+          <span class="sce-review-subject-option-copy"><strong>${escapeHtmlText(subject)}</strong><small>${materials} material(is)${overdue ? ` · ${overdue} vencido(s)` : ''}</small></span>
+          <span class="sce-review-subject-option-count">${cards.length}<small>cards</small></span>
+        </button>`;
+      }).join('')}</div>` : '<div class="sce-review-empty">Nenhum flashcard está previsto para este prazo.</div>';
+      list.querySelectorAll('[data-sce-review-subject]').forEach(button => button.addEventListener('click', () => startSceReviewDeck(button.dataset.sceReviewSubject)));
+    }
+
+    function startSceReviewDeck(subject) {
+      if (!sceReviewState) return;
+      const bucket = getSceReviewBucketData()[sceReviewState.bucketId];
+      const cards = (bucket?.cards || []).filter(card => card.subject === subject);
+      if (!cards.length) { renderSceReviewSubjects(); return; }
+      sceReviewState = { ...sceReviewState, subject, cards, index: 0, rated: new Set() };
+      renderSceReviewDeckCard();
+    }
+
+    function renderSceReviewDeckCard() {
+      if (!sceReviewState) return;
+      const { cards, index, subject } = sceReviewState;
+      const title = document.getElementById('sceReviewModalTitle');
+      const subtitle = document.getElementById('sceReviewModalSubtitle');
+      const list = document.getElementById('sceReviewCards');
+      const backButton = document.getElementById('sceReviewBackButton');
+      if (!list) return;
+      if (backButton) backButton.hidden = false;
+      if (index >= cards.length) {
+        if (title) title.textContent = `Revisão concluída · ${subject}`;
+        const ratedCount = sceReviewState.rated.size;
+        if (subtitle) subtitle.textContent = `${ratedCount} de ${cards.length} card(s) avaliados.`;
+        list.innerHTML = `<div class="sce-review-complete"><span aria-hidden="true">✓</span><h4>Você chegou ao fim deste deck</h4><p>${ratedCount ? 'Suas avaliações foram salvas e os próximos prazos atualizados.' : 'Você pode voltar às disciplinas e retomar a revisão quando quiser.'}</p><button class="btn-outline-action primary" type="button" data-sce-review-subjects>Voltar às disciplinas</button></div>`;
+        list.querySelector('[data-sce-review-subjects]')?.addEventListener('click', renderSceReviewSubjects);
+        return;
+      }
+      const card = cards[index];
+      if (title) title.textContent = `Flashcards · ${subject}`;
+      if (subtitle) subtitle.textContent = `Card ${index + 1} de ${cards.length} · ${card.material.name || card.material.originalFileName || 'Material de estudo'}`;
+      const alreadyRated = sceReviewState.rated.has(index);
+      list.innerHTML = `<div class="sce-review-deck-progress" role="progressbar" aria-valuenow="${index + 1}" aria-valuemin="1" aria-valuemax="${cards.length}"><span style="width:${Math.round(((index + 1) / cards.length) * 100)}%"></span></div>${renderSceReviewCard(card, index)}
+        <div class="sce-review-deck-navigation"><button class="btn-outline-action" type="button" data-sce-review-prev ${index === 0 ? 'disabled' : ''}>← Anterior</button><span>${alreadyRated ? 'Resposta registrada' : 'Revele a resposta e avalie sua lembrança'}</span><button class="btn-outline-action" type="button" data-sce-review-next>${index === cards.length - 1 ? 'Concluir' : 'Pular →'}</button></div>`;
+      if (alreadyRated) list.querySelector('.sce-review-deck-card')?.setAttribute('data-sce-review-locked', 'true');
+      bindSceReviewRevealButtons(list);
+      if (alreadyRated) list.querySelectorAll('[data-sce-review-rate]').forEach(button => { button.disabled = true; });
+      list.querySelector('[data-sce-review-prev]')?.addEventListener('click', () => { sceReviewState.index--; renderSceReviewDeckCard(); });
+      list.querySelector('[data-sce-review-next]')?.addEventListener('click', () => { sceReviewState.index++; renderSceReviewDeckCard(); });
+      list.querySelectorAll('[data-sce-review-rate]').forEach(button => button.addEventListener('click', () => rateSceReviewDeckCard(Number(button.dataset.sceReviewRate))));
+    }
+
+    function applyFlashcardSrsRating(item, rating) {
+      if (!item || ![1, 2, 3, 4].includes(Number(rating))) return null;
+      item.srs = calculateSrsNext(item.srs, Number(rating));
+      saveSharedQuestionsBank();
+      const ratingNames = { 1: 'Repetir', 2: 'Difícil', 3: 'Bom', 4: 'Fácil' };
+      showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.`);
+      if (typeof AppExpenseTracker !== 'undefined') {
+        AppExpenseTracker.recordAction({
+          actionName: `Revisão Flashcard SRS (${ratingNames[rating] || 'Card'}): ${item.disease || 'Caso'}`,
+          model: 'local-heuristic', inputTokens: 85, outputTokens: 45, isLocal: true
+        });
+      }
+      return item.srs;
+    }
+
+    function rateSceReviewDeckCard(rating) {
+      if (!sceReviewState) return;
+      const index = sceReviewState.index;
+      if (sceReviewState.rated.has(index)) return;
+      const item = sceReviewState.cards[index]?.question;
+      if (!item || !applyFlashcardSrsRating(item, rating)) return;
+      sceReviewState.rated.add(index);
+      renderSceReviewBuckets();
+      renderSceBars();
+      sceReviewState.index++;
+      renderSceReviewDeckCard();
+    }
+
+    function backToSceReviewSubjects() {
+      if (!sceReviewState) return;
+      renderSceReviewSubjects();
+    }
+
+    function openSceReviewModal(bucketId) {
+      const bucket = getSceReviewBucketData()[bucketId];
+      const modal = document.getElementById('sceReviewModal');
+      if (!bucket || !modal) return;
+      sceReviewState = { bucketId };
+      renderSceReviewSubjects();
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
       if (sceReviewEscapeHandler) document.removeEventListener('keydown', sceReviewEscapeHandler);
@@ -23707,6 +23792,7 @@ Para cada material, retorne um objeto no JSON com:
       modal?.setAttribute('aria-hidden', 'true');
       if (sceReviewEscapeHandler) document.removeEventListener('keydown', sceReviewEscapeHandler);
       sceReviewEscapeHandler = null;
+      sceReviewState = null;
     }
 
     function resolveScheduleTargetSubject(subjectHint) {
@@ -23764,6 +23850,7 @@ Para cada material, retorne um objeto no JSON com:
       window.openScheduleQuestions = openScheduleQuestions;
       window.openSceReviewModal = openSceReviewModal;
       window.closeSceReviewModal = closeSceReviewModal;
+      window.backToSceReviewSubjects = backToSceReviewSubjects;
     }
 
     function renderSceTimeline() {
