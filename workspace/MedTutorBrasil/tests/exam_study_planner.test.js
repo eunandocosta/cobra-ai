@@ -12,11 +12,31 @@ const materials = [
 assert.equal(Planner.parseLocalDate('2026-09-22').getDate(), 22);
 assert.equal(Planner.parseLocalDate('2026-02-31'), null, 'datas impossíveis não devem ser normalizadas');
 assert.equal(Planner.estimateMaterialMinutes({ cardCount: 30 }), 62);
+assert.equal(Planner.isExamPlanExpired({ examDate: '2026-10-06' }, '2026-10-07'), false,
+  'roteiro permanece salvo durante o dia seguinte à prova');
+assert.equal(Planner.isExamPlanExpired({ examDate: '2026-10-06' }, '2026-10-08'), true,
+  'roteiro expira ao iniciar o segundo dia após a prova');
+assert.equal(Planner.planKey({ examDate: '2026-10-06', period: '2º Período', subject: 'Sistema Nervoso' }),
+  Planner.planKey({ examDate: '2026-10-06', period: '2o periodo', subject: 'Sistema Nervoso' }),
+  'variações de acento/símbolo devem localizar a mesma prova');
+assert.notEqual(Planner.planKey({ examDate: '2026-10-06', period: '2º Período', subject: 'Sistema Nervoso' }),
+  Planner.planKey({ examDate: '2026-10-06', period: '2º Período', subject: 'Sistema Tegumentar' }),
+  'disciplinas diferentes podem ter provas independentes no mesmo dia');
+assert.deepEqual(Planner.mergeMaterialsById(
+  [{ id: 'mat-1', name: 'Neuroanatomia' }],
+  [{ id: 'mat-1', name: 'Neuroanatomia atualizada' }, { id: 'mat-2', name: 'Meninges' }]
+).map(material => material.id), ['mat-1', 'mat-2'], 'novos materiais devem ser acrescentados sem duplicar os já selecionados');
 
 const plan = Planner.buildSchedule({ materials, examDate: '2026-10-06', dailyMinutes: 60, today: '2026-09-22' });
 assert.equal(plan.ok, true);
 assert.deepEqual(plan.materials.map(material => material.id), ['mat-1', 'mat-2']);
 assert.ok(plan.tasks.some(task => task.kind === 'study'));
+const completedStudyTaskId = `study:${encodeURIComponent('mat-1')}:1`;
+const appendedMaterials = Planner.mergeMaterialsById(materials, [{ id: 'mat-3', name: 'Nervos cranianos', subject: 'Sistema Nervoso', period: '2º Período', textLength: 4000 }]);
+const appendedPlan = Planner.buildSchedule({ materials: appendedMaterials, examDate: '2026-10-06', dailyMinutes: 60,
+  today: '2026-09-22', completedTaskIds: [completedStudyTaskId] });
+assert.deepEqual(appendedPlan.materials.map(material => material.id), ['mat-1', 'mat-2', 'mat-3'], 'adicionar material expande a mesma prova');
+assert.equal(appendedPlan.tasks.find(task => task.id === completedStudyTaskId)?.completed, true, 'recalcular após adicionar material preserva tarefa concluída');
 assert.ok(plan.tasks.some(task => task.kind === 'study' && task.focusSection), 'sessões devem priorizar títulos reais do material quando existirem');
 assert.ok(plan.tasks.some(task => task.kind === 'review'), 'deve criar revisão cumulativa antes da prova');
 const finalReview = plan.tasks.find(task => task.kind === 'final-review');

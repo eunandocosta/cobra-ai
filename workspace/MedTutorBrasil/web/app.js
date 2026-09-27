@@ -22676,10 +22676,16 @@ Para cada material, retorne um objeto no JSON com:
     // aulas demonstrativas como fallback: além de poluir a tela, elas podiam
     // levar o aluno a uma matéria sem material ao clicar no card.
     let studyRouteSchedule = [];
-    let examStudyPlan = null;
+    let examStudyPlans = [];
     let examPlanSelectedMaterialIds = new Set();
+    let examPlanSelectedContextKey = '';
+    let examPlanActiveContext = null;
     let examPlanLoadedOwner = '';
     let examPlanLocalUpdatedAt = 0;
+    let examPlanCloudUpdatedAt = 0;
+    let examPlanDetailsOpenId = '';
+    let examPlanExpiryTimer = null;
+    let examPlanExpiryTimerTarget = 0;
     const EXAM_PLAN_STORAGE_PREFIX = 'medtutor_exam_study_plan_v1_';
 
     function getExamPlanOwner() {
@@ -22701,36 +22707,99 @@ Para cada material, retorne um objeto no JSON com:
       }
     }
 
+    function normalizeExamPlannerState(source) {
+      if (!source || typeof source !== 'object') return { plans: [], selectedMaterialIds: [], activeContext: null };
+      const legacyPlan = source.plan && typeof source.plan === 'object' ? source.plan : null;
+      const plans = Array.isArray(source.plans) ? source.plans.filter(plan => plan && Array.isArray(plan.tasks))
+        : legacyPlan ? [{ ...legacyPlan, id: legacyPlan.id || `exam_legacy_${legacyPlan.examDate || Date.now()}` }] : [];
+      return {
+        ...source,
+        plans,
+        selectedMaterialIds: Array.isArray(source.selectedMaterialIds) ? source.selectedMaterialIds
+          : (source.activeMaterialIds || plans[0]?.materials || []),
+        activeContext: source.activeContext && typeof source.activeContext === 'object' ? source.activeContext : null
+      };
+    }
+
+    function getExamPlanPurgeAt(plan) {
+      const examDate = ExamStudyPlanner?.parseLocalDate(plan?.examDate);
+      if (!examDate) return null;
+      examDate.setDate(examDate.getDate() + 2);
+      examDate.setHours(0, 0, 0, 0);
+      return examDate;
+    }
+
+    function pruneExpiredExamPlans() {
+      const todayKey = ExamStudyPlanner.dateKey(new Date());
+      const previousCount = examStudyPlans.length;
+      const expiredPlans = examStudyPlans.filter(plan => ExamStudyPlanner.isExamPlanExpired(plan, todayKey));
+      if (!expiredPlans.length) return false;
+      const expiredKeys = new Set(expiredPlans.map(getExamPlanContextKey));
+      examStudyPlans = examStudyPlans.filter(plan => !expiredPlans.includes(plan));
+      if (expiredKeys.has(examPlanSelectedContextKey)) examPlanSelectedMaterialIds = new Set();
+      return examStudyPlans.length !== previousCount;
+    }
+
+    function scheduleExamPlanExpiryCleanup() {
+      const now = Date.now();
+      const nextTarget = examStudyPlans.map(getExamPlanPurgeAt).filter(date => date && date.getTime() > now)
+        .map(date => date.getTime()).sort((a, b) => a - b)[0] || 0;
+      if (nextTarget === examPlanExpiryTimerTarget) return;
+      if (examPlanExpiryTimer) clearTimeout(examPlanExpiryTimer);
+      examPlanExpiryTimer = null;
+      examPlanExpiryTimerTarget = nextTarget;
+      if (!nextTarget) return;
+      examPlanExpiryTimer = setTimeout(() => {
+        examPlanExpiryTimer = null;
+        examPlanExpiryTimerTarget = 0;
+        if (pruneExpiredExamPlans()) {
+          persistExamStudyPlan();
+          renderExamPlanRoute();
+        } else scheduleExamPlanExpiryCleanup();
+      }, Math.min(Math.max(1000, nextTarget - now + 1000), 2147480000));
+    }
+
     function hydrateExamPlanFromProfile(profile = MedTutorAuthService?.userProfile) {
       const owner = getExamPlanOwner();
       const localState = readExamPlanLocalState(owner);
       const cloudState = profile?.uid === owner ? profile.examStudyPlanner : null;
       const localUpdatedAt = Date.parse(localState?.updatedAt || '') || 0;
       const cloudUpdatedAt = Date.parse(cloudState?.updatedAt || '') || 0;
-      const state = cloudUpdatedAt > localUpdatedAt ? cloudState : (localState || cloudState);
+      const selectedSource = cloudUpdatedAt > localUpdatedAt ? cloudState : (localState || cloudState);
+      const state = normalizeExamPlannerState(selectedSource);
       if (owner !== examPlanLoadedOwner || localUpdatedAt !== examPlanLocalUpdatedAt) {
         examPlanLoadedOwner = owner;
         examPlanLocalUpdatedAt = localUpdatedAt;
-        examStudyPlan = state?.plan && typeof state.plan === 'object' ? state.plan : null;
-        examPlanSelectedMaterialIds = new Set((state?.selectedMaterialIds || examStudyPlan?.materials || [])
+        examPlanCloudUpdatedAt = cloudUpdatedAt;
+        examStudyPlans = state.plans;
+        examPlanSelectedMaterialIds = new Set((state.selectedMaterialIds || [])
           .map(item => String(typeof item === 'object' ? item.id : item)).filter(Boolean));
-      } else if (cloudUpdatedAt > localUpdatedAt) {
-        examPlanLocalUpdatedAt = cloudUpdatedAt;
-        examStudyPlan = cloudState?.plan && typeof cloudState.plan === 'object' ? cloudState.plan : null;
-        examPlanSelectedMaterialIds = new Set((cloudState?.selectedMaterialIds || examStudyPlan?.materials || [])
+        examPlanActiveContext = state.activeContext;
+        examPlanSelectedContextKey = state.activeContext?.key || '';
+      } else if (cloudUpdatedAt > examPlanCloudUpdatedAt) {
+        examPlanCloudUpdatedAt = cloudUpdatedAt;
+        const remoteState = normalizeExamPlannerState(cloudState);
+        examStudyPlans = remoteState.plans;
+        examPlanSelectedMaterialIds = new Set((remoteState.selectedMaterialIds || [])
           .map(item => String(typeof item === 'object' ? item.id : item)).filter(Boolean));
+        examPlanActiveContext = remoteState.activeContext;
+        examPlanSelectedContextKey = remoteState.activeContext?.key || '';
       }
+      if (pruneExpiredExamPlans()) persistExamStudyPlan();
+      scheduleExamPlanExpiryCleanup();
       return state;
     }
 
     function persistExamStudyPlan() {
       const owner = getExamPlanOwner();
       const state = {
-        version: 1,
+        version: 2,
         updatedAt: new Date().toISOString(),
-        plan: examStudyPlan,
-        selectedMaterialIds: [...examPlanSelectedMaterialIds]
+        plans: examStudyPlans,
+        selectedMaterialIds: [...examPlanSelectedMaterialIds],
+        activeContext: getCurrentExamPlanContext()
       };
+      examPlanActiveContext = state.activeContext;
       examPlanLoadedOwner = owner;
       examPlanLocalUpdatedAt = Date.parse(state.updatedAt);
       try {
@@ -22757,6 +22826,7 @@ Para cada material, retorne um objeto no JSON com:
               MedTutorAuthService.userProfile = { ...MedTutorAuthService.userProfile, examStudyPlanner: state };
               try { localStorage.setItem('medtutor_user_profile', JSON.stringify(MedTutorAuthService.userProfile)); } catch (error) {}
             }
+            examPlanCloudUpdatedAt = Math.max(examPlanCloudUpdatedAt, Date.parse(state.updatedAt) || 0);
           })
           .catch(error => {
             console.warn('[Planejamento de prova] Falha ao sincronizar com Firestore; a cópia local foi mantida.', error);
@@ -22764,12 +22834,64 @@ Para cada material, retorne um objeto no JSON com:
             if (currentStatus && getExamPlanOwner() === owner) currentStatus.textContent = 'Salvo localmente · sincronização pendente';
           });
       }
+      scheduleExamPlanExpiryCleanup();
       return state;
     }
 
     function normalizeExamPeriodLabel(value) {
       return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
         .replace(/º|°/g, 'o').replace(/\s+/g, ' ').trim();
+    }
+
+    function normalizeExamSubjectLabel(value) {
+      return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function getCurrentExamPlanContext() {
+      const periods = listExamPickerPeriods();
+      const periodSelect = document.getElementById('examPickerPeriod');
+      const subjectSelect = document.getElementById('examPickerSubject');
+      const period = periods.find(item => (item.id || item.period) === periodSelect?.value) || null;
+      const subjectName = subjectSelect?.value || '';
+      const examDate = document.getElementById('examPlanExamDate')?.value || '';
+      const periodName = period?.period || '';
+      const key = ExamStudyPlanner.planKey({ examDate, period: periodName, subject: subjectName });
+      return {
+        key,
+        examDate,
+        dailyMinutes: document.getElementById('examPlanDailyMinutes')?.value || '60',
+        periodId: period ? String(period.id || period.period) : '',
+        period: periodName,
+        subject: subjectName,
+        subjectKey: normalizeExamSubjectLabel(subjectName)
+      };
+    }
+
+    function getExamPlanContextKey(plan) {
+      if (plan?.contextKey) return String(plan.contextKey);
+      const material = plan?.materials?.[0] || {};
+      return ExamStudyPlanner.planKey({
+        examDate: plan?.examDate || '',
+        period: plan?.period || material.period,
+        subject: plan?.subject || material.subject
+      });
+    }
+
+    function getExamPlanForCurrentContext() {
+      const context = getCurrentExamPlanContext();
+      return examStudyPlans.find(plan => getExamPlanContextKey(plan) === context.key) || null;
+    }
+
+    function loadExamPlanDraftForCurrentContext() {
+      const context = getCurrentExamPlanContext();
+      if (context.key !== examPlanSelectedContextKey) {
+        const plan = getExamPlanForCurrentContext();
+        examPlanSelectedMaterialIds = new Set((plan?.materials || []).map(material => String(material.id)).filter(Boolean));
+      }
+      examPlanSelectedContextKey = context.key;
+      renderExamPlanFormSummary();
+      renderExamPlanRoute();
     }
 
     function getMaterialsForExamPickerSubject(subjectName, periodName) {
@@ -22803,6 +22925,7 @@ Para cada material, retorne um objeto no JSON com:
       const periodSelect = document.getElementById('examPickerPeriod');
       const periods = listExamPickerPeriods();
       if (!periodSelect) return periods;
+      const previous = periodSelect.value;
       periodSelect.innerHTML = '';
       periods.forEach(period => {
         const option = document.createElement('option');
@@ -22816,6 +22939,11 @@ Para cada material, retorne um objeto no JSON com:
         option.textContent = 'Nenhum período com materiais enviados';
         periodSelect.appendChild(option);
       }
+      const savedPeriodId = examPlanActiveContext?.periodId;
+      const desired = previous || savedPeriodId;
+      if (desired && periods.some(period => String(period.id || period.period) === String(desired))) {
+        periodSelect.value = String(desired);
+      }
       return periods;
     }
 
@@ -22826,6 +22954,7 @@ Para cada material, retorne um objeto no JSON com:
       const selectedPeriod = periods.find(period => (period.id || period.period) === periodSelect?.value) || periods[0];
       if (!subjectSelect) return;
       const previous = subjectSelect.value;
+      const savedContext = examPlanActiveContext;
       subjectSelect.innerHTML = '';
       (selectedPeriod?.subjects || []).forEach(subject => {
         const option = document.createElement('option');
@@ -22833,7 +22962,8 @@ Para cada material, retorne um objeto no JSON com:
         option.textContent = `${subject.name} (${getMaterialsForExamPickerSubject(subject.name, selectedPeriod?.period).length})`;
         subjectSelect.appendChild(option);
       });
-      if (previous && (selectedPeriod?.subjects || []).some(subject => subject.name === previous)) subjectSelect.value = previous;
+      const desired = previous || savedContext?.subject;
+      if (desired && (selectedPeriod?.subjects || []).some(subject => subject.name === desired)) subjectSelect.value = desired;
       renderExamPickerMaterials();
     }
 
@@ -22845,9 +22975,12 @@ Para cada material, retorne um objeto no JSON com:
       const subjectName = subjectSelect.value;
       const selectedPeriod = (universityCurriculum || []).find(period => (period.id || period.period) === document.getElementById('examPickerPeriod')?.value);
       const materials = subjectName ? getMaterialsForExamPickerSubject(subjectName, selectedPeriod?.period) : [];
+      const currentPlan = getExamPlanForCurrentContext();
+      const includedMaterialIds = new Set((currentPlan?.materials || []).map(item => String(item.id)));
       const selectableMaterials = materials.filter(material => {
         const normalized = normalizeMaterial(material);
-        return String(normalized.material_md || '').trim().length > 0 || getExamPlanCardCount(normalized) > 0;
+        return !includedMaterialIds.has(String(normalized.id))
+          && (String(normalized.material_md || '').trim().length > 0 || getExamPlanCardCount(normalized) > 0);
       });
       list.innerHTML = '';
       materials.forEach(material => {
@@ -22860,7 +22993,9 @@ Para cada material, retorne um objeto no JSON com:
         const textLength = String(normalized.material_md || '').trim().length;
         const canStudy = cardCount > 0 || textLength > 0;
         checkbox.checked = canStudy && examPlanSelectedMaterialIds.has(String(normalized.id));
-        checkbox.disabled = !canStudy;
+        const alreadyInPlan = includedMaterialIds.has(String(normalized.id));
+        checkbox.disabled = !canStudy || alreadyInPlan;
+        if (alreadyInPlan) checkbox.title = 'Este material já está incluído nesta prova.';
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) examPlanSelectedMaterialIds.add(String(normalized.id));
           else examPlanSelectedMaterialIds.delete(String(normalized.id));
@@ -22879,7 +23014,7 @@ Para cada material, retorne um objeto no JSON com:
       if (!materials.length) {
         list.innerHTML = '<div class="exam-picker-empty">Esta disciplina não possui materiais disponíveis em Matérias Curriculares.</div>';
       }
-      if (selectAll) selectAll.checked = selectableMaterials.length > 0 && selectableMaterials.every(material => examPlanSelectedMaterialIds.has(String(material.id)));
+      if (selectAll) selectAll.checked = selectableMaterials.length > 0 && selectableMaterials.every(material => examPlanSelectedMaterialIds.has(String(normalizeMaterial(material).id)));
       if (selectAll) selectAll.onchange = () => {
         selectableMaterials.forEach(material => {
           if (selectAll.checked) examPlanSelectedMaterialIds.add(String(material.id));
@@ -22899,7 +23034,9 @@ Para cada material, retorne um objeto no JSON com:
         const normalized = normalizeMaterial(material);
         return String(normalized.material_md || '').trim().length > 0 || getExamPlanCardCount(normalized) > 0;
       }) : [];
-      if (selectAll) selectAll.checked = currentMaterials.length > 0 && currentMaterials.every(material => examPlanSelectedMaterialIds.has(String(material.id)));
+      const existingIds = new Set((getExamPlanForCurrentContext()?.materials || []).map(material => String(material.id)));
+      const addableMaterials = currentMaterials.filter(material => !existingIds.has(String(normalizeMaterial(material).id)));
+      if (selectAll) selectAll.checked = addableMaterials.length > 0 && addableMaterials.every(material => examPlanSelectedMaterialIds.has(String(normalizeMaterial(material).id)));
       const selectedCount = getSelectedExamMaterials().length;
       if (counter) counter.textContent = `${selectedCount} ${selectedCount === 1 ? 'material selecionado' : 'materiais selecionados'}`;
     }
@@ -22912,6 +23049,9 @@ Para cada material, retorne um objeto no JSON com:
         showToast('⚠️ Primeiro envie materiais em Matérias Curriculares e confirme a ementa da disciplina.');
         return;
       }
+      const context = getCurrentExamPlanContext();
+      const pickerContext = document.getElementById('examPickerContext');
+      if (pickerContext) pickerContext.textContent = `${context.period || 'Período'} · ${context.subject || 'Disciplina'} · ${context.examDate ? formatExamPlanDate(context.examDate, { day: 'numeric', month: 'long', year: 'numeric' }) : 'selecione a data da prova'}`;
       renderExamPickerSubjects();
       modal?.classList.add('active');
       modal?.setAttribute('aria-hidden', 'false');
@@ -22959,9 +23099,12 @@ Para cada material, retorne um objeto no JSON com:
           periodByMaterialId.set(String(material.id), period.period);
         });
       }));
+      const context = getCurrentExamPlanContext();
       return (chatDriveMaterials || []).map(normalizeMaterial)
         .filter(material => examPlanSelectedMaterialIds.has(String(material.id)))
         .filter(material => periodByMaterialId.has(String(material.id)))
+        .filter(material => normalizeExamPeriodLabel(periodByMaterialId.get(String(material.id))) === normalizeExamPeriodLabel(context.period))
+        .filter(material => normalizeExamSubjectLabel(resolveCanonicalCurriculumSubjectName(material.subject || material.disciplina)) === context.subjectKey)
         .filter(material => String(material.material_md || '').trim().length > 0 || getExamPlanCardCount(material) > 0)
         .map(material => ({
           id: String(material.id), name: material.name,
@@ -22976,11 +23119,15 @@ Para cada material, retorne um objeto no JSON com:
     function renderExamPlanFormSummary() {
       const count = document.getElementById('examPlanSelectedCount');
       const list = document.getElementById('examPlanSelectedList');
-      const materials = getSelectedExamMaterials();
-      if (count) count.textContent = `${materials.length} ${materials.length === 1 ? 'material selecionado' : 'materiais selecionados'}`;
+      const additions = getSelectedExamMaterials();
+      const existing = getExamPlanForCurrentContext()?.materials || [];
+      const materials = ExamStudyPlanner.mergeMaterialsById(existing, additions);
+      const generateButton = document.getElementById('examPlanGenerateBtn');
+      if (generateButton) generateButton.textContent = existing.length ? '➕ Adicionar materiais à prova' : '🧭 Criar roteiro até a prova';
+      if (count) count.textContent = `${materials.length} ${materials.length === 1 ? 'material previsto' : 'materiais previstos'}${existing.length ? ` · ${additions.length > existing.length ? `${additions.length - existing.length} novo(s)` : 'pode adicionar mais'}` : ''}`;
       if (list) list.textContent = materials.length
         ? materials.map(material => `${material.period ? `${material.period} · ` : ''}${material.subject}: ${material.name}`).join('  •  ')
-        : 'Selecione os materiais navegando pela ementa.';
+        : 'Selecione período, disciplina e data da prova; depois escolha os materiais.';
     }
 
     function showExamPlanFeedback(message, kind = 'success') {
@@ -23000,7 +23147,7 @@ Para cada material, retorne um objeto no JSON com:
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
-    function renderExamPlanTask(task) {
+    function renderExamPlanTask(task, planId) {
       const completed = Boolean(task.completed);
       const title = task.kind === 'study'
         ? `${task.materialName}${task.focusSection ? ` · ${task.focusSection}` : (task.parts > 1 ? ` · Parte ${task.part} de ${task.parts}` : '')}`
@@ -23013,7 +23160,7 @@ Para cada material, retorne um objeto no JSON com:
         ? `<button class="btn-outline-action" type="button" data-exam-open-material="${escapeExamPlannerText(task.materialIds?.[0] || '')}" data-exam-open-mode="study" data-exam-focus="${escapeExamPlannerText(task.focusSection || '')}">📖 Estudar</button>`
         : `<button class="btn-outline-action" type="button" data-exam-open-materials="${escapeExamPlannerText((task.materialIds || []).join('|'))}" data-exam-open-mode="review">🗂️ Abrir revisão</button>`;
       return `<div class="exam-plan-task-row ${completed ? 'is-complete' : ''}">
-        <label class="exam-plan-task-copy"><input type="checkbox" data-exam-task-complete="${escapeExamPlannerText(task.id)}" ${completed ? 'checked' : ''} aria-label="Marcar como concluída: ${escapeExamPlannerText(title)}">
+        <label class="exam-plan-task-copy"><input type="checkbox" data-exam-plan-id="${escapeExamPlannerText(planId)}" data-exam-task-complete="${escapeExamPlannerText(task.id)}" ${completed ? 'checked' : ''} aria-label="Marcar como concluída: ${escapeExamPlannerText(title)}">
           <span class="exam-plan-task-name">${escapeExamPlannerText(title)} <small>${typeLabel} · ${escapeExamPlannerText(subjectLabel)}</small></span>
         </label>
         <div class="exam-plan-task-actions">${openButtons}<span class="exam-plan-day-load">${Number(task.minutes) || 0} min</span></div>
@@ -23026,63 +23173,97 @@ Para cada material, retorne um objeto no JSON com:
       if (!route) return;
       hydrateExamPlanFromProfile();
       renderExamPlanFormSummary();
-      if (recalcButton) recalcButton.style.display = examStudyPlan ? 'inline-flex' : 'none';
-      if (!examStudyPlan || !Array.isArray(examStudyPlan.tasks)) {
-        route.innerHTML = '';
+      if (recalcButton) recalcButton.style.display = examStudyPlans.length ? 'inline-flex' : 'none';
+      if (!examStudyPlans.length) {
+        route.innerHTML = '<div class="exam-plan-empty">Seus roteiros de prova aparecerão aqui depois que você criar o primeiro.</div>';
+        if (examPlanDetailsOpenId) closeExamPlanDetails();
         return;
       }
+      route.innerHTML = [...examStudyPlans].sort((a, b) => String(a.examDate).localeCompare(String(b.examDate))
+        || String(a.subject || '').localeCompare(String(b.subject || ''), 'pt-BR')).map(plan => {
+        const daysWithActivities = new Set(plan.tasks.map(task => task.date)).size;
+        const completedCount = plan.tasks.filter(task => task.completed).length;
+        const totalCount = plan.tasks.length;
+        const studyHours = (Number(plan.totalStudyMinutes) || 0) / 60;
+        const examLabel = [plan.period, plan.subject].filter(Boolean).join(' · ') || 'Prova';
+        const overdueCount = plan.tasks.filter(task => !task.completed && task.date < ExamStudyPlanner.dateKey(new Date())).length;
+        return `<button class="exam-plan-summary-card" type="button" data-exam-open-plan="${escapeExamPlannerText(plan.id)}" aria-haspopup="dialog">
+          <span class="exam-plan-summary-heading"><span><strong>${escapeExamPlannerText(examLabel)}</strong><small>Prova em ${escapeExamPlannerText(formatExamPlanDate(plan.examDate, { day: 'numeric', month: 'long', year: 'numeric' }))} · ${Number(plan.dailyMinutes) || 60} min/dia</small></span><span class="exam-plan-summary-chevron" aria-hidden="true">›</span></span>
+          <span class="exam-plan-summary-metrics">
+            <span><strong>${daysWithActivities}</strong><small>dias com atividades</small></span>
+            <span><strong>${studyHours.toFixed(1).replace('.', ',')} h</strong><small>estudo estimado</small></span>
+            <span><strong>${completedCount}/${totalCount}</strong><small>atividades concluídas</small></span>
+          </span>
+          ${overdueCount ? `<span class="exam-plan-summary-warning">${overdueCount} atividade(s) atrasada(s)</span>` : ''}
+        </button>`;
+      }).join('');
 
+      route.querySelectorAll('[data-exam-open-plan]').forEach(button => button.addEventListener('click', () => {
+        openExamPlanDetails(button.dataset.examOpenPlan);
+      }));
+      if (examPlanDetailsOpenId) renderExamPlanDetails(examPlanDetailsOpenId);
+    }
+
+    function renderExamPlanDetails(planId) {
+      const plan = examStudyPlans.find(item => item.id === planId);
+      const modal = document.getElementById('examPlanDetailsModal');
+      const title = document.getElementById('examPlanDetailsTitle');
+      const subtitle = document.getElementById('examPlanDetailsSubtitle');
+      const content = document.getElementById('examPlanDetailsContent');
+      const removeButton = document.getElementById('examPlanDetailsRemoveBtn');
+      if (!plan || !modal || !content) {
+        closeExamPlanDetails();
+        return;
+      }
+      if (title) title.textContent = [plan.period, plan.subject].filter(Boolean).join(' · ') || 'Roteiro da prova';
+      if (subtitle) subtitle.textContent = `Prova em ${formatExamPlanDate(plan.examDate, { day: 'numeric', month: 'long', year: 'numeric' })} · ${Number(plan.dailyMinutes) || 60} minutos disponíveis por dia`;
       const tasksByDate = new Map();
-      examStudyPlan.tasks.forEach(task => {
+      plan.tasks.forEach(task => {
         if (!tasksByDate.has(task.date)) tasksByDate.set(task.date, []);
         tasksByDate.get(task.date).push(task);
       });
-      const allDays = [...tasksByDate.entries()].sort(([a], [b]) => a.localeCompare(b));
-      const completedCount = examStudyPlan.tasks.filter(task => task.completed).length;
-      const totalCount = examStudyPlan.tasks.length;
-      const studyHours = (Number(examStudyPlan.totalStudyMinutes) || 0) / 60;
-      const overdueCount = examStudyPlan.tasks.filter(task => !task.completed && task.date < ExamStudyPlanner.dateKey(new Date())).length;
       const todayKey = ExamStudyPlanner.dateKey(new Date());
-      const nextWeekDate = new Date(); nextWeekDate.setDate(nextWeekDate.getDate() + 6);
-      const nextWeekKey = ExamStudyPlanner.dateKey(nextWeekDate);
-      const finalReviewKey = examStudyPlan.tasks.find(task => task.kind === 'final-review')?.date;
-      const visibleDays = allDays.filter(([date]) => date <= nextWeekKey || date === finalReviewKey);
-      const hiddenDays = allDays.filter(([date]) => !visibleDays.some(([visible]) => visible === date));
-      const makeDayHtml = ([date, tasks]) => {
-        const total = tasks.reduce((sum, task) => sum + (Number(task.minutes) || 0), 0);
-        const isOver = total > (Number(examStudyPlan.dailyMinutes) || 60);
-        const dateLabel = date === todayKey ? 'Hoje' : formatExamPlanDate(date);
-        return `<article class="exam-plan-day ${isOver ? 'is-over-cap' : ''}">
-          <div class="exam-plan-day-heading"><span>${escapeExamPlannerText(dateLabel)}</span><span class="exam-plan-day-load">${total} min${isOver ? ' · acima da meta diária' : ''}</span></div>
-          <div class="exam-plan-task-list">${tasks.map(renderExamPlanTask).join('')}</div>
-        </article>`;
-      };
-      const overloadMessage = examStudyPlan.overloadedDays?.length
-        ? `Há ${examStudyPlan.overloadedDays.length} dia(s) acima da disponibilidade diária informada. O roteiro mostra a carga estimada para você poder ajustar o tempo ou rever a seleção.`
-        : '';
-      route.innerHTML = `<div class="exam-plan-overview">
-        <div class="exam-plan-stat"><strong>${examStudyPlan.materials?.length || 0}</strong><span>materiais na prova</span></div>
-        <div class="exam-plan-stat"><strong>${Math.max(1, allDays.length)}</strong><span>dias com atividades</span></div>
-        <div class="exam-plan-stat"><strong>${studyHours.toFixed(1).replace('.', ',')} h</strong><span>estudo estimado</span></div>
-        <div class="exam-plan-stat"><strong>${completedCount}/${totalCount}</strong><span>atividades concluídas</span></div>
-      </div>
-      ${overdueCount ? `<div class="exam-plan-feedback is-visible is-warning">Você tem ${overdueCount} atividade(s) com data passada. Use “Recalcular tarefas pendentes” para redistribuí-las até a véspera.</div>` : ''}
-      ${overloadMessage ? `<div class="exam-plan-feedback is-visible is-warning">${escapeExamPlannerText(overloadMessage)}</div>` : ''}
-      <div class="exam-plan-route-list">${visibleDays.map(makeDayHtml).join('')}</div>
-      ${hiddenDays.length ? `<details class="exam-plan-all-days"><summary>Ver os outros ${hiddenDays.length} dia(s) do roteiro completo</summary><div class="exam-plan-route-list">${hiddenDays.map(makeDayHtml).join('')}</div></details>` : ''}
-      <p class="exam-plan-method-note">Prova: ${escapeExamPlannerText(formatExamPlanDate(examStudyPlan.examDate, { day: 'numeric', month: 'long', year: 'numeric' }))}. A primeira passada é distribuída até a prova; há revisões cumulativas a cada poucos dias e uma revisão geral na véspera. O tempo é uma estimativa e pode ser recalculado quando houver atraso.</p>`;
-
-      route.querySelectorAll('[data-exam-task-complete]').forEach(input => input.addEventListener('change', () => {
-        setExamPlanTaskCompleted(input.dataset.examTaskComplete, input.checked);
+      content.innerHTML = [...tasksByDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, tasks]) => {
+        const totalMinutes = tasks.reduce((sum, task) => sum + (Number(task.minutes) || 0), 0);
+        const overDailyLimit = totalMinutes > (Number(plan.dailyMinutes) || 60);
+        const dateLabel = date === todayKey ? `Hoje · ${formatExamPlanDate(date)}` : formatExamPlanDate(date);
+        return `<section class="exam-plan-day ${overDailyLimit ? 'is-over-cap' : ''}">
+          <header class="exam-plan-day-heading"><span>${escapeExamPlannerText(dateLabel)}</span><span class="exam-plan-day-load">${totalMinutes} min${overDailyLimit ? ' · acima da meta diária' : ''}</span></header>
+          <div class="exam-plan-task-list">${tasks.map(task => renderExamPlanTask(task, plan.id)).join('')}</div>
+        </section>`;
+      }).join('');
+      if (plan.overloadedDays?.length) {
+        content.insertAdjacentHTML('afterbegin', `<p class="exam-plan-feedback is-visible is-warning">${plan.overloadedDays.length} dia(s) ultrapassam o tempo diário informado. Considere aumentar a disponibilidade ou revisar os materiais selecionados.</p>`);
+      }
+      if (removeButton) removeButton.onclick = () => removeExamStudyPlan(plan.id);
+      content.querySelectorAll('[data-exam-task-complete]').forEach(input => input.addEventListener('change', () => {
+        setExamPlanTaskCompleted(input.dataset.examPlanId, input.dataset.examTaskComplete, input.checked);
       }));
-      route.querySelectorAll('[data-exam-open-material]').forEach(button => button.addEventListener('click', () => {
+      content.querySelectorAll('[data-exam-open-material]').forEach(button => button.addEventListener('click', () => {
+        closeExamPlanDetails();
         openExamPlanMaterial(button.dataset.examOpenMaterial, button.dataset.examOpenMode, button.dataset.examFocus || '');
       }));
-      route.querySelectorAll('[data-exam-open-materials]').forEach(button => button.addEventListener('click', () => {
+      content.querySelectorAll('[data-exam-open-materials]').forEach(button => button.addEventListener('click', () => {
         const ids = String(button.dataset.examOpenMaterials || '').split('|').filter(Boolean);
+        closeExamPlanDetails();
         if (ids.length === 1) openExamPlanMaterial(ids[0], button.dataset.examOpenMode);
         else openExamPlanReviewPicker(ids);
       }));
+    }
+
+    function openExamPlanDetails(planId) {
+      examPlanDetailsOpenId = String(planId || '');
+      renderExamPlanDetails(examPlanDetailsOpenId);
+      const modal = document.getElementById('examPlanDetailsModal');
+      modal?.classList.add('active');
+      modal?.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeExamPlanDetails() {
+      const modal = document.getElementById('examPlanDetailsModal');
+      modal?.classList.remove('active');
+      modal?.setAttribute('aria-hidden', 'true');
+      examPlanDetailsOpenId = '';
     }
 
     function renderExamStudyPlanner() {
@@ -23091,43 +23272,78 @@ Para cada material, retorne um objeto no JSON com:
       const minutesInput = document.getElementById('examPlanDailyMinutes');
       const periodSelect = document.getElementById('examPickerPeriod');
       const subjectSelect = document.getElementById('examPickerSubject');
-      if (periodSelect) periodSelect.onchange = renderExamPickerSubjects;
-      if (subjectSelect) subjectSelect.onchange = renderExamPickerMaterials;
+      if (periodSelect) periodSelect.onchange = () => {
+        renderExamPickerSubjects();
+        loadExamPlanDraftForCurrentContext();
+      };
+      if (subjectSelect) subjectSelect.onchange = () => loadExamPlanDraftForCurrentContext();
+      if (dateInput) dateInput.onchange = () => loadExamPlanDraftForCurrentContext();
       if (dateInput) {
         const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
         dateInput.min = ExamStudyPlanner.dateKey(tomorrow);
-        if (!dateInput.value) dateInput.value = examStudyPlan?.examDate || dateInput.min;
+        if (!dateInput.value) dateInput.value = examPlanActiveContext?.examDate || examStudyPlans[0]?.examDate || dateInput.min;
       }
-      if (minutesInput && examStudyPlan) minutesInput.value = String(examStudyPlan.dailyMinutes || 60);
+      const savedContext = examPlanActiveContext;
+      const periods = populateExamPickerPeriods();
+      const periodChoice = savedContext?.periodId || (examStudyPlans[0]?.period
+        ? periods.find(period => normalizeExamPeriodLabel(period.period) === normalizeExamPeriodLabel(examStudyPlans[0].period))?.id || examStudyPlans[0].period
+        : '');
+      if (periodSelect && periodChoice && periods.some(period => String(period.id || period.period) === String(periodChoice))) periodSelect.value = String(periodChoice);
+      renderExamPickerSubjects();
+      if (subjectSelect && savedContext?.subject && [...subjectSelect.options].some(option => option.value === savedContext.subject)) subjectSelect.value = savedContext.subject;
+      const activePlan = getExamPlanForCurrentContext();
+      if (minutesInput) minutesInput.value = String(activePlan?.dailyMinutes || savedContext?.dailyMinutes || 60);
+      loadExamPlanDraftForCurrentContext();
       renderExamPlanRoute();
     }
 
     function createExamStudyPlan() {
       const dateInput = document.getElementById('examPlanExamDate');
       const minutesInput = document.getElementById('examPlanDailyMinutes');
-      const materials = getSelectedExamMaterials();
+      const context = getCurrentExamPlanContext();
+      if (!context.period || !context.subject) {
+        showExamPlanFeedback('Selecione o período e a disciplina da prova antes de escolher os materiais.', 'error');
+        return;
+      }
+      const selectedMaterials = getSelectedExamMaterials();
+      const existingPlan = getExamPlanForCurrentContext();
+      const materials = ExamStudyPlanner.mergeMaterialsById(existingPlan?.materials || [], selectedMaterials);
       const result = ExamStudyPlanner.buildSchedule({
         materials,
         examDate: dateInput?.value,
-        dailyMinutes: minutesInput?.value || 60
+        dailyMinutes: minutesInput?.value || existingPlan?.dailyMinutes || 60,
+        completedTaskIds: existingPlan?.tasks?.filter(task => task.completed).map(task => task.id) || []
       });
       if (!result.ok) {
         showExamPlanFeedback(result.error, 'error');
         return;
       }
-      if (examStudyPlan && !window.confirm('Criar este roteiro substituirá o planejamento de prova atual. Continuar?')) return;
-      examStudyPlan = { ...result, id: `exam_${Date.now()}` };
+      const plan = {
+        ...result,
+        id: existingPlan?.id || `exam_${Date.now()}`,
+        contextKey: context.key,
+        periodId: context.periodId,
+        period: context.period,
+        subject: context.subject,
+        dailyMinutes: Number(minutesInput?.value || existingPlan?.dailyMinutes || 60)
+      };
+      if (existingPlan) examStudyPlans = examStudyPlans.map(item => item.id === existingPlan.id ? plan : item);
+      else examStudyPlans = [...examStudyPlans, plan];
       dateInput.value = result.examDate;
-      examPlanSelectedMaterialIds = new Set(result.materials.map(material => material.id));
+      examPlanSelectedMaterialIds = new Set(materials.map(material => String(material.id)));
+      examPlanSelectedContextKey = context.key;
       persistExamStudyPlan();
       renderExamPlanRoute();
-      showExamPlanFeedback('Roteiro criado. A primeira passada, revisões cumulativas e revisão final já estão distribuídas até a véspera da prova.', 'success');
+      showExamPlanFeedback(existingPlan
+        ? `Materiais adicionados à prova de ${context.subject}; os materiais e atividades já existentes foram mantidos.`
+        : `Roteiro criado para ${context.subject}. Você pode criar outras provas na mesma data para disciplinas diferentes.`, 'success');
       document.getElementById('examPlanRoute')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    function setExamPlanTaskCompleted(taskId, completed) {
-      if (!examStudyPlan) return;
-      const task = examStudyPlan.tasks.find(item => item.id === taskId);
+    function setExamPlanTaskCompleted(planId, taskId, completed) {
+      const plan = examStudyPlans.find(item => item.id === planId);
+      if (!plan) return;
+      const task = plan.tasks.find(item => item.id === taskId);
       if (!task) return;
       task.completed = Boolean(completed);
       task.completedAt = task.completed ? new Date().toISOString() : null;
@@ -23136,24 +23352,44 @@ Para cada material, retorne um objeto no JSON com:
     }
 
     function recalculateExamStudyPlanNow() {
-      if (!examStudyPlan) return;
-      const completedTaskIds = examStudyPlan.tasks.filter(task => task.completed).map(task => task.id);
-      const materials = getSelectedExamMaterials().length ? getSelectedExamMaterials() : examStudyPlan.materials;
-      const result = ExamStudyPlanner.buildSchedule({
-        materials,
-        examDate: document.getElementById('examPlanExamDate')?.value || examStudyPlan.examDate,
-        dailyMinutes: document.getElementById('examPlanDailyMinutes')?.value || examStudyPlan.dailyMinutes,
-        completedTaskIds
+      if (!examStudyPlans.length) return;
+      const results = [];
+      examStudyPlans = examStudyPlans.map(plan => {
+        const completedTaskIds = plan.tasks.filter(task => task.completed).map(task => task.id);
+        const result = ExamStudyPlanner.buildSchedule({
+          materials: plan.materials,
+          examDate: plan.examDate,
+          dailyMinutes: plan.dailyMinutes,
+          completedTaskIds
+        });
+        if (!result.ok) {
+          results.push(`${plan.subject || 'Prova'}: ${result.error}`);
+          return plan;
+        }
+        results.push('ok');
+        return {
+          ...ExamStudyPlanner.rescheduleIncompleteTasks({ ...result, id: plan.id }),
+          id: plan.id, contextKey: plan.contextKey, periodId: plan.periodId,
+          period: plan.period, subject: plan.subject, dailyMinutes: plan.dailyMinutes
+        };
       });
-      if (!result.ok) {
-        showExamPlanFeedback(result.error, 'error');
-        return;
-      }
-      examStudyPlan = ExamStudyPlanner.rescheduleIncompleteTasks({ ...result, id: examStudyPlan.id });
-      examPlanSelectedMaterialIds = new Set(examStudyPlan.materials.map(material => String(material.id)));
       persistExamStudyPlan();
       renderExamPlanRoute();
-      showExamPlanFeedback('Tarefas não concluídas com data passada foram redistribuídas nos dias disponíveis antes da prova. Atividades concluídas foram preservadas.', 'success');
+      const failures = results.filter(result => result !== 'ok');
+      showExamPlanFeedback(failures.length
+        ? `Algumas provas não puderam ser recalculadas: ${failures.join(' · ')}`
+        : 'Tarefas não concluídas com data passada foram redistribuídas em cada prova. Atividades concluídas foram preservadas.', failures.length ? 'warning' : 'success');
+    }
+
+    function removeExamStudyPlan(planId) {
+      const plan = examStudyPlans.find(item => item.id === planId);
+      if (!plan || !window.confirm(`Remover o planejamento da prova de ${plan.subject || 'disciplina'} em ${formatExamPlanDate(plan.examDate)}?`)) return;
+      examStudyPlans = examStudyPlans.filter(item => item.id !== planId);
+      if (getExamPlanContextKey(plan) === examPlanSelectedContextKey) examPlanSelectedMaterialIds = new Set();
+      if (examPlanDetailsOpenId === plan.id) closeExamPlanDetails();
+      persistExamStudyPlan();
+      renderExamPlanRoute();
+      showExamPlanFeedback('Planejamento da prova removido. Os materiais curriculares e os flashcards não foram apagados.', 'success');
     }
 
     function openExamPlanMaterial(materialId, mode = 'study', focusSection = '') {
@@ -23220,6 +23456,8 @@ Para cada material, retorne um objeto no JSON com:
       window.createExamStudyPlan = createExamStudyPlan;
       window.recalculateExamStudyPlanNow = recalculateExamStudyPlanNow;
       window.hydrateExamPlanFromProfile = hydrateExamPlanFromProfile;
+      window.openExamPlanDetails = openExamPlanDetails;
+      window.closeExamPlanDetails = closeExamPlanDetails;
     }
 
     function findStudyMaterialForQuestion(question) {

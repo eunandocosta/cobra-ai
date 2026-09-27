@@ -28,6 +28,14 @@
     return `${year}-${month}-${day}`;
   }
 
+  function isExamPlanExpired(plan, today = new Date()) {
+    const exam = parseLocalDate(plan?.examDate);
+    const currentDay = parseLocalDate(today);
+    if (!exam || !currentDay) return false;
+    const purgeDay = addDays(exam, 2);
+    return dateKey(currentDay) >= dateKey(purgeDay);
+  }
+
   function addDays(date, amount) {
     const next = new Date(date);
     next.setDate(next.getDate() + amount);
@@ -37,6 +45,23 @@
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+  }
+
+  function normalizePlanLabel(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[º°]/g, 'o').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function planKey({ examDate = '', period = '', subject = '' } = {}) {
+    return [String(examDate), normalizePlanLabel(period), normalizePlanLabel(subject)].join('|');
+  }
+
+  function mergeMaterialsById(existing = [], additions = []) {
+    const byId = new Map();
+    [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(additions) ? additions : [])]
+      .filter(material => material && material.id != null && String(material.id).trim())
+      .forEach(material => byId.set(String(material.id), material));
+    return [...byId.values()];
   }
 
   function estimateMaterialMinutes(material) {
@@ -208,5 +233,5 @@
     return { ...plan, tasks, overloadedDays, generatedAt: new Date().toISOString() };
   }
 
-  return { parseLocalDate, dateKey, estimateMaterialMinutes, buildSchedule, rescheduleIncompleteTasks };
+  return { parseLocalDate, dateKey, isExamPlanExpired, estimateMaterialMinutes, planKey, mergeMaterialsById, buildSchedule, rescheduleIncompleteTasks };
 });
