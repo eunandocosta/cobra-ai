@@ -1,13 +1,13 @@
-const CACHE_NAME = 'medtutor-static-v83';
+const CACHE_NAME = 'medtutor-static-v84';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/landing.html',
   '/landing.css?v=20260922-landing-v1',
-  '/styles.css?v=20260927-exam-plan-cards-v1',
+  '/styles.css?v=20260927-sce-review-buckets-v1',
   '/academic-report-renderer.js?v=20260922-report-print-v5',
-  '/exam-study-planner.js?v=20260927-exam-plan-cards-v1',
-  '/app.min.js?v=20260927-exam-plan-quiz-v1',
+  '/exam-study-planner.js?v=20260927-sce-review-buckets-v1',
+  '/app.min.js?v=20260927-sce-review-buckets-v1',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
 ];

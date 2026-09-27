@@ -28,6 +28,26 @@
     return `${year}-${month}-${day}`;
   }
 
+  function calendarDayDifference(from, to) {
+    const start = parseLocalDate(from);
+    const end = parseLocalDate(to);
+    if (!start || !end) return null;
+    const startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+    const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+    return Math.round((endUtc - startUtc) / DAY_MS);
+  }
+
+  function reviewBucketForOffset(dayOffset) {
+    const offset = Number(dayOffset);
+    if (!Number.isFinite(offset)) return null;
+    if (offset <= 0) return 'today';
+    if (offset === 1) return 'tomorrow';
+    if (offset === 2) return 'twoDays';
+    if (offset === 3) return 'threeDays';
+    if (offset === 4) return 'fourDays';
+    return 'later';
+  }
+
   function isExamPlanExpired(plan, today = new Date()) {
     const exam = parseLocalDate(plan?.examDate);
     const currentDay = parseLocalDate(today);
@@ -233,5 +253,5 @@
     return { ...plan, tasks, overloadedDays, generatedAt: new Date().toISOString() };
   }
 
-  return { parseLocalDate, dateKey, isExamPlanExpired, estimateMaterialMinutes, planKey, mergeMaterialsById, buildSchedule, rescheduleIncompleteTasks };
+  return { parseLocalDate, dateKey, calendarDayDifference, reviewBucketForOffset, isExamPlanExpired, estimateMaterialMinutes, planKey, mergeMaterialsById, buildSchedule, rescheduleIncompleteTasks };
 });

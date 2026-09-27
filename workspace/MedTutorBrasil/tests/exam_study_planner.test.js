@@ -11,6 +11,14 @@ const materials = [
 
 assert.equal(Planner.parseLocalDate('2026-09-22').getDate(), 22);
 assert.equal(Planner.parseLocalDate('2026-02-31'), null, 'datas impossíveis não devem ser normalizadas');
+assert.equal(Planner.calendarDayDifference('2026-09-22', '2026-09-24'), 2, 'diferença por dia civil não deve depender do horário local');
+assert.equal(Planner.reviewBucketForOffset(-3), 'today', 'revisões vencidas entram no grupo de hoje');
+assert.equal(Planner.reviewBucketForOffset(0), 'today');
+assert.equal(Planner.reviewBucketForOffset(1), 'tomorrow');
+assert.equal(Planner.reviewBucketForOffset(2), 'twoDays');
+assert.equal(Planner.reviewBucketForOffset(3), 'threeDays');
+assert.equal(Planner.reviewBucketForOffset(4), 'fourDays');
+assert.equal(Planner.reviewBucketForOffset(5), 'later');
 assert.equal(Planner.estimateMaterialMinutes({ cardCount: 30 }), 62);
 assert.equal(Planner.isExamPlanExpired({ examDate: '2026-10-06' }, '2026-10-07'), false,
   'roteiro permanece salvo durante o dia seguinte à prova');

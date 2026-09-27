@@ -23576,6 +23576,139 @@ Para cada material, retorne um objeto no JSON com:
       return studyRouteSchedule;
     }
 
+    const sceReviewBucketDefinitions = [
+      { id: 'today', label: 'Hoje', caption: 'inclui revisões vencidas' },
+      { id: 'tomorrow', label: 'Amanhã', caption: 'revisões em 1 dia' },
+      { id: 'twoDays', label: 'Em 2 dias', caption: 'revisões em 2 dias' },
+      { id: 'threeDays', label: 'Em 3 dias', caption: 'revisões em 3 dias' },
+      { id: 'fourDays', label: 'Em 4 dias', caption: 'revisões em 4 dias' },
+      { id: 'later', label: 'Mais que 4 dias', caption: 'revisões futuras' }
+    ];
+
+    function getSceReviewBucketData() {
+      const today = getStartOfDay();
+      const buckets = Object.fromEntries(sceReviewBucketDefinitions.map(bucket => [bucket.id, { ...bucket, cards: [] }]));
+      const canonicalDisciplines = getSceCanonicalDisciplines();
+
+      (sharedQuestionsBank || []).forEach(question => {
+        const front = question?.flashcard?.front || question?.question || question?.pergunta || '';
+        if (!String(front).trim()) return;
+        const material = findStudyMaterialForQuestion(question);
+        const discipline = resolveSceQuestionDiscipline(question, canonicalDisciplines);
+        if (!material || !discipline) return;
+
+        const dueDate = getSceTaskDate(question, today);
+        const dayOffset = ExamStudyPlanner.calendarDayDifference(today, dueDate);
+        const bucketId = ExamStudyPlanner.reviewBucketForOffset(dayOffset);
+        const bucket = buckets[bucketId];
+        if (!bucket) return;
+        bucket.cards.push({ question, material, subject: discipline.name, dueDate, dayOffset, overdue: dayOffset < 0 });
+      });
+
+      Object.values(buckets).forEach(bucket => bucket.cards.sort((a, b) =>
+        a.subject.localeCompare(b.subject, 'pt-BR')
+        || String(a.material.name || a.material.originalFileName || '').localeCompare(String(b.material.name || b.material.originalFileName || ''), 'pt-BR')
+        || String(a.question.flashcardTitle || a.question.topic || '').localeCompare(String(b.question.flashcardTitle || b.question.topic || ''), 'pt-BR')));
+      return buckets;
+    }
+
+    function renderSceReviewBuckets() {
+      const container = document.getElementById('sceReviewBuckets');
+      if (!container) return;
+      const buckets = getSceReviewBucketData();
+      container.innerHTML = sceReviewBucketDefinitions.map(definition => {
+        const bucket = buckets[definition.id];
+        const subjectNames = [...new Set(bucket.cards.map(card => card.subject))];
+        const visibleSubjects = subjectNames.slice(0, 3).map(escapeHtmlText).join(' · ');
+        const remainingSubjects = Math.max(0, subjectNames.length - 3);
+        const overdueCount = bucket.cards.filter(card => card.overdue).length;
+        const isTodayWithOverdue = definition.id === 'today' && overdueCount > 0;
+        return `<button class="sce-review-bucket-button ${isTodayWithOverdue ? 'has-overdue' : ''}" type="button" data-sce-review-bucket="${definition.id}" aria-haspopup="dialog">
+          <span class="sce-review-bucket-top"><strong>${escapeHtmlText(definition.label)}</strong><span class="sce-review-bucket-count">${bucket.cards.length}</span></span>
+          <span class="sce-review-bucket-caption">${escapeHtmlText(definition.caption)}</span>
+          <span class="sce-review-bucket-subjects">${visibleSubjects || 'Nenhuma matéria'}${remainingSubjects ? ` · +${remainingSubjects}` : ''}</span>
+          ${overdueCount ? `<span class="sce-review-overdue-count">${overdueCount} vencido(s)</span>` : ''}
+        </button>`;
+      }).join('');
+      container.querySelectorAll('[data-sce-review-bucket]').forEach(button => {
+        button.addEventListener('click', () => openSceReviewModal(button.dataset.sceReviewBucket));
+      });
+    }
+
+    function renderSceReviewCard(card, index) {
+      const question = card.question;
+      const rawFront = String(question?.flashcard?.front || question?.question || question?.pergunta || '').trim();
+      const sanitizedFront = typeof sanitizeSharedQuestionStem === 'function' ? sanitizeSharedQuestionStem(rawFront) : rawFront;
+      const front = typeof isSharedQuestionStemValid === 'function' && !isSharedQuestionStemValid(sanitizedFront) ? rawFront : sanitizedFront;
+      const answer = String(question?.flashcard?.back || question?.reference_answer || question?.answer || question?.resposta || '').trim();
+      const title = typeof resolveFlashcardTitle === 'function' ? resolveFlashcardTitle(question) : (question.flashcardTitle || question.topic || 'Flashcard');
+      const materialName = card.material.name || card.material.originalFileName || 'Material de estudo';
+      const dateLabel = card.overdue
+        ? `Vencido há ${Math.abs(card.dayOffset)} dia(s)`
+        : card.dayOffset === 0 ? 'Revisar hoje'
+          : `Revisar em ${card.dayOffset} dia(s) · ${formatExamPlanDate(card.dueDate, { day: 'numeric', month: 'short' })}`;
+      const image = typeof renderStudySupportImage === 'function' ? renderStudySupportImage(question) : '';
+      const formattedFront = typeof formatStudyRichText === 'function' ? formatStudyRichText(front) : escapeHtmlText(front);
+      const formattedAnswer = typeof formatStudyRichText === 'function' ? formatStudyRichText(answer) : escapeHtmlText(answer);
+      return `<article class="sce-review-flashcard ${card.overdue ? 'is-overdue' : 'is-upcoming'}" style="--sce-review-card-index:${index}">
+        <header class="sce-review-flashcard-header">
+          <div><span class="sce-review-flashcard-subject">${escapeHtmlText(card.subject)}</span><h4>${escapeHtmlText(title)}</h4></div>
+          <span class="sce-review-due-label">${escapeHtmlText(dateLabel)}</span>
+        </header>
+        <div class="sce-review-material-label">${escapeHtmlText(materialName)}</div>
+        <div class="sce-review-flashcard-front study-rich-text">${formattedFront}</div>
+        <div class="sce-review-answer" hidden><span class="sce-review-answer-label">Resposta</span><div class="study-rich-text">${formattedAnswer || '<p>Este card não possui resposta registrada.</p>'}${image}</div></div>
+        <button class="btn-outline-action sce-review-reveal-button" type="button" data-sce-review-reveal aria-expanded="false">Mostrar resposta</button>
+      </article>`;
+    }
+
+    let sceReviewEscapeHandler = null;
+
+    function openSceReviewModal(bucketId) {
+      const bucket = getSceReviewBucketData()[bucketId];
+      const modal = document.getElementById('sceReviewModal');
+      const title = document.getElementById('sceReviewModalTitle');
+      const subtitle = document.getElementById('sceReviewModalSubtitle');
+      const list = document.getElementById('sceReviewCards');
+      if (!bucket || !modal || !list) return;
+      const subjectGroups = new Map();
+      bucket.cards.forEach(card => {
+        if (!subjectGroups.has(card.subject)) subjectGroups.set(card.subject, []);
+        subjectGroups.get(card.subject).push(card);
+      });
+      if (title) title.textContent = `Flashcards · ${bucket.label}`;
+      if (subtitle) subtitle.textContent = `${bucket.cards.length} card(s) · ${new Set(bucket.cards.map(card => card.subject)).size} matéria(s). Cards vencidos ficam destacados em vermelho.`;
+      list.innerHTML = bucket.cards.length
+        ? [...subjectGroups.entries()].map(([subject, cards]) => `<section class="sce-review-subject-group">
+            <h4>${escapeHtmlText(subject)} <span>${cards.length} card(s)</span></h4>
+            <div class="sce-review-flashcard-grid">${cards.map((card, index) => renderSceReviewCard(card, index)).join('')}</div>
+          </section>`).join('')
+        : '<div class="sce-review-empty">Nenhum flashcard está previsto para este prazo.</div>';
+      list.querySelectorAll('[data-sce-review-reveal]').forEach(button => button.addEventListener('click', () => {
+        const answerPanel = button.closest('.sce-review-flashcard')?.querySelector('.sce-review-answer');
+        if (!answerPanel) return;
+        answerPanel.hidden = !answerPanel.hidden;
+        button.setAttribute('aria-expanded', answerPanel.hidden ? 'false' : 'true');
+        button.textContent = answerPanel.hidden ? 'Mostrar resposta' : 'Ocultar resposta';
+      }));
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+      if (sceReviewEscapeHandler) document.removeEventListener('keydown', sceReviewEscapeHandler);
+      sceReviewEscapeHandler = event => {
+        if (event.key === 'Escape') closeSceReviewModal();
+      };
+      document.addEventListener('keydown', sceReviewEscapeHandler);
+      modal.querySelector('.btn-icon')?.focus();
+    }
+
+    function closeSceReviewModal() {
+      const modal = document.getElementById('sceReviewModal');
+      modal?.classList.remove('active');
+      modal?.setAttribute('aria-hidden', 'true');
+      if (sceReviewEscapeHandler) document.removeEventListener('keydown', sceReviewEscapeHandler);
+      sceReviewEscapeHandler = null;
+    }
+
     function resolveScheduleTargetSubject(subjectHint) {
       if (!subjectHint) return '';
       const available = typeof getAvailableStudySubjects === 'function' ? getAvailableStudySubjects() : [];
@@ -23629,10 +23762,13 @@ Para cada material, retorne um objeto no JSON com:
     if (typeof window !== 'undefined') {
       window.resolveScheduleTargetSubject = resolveScheduleTargetSubject;
       window.openScheduleQuestions = openScheduleQuestions;
+      window.openSceReviewModal = openSceReviewModal;
+      window.closeSceReviewModal = closeSceReviewModal;
     }
 
     function renderSceTimeline() {
       renderExamStudyPlanner();
+      renderSceReviewBuckets();
       const container = document.getElementById('timelineSchedule');
       if (!container) return;
       container.innerHTML = '';
