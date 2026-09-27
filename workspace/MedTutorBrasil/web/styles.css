@@ -7992,6 +7992,11 @@
     .sce-review-deck-card { width: min(760px, 100%); align-self: center; padding: clamp(16px, 3vw, 24px); }
     .sce-review-deck-card .sce-review-flashcard-front { font-size: 14px; line-height: 1.65; }
     .sce-review-deck-card .sce-review-answer { font-size: 13px; line-height: 1.65; }
+    .sce-review-written-answer { display: grid; gap: 8px; margin-top: 3px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .sce-review-written-answer > label { color: var(--text-secondary); font-size: 11.5px; font-weight: 700; }
+    .sce-review-written-answer .written-textarea { min-height: 78px; font-size: 12.5px; }
+    .sce-review-written-answer > button { justify-self: end; }
+    .sce-review-written-answer .ai-feedback-banner { padding: 11px; font-size: 11.5px; }
     .sce-review-rating-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 5px; }
     .sce-review-rating-actions button { justify-content: center; min-width: 0; }
     .sce-review-rating-actions button:disabled { opacity: .42; cursor: not-allowed; }

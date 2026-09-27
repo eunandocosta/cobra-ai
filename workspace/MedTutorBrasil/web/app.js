@@ -14362,8 +14362,8 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
     }
 
     // Renderiza o feedback formatado e a pontuação do flashcard
-    function renderEvaluationFeedback(evalData) {
-      const feedbackBanner = document.getElementById('aiEvaluationFeedback');
+    function renderEvaluationFeedback(evalData, targetId = 'aiEvaluationFeedback', options = {}) {
+      const feedbackBanner = document.getElementById(targetId);
       if (!feedbackBanner) return;
 
       const accuracy = typeof evalData.accuracy === 'number' ? evalData.accuracy : 0;
@@ -14429,39 +14429,38 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
             </div>
           </div>
 
-          <div style="display: flex; justify-content: flex-end; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
-            <button class="btn-outline-action" style="font-size: 11.5px; padding: 4px 12px;" onclick="flipCardManual()">
-              🔄 Ver Gabarito Completo no Verso
-            </button>
-            <button class="btn-outline-action primary" style="font-size: 11.5px; padding: 4px 12px;" onclick="openDerivedQuestionModalFromCurrentFlashcard()">
-              ✨ Gerar Pergunta com Novo Contexto
-            </button>
-          </div>
+          ${options.inSceDeck ? `<div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn-outline-action" style="font-size:11.5px;padding:4px 12px" type="button" data-sce-review-show-answer>🔄 Ver gabarito no card</button></div>` : `<div style="display: flex; justify-content: flex-end; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
+            <button class="btn-outline-action" style="font-size: 11.5px; padding: 4px 12px;" onclick="flipCardManual()">🔄 Ver Gabarito Completo no Verso</button>
+            <button class="btn-outline-action primary" style="font-size: 11.5px; padding: 4px 12px;" onclick="openDerivedQuestionModalFromCurrentFlashcard()">✨ Gerar Pergunta com Novo Contexto</button>
+          </div>`}
         </div>
       `;
     }
 
     // Avaliação Semântica de Resposta Escrita (Backend Gemini 3.5 Flash-Lite + Fallback Inteligente)
-    async function evaluateWrittenAnswer() {
-      const answer = document.getElementById('studentAnswerInput').value.trim();
+    async function evaluateWrittenAnswer(options = {}) {
+      const answerInput = document.getElementById(options.inputId || 'studentAnswerInput');
+      const answer = answerInput?.value.trim() || '';
       if (!answer) {
         showToast('⚠️ Digite sua resposta antes de solicitar correção.');
         return;
       }
-      const baseList = getFilteredQuestions();
-      const list = getSrsFilteredList(baseList);
-      if (list.length === 0) return;
-      const item = list[currentCardIndex];
+      const baseList = options.item ? null : getFilteredQuestions();
+      const list = options.item ? null : getSrsFilteredList(baseList);
+      if (!options.item && list.length === 0) return;
+      const item = options.item || list[currentCardIndex];
       if (!item) return;
 
-      const evalBtn = document.getElementById('btnEvaluateAnswer');
-      const feedbackBanner = document.getElementById('aiEvaluationFeedback');
+      const evalBtn = document.getElementById(options.buttonId || 'btnEvaluateAnswer');
+      const feedbackBanner = document.getElementById(options.feedbackId || 'aiEvaluationFeedback');
       if (evalBtn) {
         evalBtn.disabled = true;
         evalBtn.innerHTML = '⏳ Corrigindo...';
       }
-      feedbackBanner.style.display = 'block';
-      feedbackBanner.innerHTML = '<div style="display: flex; align-items: center; gap: 8px;"><span class="spinner" style="width: 14px; height: 14px; border: 2px solid var(--neon); border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span><em>🩺 MedCopilot AI: Corrigindo resposta com Gemini 3.5 Flash-Lite...</em></div>';
+      if (feedbackBanner) {
+        feedbackBanner.style.display = 'block';
+        feedbackBanner.innerHTML = '<div style="display: flex; align-items: center; gap: 8px;"><span class="spinner" style="width: 14px; height: 14px; border: 2px solid var(--neon); border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span><em>🩺 MedCopilot AI: Corrigindo resposta...</em></div>';
+      }
 
       const questionText = item.flashcard?.front || item.question || '';
       const referenceAnswer = item.flashcard?.back || item.reference_answer || item.answer || '';
@@ -14600,7 +14599,12 @@ Retorne EXCLUSIVAMENTE um JSON:
       item.lastEvaluation = evaluationResult;
 
       // Renderiza feedback e atualiza badge de pontuação
-      renderEvaluationFeedback(evaluationResult);
+      const isActiveSceCard = !options.inSceDeck || sceReviewState?.cards[sceReviewState.index]?.question === item;
+      if (isActiveSceCard) {
+        renderEvaluationFeedback(evaluationResult, options.feedbackId || 'aiEvaluationFeedback', { inSceDeck: options.inSceDeck === true });
+        if (options.inSceDeck) bindSceReviewEvaluationAnswerButton(document.getElementById('sceReviewCards'));
+      }
+      saveSharedQuestionsBank();
       const badgeScore = document.getElementById('srsBadgeScore');
       if (badgeScore) {
         const score = window.flashcardSessionStats.totalScore;
@@ -14609,7 +14613,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         badgeScore.textContent = `⭐ Pontos: ${score.toFixed(1).replace('.', ',')} / ${max.toFixed(1).replace('.', ',')} pts (${pct}%)`;
       }
 
-      if (evalBtn) {
+      if (evalBtn?.isConnected) {
         evalBtn.disabled = false;
         evalBtn.innerHTML = '<span>✨ Corrigir com IA</span>';
       }
@@ -23643,6 +23647,12 @@ Para cada material, retorne um objeto no JSON com:
         <div class="sce-review-material-label">${escapeHtmlText(materialName)}</div>
         <div class="sce-review-flashcard-front study-rich-text">${formattedFront}</div>
         <div class="sce-review-answer" hidden><span class="sce-review-answer-label">Resposta</span><div class="study-rich-text">${formattedAnswer || '<p>Este card não possui resposta registrada.</p>'}${image}</div></div>
+        <div class="sce-review-written-answer">
+          <label for="sceReviewStudentAnswerInput">✍️ Digite sua resposta</label>
+          <textarea id="sceReviewStudentAnswerInput" class="written-textarea" placeholder="Responda com suas palavras antes de consultar o gabarito..." onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); evaluateSceReviewWrittenAnswer();}">${escapeHtmlText(question.lastStudentAnswer || '')}</textarea>
+          <button class="btn-outline-action primary" id="sceReviewEvaluateAnswerButton" type="button" onclick="evaluateSceReviewWrittenAnswer()">✨ Corrigir com IA</button>
+          <div id="sceReviewEvaluationFeedback" class="ai-feedback-banner" aria-live="polite"></div>
+        </div>
         <button class="btn-outline-action sce-review-reveal-button" type="button" data-sce-review-reveal aria-expanded="false">Mostrar resposta</button>
         <div class="sce-review-rating-actions" aria-label="Avalie sua lembrança">
           <button class="btn-outline-action danger" type="button" data-sce-review-rate="1" disabled>Repetir</button>
@@ -23731,10 +23741,34 @@ Para cada material, retorne um objeto no JSON com:
         <div class="sce-review-deck-navigation"><button class="btn-outline-action" type="button" data-sce-review-prev ${index === 0 ? 'disabled' : ''}>← Anterior</button><span>${alreadyRated ? 'Resposta registrada' : 'Revele a resposta e avalie sua lembrança'}</span><button class="btn-outline-action" type="button" data-sce-review-next>${index === cards.length - 1 ? 'Concluir' : 'Pular →'}</button></div>`;
       if (alreadyRated) list.querySelector('.sce-review-deck-card')?.setAttribute('data-sce-review-locked', 'true');
       bindSceReviewRevealButtons(list);
+      if (card.question.lastEvaluation) {
+        renderEvaluationFeedback(card.question.lastEvaluation, 'sceReviewEvaluationFeedback', { inSceDeck: true });
+        bindSceReviewEvaluationAnswerButton(list);
+      }
       if (alreadyRated) list.querySelectorAll('[data-sce-review-rate]').forEach(button => { button.disabled = true; });
       list.querySelector('[data-sce-review-prev]')?.addEventListener('click', () => { sceReviewState.index--; renderSceReviewDeckCard(); });
       list.querySelector('[data-sce-review-next]')?.addEventListener('click', () => { sceReviewState.index++; renderSceReviewDeckCard(); });
       list.querySelectorAll('[data-sce-review-rate]').forEach(button => button.addEventListener('click', () => rateSceReviewDeckCard(Number(button.dataset.sceReviewRate))));
+    }
+
+    function bindSceReviewEvaluationAnswerButton(root) {
+      root?.querySelector('[data-sce-review-show-answer]')?.addEventListener('click', () => {
+        const revealButton = root.querySelector('[data-sce-review-reveal]');
+        if (revealButton?.getAttribute('aria-expanded') !== 'true') revealButton?.click();
+      });
+    }
+
+    function evaluateSceReviewWrittenAnswer() {
+      if (!sceReviewState || sceReviewState.index >= sceReviewState.cards.length) return;
+      const item = sceReviewState.cards[sceReviewState.index]?.question;
+      if (!item) return;
+      return evaluateWrittenAnswer({
+        item,
+        inputId: 'sceReviewStudentAnswerInput',
+        buttonId: 'sceReviewEvaluateAnswerButton',
+        feedbackId: 'sceReviewEvaluationFeedback',
+        inSceDeck: true
+      });
     }
 
     function applyFlashcardSrsRating(item, rating) {
@@ -23851,6 +23885,7 @@ Para cada material, retorne um objeto no JSON com:
       window.openSceReviewModal = openSceReviewModal;
       window.closeSceReviewModal = closeSceReviewModal;
       window.backToSceReviewSubjects = backToSceReviewSubjects;
+      window.evaluateSceReviewWrittenAnswer = evaluateSceReviewWrittenAnswer;
     }
 
     function renderSceTimeline() {
