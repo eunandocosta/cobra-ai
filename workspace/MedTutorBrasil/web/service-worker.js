@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtutor-static-v82';
+const CACHE_NAME = 'medtutor-static-v83';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -7,7 +7,7 @@ const APP_SHELL = [
   '/styles.css?v=20260927-exam-plan-cards-v1',
   '/academic-report-renderer.js?v=20260922-report-print-v5',
   '/exam-study-planner.js?v=20260927-exam-plan-cards-v1',
-  '/app.min.js?v=20260927-exam-plan-cards-v1',
+  '/app.min.js?v=20260927-exam-plan-quiz-v1',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'
 ];

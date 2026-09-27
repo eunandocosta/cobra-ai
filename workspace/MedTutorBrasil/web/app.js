@@ -8264,7 +8264,18 @@ ${cleanText}
         list = list.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, currentStudySubject));
       }
       if (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') {
+        const selectedMaterial = (chatDriveMaterials || []).find(material => {
+          const normalized = normalizeMaterial(material);
+          return normalizeStudyComparisonText(normalized.name || normalized.id) === normalizeStudyComparisonText(currentQuizSlideFilter);
+        });
         list = list.filter(q => {
+          if (selectedMaterial) {
+            const linkedMaterial = typeof findStudyMaterialForQuestion === 'function' ? findStudyMaterialForQuestion(q) : null;
+            if (linkedMaterial) return String(linkedMaterial.id) === String(selectedMaterial.id);
+            const questionMaterial = normalizeStudyComparisonText(q.slideName || q.materialName || '');
+            return [selectedMaterial.name, selectedMaterial.originalFileName, selectedMaterial.id]
+              .some(value => normalizeStudyComparisonText(value) === questionMaterial);
+          }
           if (q.slideName === currentQuizSlideFilter) return true;
           if (q.materialName === currentQuizSlideFilter) return true;
           const sLower = currentQuizSlideFilter.toLowerCase();
@@ -23157,7 +23168,7 @@ Para cada material, retorne um objeto no JSON com:
       const subjectLabel = task.kind === 'study' ? [task.period, task.subject].filter(Boolean).join(' · ')
         : `${task.materialIds?.length || 0} materiais para revisar`;
       const openButtons = task.kind === 'study'
-        ? `<button class="btn-outline-action" type="button" data-exam-open-material="${escapeExamPlannerText(task.materialIds?.[0] || '')}" data-exam-open-mode="study" data-exam-focus="${escapeExamPlannerText(task.focusSection || '')}">📖 Estudar</button>`
+        ? `<button class="btn-outline-action" type="button" data-exam-open-material="${escapeExamPlannerText(task.materialIds?.[0] || '')}" data-exam-open-mode="quiz" data-exam-focus="${escapeExamPlannerText(task.focusSection || '')}">📝 Fazer quiz</button>`
         : `<button class="btn-outline-action" type="button" data-exam-open-materials="${escapeExamPlannerText((task.materialIds || []).join('|'))}" data-exam-open-mode="review">🗂️ Abrir revisão</button>`;
       return `<div class="exam-plan-task-row ${completed ? 'is-complete' : ''}">
         <label class="exam-plan-task-copy"><input type="checkbox" data-exam-plan-id="${escapeExamPlannerText(planId)}" data-exam-task-complete="${escapeExamPlannerText(task.id)}" ${completed ? 'checked' : ''} aria-label="Marcar como concluída: ${escapeExamPlannerText(title)}">
@@ -23404,8 +23415,30 @@ Para cada material, retorne um objeto no JSON com:
         showToast('⚠️ A disciplina deste material não está mais na ementa. Refaça o planejamento.');
         return;
       }
+      const curriculumSubject = (typeof getAllCurriculumSubjects === 'function' ? getAllCurriculumSubjects() : [])
+        .find(item => isSameCurriculumSubject(item.name, subject));
+      if (curriculumSubject?.period) currentStudyPeriodFilter = curriculumSubject.period;
       selectStudySubject(subject);
-      const matchingQuestions = (sharedQuestionsBank || []).filter(question => findStudyMaterialForQuestion(question)?.id === normalized.id);
+      const matchingQuestions = (sharedQuestionsBank || []).filter(question => String(findStudyMaterialForQuestion(question)?.id || '') === String(normalized.id));
+      if (mode === 'quiz') {
+        navigateTab('quizzes');
+        handleSlideSelectChange(normalized.name);
+        const quizReady = matchingQuestions.some(question => {
+          if (question.flashcardOnly) return false;
+          const options = question.quizOptions || question.alternativas || question.options;
+          const correctIndex = Number(question.correctIndex ?? question.correctAnswerIndex ?? 0);
+          return Array.isArray(options) && options.length >= 2
+            && Number.isInteger(correctIndex) && correctIndex >= 0 && correctIndex < options.length;
+        });
+        if (quizReady) {
+          setTimeout(() => document.getElementById('quizDeck')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+          showToast(`📝 Abrindo o quiz de ${normalized.name}.`);
+        } else {
+          openGenerateStudyModal(normalized.name, subject);
+          showToast(`📝 Ainda não há quiz pronto para ${normalized.name}. Iniciei a preparação da geração.`);
+        }
+        return;
+      }
       if (mode === 'review' && matchingQuestions.length) {
         handleSlideSelectChange(normalized.name);
         navigateTab('flashcards');
