@@ -172,6 +172,30 @@ function buildReusedQuestionStem(value) {
     .trim();
 }
 
+function addCaseContextToQuestion(question, materialText) {
+  const stem = buildReusedQuestionStem(question);
+  const reference = stem.match(/\b(?:no|do|na|da)\s+caso\s*(\d+)\b/i);
+  if (!reference) return stem;
+
+  const caseNumber = reference[1];
+  const material = String(materialText || '').replace(/\r/g, '').replace(/\s+/g, ' ').trim();
+  const label = new RegExp(`\\bcaso(?:\\s+cl[ií]nico)?\\s*${caseNumber}\\s*[:.)-]`, 'i');
+  const match = label.exec(material);
+  if (!match) return '';
+
+  const start = match.index + match[0].length;
+  const tail = material.slice(start);
+  const boundary = tail.search(new RegExp(`\\b(?:quest[aã]o|pergunta|exerc[ií]cio)\\s*\\d+\\s*[:.)-]|\\b(?:no|do|na|da)\\s+caso\\s*${caseNumber}\\b|\\bcaso(?:\\s+cl[ií]nico)?\\s*\\d+\\s*[:.)-]`, 'i'));
+  const context = (boundary >= 0 ? tail.slice(0, boundary) : tail.slice(0, 1800))
+    .replace(/\s+/g, ' ').trim().replace(/^[\s:.)-]+|[\s:.)-]+$/g, '');
+  if (context.length < 30) return '';
+
+  const questionOnly = stem.replace(/\b(?:no|do|na|da)\s+caso\s*\d+\s*[,;:]?\s*/i, '').trim()
+    .replace(/^([a-zà-ÿ])/, (_, letter) => letter.toLocaleUpperCase('pt-BR'));
+  if (!questionOnly || !questionOnly.includes('?')) return '';
+  return `Contexto: ${context}. ${questionOnly}`;
+}
+
 function extractAuthoredQuestionStructure(value) {
   const original = String(value || '').trim();
   const questionEnd = original.indexOf('?');
@@ -516,7 +540,7 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 5. Use somente fatos, relações e termos que estejam explícitos na fonte. Não complete lacunas com conhecimento externo, dados de prova, condutas ou casos inventados.
 6. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
 7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado; mesmo nesse caso, mantenha uma única decisão conceitual simples.
-8. PROIBIDO usar no enunciado e nas alternativas termos como: "aula", "disciplina", "módulo", "curso", "professor", "índice", "sumário", "material", "slide", "apostila", "item", "seção", "mencionado", "de acordo com o texto", "caso 1", "caso 2", "caso clínico X".
+8. Não use rótulos editoriais como "caso 1" ou "caso clínico X" sem contexto. Quando uma questão da fonte referir-se a um caso numerado, encontre os dados clínicos correspondentes no material e incorpore-os ao enunciado, sem citar a numeração. Não apague a questão apenas para retirar o rótulo; se não houver contexto suficiente, omita só essa questão e preserve as demais válidas.
 9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
 10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com os opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 11. ALTA QUALIDADE DOS DISTRATORES MÉDICOS:
@@ -526,7 +550,7 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 12. ANCORAGEM CLÍNICA NOS CASOS DO MATERIAL (REGRAS ANTI-DECOREBA):
     - Se o material contiver relatos de pacientes ou vinhetas clínicas, descreva os achados médicos relevantes diretamente no enunciado (ex.: "Um paciente apresenta perda progressiva do campo visual bitemporal...").
     - É EXPRESSAMENTE PROIBIDO perguntar a idade exata, o sexo, a profissão ou a numeração do caso isoladamente (ex.: NUNCA pergunte "Qual é a idade do paciente no Caso 2?", "Qual a profissão do paciente?"). A pergunta DEVE cobrar raciocínio médico (etiologia, fisiopatologia, diagnóstico diferencial, exame de escolha ou conduta).
-    - É EXPRESSAMENTE PROIBIDO citar "no Caso 1", "no Caso 2" ou "no Caso X" no enunciado ou nas alternativas. O enunciado deve ser 100% autossuficiente e independente de rótulos do documento.
+    - Se uma questão citar "no Caso 1", "no Caso 2" ou outro rótulo, recupere os achados correspondentes no material e incorpore o contexto clínico ao enunciado; não se limite a apagar a referência. Se o contexto não existir ou não puder ser associado com segurança, descarte somente essa questão, nunca o lote inteiro.
     - O campo secao_origem deve ser um tema anatômico ou clínico específico (ex.: 'Pares Cranianos e Sensibilidade Lingual', 'Hemorragia Subaracnóidea'), NUNCA títulos vazios de sumário como 'Fundamentos Etiopatogênicos'.
 13. DISTRIBUIÇÃO DAS RESPOSTAS:
     - Varie a alternativa correta naturalmente entre A, B, C e D no array e no gabarito ao longo do lote gerado.
@@ -871,7 +895,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const canReuseSource = Boolean(sourceQuestion && !usedSourceIndexes.has(sourceIndex));
         if (canReuseSource) usedSourceIndexes.add(sourceIndex);
         const sharedStem = canReuseSource
-          ? buildReusedQuestionStem(sourceQuestion)
+          ? addCaseContextToQuestion(sourceQuestion, materialText)
           : sanitizeSharedQuestionStem(question?.pergunta);
         const sourceStructure = canReuseSource ? extractAuthoredQuestionStructure(sourceQuestion) : null;
         const sourceHasAnsweredOptions = sourceStructure?.options.length === 4
@@ -896,7 +920,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         // A extração já identificou esse texto como pergunta; validamos sua
         // origem e tamanho, mas não reescrevemos o estilo original do professor.
         if (question.origem_pergunta === 'reaproveitada_da_fonte') {
-          return question.pergunta.trim().length >= 18 && isAuthoredQuestionCandidate(question.sourceQuestionText);
+          return question.pergunta.trim().length >= 18 && isAuthoredQuestionCandidate(question.pergunta);
         }
         return isSharedQuestionStemValid(question.pergunta);
       });
@@ -921,15 +945,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       });
 
       if (questoesUnicas.length === 0) {
-        if (authoredQuestionsMissingFromDeck.length) {
-          throw new Error('A IA não retornou as questões autorais pendentes do material. Tente gerar novamente.');
-        }
-        console.warn('⚠️ [Quiz Engine] Todas as questões sugeridas pela IA já constam no deck do aluno.');
+        console.warn('⚠️ [Quiz Engine] Nenhuma questão válida e não redundante restou após a validação; itens problemáticos foram descartados individualmente.');
         return [];
       }
 
       if (authoredSourceQuestions.length && !questoesUnicas.some(question => question.origem_pergunta === 'inspirada_na_fonte')) {
-        throw new Error('A IA não criou uma questão adicional inspirada nas questões do material. Tente gerar novamente.');
+        console.warn('⚠️ [Quiz Engine] Nenhuma questão inspirada válida neste lote; preservando as demais questões aproveitáveis.');
       }
 
       const formatadas = questoesUnicas.map((q, index) => {
@@ -1025,19 +1046,19 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         .map(question => question.sourceQuestionIndex));
       const missingSourceQuestions = authoredQuestionsMissingFromDeck.filter(source => !acceptedSourceIndexes.has(source.index));
       if (missingSourceQuestions.length) {
-        console.warn('⚠️ [Quiz Engine] Questão(ões) autoral(is) pendente(s) não retornada(s) pela IA:', {
+        console.warn('⚠️ [Quiz Engine] Questão(ões) autoral(is) não utilizável(is) ignorada(s) individualmente:', {
           missingIndexes: missingSourceQuestions.map(source => source.index),
           acceptedSourceCount: acceptedSourceIndexes.size,
           validOutputCount: formatadas.length
         });
-        throw new Error(`A IA não reaproveitou integralmente as questões autorais pendentes (índices ${missingSourceQuestions.map(source => source.index).join(', ')}). Tente gerar novamente.`);
       }
 
       if (formatadas.length === 0) {
-        throw new Error('A IA não retornou questões com quatro alternativas válidas.');
+        console.warn('⚠️ [Quiz Engine] Todas as questões deste lote foram inválidas; nenhuma foi salva.');
+        return [];
       }
       if (authoredSourceQuestions.length && !formatadas.some(question => question.sourceQuestionOrigin === 'inspirada_na_fonte')) {
-        throw new Error('A IA não retornou uma questão adicional inspirada que seja válida para quiz e flashcard. Tente gerar novamente.');
+        console.warn('⚠️ [Quiz Engine] Questão inspirada ausente/inválida; as demais questões válidas serão mantidas.');
       }
 
       console.log(`✅ [Quiz Engine] ${formatadas.length} questões geradas com sucesso.`);

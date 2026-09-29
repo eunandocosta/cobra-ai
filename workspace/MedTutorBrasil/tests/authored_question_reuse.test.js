@@ -43,7 +43,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     };
 
     const generated = await quizzesService.generateQuestions({
-      materialText: `${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
+      materialText: `Caso 1: Homem de 19 anos apresenta perda sensitiva vibratória distal.\n${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
       quantidade: 1,
       generationMode: 'science_based',
       difficulty: 'balanced'
@@ -52,11 +52,22 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     const reused = generated.find(item => item.sourceQuestionOrigin === 'reaproveitada_da_fonte');
     const inspired = generated.find(item => item.sourceQuestionOrigin === 'inspirada_na_fonte');
     assert(reused, 'A questão autoral deve ser mantida no resultado');
-    assert.strictEqual(reused.question, 'No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?');
+    assert.strictEqual(reused.question, 'Contexto: Homem de 19 anos apresenta perda sensitiva vibratória distal. Qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?');
     assert.strictEqual(reused.sourceQuestionText, sourceLine);
     assert(inspired, 'O lote também deve conter uma questão adicional inspirada');
     console.log('  [PASS] Questão autoral com "no caso 1" e índice omitido é reconciliada pelo enunciado');
-    console.log('  [PASS] Enunciado-fonte é preservado e questão inspirada permanece adicional');
+    console.log('  [PASS] Referência a caso é substituída pelos achados correspondentes da fonte');
+    console.log('  [PASS] Questão inspirada permanece adicional');
+
+    const withoutCaseDetails = await quizzesService.generateQuestions({
+      materialText: `${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
+      quantidade: 1,
+      generationMode: 'science_based',
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(withoutCaseDetails.length, 1, 'A questão com contexto não recuperável deve ser descartada sem cancelar o lote');
+    assert.strictEqual(withoutCaseDetails[0].sourceQuestionOrigin, 'inspirada_na_fonte');
+    console.log('  [PASS] Sem contexto recuperável, apenas a questão problemática é descartada');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;
