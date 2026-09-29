@@ -7651,7 +7651,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         }
         const items = data.map(item => {
           const sharedStem = sanitizeSharedQuestionStem(item.question || item.pergunta || '');
-          if (!isSharedQuestionStemValid(sharedStem)) return null;
+          const isAuthoredReuse = item.sourceQuestionOrigin === 'reaproveitada_da_fonte'
+            || item.origem_pergunta === 'reaproveitada_da_fonte';
+          if (isAuthoredReuse) {
+            if (sharedStem.length < 18 || String(item.sourceQuestionText || '').trim().length < 18) return null;
+          } else if (!isSharedQuestionStemValid(sharedStem)) return null;
           const itemDiff = ['iniciante', 'intermediario', 'avancado'].includes(item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             ? (item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             : 'iniciante';

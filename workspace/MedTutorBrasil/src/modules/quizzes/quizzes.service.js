@@ -855,8 +855,19 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       const pendingByIndex = new Map(authoredQuestionsMissingFromDeck.map(source => [source.index, source.question]));
       const usedSourceIndexes = new Set();
       const questoesNormalizadas = (Array.isArray(questoes) ? questoes : []).map(question => {
-        const sourceIndex = Number(question?.indice_questao_fonte);
-        const sourceQuestion = pendingByIndex.get(sourceIndex);
+        const declaredSourceIndex = Number(question?.indice_questao_fonte);
+        const responseStem = buildReusedQuestionStem(question?.pergunta || '');
+        const declaredSource = pendingByIndex.get(declaredSourceIndex);
+        // Gemini às vezes preserva o enunciado, mas omite ou troca o índice.
+        // Reconcilie pelo texto antes de considerar a questão autoral ausente.
+        const matchedSource = declaredSource && !usedSourceIndexes.has(declaredSourceIndex)
+          && areAuthoredQuestionsEquivalent(responseStem, declaredSource)
+          ? { index: declaredSourceIndex, question: declaredSource }
+          : authoredQuestionsMissingFromDeck.find(source =>
+            !usedSourceIndexes.has(source.index) && areAuthoredQuestionsEquivalent(responseStem, source.question)
+          );
+        const sourceIndex = matchedSource?.index || 0;
+        const sourceQuestion = matchedSource?.question || '';
         const canReuseSource = Boolean(sourceQuestion && !usedSourceIndexes.has(sourceIndex));
         if (canReuseSource) usedSourceIndexes.add(sourceIndex);
         const sharedStem = canReuseSource

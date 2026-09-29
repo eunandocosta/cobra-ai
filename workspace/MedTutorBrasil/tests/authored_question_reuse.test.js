@@ -36,7 +36,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     GoogleGenerativeAI.prototype.getGenerativeModel = function () {
       return {
         generateContent: async () => ({ response: { text: () => JSON.stringify([
-          makeQuestion('Versão parafraseada pelo modelo que deve ser substituída.', 1, 'reaproveitada_da_fonte', 'Fascículo grácil e cuneiforme'),
+          makeQuestion('No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?', 0, 'reaproveitada_da_fonte', 'Fascículo grácil e cuneiforme'),
           makeQuestion('Como a organização das colunas dorsais se relaciona ao trajeto sensitivo?', 0, 'inspirada_na_fonte', 'Transmissão de propriocepção e tato discriminativo')
         ]) } })
       };
@@ -55,7 +55,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(reused.question, 'No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?');
     assert.strictEqual(reused.sourceQuestionText, sourceLine);
     assert(inspired, 'O lote também deve conter uma questão adicional inspirada');
-    console.log('  [PASS] Questão autoral com "no caso 1" não é descartada pelo filtro de questões novas');
+    console.log('  [PASS] Questão autoral com "no caso 1" e índice omitido é reconciliada pelo enunciado');
     console.log('  [PASS] Enunciado-fonte é preservado e questão inspirada permanece adicional');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
