@@ -2,6 +2,17 @@
 const quizzesService = require('./quizzes.service');
 
 class QuizzesController {
+  async recommendStudyGeneration(req, res) {
+    try {
+      const recommendation = await quizzesService.recommendStudyGeneration(req.body || {});
+      return res.json(recommendation);
+    } catch (err) {
+      console.error('❌ [Quiz Recommendation] Falha na sugestão pedagógica:', err);
+      const status = err.statusCode === 400 || err.statusCode === 413 ? err.statusCode : 502;
+      return res.status(status).json({ error: 'Não foi possível obter a sugestão pedagógica da IA.', details: err.message });
+    }
+  }
+
   async generate(req, res) {
     try {
       const payload = req.body || {};

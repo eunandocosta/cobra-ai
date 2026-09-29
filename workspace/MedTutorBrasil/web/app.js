@@ -12706,6 +12706,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     // MODAL DE QUANTIDADE (BOTÃO ÚNICO QUIZ ⇄ FLASHCARD)
     let currentStudyRecommendation = null;
+    let studyRecommendationRequestId = 0;
 
     function analyzeDocumentForStudyRecommendation(materialName, subjectName) {
       const targetSubj = subjectName || currentStudySubject || 'Clínica Médica';
@@ -12794,6 +12795,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         charCount,
         wordCount,
         suggestedCount,
+        suggestedDifficulty: 'balanced',
         countRationale,
         suggestedMode,
         suggestedModeLabel,
@@ -12804,10 +12806,70 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       };
     }
 
-    function updateStudyRecommendationUI(materialName, subjectName) {
-      const rec = analyzeDocumentForStudyRecommendation(materialName, subjectName);
-      currentStudyRecommendation = rec;
+    function getStudyRecommendationMaterialText(material) {
+      return String(material?.markdownText || material?.conteudo_md || material?.text || material?.texto || material?.content || '');
+    }
 
+    function sampleStudyRecommendationText(text, limit) {
+      const source = String(text || '').trim();
+      if (source.length <= limit) return source;
+      const windowSize = Math.floor(limit / 4);
+      const positions = [0, 0.34, 0.67, 1].map(ratio => Math.floor((source.length - windowSize) * ratio));
+      const excerpts = positions.map((start, index) => {
+        let from = Math.max(0, start);
+        let to = Math.min(source.length, from + windowSize);
+        if (from > 0) {
+          const nextLine = source.indexOf('\n', from);
+          if (nextLine >= 0 && nextLine < from + 240) from = nextLine + 1;
+        }
+        if (to < source.length) {
+          const previousLine = source.lastIndexOf('\n', to);
+          if (previousLine > to - 240) to = previousLine;
+        }
+        return `[AMOSTRA ${index + 1}]\n${source.slice(from, Math.max(from, to)).trim()}`;
+      });
+      return excerpts.join('\n\n').slice(0, limit);
+    }
+
+    function collectStudyRecommendationSamples(materialName, subjectName) {
+      const targetSubj = subjectName || currentStudySubject || 'Disciplina';
+      let materials = [];
+      if (materialName && Array.isArray(chatDriveMaterials)) {
+        const selected = chatDriveMaterials.find(material =>
+          material.id === materialName || material.name === materialName || material.originalFileName === materialName ||
+          (material.name && typeof normalizeStudyComparisonText === 'function' && normalizeStudyComparisonText(material.name) === normalizeStudyComparisonText(materialName))
+        );
+        if (selected) materials = [selected];
+      }
+      if (!materials.length && typeof getMaterialsForSubject === 'function') {
+        const all = getMaterialsForSubject(targetSubj).filter(material => getStudyRecommendationMaterialText(material).trim().length >= 80);
+        const sampleCount = Math.min(6, all.length);
+        materials = sampleCount ? Array.from({ length: sampleCount }, (_, index) => all[Math.floor(index * all.length / sampleCount)]) : [];
+      }
+      return materials.map(material => {
+        const text = getStudyRecommendationMaterialText(material);
+        return {
+          name: String(material.name || material.originalFileName || 'Material').slice(0, 160),
+          text: sampleStudyRecommendationText(text, materials.length === 1 ? 10500 : 1350)
+        };
+      }).filter(material => material.text.length >= 80).slice(0, 8);
+    }
+
+    function getStudyRecommendationLabels(rec) {
+      const generationMode = rec.suggestedMode || rec.generationMode;
+      const examStyle = rec.suggestedExamStyle || rec.examStyle;
+      const modes = {
+        sections: ['📄 Cobertura por seções/páginas', 'Organiza a geração por trechos e distribui a cobertura pelo material.'],
+        curated: ['🧠 Curadoria integral do arquivo', 'Prioriza os conceitos de maior rendimento e os eixos presentes no material.'],
+        science_based: ['🧪 Progressão Science Based', 'Ordena os objetivos do conhecimento prévio à integração e aplicação.']
+      };
+      return {
+        mode: modes[generationMode] || modes.sections,
+        style: examStyle === 'enare' ? '🏥 Padrão ENARE (casos clínicos)' : '🎓 Acadêmico (Taxonomia de Bloom)'
+      };
+    }
+
+    function renderStudyRecommendation(rec, status = '') {
       const badgeEl = document.getElementById('generateStudyDocStatsBadge');
       const contentEl = document.getElementById('generateStudyRecommendationContent');
       if (!badgeEl || !contentEl) return;
@@ -12816,9 +12878,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         ? `📊 ~${rec.wordCount.toLocaleString('pt-BR')} palavras • ${rec.charCount.toLocaleString('pt-BR')} caracteres`
         : `📚 Material do Drive`;
       badgeEl.textContent = statsText;
+      const labels = getStudyRecommendationLabels(rec);
+      const rationale = rec.rationale || rec.modeRationale || 'A estratégia foi selecionada conforme o conteúdo e a diversidade observados.';
+      const safe = value => typeof escapeHtml === 'function' ? escapeHtml(String(value || '')) : String(value || '').replace(/[&<>"']/g, '');
 
       contentEl.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${status ? `<div style="font-size: 10.5px; color: var(--text-secondary);">${safe(status)}</div>` : ''}
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px;">
             <!-- Quantidade Recomendada -->
             <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(0, 229, 255, 0.2); border-left: 3px solid var(--neon); border-radius: 8px; padding: 8px 10px;">
@@ -12829,7 +12895,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 ${rec.suggestedCount} Questões
               </div>
               <div style="font-size: 10.5px; color: var(--text-muted); line-height: 1.35;">
-                ${rec.countRationale}
+                ${safe(rec.countRationale || rationale)}
               </div>
             </div>
 
@@ -12839,26 +12905,100 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 ⚙️ Estratégia Recomendada:
               </div>
               <div style="font-size: 12.5px; font-weight: 800; color: #00ff66; margin: 2px 0;">
-                ${rec.suggestedModeLabel}
+                ${safe(rec.suggestedModeLabel || labels.mode[0])}
               </div>
               <div style="font-size: 10.5px; color: var(--text-muted); line-height: 1.35;">
-                ${rec.modeRationale}
+                ${safe(rationale)}
               </div>
             </div>
           </div>
 
           <div style="font-size: 11px; color: var(--text-secondary); background: rgba(255, 255, 255, 0.02); padding: 5px 8px; border-radius: 6px; border: 1px dashed rgba(255, 255, 255, 0.1);">
-            💡 <strong>Estilo de Avaliação Sugerido:</strong> <span style="color: var(--text-primary); font-weight: 600;">${rec.suggestedExamStyleLabel}</span>
+            💡 <strong>Estilo de Avaliação Sugerido:</strong> <span style="color: var(--text-primary); font-weight: 600;">${safe(rec.suggestedExamStyleLabel || labels.style)}</span>
+            ${Number.isFinite(Number(rec.confidence)) ? `<span style="color: var(--text-muted);"> • confiança da análise: ${Math.max(0, Math.min(100, Number(rec.confidence)))}%</span>` : ''}
           </div>
         </div>
       `;
+    }
 
-      // Pré-seleciona os valores recomendados no formulário
+    function applyStudyRecommendationToForm(rec) {
       setGenerateStudyCount(rec.suggestedCount);
       const modeSelect = document.getElementById('generateStudyModeSelect');
       if (modeSelect) modeSelect.value = rec.suggestedMode;
       const styleSelect = document.getElementById('generateStudyExamStyleSelect');
       if (styleSelect) styleSelect.value = rec.suggestedExamStyle;
+      const difficultySelect = document.getElementById('generateStudyDifficultySelect');
+      if (difficultySelect && rec.suggestedDifficulty) difficultySelect.value = rec.suggestedDifficulty;
+    }
+
+    async function updateStudyRecommendationUI(materialName, subjectName) {
+      const requestId = ++studyRecommendationRequestId;
+      const rec = analyzeDocumentForStudyRecommendation(materialName, subjectName);
+      currentStudyRecommendation = rec;
+      renderStudyRecommendation(rec, 'Sugestão inicial; verificando amostras do conteúdo…');
+
+      // A regra local deixa o formulário pronto imediatamente; Gemini pode refiná-la sem bloquear a tela.
+      applyStudyRecommendationToForm(rec);
+      const baseline = {
+        count: document.getElementById('generateStudyQuestionsCountInput')?.value || '',
+        mode: document.getElementById('generateStudyModeSelect')?.value || '',
+        style: document.getElementById('generateStudyExamStyleSelect')?.value || '',
+        difficulty: document.getElementById('generateStudyDifficultySelect')?.value || ''
+      };
+      const materials = collectStudyRecommendationSamples(materialName, subjectName);
+      if (!materials.length) {
+        renderStudyRecommendation(rec, 'Sem texto legível suficiente; usando recomendação local.');
+        return;
+      }
+
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 9000);
+      try {
+        const response = await fetch('/api/quizzes/recomendacao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ materials }),
+          signal: abortController.signal
+        });
+        if (!response.ok) throw new Error(`Recomendação indisponível (${response.status})`);
+        const recommendation = await response.json();
+        if (requestId !== studyRecommendationRequestId || !document.getElementById('modalGenerateStudyCount')?.classList.contains('active')) return;
+
+        const labels = getStudyRecommendationLabels(recommendation);
+        const refined = {
+          ...rec,
+          suggestedCount: Math.max(5, Math.min(30, Number(recommendation.suggestedCount) || rec.suggestedCount)),
+          suggestedMode: ['sections', 'curated', 'science_based'].includes(recommendation.generationMode) ? recommendation.generationMode : rec.suggestedMode,
+          suggestedDifficulty: ['balanced', 'iniciante', 'intermediario', 'avancado'].includes(recommendation.difficulty) ? recommendation.difficulty : 'balanced',
+          suggestedExamStyle: recommendation.examStyle === 'enare' ? 'enare' : 'bloom',
+          suggestedModeLabel: labels.mode[0],
+          modeRationale: recommendation.rationale || labels.mode[1],
+          countRationale: `${Math.max(5, Math.min(30, Number(recommendation.suggestedCount) || rec.suggestedCount))} questões sugeridas conforme a diversidade conceitual observada nas amostras.`,
+          suggestedExamStyleLabel: labels.style,
+          rationale: recommendation.rationale,
+          confidence: recommendation.confidence,
+          model: recommendation.model
+        };
+        currentStudyRecommendation = refined;
+        const current = {
+          count: document.getElementById('generateStudyQuestionsCountInput')?.value || '',
+          mode: document.getElementById('generateStudyModeSelect')?.value || '',
+          style: document.getElementById('generateStudyExamStyleSelect')?.value || '',
+          difficulty: document.getElementById('generateStudyDifficultySelect')?.value || ''
+        };
+        if (current.count === baseline.count) setGenerateStudyCount(refined.suggestedCount);
+        if (current.mode === baseline.mode) document.getElementById('generateStudyModeSelect').value = refined.suggestedMode;
+        if (current.style === baseline.style) document.getElementById('generateStudyExamStyleSelect').value = refined.suggestedExamStyle;
+        if (current.difficulty === baseline.difficulty) document.getElementById('generateStudyDifficultySelect').value = refined.suggestedDifficulty;
+        renderStudyRecommendation(refined, `Gemini ${refined.model || ''} · amostra distribuída · confiança ${refined.confidence}%`);
+      } catch (error) {
+        if (requestId === studyRecommendationRequestId && document.getElementById('modalGenerateStudyCount')?.classList.contains('active')) {
+          const reason = error.name === 'AbortError' ? 'Análise demorou mais que 9 s; usando sugestão local.' : 'IA indisponível; usando sugestão local.';
+          renderStudyRecommendation(rec, reason);
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
 
     function applyStudyRecommendation() {
@@ -12869,6 +13009,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (modeSelect) modeSelect.value = rec.suggestedMode;
       const styleSelect = document.getElementById('generateStudyExamStyleSelect');
       if (styleSelect) styleSelect.value = rec.suggestedExamStyle;
+      const difficultySelect = document.getElementById('generateStudyDifficultySelect');
+      if (difficultySelect && rec.suggestedDifficulty) difficultySelect.value = rec.suggestedDifficulty;
 
       if (typeof showToast === 'function') {
         showToast(`✨ Sugestão aplicada: ${rec.suggestedCount} questões com ${rec.suggestedModeLabel}`);

@@ -5,6 +5,7 @@ const { withAccess } = require('../../shared/access.middleware');
 const quizzesController = require('./quizzes.controller');
 
 router.post('/gerar', withAccess((req, res) => quizzesController.generate(req, res)));
+router.post('/recomendacao', withAccess((req, res) => quizzesController.recommendStudyGeneration(req, res)));
 router.post('/gerar-derivada', withAccess((req, res) => quizzesController.generateDerived(req, res)));
 router.post('/analisar-material', withAccess((req, res) => quizzesController.analyzeMaterial(req, res)));
 router.post('/responder', withAccess((req, res) => quizzesController.submit(req, res)));
