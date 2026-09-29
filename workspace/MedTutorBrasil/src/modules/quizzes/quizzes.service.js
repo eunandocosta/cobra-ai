@@ -221,12 +221,14 @@ function extractAuthoredQuestionStructure(value) {
 }
 
 function isSharedQuestionStemValid(stem) {
-  if (!stem || stem.length < 18) return false;
-  if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem)) return false;
-  if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(stem)) return false;
-  if (/\b(?:no|do|na|da|segundo|conforme|mencionad[oa]\s+no)\s+caso\s*\d*\b/i.test(stem)) return false;
-  if (/\bqual\s+(?:[eé]\s+)?(?:a\s+)?idade\s+(?:do|da|de|dos|das)?\s*paciente\b/i.test(stem)) return false;
-  if (/\bqual\s+[eé]\s+a\s+idade\b/i.test(stem)) return false;
+  const clean = String(stem || '').trim();
+  if (clean.length < 18) return false;
+  if (!/^\p{Lu}/u.test(clean) || !/\?\s*["'”’)]?$/.test(clean) || /(?:\.\.\.|…|[,;:])\s*\?/.test(clean)) return false;
+  if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(clean)) return false;
+  if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(clean)) return false;
+  if (/\b(?:no|do|na|da|segundo|conforme|mencionad[oa]\s+no)\s+caso\s*\d*\b/i.test(clean)) return false;
+  if (/\bqual\s+(?:[eé]\s+)?(?:a\s+)?idade\s+(?:do|da|de|dos|das)?\s*paciente\b/i.test(clean)) return false;
+  if (/\bqual\s+[eé]\s+a\s+idade\b/i.test(clean)) return false;
   return true;
 }
 
@@ -541,7 +543,7 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 6. JAMAIS trate termos anatômicos, disciplinas ou tópicos como doenças (ex.: nunca escreva "paciente com diagnóstico de Tronco Encefálico").
 7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado; mesmo nesse caso, mantenha uma única decisão conceitual simples.
 8. Não use rótulos editoriais como "caso 1" ou "caso clínico X" sem contexto. Quando uma questão da fonte referir-se a um caso numerado, encontre os dados clínicos correspondentes no material e incorpore-os ao enunciado, sem citar a numeração. Não apague a questão apenas para retirar o rótulo; se não houver contexto suficiente, omita só essa questão e preserve as demais válidas.
-9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real.
+9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real. Cada pergunta precisa ser uma frase interrogativa completa, iniciar com letra maiúscula e terminar com "?". Não devolva fragmentos de frases, continuações entre parênteses, reticências ou trechos iniciados por conjunções/preposições; se não conseguir reconstruir o enunciado completo com a fonte, omita somente essa questão.
 10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com os opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 11. ALTA QUALIDADE DOS DISTRATORES MÉDICOS:
     - Todas as 4 alternativas (1 correta e 3 distratores) devem pertencer rigorosamente ao mesmo universo anatomofisiológico ou clínico do tema.
@@ -920,7 +922,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         // A extração já identificou esse texto como pergunta; validamos sua
         // origem e tamanho, mas não reescrevemos o estilo original do professor.
         if (question.origem_pergunta === 'reaproveitada_da_fonte') {
-          return question.pergunta.trim().length >= 18 && isAuthoredQuestionCandidate(question.pergunta);
+          return isAuthoredQuestionCandidate(question.pergunta) && isSharedQuestionStemValid(question.pergunta);
         }
         return isSharedQuestionStemValid(question.pergunta);
       });

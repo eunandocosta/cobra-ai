@@ -7595,12 +7595,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     function isSharedQuestionStemValid(stem) {
-      if (!stem || stem.length < 18) return false;
-      if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(stem)) return false;
-      if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(stem)) return false;
-      if (/\b(?:no|do|na|da|segundo|conforme|mencionad[oa]\s+no)\s+caso\s*\d*\b/i.test(stem)) return false;
-      if (/\bqual\s+(?:[eé]\s+)?(?:a\s+)?idade\s+(?:do|da|de|dos|das)?\s*paciente\b/i.test(stem)) return false;
-      if (/\bqual\s+[eé]\s+a\s+idade\b/i.test(stem)) return false;
+      const clean = String(stem || '').trim();
+      if (clean.length < 18) return false;
+      if (!/^\p{Lu}/u.test(clean) || !/\?\s*["'”’)]?$/.test(clean) || /(?:\.\.\.|…|[,;:])\s*\?/.test(clean)) return false;
+      if (/\b(alternativa|opções?|assinale|marque|selecione)\b/i.test(clean)) return false;
+      if (/\b(definid[oa] na aula|tema (?:cl[ií]nico )?principal da aula|da disciplina de|na aula de|no slide|na apostila|no material de estudo|conforme a aula|ministrad[oa] na aula|abordad[oa] na aula)\b/i.test(clean)) return false;
+      if (/\b(?:no|do|na|da|segundo|conforme|mencionad[oa]\s+no)\s+caso\s*\d*\b/i.test(clean)) return false;
+      if (/\bqual\s+(?:[eé]\s+)?(?:a\s+)?idade\s+(?:do|da|de|dos|das)?\s*paciente\b/i.test(clean)) return false;
+      if (/\bqual\s+[eé]\s+a\s+idade\b/i.test(clean)) return false;
       return true;
     }
 

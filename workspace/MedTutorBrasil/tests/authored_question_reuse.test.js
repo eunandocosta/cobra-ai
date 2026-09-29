@@ -10,6 +10,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
   const originalBalancedModel = process.env.MODEL_BALANCED;
   const originalGetModel = GoogleGenerativeAI.prototype.getGenerativeModel;
   const sourceLine = 'Questão 1: No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?';
+  let mockQuestions;
   const makeQuestion = (question, sourceIndex, origin, answer) => ({
     pergunta: question,
     alternativas: [answer, 'Alternativa incorreta A', 'Alternativa incorreta B', 'Alternativa incorreta C'],
@@ -35,13 +36,14 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     process.env.MODEL_QUIZ = 'gemini-test-quiz';
     GoogleGenerativeAI.prototype.getGenerativeModel = function () {
       return {
-        generateContent: async () => ({ response: { text: () => JSON.stringify([
-          makeQuestion('No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?', 0, 'reaproveitada_da_fonte', 'Fascículo grácil e cuneiforme'),
-          makeQuestion('Como a organização das colunas dorsais se relaciona ao trajeto sensitivo?', 0, 'inspirada_na_fonte', 'Transmissão de propriocepção e tato discriminativo')
-        ]) } })
+        generateContent: async () => ({ response: { text: () => JSON.stringify(mockQuestions) } })
       };
     };
 
+    mockQuestions = [
+      makeQuestion('No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?', 0, 'reaproveitada_da_fonte', 'Fascículo grácil e cuneiforme'),
+      makeQuestion('Como a organização das colunas dorsais se relaciona ao trajeto sensitivo?', 0, 'inspirada_na_fonte', 'Transmissão de propriocepção e tato discriminativo')
+    ];
     const generated = await quizzesService.generateQuestions({
       materialText: `Caso 1: Homem de 19 anos apresenta perda sensitiva vibratória distal.\n${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
       quantidade: 1,
@@ -68,6 +70,21 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(withoutCaseDetails.length, 1, 'A questão com contexto não recuperável deve ser descartada sem cancelar o lote');
     assert.strictEqual(withoutCaseDetails[0].sourceQuestionOrigin, 'inspirada_na_fonte');
     console.log('  [PASS] Sem contexto recuperável, apenas a questão problemática é descartada');
+
+    mockQuestions = [
+      makeQuestion('sintoma do paciente está associado a cada um deles?', 0, 'inspirada_na_fonte', 'Relação anatômico-funcional'),
+      makeQuestion('(ipsilateral) ou do lado oposto (contralateral) à lesão?', 0, 'inspirada_na_fonte', 'Depende do nível de decussação'),
+      makeQuestion('Como a decussação da via determina o lado do déficit sensitivo?', 0, 'inspirada_na_fonte', 'A decussação define se o déficit é ipsilateral ou contralateral')
+    ];
+    const completeQuestions = await quizzesService.generateQuestions({
+      materialText: 'As fibras da via cruzam na decussação sensitiva e seguem pelo lado oposto.',
+      quantidade: 3,
+      generationMode: 'science_based',
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(completeQuestions.length, 1, 'Fragmentos devem ser descartados individualmente');
+    assert.strictEqual(completeQuestions[0].question, 'Como a decussação da via determina o lado do déficit sensitivo?');
+    console.log('  [PASS] Fragmentos iniciados em minúscula ou parênteses são descartados; questão completa é mantida');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;
