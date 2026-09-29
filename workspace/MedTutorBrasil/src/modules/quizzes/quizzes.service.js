@@ -879,7 +879,16 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
             : question?.origem_pergunta,
           sourceQuestionText: canReuseSource ? sourceQuestion : ''
         };
-      }).filter(question => isSharedQuestionStemValid(question.pergunta));
+      }).filter(question => {
+        // Questões autorais precisam conservar o enunciado mesmo quando a
+        // heurística de itens novos rejeitaria expressões como "no caso 1".
+        // A extração já identificou esse texto como pergunta; validamos sua
+        // origem e tamanho, mas não reescrevemos o estilo original do professor.
+        if (question.origem_pergunta === 'reaproveitada_da_fonte') {
+          return question.pergunta.trim().length >= 18 && isAuthoredQuestionCandidate(question.sourceQuestionText);
+        }
+        return isSharedQuestionStemValid(question.pergunta);
+      });
       const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
       const getCorrectAnswer = question => {
         const correctIdx = letterToIndex[question?.gabarito] ?? 0;
@@ -1005,7 +1014,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         .map(question => question.sourceQuestionIndex));
       const missingSourceQuestions = authoredQuestionsMissingFromDeck.filter(source => !acceptedSourceIndexes.has(source.index));
       if (missingSourceQuestions.length) {
-        throw new Error(`A IA não reaproveitou integralmente ${missingSourceQuestions.length} questão(ões) pendente(s) do material. Tente gerar novamente.`);
+        console.warn('⚠️ [Quiz Engine] Questão(ões) autoral(is) pendente(s) não retornada(s) pela IA:', {
+          missingIndexes: missingSourceQuestions.map(source => source.index),
+          acceptedSourceCount: acceptedSourceIndexes.size,
+          validOutputCount: formatadas.length
+        });
+        throw new Error(`A IA não reaproveitou integralmente as questões autorais pendentes (índices ${missingSourceQuestions.map(source => source.index).join(', ')}). Tente gerar novamente.`);
       }
 
       if (formatadas.length === 0) {
