@@ -13926,6 +13926,13 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const emptyLabels = { new: 'Não feitos', due: 'Revisão de Hoje', tomorrow: 'Revisão de amanhã', upcoming: 'Revisão dos próximos dias' };
         if (countEl) countEl.textContent = `${emptyLabels[srsQueueFilter] || 'Fila'} • vazia`;
         if (difficultyBadge) difficultyBadge.style.display = 'none';
+        const answerInput = document.getElementById('studentAnswerInput');
+        if (answerInput) answerInput.value = '';
+        const emptyFeedback = document.getElementById('aiEvaluationFeedback');
+        if (emptyFeedback) {
+          emptyFeedback.style.display = 'none';
+          emptyFeedback.innerHTML = '';
+        }
         if (frontEl) frontEl.textContent = srsQueueFilter === 'new'
           ? '🎉 Não há cartões inéditos neste filtro.'
           : '🎉 Todos os flashcards desta fila foram revisados!';
@@ -14040,11 +14047,11 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (fcBox) fcBox.classList.remove('flipped');
       document.querySelectorAll('.flashcard-side').forEach(side => { side.scrollTop = 0; });
       const ansInput = document.getElementById('studentAnswerInput');
-      if (ansInput) ansInput.value = item.lastStudentAnswer || '';
+      // A resposta anterior continua registrada para histórico/avaliação, mas
+      // nunca deve ser reapresentada no campo de recuperação ativa.
+      if (ansInput) ansInput.value = '';
       const aiFeedback = document.getElementById('aiEvaluationFeedback');
-      if (item.lastEvaluation && typeof renderEvaluationFeedback === 'function') {
-        renderEvaluationFeedback(item.lastEvaluation);
-      } else if (aiFeedback) {
+      if (aiFeedback) {
         aiFeedback.style.display = 'none';
         aiFeedback.innerHTML = '';
       }
@@ -23797,7 +23804,7 @@ Para cada material, retorne um objeto no JSON com:
         <div class="sce-review-answer" hidden><span class="sce-review-answer-label">Resposta</span><div class="study-rich-text">${formattedAnswer || '<p>Este card não possui resposta registrada.</p>'}${image}</div></div>
         <div class="sce-review-written-answer">
           <label for="sceReviewStudentAnswerInput">✍️ Digite sua resposta</label>
-          <textarea id="sceReviewStudentAnswerInput" class="written-textarea" placeholder="Responda com suas palavras antes de consultar o gabarito..." onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); evaluateSceReviewWrittenAnswer();}">${escapeHtmlText(question.lastStudentAnswer || '')}</textarea>
+          <textarea id="sceReviewStudentAnswerInput" class="written-textarea" placeholder="Responda com suas palavras antes de consultar o gabarito..." onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); evaluateSceReviewWrittenAnswer();}"></textarea>
           <button class="btn-outline-action primary" id="sceReviewEvaluateAnswerButton" type="button" onclick="evaluateSceReviewWrittenAnswer()">✨ Corrigir com IA</button>
           <div id="sceReviewEvaluationFeedback" class="ai-feedback-banner" aria-live="polite"></div>
         </div>
@@ -23889,10 +23896,6 @@ Para cada material, retorne um objeto no JSON com:
         <div class="sce-review-deck-navigation"><button class="btn-outline-action" type="button" data-sce-review-prev ${index === 0 ? 'disabled' : ''}>← Anterior</button><span>${alreadyRated ? 'Resposta registrada' : 'Revele a resposta e avalie sua lembrança'}</span><button class="btn-outline-action" type="button" data-sce-review-next>${index === cards.length - 1 ? 'Concluir' : 'Pular →'}</button></div>`;
       if (alreadyRated) list.querySelector('.sce-review-deck-card')?.setAttribute('data-sce-review-locked', 'true');
       bindSceReviewRevealButtons(list);
-      if (card.question.lastEvaluation) {
-        renderEvaluationFeedback(card.question.lastEvaluation, 'sceReviewEvaluationFeedback', { inSceDeck: true });
-        bindSceReviewEvaluationAnswerButton(list);
-      }
       if (alreadyRated) list.querySelectorAll('[data-sce-review-rate]').forEach(button => { button.disabled = true; });
       list.querySelector('[data-sce-review-prev]')?.addEventListener('click', () => { sceReviewState.index--; renderSceReviewDeckCard(); });
       list.querySelector('[data-sce-review-next]')?.addEventListener('click', () => { sceReviewState.index++; renderSceReviewDeckCard(); });
