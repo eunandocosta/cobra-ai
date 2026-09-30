@@ -13988,6 +13988,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (previousButton) previousButton.disabled = list.length <= 1;
       if (nextButton) nextButton.disabled = list.length <= 1;
       if (frontEl) frontEl.innerHTML = formatStudyRichText(visibleQuestion);
+      const frontImageEl = document.getElementById('fcFrontImage');
+      if (frontImageEl) frontImageEl.innerHTML = renderStudySupportImage(item, { asStimulus: true });
       if (backEl) backEl.innerHTML = formatStudyRichText(item.flashcard?.back || item.reference_answer || item.answer || '');
       if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item));
 
@@ -23792,6 +23794,7 @@ Para cada material, retorne um objeto no JSON com:
         : card.dayOffset === 0 ? 'Revisar hoje'
           : `Revisar em ${card.dayOffset} dia(s) · ${formatExamPlanDate(card.dueDate, { day: 'numeric', month: 'short' })}`;
       const image = typeof renderStudySupportImage === 'function' ? renderStudySupportImage(question) : '';
+      const stimulusImage = typeof renderStudySupportImage === 'function' ? renderStudySupportImage(question, { asStimulus: true }) : '';
       const formattedFront = typeof formatStudyRichText === 'function' ? formatStudyRichText(front) : escapeHtmlText(front);
       const formattedAnswer = typeof formatStudyRichText === 'function' ? formatStudyRichText(answer) : escapeHtmlText(answer);
       return `<article class="sce-review-flashcard sce-review-deck-card ${card.overdue ? 'is-overdue' : 'is-upcoming'}" style="--sce-review-card-index:${index}">
@@ -23801,6 +23804,7 @@ Para cada material, retorne um objeto no JSON com:
         </header>
         <div class="sce-review-material-label">${escapeHtmlText(materialName)}</div>
         <div class="sce-review-flashcard-front study-rich-text">${formattedFront}</div>
+        ${stimulusImage}
         <div class="sce-review-answer" hidden><span class="sce-review-answer-label">Resposta</span><div class="study-rich-text">${formattedAnswer || '<p>Este card não possui resposta registrada.</p>'}${image}</div></div>
         <div class="sce-review-written-answer">
           <label for="sceReviewStudentAnswerInput">✍️ Digite sua resposta</label>
