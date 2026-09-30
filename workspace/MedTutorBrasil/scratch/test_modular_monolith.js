@@ -142,11 +142,11 @@ assert(renderSceCard.includes('autocomplete="off"') && !renderSceCard.includes('
 const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
-assert(sceReviewMarkup.includes('/app.min.js?v=20260930-flashcard-front-image-v1'), 'o bundle deve usar versão nova para invalidar cache após corrigir a renderização de imagens');
+assert(sceReviewMarkup.includes('/app.min.js?v=20260930-fair-flashcard-grading-v1'), 'o bundle deve usar versão nova para invalidar cache após corrigir a renderização de imagens');
 assert(appSource.includes("frontImageEl.innerHTML = renderStudySupportImage(item, { asStimulus: true });"), 'a frente do flashcard deve renderizar a figura sem revelar a explicação do gabarito');
 const sceReviewCardRenderer = appSource.match(/function renderSceReviewCard\(card, index\) \{[\s\S]*?\n    \}/)?.[0] || '';
 assert(sceReviewCardRenderer.includes('${stimulusImage}') && sceReviewCardRenderer.indexOf('${stimulusImage}') < sceReviewCardRenderer.indexOf('class="sce-review-answer"'), 'a figura do card SCE deve aparecer na frente, fora do gabarito oculto');
-assert(sceReviewMarkup.includes('id="fcFrontImage"') && sceReviewMarkup.includes('/app.min.js?v=20260930-flashcard-front-image-v1'), 'o espaço de imagem e o bundle de Flashcards devem ter versão atualizada');
+assert(sceReviewMarkup.includes('id="fcFrontImage"') && sceReviewMarkup.includes('/app.min.js?v=20260930-fair-flashcard-grading-v1'), 'o espaço de imagem e o bundle de Flashcards devem ter versão atualizada');
 console.log('[PASS] Campos de recuperação ativa abrem vazios e botão de fechar do SCE tem tamanho acessível');
 
 const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');

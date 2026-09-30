@@ -1118,13 +1118,22 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       }
     });
 
-    const prompt = `Você é um avaliador médico e preceptor clínico estrito e pedagógico.
-Compare a resposta do estudante com a Resposta de Referência e os Conceitos-Chave esperados para o flashcard médico.
+    const prompt = `Você é um avaliador médico e preceptor clínico rigoroso, justo e pedagógico.
+Compare a resposta do estudante com a pergunta exibida, a Resposta de Referência e os Conceitos-Chave esperados para o flashcard médico.
 
 Pergunta / Caso Clínico: ${question}
 Resposta de Referência: ${referenceAnswer}
 Conceitos-Chave Esperados: ${Array.isArray(keyConcepts) ? keyConcepts.join(', ') : keyConcepts}
 Resposta do Estudante: "${studentAnswer}"
+
+PRINCÍPIO CENTRAL: avalie primeiro o que a pergunta visível realmente pergunta e a validade científica da resposta. A resposta de referência é um gabarito esperado, NÃO uma lista exclusiva de formulações aceitáveis.
+
+REGRAS DE JUSTIÇA OBRIGATÓRIAS:
+- Aceite sinônimos, termos equivalentes e respostas alternativas cientificamente corretas que respondam diretamente à pergunta, mesmo quando diferentes do termo usado no gabarito.
+- Não marque como errada uma resposta correta só porque ela não aparece em alternativas de múltipla escolha que foram omitidas do flashcard. Não infira nem cobre alternativas que não estão no enunciado visível.
+- Se a pergunta estiver ampla ou ambígua e a resposta do estudante for uma interpretação correta e defensável, dê crédito integral; explique discretamente que o enunciado deveria ter sido mais específico.
+- Só exija um subtipo, via ou alternativa específica quando isso estiver explicitamente delimitado na pergunta visível.
+- Não exija correspondência literal nem penalize a resposta por diferir do gabarito se o conceito estiver correto. Use os Conceitos-Chave para avaliar cobertura, não para invalidar equivalentes.
 
 Avalie a precisão clínica e conceitual da resposta do estudante atribuindo uma porcentagem de acerto de 0 a 100%.
 
@@ -1178,7 +1187,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON contendo:
           status: calcAccuracy > 80 ? 'completamente_correta' : (calcAccuracy > 50 ? 'parcialmente_correta' : 'insuficiente'),
           strengths: matched.length > 0 ? `Termos identificados: ${matched.join(', ')}` : 'Resposta recebida.',
           gaps: matched.length < expectedTerms.length ? 'Aprofunde os conceitos da referência.' : 'Sem lacunas críticas.',
-          feedback: 'Avaliação de correspondência conceitual concluída.'
+        feedback: 'A avaliação semântica não estava disponível; esta pontuação lexical é aproximada e pode não reconhecer sinônimos ou respostas alternativas corretas. Tente novamente com a IA antes de considerar a resposta errada.'
         };
       }
 

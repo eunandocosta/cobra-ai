@@ -14653,13 +14653,15 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
         const apiKey = getGeminiApiKey();
         if (apiKey) {
           try {
-            const prompt = `Você é um avaliador de provas médicas e preceptor clínico do MedCopilot.
-Analise a resposta discursiva do estudante de medicina comparando-a com a Resposta de Referência e os Conceitos-Chave esperados.
+            const prompt = `Você é um avaliador médico rigoroso, justo e pedagógico do MedCopilot.
+Avalie a resposta pela pergunta visível e pela validade científica, usando a Resposta de Referência como orientação, não como formulação exclusiva.
 
 Pergunta: ${questionText}
 Resposta de Referência: ${referenceAnswer}
 Conceitos-Chave: ${keyConcepts.join(', ')}
 Resposta do Estudante: "${answer}"
+
+Aceite sinônimos e respostas alternativas cientificamente corretas que respondam diretamente ao enunciado. Não marque uma resposta correta como errada só por não coincidir literalmente com o gabarito. Não cobre alternativas de múltipla escolha ausentes do enunciado visível. Se a pergunta for ampla/ambígua e a resposta for uma interpretação correta e defensável, dê crédito integral e sinalize brevemente a ambiguidade no feedback. Só exija um subtipo específico se a própria pergunta visível o delimitar.
 
 Regras de pontuação (Cada questão vale 1.0 ponto):
 - >80% de acerto: 1.0 ponto (Completamente correta)
@@ -14715,6 +14717,21 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (!evaluationResult) {
         const lowerAns = answer.toLowerCase();
         const hits = keyConcepts.filter(k => lowerAns.includes(k.toLowerCase()));
+        // Uma checagem lexical local não consegue confirmar sinônimos ou respostas
+        // alternativas. Sem correspondência explícita, não grave um falso zero:
+        // deixe a tentativa sem nota e peça nova avaliação semântica.
+        if (!keyConcepts.length || !hits.length) {
+          if (feedbackBanner) {
+            feedbackBanner.style.display = 'block';
+            feedbackBanner.innerHTML = '<div role="status"><strong>Não foi possível avaliar com segurança.</strong> A correção por IA está indisponível e a verificação local não reconhece sinônimos ou respostas alternativas. Sua resposta não foi marcada como errada nem pontuada; tente novamente quando a IA estiver disponível.</div>';
+          }
+          if (evalBtn?.isConnected) {
+            evalBtn.disabled = false;
+            evalBtn.innerHTML = '<span>✨ Corrigir com IA</span>';
+          }
+          showToast('⚠️ Resposta não pontuada: não foi possível verificar equivalências semânticas.');
+          return;
+        }
         const coverageRate = keyConcepts.length > 0 ? (hits.length / keyConcepts.length) : (answer.length > 40 ? 0.75 : 0.4);
         const lengthBonus = Math.min(0.25, answer.length / 280);
         const acc = Math.round(Math.min(100, Math.max(20, (coverageRate * 75) + (lengthBonus * 100))));
