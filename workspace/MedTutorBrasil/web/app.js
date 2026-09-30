@@ -23804,7 +23804,7 @@ Para cada material, retorne um objeto no JSON com:
         <div class="sce-review-answer" hidden><span class="sce-review-answer-label">Resposta</span><div class="study-rich-text">${formattedAnswer || '<p>Este card não possui resposta registrada.</p>'}${image}</div></div>
         <div class="sce-review-written-answer">
           <label for="sceReviewStudentAnswerInput">✍️ Digite sua resposta</label>
-          <textarea id="sceReviewStudentAnswerInput" class="written-textarea" placeholder="Responda com suas palavras antes de consultar o gabarito..." onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); evaluateSceReviewWrittenAnswer();}"></textarea>
+          <textarea id="sceReviewStudentAnswerInput" class="written-textarea" autocomplete="off" autocorrect="off" placeholder="Responda com suas palavras antes de consultar o gabarito..." onkeydown="if((event.ctrlKey||event.metaKey) && event.key==='Enter'){event.preventDefault(); evaluateSceReviewWrittenAnswer();}"></textarea>
           <button class="btn-outline-action primary" id="sceReviewEvaluateAnswerButton" type="button" onclick="evaluateSceReviewWrittenAnswer()">✨ Corrigir com IA</button>
           <div id="sceReviewEvaluationFeedback" class="ai-feedback-banner" aria-live="polite"></div>
         </div>
@@ -23894,6 +23894,13 @@ Para cada material, retorne um objeto no JSON com:
       const alreadyRated = sceReviewState.rated.has(index);
       list.innerHTML = `<div class="sce-review-deck-progress" role="progressbar" aria-valuenow="${index + 1}" aria-valuemin="1" aria-valuemax="${cards.length}"><span style="width:${Math.round(((index + 1) / cards.length) * 100)}%"></span></div>${renderSceReviewCard(card, index)}
         <div class="sce-review-deck-navigation"><button class="btn-outline-action" type="button" data-sce-review-prev ${index === 0 ? 'disabled' : ''}>← Anterior</button><span>${alreadyRated ? 'Resposta registrada' : 'Revele a resposta e avalie sua lembrança'}</span><button class="btn-outline-action" type="button" data-sce-review-next>${index === cards.length - 1 ? 'Concluir' : 'Pular →'}</button></div>`;
+      const answerInput = list.querySelector('#sceReviewStudentAnswerInput');
+      if (answerInput) answerInput.value = '';
+      const oldFeedback = list.querySelector('#sceReviewEvaluationFeedback');
+      if (oldFeedback) {
+        oldFeedback.style.display = 'none';
+        oldFeedback.innerHTML = '';
+      }
       if (alreadyRated) list.querySelector('.sce-review-deck-card')?.setAttribute('data-sce-review-locked', 'true');
       bindSceReviewRevealButtons(list);
       if (alreadyRated) list.querySelectorAll('[data-sce-review-rate]').forEach(button => { button.disabled = true; });

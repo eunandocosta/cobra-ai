@@ -131,6 +131,20 @@ assert(openScheduleQuestions.includes("navigateTab('flashcards')"), 'cards diár
 assert(!openScheduleQuestions.includes("navigateTab('quizzes')"), 'cards diários do SCE não devem abrir Quizzes');
 console.log('[PASS] Cards diários do SCE navegam para Flashcards');
 
+const renderFlashcardDisplay = appSource.match(/function updateCardDisplay\(filteredList\) \{[\s\S]*?\n    \}/)?.[0] || '';
+const renderSceDeckCard = appSource.match(/function renderSceReviewDeckCard\(\) \{[\s\S]*?\n    \}/)?.[0] || '';
+const renderSceCard = appSource.match(/function renderSceReviewCard\(card, index\) \{[\s\S]*?\n    \}/)?.[0] || '';
+assert(renderFlashcardDisplay.includes("if (ansInput) ansInput.value = '';"), 'Flashcards deve limpar a resposta digitada ao trocar ou reabrir um card');
+assert(!renderFlashcardDisplay.includes('item.lastStudentAnswer'), 'Flashcards não deve reexibir tentativas anteriores no campo de resposta');
+assert(renderSceDeckCard.includes("if (answerInput) answerInput.value = '';"), 'o deck SCE deve forçar o campo de resposta a iniciar vazio ao renderizar cada card');
+assert(renderSceDeckCard.includes("oldFeedback.style.display = 'none'"), 'o deck SCE não deve reapresentar feedback de uma tentativa anterior');
+assert(renderSceCard.includes('autocomplete="off"') && !renderSceCard.includes('lastStudentAnswer'), 'o campo de resposta do SCE não deve restaurar texto anterior via conteúdo ou autofill');
+const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
+assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
+assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
+assert(sceReviewMarkup.includes('/app.min.js?v=20260929-active-recall-v1'), 'o bundle deve usar versão nova para invalidar cache após corrigir o campo de resposta');
+console.log('[PASS] Campos de recuperação ativa abrem vazios e botão de fechar do SCE tem tamanho acessível');
+
 const authMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
 const standaloneLoginMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'login.html'), 'utf-8');
 assert(authMarkup.includes('id="paymentScreenContainer"'), 'a tela de cupom deve ter um container independente da tela de login');

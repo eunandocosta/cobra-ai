@@ -7940,6 +7940,31 @@
     .sce-review-overdue-count { align-self: flex-start; padding: 2px 6px; border: 1px solid rgba(255, 68, 68, .32); border-radius: 999px; color: var(--danger); font-size: 9.5px; font-weight: 700; }
     .sce-review-overlay { z-index: 110200 !important; }
     .sce-review-modal { width: min(980px, 100%); max-width: 980px; max-height: min(90dvh, 920px); overflow: hidden; }
+    .sce-review-modal .sce-review-close {
+      display: grid;
+      flex: 0 0 44px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      place-items: center;
+      margin: 0 0 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, .035);
+      cursor: pointer;
+      transition: color .18s ease, background-color .18s ease, border-color .18s ease, transform .18s ease;
+    }
+    .sce-review-modal .sce-review-close:hover,
+    .sce-review-modal .sce-review-close:focus-visible {
+      border-color: var(--neon);
+      color: var(--neon);
+      background: rgba(0, 255, 102, .1);
+      outline: none;
+      transform: scale(1.04);
+    }
+    .sce-review-modal .sce-review-close svg { display: block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 2; }
     .sce-review-cards { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; gap: 14px; overflow-y: auto; padding: 2px 4px 2px 0; overscroll-behavior: contain; }
     .sce-review-subject-group { display: flex; flex-direction: column; gap: 9px; }
     .sce-review-subject-group > h4 { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding-bottom: 7px; border-bottom: 1px solid var(--border); font-size: 13px; }

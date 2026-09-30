@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20260927-sce-review-deck-v2">
+  <link rel="stylesheet" href="/styles.css?v=20260929-active-recall-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -867,7 +867,7 @@
                   <h3 id="sceReviewModalTitle" style="margin:0">Flashcards para revisão</h3>
                   <p id="sceReviewModalSubtitle" style="margin:5px 0 0;color:var(--text-secondary);font-size:13px"></p>
                 </div>
-                <button class="btn-icon" type="button" onclick="closeSceReviewModal()" aria-label="Fechar flashcards">×</button>
+                <button class="btn-icon sce-review-close" type="button" onclick="closeSceReviewModal()" aria-label="Fechar flashcards"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
               </div>
               <div class="sce-review-cards" id="sceReviewCards"></div>
               <div class="sce-review-modal-footer">
@@ -3544,7 +3544,7 @@
        ========================================================= -->
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
-  <script defer src="/app.min.js?v=20260927-sce-review-deck-v2"></script>
+  <script defer src="/app.min.js?v=20260929-active-recall-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
