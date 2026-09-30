@@ -17,7 +17,9 @@ const PORT = process.env.PORT || 3001;
 app.use(compression);
 app.use(staticCacheHeaders);
 app.use(apiRateLimit({ windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000), maxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS || 120) }));
-app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '2mb' }));
+// Materiais acadêmicos concatenados para geração (PDFs e aulas longas) podem
+// exceder 2 MB. O limite continua configurável no ambiente do deploy.
+app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: process.env.REQUEST_BODY_LIMIT || '2mb' }));
 
 // Servir JS minificado/ofuscado se disponível, com fallback para app.js

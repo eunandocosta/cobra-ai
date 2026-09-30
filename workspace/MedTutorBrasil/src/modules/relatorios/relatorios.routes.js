@@ -3,7 +3,9 @@ const express = require('../../shared/express');
 const router = express.Router();
 const { withAccess } = require('../../shared/access.middleware');
 const relatoriosController = require('./relatorios.controller');
+const revisionController = require('./revision.controller');
 
+router.post('/revisao', withAccess((req, res) => revisionController.generate(req, res)));
 router.post('/gerar', withAccess((req, res) => relatoriosController.generate(req, res)));
 router.get('/:id', withAccess((req, res) => relatoriosController.getById(req, res)));
 router.post('/exportar/pdf', withAccess((req, res) => relatoriosController.exportPdf(req, res)));

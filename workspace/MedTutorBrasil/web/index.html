@@ -1468,6 +1468,33 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="disciplineReviewModal" onclick="closeDisciplineReviewModal(event)">
+    <div class="modal-window" onclick="event.stopPropagation()" style="width:min(900px,94vw);max-height:92vh;display:flex;flex-direction:column;gap:14px;padding:20px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+        <div>
+          <h2 style="margin:0 0 5px;font-size:19px;">📖 Gerar revisão da disciplina</h2>
+          <div id="disciplineReviewSubject" style="color:var(--text-secondary);font-size:13px;"></div>
+        </div>
+        <button class="btn-close-modal" type="button" onclick="closeDisciplineReviewModal()" aria-label="Fechar">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);font-size:12px;line-height:1.55;color:var(--text-secondary);">
+        O texto abaixo define o assunto da revisão. Os documentos da disciplina serão examinados, mas só os que tratarem do mesmo tema poderão complementar a fonte. Conteúdo de outros assuntos não será enviado para a geração.
+      </div>
+      <label style="display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700;">
+        Texto ou documento-base (TXT/PDF)
+        <input id="disciplineReviewFile" type="file" accept=".txt,.pdf,text/plain,application/pdf" onchange="loadDisciplineReviewFile(this.files?.[0])">
+      </label>
+      <textarea id="disciplineReviewSource" placeholder="Cole aqui o texto que define o assunto da revisão, ou selecione um arquivo TXT/PDF acima." style="width:100%;min-height:260px;resize:vertical;box-sizing:border-box;padding:13px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input,var(--bg-surface));color:var(--text-primary);font:inherit;line-height:1.5;"></textarea>
+      <div id="disciplineReviewStatus" role="status" aria-live="polite" style="min-height:18px;color:var(--text-secondary);font-size:12px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
+        <button class="btn-outline-action" type="button" onclick="closeDisciplineReviewModal()">Cancelar</button>
+        <button class="btn-outline-action primary" id="btnGenerateDisciplineReview" type="button" onclick="generateDisciplineReview()">✨ Gerar revisão</button>
+      </div>
+    </div>
+  </div>
+
   <!-- =========================================================
        MODAL LIGHTBOX DE IMAGENS MÉDICAS EM ALTA DEFINIÇÃO
        ========================================================= -->

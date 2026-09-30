@@ -12099,6 +12099,157 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       await openAcademicReportForMaterial(mat?.id || subjectName, subjectName, mat?.name || subjectName);
     }
 
+    let disciplineReviewContext = { subject: '', materials: [], materialsLoaded: false };
+
+    function getReviewTopicTerms(value) {
+      const stop = new Set('a ao aos aquela aquele as ate com como da das de dela dele depois do dos e em entre era essa esse esta este foi foram ha isso mais mas muito na nas nem no nos o os ou para pela pelo por porque qual quando que se sem ser sua suas seu seus tambem tem ter um uma uns umas'.split(/\s+/));
+      return new Set(String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .split(/[^a-z0-9]+/).filter(term => term.length >= 4 && !stop.has(term) && !/^\d+$/.test(term)));
+    }
+
+    async function openDisciplineReviewModal(subjectName) {
+      const subject = String(subjectName || '').trim();
+      const modal = document.getElementById('disciplineReviewModal');
+      const subjectEl = document.getElementById('disciplineReviewSubject');
+      const statusEl = document.getElementById('disciplineReviewStatus');
+      const textEl = document.getElementById('disciplineReviewSource');
+      const fileEl = document.getElementById('disciplineReviewFile');
+      const generateButton = document.getElementById('btnGenerateDisciplineReview');
+      if (!modal || !subject) return;
+      disciplineReviewContext = { subject, materials: [], materialsLoaded: false };
+      if (subjectEl) subjectEl.textContent = `Disciplina: ${subject}`;
+      if (statusEl) statusEl.textContent = '⏳ Buscando os documentos desta disciplina no Firestore…';
+      if (textEl) textEl.value = '';
+      if (fileEl) fileEl.value = '';
+      if (generateButton) generateButton.disabled = true;
+      modal.classList.add('active');
+      try {
+        let timeoutId;
+        const result = await Promise.race([
+          MedTutorFirebaseService.getAuthoritativeSubjectText(subject),
+          new Promise((_, reject) => { timeoutId = window.setTimeout(() => reject(new Error('A consulta ao Firestore excedeu 25 segundos.')), 25000); })
+        ]).finally(() => window.clearTimeout(timeoutId));
+        if (result?.source === 'auth_required') throw new Error('Entre na conta que contém os materiais da disciplina para verificar as fontes complementares.');
+        disciplineReviewContext.materials = Array.isArray(result?.materials) ? result.materials : [];
+        disciplineReviewContext.materialsLoaded = true;
+        if (statusEl) {
+          statusEl.textContent = disciplineReviewContext.materials.length
+            ? `✅ ${disciplineReviewContext.materials.length} documento(s) da disciplina carregado(s). A pertinência será checada contra o assunto-base antes de gerar.`
+            : '⚠️ Nenhum documento com texto foi localizado no Firestore para esta disciplina. Ainda é possível gerar somente com o texto enviado.';
+        }
+        if (generateButton) generateButton.disabled = false;
+      } catch (error) {
+        console.error('[Revisão MedTutor] Não foi possível carregar os materiais da disciplina:', error);
+        if (statusEl) statusEl.textContent = `⚠️ Não consegui carregar documentos complementares (${error.message || 'erro no Firestore'}). A revisão ainda poderá usar apenas o texto-base.`;
+      }
+    }
+
+    async function loadDisciplineReviewFile(file) {
+      const statusEl = document.getElementById('disciplineReviewStatus');
+      const textEl = document.getElementById('disciplineReviewSource');
+      if (!file || !textEl) return;
+      const fileName = String(file.name || '').toLowerCase();
+      if (!fileName.endsWith('.txt') && !fileName.endsWith('.pdf')) {
+        if (statusEl) statusEl.textContent = '⚠️ Selecione um arquivo TXT ou PDF.';
+        return;
+      }
+      if (statusEl) statusEl.textContent = `⏳ Extraindo texto de ${file.name}…`;
+      try {
+        const text = await extractTextFromFile(file);
+        if (!String(text || '').trim()) throw new Error('Não encontrei texto selecionável. PDFs somente-imagem precisam de OCR ou de texto colado.');
+        textEl.value = text;
+        if (statusEl) statusEl.textContent = `✅ Texto extraído de ${file.name} (${text.length.toLocaleString('pt-BR')} caracteres).`;
+      } catch (error) {
+        console.warn('[Revisão MedTutor] Falha ao extrair arquivo-base:', error);
+        if (statusEl) statusEl.textContent = `⚠️ ${error.message || 'Não foi possível ler esse arquivo.'}`;
+      }
+    }
+
+    function closeDisciplineReviewModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('disciplineReviewModal')?.classList.remove('active');
+    }
+
+    async function generateDisciplineReview() {
+      const { subject, materials } = disciplineReviewContext;
+      const sourceText = String(document.getElementById('disciplineReviewSource')?.value || '').trim();
+      const sourceName = String(document.getElementById('disciplineReviewFile')?.files?.[0]?.name || 'Texto informado pelo estudante');
+      const statusEl = document.getElementById('disciplineReviewStatus');
+      const button = document.getElementById('btnGenerateDisciplineReview');
+      if (!disciplineReviewContext.materialsLoaded) {
+        if (statusEl) statusEl.textContent = '⚠️ Ainda não consegui confirmar os documentos desta disciplina no Firestore. Feche e reabra para tentar novamente.';
+        return;
+      }
+      if (sourceText.length < 80) {
+        if (statusEl) statusEl.textContent = '⚠️ Informe pelo menos 80 caracteres de texto útil para definir o assunto.';
+        return;
+      }
+
+      // Pré-filtro local lê todos os documentos retornados pelo Firestore, mas
+      // somente envia candidatos com mais de um conceito específico em comum.
+      const sourceTerms = getReviewTopicTerms(sourceText);
+      const threshold = sourceTerms.size < 12 ? 2 : 3;
+      const scoped = materials.map(material => {
+        const matches = [...sourceTerms].filter(term => getReviewTopicTerms(`${material.name || ''} ${material.text || ''}`).has(term));
+        return { material, matches: matches.length };
+      });
+      const candidateMaterials = scoped.map(({ material, matches }) => ({
+        name: material.name || 'Aula sem título',
+        subject,
+        text: matches >= threshold && (matches >= 3 || matches / Math.max(1, sourceTerms.size) >= 0.2)
+          ? String(material.text || '')
+          : ''
+      }));
+
+      if (button) { button.disabled = true; button.textContent = '⏳ Gerando revisão…'; }
+      if (statusEl) statusEl.textContent = `⏳ Analisando ${materials.length} documento(s) da disciplina e preparando uma revisão ancorada no texto escolhido…`;
+      console.info('[Revisão MedTutor] Solicitação de geração', {
+        disciplina: subject,
+        arquivoBase: sourceName,
+        caracteresBase: sourceText.length,
+        documentosDaDisciplina: materials.length,
+        candidatosTemáticos: candidateMaterials.filter(material => material.text).length
+      });
+
+      try {
+        const response = await fetch('/api/relatorios/revisao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject, sourceName, sourceText, materials: candidateMaterials })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.details || result.error || `Falha HTTP ${response.status}`);
+        console.info(`[Revisão MedTutor] Revisão gerada com ${result.generatorEngine || 'IA'} ${result.generatorModel || ''} com sucesso.`, {
+          disciplina: subject,
+          fontesUsadas: result.sources?.length || 1,
+          materiaisDescartados: result.excludedMaterials?.length || 0
+        });
+        document.getElementById('disciplineReviewModal')?.classList.remove('active');
+        const reader = document.getElementById('readerModal');
+        const titleEl = document.getElementById('readerModalTitle');
+        const subtitleEl = document.getElementById('readerModalSubtitle');
+        const contentEl = document.getElementById('readerModalContent');
+        if (!reader || !contentEl) throw new Error('A janela de leitura não está disponível.');
+        activeAcademicReportData = result;
+        if (titleEl) titleEl.textContent = result.title || `Revisão • ${subject}`;
+        if (subtitleEl) subtitleEl.textContent = `Revisão estritamente baseada na fonte • ${result.generatorEngine || ''} ${result.generatorModel || ''}`;
+        const safeSources = (result.sources || []).map(name => `<li>${escapeHtml(name)}</li>`).join('');
+        const sourceNote = `<section style="margin:16px auto;padding:10px 14px;max-width:820px;border:1px solid #d5dce5;border-radius:6px;background:#f8fafc;color:#334155;font:10pt Arial,sans-serif;"><strong>Fontes efetivamente utilizadas</strong><ul style="margin:6px 0 0;padding-left:20px;">${safeSources || `<li>${escapeHtml(sourceName)}</li>`}</ul></section>`;
+        contentEl.innerHTML = `${sourceNote}${window.AcademicReportRenderer.render(result.markdown || '', { title: result.title, subject })}`;
+        reader.classList.add('active');
+      } catch (error) {
+        console.error('[Revisão MedTutor] Revisão falhou.', { disciplina: subject, erro: error.message });
+        if (statusEl) statusEl.textContent = `❌ Não foi possível gerar: ${error.message}`;
+      } finally {
+        if (button) { button.disabled = false; button.textContent = '✨ Gerar revisão'; }
+      }
+    }
+
+    window.openDisciplineReviewModal = openDisciplineReviewModal;
+    window.loadDisciplineReviewFile = loadDisciplineReviewFile;
+    window.closeDisciplineReviewModal = closeDisciplineReviewModal;
+    window.generateDisciplineReview = generateDisciplineReview;
+
     async function printAcademicReport() {
       const container = document.getElementById('readerModalContent');
       const images = container ? [...container.querySelectorAll('img[src]')] : [];
@@ -22781,6 +22932,7 @@ Para cada material, retorne um objeto no JSON com:
                 rightTag = `
                   <span style="background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">⚡ ${matCount} ${matCount === 1 ? 'aula' : 'aulas'} • Pendente</span>
                   <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Gerar Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
+                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="openDisciplineReviewModal('${escapedName}')" title="Usar texto/TXT/PDF como tema e complementar apenas com materiais pertinentes desta disciplina">📖 Gerar revisão</button>
                   <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="synchronizeSubjectQuestions('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ler todos os arquivos enviados desta disciplina e criar os primeiros Quiz e Flashcards">🔄 Sincronizar Questões</button>
                   <button class="btn-outline-action danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
                 `;
@@ -22788,6 +22940,7 @@ Para cada material, retorne um objeto no JSON com:
                 rightTag = `
                   <span style="background: rgba(0, 255, 102, 0.15); color: #00ff66; border: 1px solid rgba(0, 255, 102, 0.35); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap;">🟢 ${matCount} ${matCount === 1 ? 'aula' : 'aulas'}</span>
                   <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="openAcademicReportForSubject('${matchedSubjectKey.replace(/'/g, "\\'")}')" title="Ver Relatório Acadêmico Formal (Artigo & Prova)">📄 Relatório</button>
+                  <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="openDisciplineReviewModal('${escapedName}')" title="Usar texto/TXT/PDF como tema e complementar apenas com materiais pertinentes desta disciplina">📖 Gerar revisão</button>
                   <button class="btn-outline-action" style="padding: 4px 10px; font-size: 11px;" onclick="openSubjectInTab('${matchedSubjectKey.replace(/'/g, "\\'")}', 'quizzes')" title="Ver Quizzes desta disciplina">📝 Quizzes</button>
                   <button class="btn-outline-action danger" style="padding: 4px 10px; font-size: 11px;" onclick="deleteSubjectAllMaterials('${escapedName}')" title="Excluir todas as aulas de ${escapedName}">🗑️ Excluir Aulas</button>
                 `;
