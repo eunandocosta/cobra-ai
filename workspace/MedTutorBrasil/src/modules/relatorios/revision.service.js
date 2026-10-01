@@ -78,7 +78,11 @@ class RevisionService {
           const model = client.getGenerativeModel({
             model: selectedModel,
             systemInstruction: system,
-            generationConfig: { temperature: 0.15, maxOutputTokens: 16384 }
+            // A revisão completa também audita todo o inventário de notas. O
+            // limite anterior (16.384) interrompia trechos extensos com
+            // finishReason=MAX_TOKENS, mesmo quando a leitura da fonte estava
+            // correta. Use o mesmo teto já adotado pelo gerador de relatórios.
+            generationConfig: { temperature: 0.15, maxOutputTokens: 65536 }
           });
           const result = await runWithAiLimit(() => model.generateContent(prompt));
           const candidate = result.response.candidates?.[0];
