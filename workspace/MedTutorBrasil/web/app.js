@@ -1367,6 +1367,7 @@
       async clearLocalStudyDataForReset(uid, resetVersion) {
         await Promise.all([
           MedTutorLocalDB.remove('materials', uid),
+          MedTutorLocalDB.remove('materials', `review_materials_${uid}`),
           MedTutorLocalDB.remove('curriculum', uid),
           MedTutorLocalDB.remove('questions', uid),
           MedTutorLocalDB.remove('chats', uid)
@@ -1448,8 +1449,18 @@
         }
       },
 
-      async readMaterialTextChunks(docRef, expectedChunks) {
-        const snapshot = await docRef.collection('conteudo_chunks').orderBy('index').limit(expectedChunks || 1000).get();
+      async readMaterialTextChunks(docRef, expectedChunks, { strict = false } = {}) {
+        const expected = Number(expectedChunks) || 0;
+        const snapshot = await docRef.collection('conteudo_chunks').orderBy('index').limit(expected || 1000).get();
+        if (strict && expected && snapshot.size < expected) {
+          throw new Error(`Chunks incompletos no Firestore: ${snapshot.size}/${expected} encontrados.`);
+        }
+        if (strict && expected) {
+          const indexes = snapshot.docs.map(doc => Number(doc.data()?.index));
+          for (let index = 0; index < expected; index += 1) {
+            if (indexes[index] !== index) throw new Error(`O chunk ${index + 1}/${expected} está ausente ou fora de ordem.`);
+          }
+        }
         return snapshot.docs.map(doc => String(doc.data()?.texto || '')).join('');
       },
 
@@ -2013,76 +2024,144 @@
       },
 
       // Recupera o conjunto autoritativo de materiais de uma disciplina diretamente do Firestore
-      async getAuthoritativeSubjectText(subjectName) {
+      async getAuthoritativeSubjectText(subjectName, { strict = false, onProgress = () => {} } = {}) {
         const uid = this.getUserId();
+        const reportProgress = progress => { try { onProgress(progress); } catch (error) {} };
         const isBoilerplate = text => typeof text === 'string' && (
           /^Apostila Didática Baseada nos Slides/i.test(text.trim()) ||
           /• Diretrizes SUS, CFM & ENARE/i.test(text.trim()) ||
           /ÍNDICE DESCRITIVO DO MATERIAL ANALISADO/i.test(text.trim())
         );
-
-        const materialsFound = [];
-        if (firestoreDb && isFirebaseCloudActive && this.hasAuthenticatedCloudSession(uid)) {
-          try {
-            const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
-            const querySnap = await colRef.where('disciplina', '==', subjectName).get();
-            const subjectDocs = new Map(querySnap.docs.map(doc => [doc.id, doc]));
-            // Materiais legados com rótulo de período não aparecem na query
-            // exata. Reaproveita apenas IDs já presentes no cache do estudante,
-            // evitando uma leitura integral da coleção do Firestore.
-            const cachedAliases = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : [])
-              .filter(material => material.id && isSameCurriculumSubject(material.subject || material.disciplina, subjectName));
-            for (const material of cachedAliases) {
-              if (subjectDocs.has(material.id)) continue;
-              try {
-                const aliasDoc = await colRef.doc(material.id).get();
-                if (aliasDoc.exists) subjectDocs.set(aliasDoc.id, aliasDoc);
-              } catch (readError) {
-                console.warn('[Firestore] Não foi possível recuperar material legado da disciplina:', material.id, readError);
-              }
+        const mapLimit = async (items, concurrency, mapper) => {
+          const input = Array.from(items || []);
+          const results = new Array(input.length);
+          let cursor = 0;
+          let firstError = null;
+          const workers = Array.from({ length: Math.min(input.length, concurrency) }, async () => {
+            while (!firstError) {
+              const index = cursor++;
+              if (index >= input.length) return;
+              try { results[index] = await mapper(input[index], index); }
+              catch (error) { firstError ||= error; }
             }
-            for (const doc of subjectDocs.values()) {
-              const data = doc.data() || {};
-              if (!isSameCurriculumSubject(data.disciplina || data.subject, subjectName)) continue;
-              let chunksText = '';
-              if (data.conteudo_armazenamento === 'chunks_v1') {
-                try {
-                  chunksText = await this.readMaterialTextChunks(doc.ref, Number(data.conteudo_chunks) || 0);
-                } catch (ce) {}
-              }
-              const candidates = [
-                chunksText,
-                data.material_md,
-                data.materialMd,
-                data.conteudo_md,
-                data.conteudoMd,
-                data.markdownText,
-                data.markdown,
-                data.texto,
-                data.text,
-                data.conteudo,
-                data.content,
-                data.corpo,
-                data.body
-              ].filter(t => typeof t === 'string' && t.trim().length > 0 && !isBoilerplate(t) && !isSyntheticDriveSummary(t)).map(t => t.trim());
-              candidates.sort((a, b) => b.length - a.length);
-              if (candidates.length > 0) {
-                materialsFound.push({
-                  name: data.nome || doc.id,
-                  text: candidates[0],
-                  id: doc.id
-                });
-              }
-            }
-          } catch (e) {
-            console.warn('[Firestore] Erro ao carregar materiais da disciplina:', e);
-          }
-        }
-
-        if (materialsFound.length === 0) {
+          });
+          await Promise.all(workers);
+          if (firstError) throw firstError;
+          return results;
+        };
+        const canReadCloud = firestoreDb && isFirebaseCloudActive && this.hasAuthenticatedCloudSession(uid);
+        if (!canReadCloud) {
+          if (strict && !this.hasAuthenticatedCloudSession(uid)) throw new Error('Entre novamente na conta que contém os materiais desta disciplina.');
+          if (strict) throw new Error('A conexão com o Firestore não está disponível para buscar os materiais.');
           return { text: '', source: this.hasAuthenticatedCloudSession(uid) ? 'none' : 'auth_required', count: 0, materials: [] };
         }
 
+        const materialsFound = [];
+        const cacheKey = `review_materials_${uid}`;
+        const subjectCacheKey = normalizeStudyComparisonText(subjectName);
+        let remoteRevision = '';
+        let reviewCache = {};
+        let cloudLoadComplete = false;
+        try {
+          reportProgress({ stage: 'revision', current: 0, total: 1, message: 'Verificando a revisão dos materiais no Firestore…' });
+          const userSnapshot = await firestoreDb.collection('users').doc(uid).get();
+          remoteRevision = String(userSnapshot.data()?.medtutor_dados_revision || '');
+          if (remoteRevision) {
+            reviewCache = await MedTutorLocalDB.get('materials', cacheKey) || {};
+            const cached = reviewCache[subjectCacheKey];
+            if (cached?.revision === remoteRevision && Array.isArray(cached.materials)) {
+              const cachedMaterials = cached.materials;
+              const cachedText = cachedMaterials.map(material => `--- INÍCIO DA AULA: ${material.name} ---\n\n${material.text}\n\n--- FIM DA AULA: ${material.name} ---`).join('\n\n');
+              reportProgress({ stage: 'cache', current: cachedMaterials.length, total: cachedMaterials.length, cached: true, message: `${cachedMaterials.length} material(is) validados pela revisão remota.` });
+              return { text: cachedText, source: cachedMaterials.length ? 'firestore_subject_cache' : 'none', count: cachedMaterials.length, materials: cachedMaterials };
+            }
+          }
+        } catch (cacheError) {
+          if (strict) throw new Error(`Não foi possível verificar a versão dos materiais no Firestore: ${cacheError.message || cacheError}`);
+          console.warn('[Firestore] Não foi possível validar o cache de revisão; será feita leitura direta:', cacheError);
+        }
+
+        try {
+          const colRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo');
+          reportProgress({ stage: 'query', current: 0, total: 1, message: 'Buscando os materiais da disciplina…' });
+          const querySnap = await colRef.where('disciplina', '==', subjectName).get();
+          const subjectDocs = new Map(querySnap.docs.map(doc => [doc.id, doc]));
+          // Compatibilidade com rótulos legados: busca somente IDs da disciplina
+          // que já estão no cache, sem varrer novamente toda a coleção remota.
+          const cachedAliases = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : [])
+            .filter(material => material.id && isSameCurriculumSubject(material.subject || material.disciplina, subjectName))
+            .filter(material => !subjectDocs.has(material.id));
+          reportProgress({ stage: 'documents', current: 0, total: Math.max(subjectDocs.size + cachedAliases.length, 1), message: `${subjectDocs.size} documento(s) encontrados; conferindo materiais legados…` });
+          const aliasSnapshots = await mapLimit(cachedAliases, 4, async material => {
+            try { return await colRef.doc(material.id).get(); }
+            catch (readError) {
+              if (strict) throw new Error(`Falha ao conferir material legado ${material.name || material.id}: ${readError.message || readError}`);
+              console.warn('[Firestore] Não foi possível recuperar material legado da disciplina:', material.id, readError);
+              return null;
+            }
+          });
+          aliasSnapshots.filter(snapshot => snapshot?.exists).forEach(snapshot => subjectDocs.set(snapshot.id, snapshot));
+
+          const subjectSnapshots = [...subjectDocs.values()];
+          let loadedCount = 0;
+          reportProgress({ stage: 'content', current: 0, total: subjectSnapshots.length || 1, message: `Lendo texto integral e chunks de ${subjectSnapshots.length} documento(s)…` });
+          const loadedMaterials = await mapLimit(subjectSnapshots, 3, async doc => {
+            const data = doc.data() || {};
+            if (!isSameCurriculumSubject(data.disciplina || data.subject, subjectName)) {
+              loadedCount += 1;
+              reportProgress({ stage: 'content', current: loadedCount, total: subjectSnapshots.length || 1, message: `Documento ${loadedCount}/${subjectSnapshots.length} conferido.` });
+              return null;
+            }
+            let chunksText = '';
+            if (data.conteudo_armazenamento === 'chunks_v1') {
+              const expectedChunks = Number(data.conteudo_chunks) || 0;
+              if (strict && !expectedChunks) throw new Error(`O material ${data.nome || doc.id} declara chunks_v1, mas não informa a quantidade de trechos.`);
+              chunksText = await this.readMaterialTextChunks(doc.ref, expectedChunks, { strict });
+              const expectedChars = Number(data.conteudo_caracteres) || 0;
+              if (strict && expectedChars && chunksText.length < expectedChars) {
+                throw new Error(`O material ${data.nome || doc.id} chegou incompleto (${chunksText.length}/${expectedChars} caracteres).`);
+              }
+            }
+            const candidates = [
+              chunksText,
+              data.material_md,
+              data.materialMd,
+              data.conteudo_md,
+              data.conteudoMd,
+              data.markdownText,
+              data.markdown,
+              data.texto,
+              data.text,
+              data.conteudo,
+              data.content,
+              data.corpo,
+              data.body
+            ].filter(text => typeof text === 'string' && text.trim().length > 0 && !isBoilerplate(text) && !isSyntheticDriveSummary(text)).map(text => text.trim());
+            candidates.sort((a, b) => b.length - a.length);
+            const completeText = candidates[0] || '';
+            const declaredChars = Number(data.conteudo_caracteres) || 0;
+            if (strict && declaredChars > 0 && completeText && completeText.length < declaredChars) {
+              throw new Error(`O texto de ${data.nome || doc.id} está incompleto (${completeText.length}/${declaredChars} caracteres).`);
+            }
+            loadedCount += 1;
+            reportProgress({ stage: 'content', current: loadedCount, total: subjectSnapshots.length || 1, message: `Texto carregado ${loadedCount}/${subjectSnapshots.length}: ${data.nome || doc.id}.` });
+            return completeText ? { name: data.nome || doc.id, text: completeText, id: doc.id } : null;
+          });
+          materialsFound.push(...loadedMaterials.filter(Boolean));
+          cloudLoadComplete = true;
+        } catch (error) {
+          console.warn('[Firestore] Erro ao carregar materiais da disciplina:', error);
+          if (strict) throw error;
+        }
+
+        if (remoteRevision && cloudLoadComplete) {
+          const currentRevisionCache = Object.values(reviewCache).every(entry => entry?.revision === remoteRevision)
+            ? reviewCache
+            : {};
+          currentRevisionCache[subjectCacheKey] = { revision: remoteRevision, materials: materialsFound };
+          await MedTutorLocalDB.set('materials', cacheKey, currentRevisionCache);
+        }
+        if (materialsFound.length === 0) return { text: '', source: 'none', count: 0, materials: [] };
         const combinedText = materialsFound.map(m => `--- INÍCIO DA AULA: ${m.name} ---\n\n${m.text}\n\n--- FIM DA AULA: ${m.name} ---`).join('\n\n');
         return {
           text: combinedText,
@@ -7533,7 +7612,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         overlay = document.createElement('div');
         overlay.id = 'studyGenerationOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;background:rgba(4,12,24,.72);backdrop-filter:blur(4px);';
-        overlay.innerHTML = `<div role="status" aria-live="polite" style="width:min(420px,calc(100vw - 40px));padding:26px;border:1px solid rgba(0,229,255,.38);border-radius:16px;background:#101b2d;color:#f4f8ff;box-shadow:0 20px 70px rgba(0,0,0,.4);text-align:center;"><div class="loader-spinner" style="width:36px;height:36px;margin:0 auto 16px;border:3px solid rgba(255,255,255,.22);border-top-color:#00e5ff;border-radius:50%;animation:spin .8s linear infinite;"></div><strong id="studyGenerationTitle">Preparando…</strong><p id="studyGenerationDetail" style="margin:9px 0 8px;color:#b8c6dc;font-size:13px;"></p><small id="studyGenerationElapsed" style="display:block;margin-bottom:14px;color:#8292aa;font-size:11px;">Tempo decorrido: 0 s</small><div style="height:7px;background:#26354d;border-radius:8px;overflow:hidden;"><div id="studyGenerationProgressBar" style="height:100%;width:0;background:linear-gradient(90deg,#00e5ff,#00ff9d);transition:width .25s ease;"></div></div></div>`;
+        overlay.innerHTML = `<div role="status" aria-live="polite" style="width:min(420px,calc(100vw - 40px));padding:26px;border:1px solid rgba(0,229,255,.38);border-radius:16px;background:#101b2d;color:#f4f8ff;box-shadow:0 20px 70px rgba(0,0,0,.4);text-align:center;"><div class="loader-spinner" style="width:36px;height:36px;margin:0 auto 16px;border:3px solid rgba(255,255,255,.22);border-top-color:#00e5ff;border-radius:50%;animation:spin .8s linear infinite;"></div><strong id="studyGenerationTitle">Preparando…</strong><p id="studyGenerationDetail" style="margin:9px 0 8px;color:#b8c6dc;font-size:13px;"></p><small id="studyGenerationElapsed" style="display:block;margin-bottom:14px;color:#8292aa;font-size:11px;">Tempo decorrido: 0 s</small><div style="height:7px;background:#26354d;border-radius:8px;overflow:hidden;"><div id="studyGenerationProgressBar" style="height:100%;width:0;background:linear-gradient(90deg,#00e5ff,#00ff9d);transition:width .25s ease;"></div></div><div id="studyGenerationActions" style="display:none;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:16px;"><button id="studyGenerationActionPrimary" type="button" style="padding:9px 14px;border:1px solid #00e5ff;border-radius:8px;background:#10283a;color:#eaf8ff;font:inherit;font-size:12px;font-weight:700;cursor:pointer;"></button><button id="studyGenerationActionSecondary" type="button" style="padding:9px 14px;border:1px solid #52657a;border-radius:8px;background:#172131;color:#eaf8ff;font:inherit;font-size:12px;font-weight:700;cursor:pointer;"></button></div></div>`;
         document.body.appendChild(overlay);
         studyProcessingTimer = window.setInterval(() => {
           const elapsed = document.getElementById('studyGenerationElapsed');
@@ -7545,9 +7624,23 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const title = document.getElementById('studyGenerationTitle');
       const detail = document.getElementById('studyGenerationDetail');
       const bar = document.getElementById('studyGenerationProgressBar');
+      const actions = document.getElementById('studyGenerationActions');
       if (title) title.textContent = state.title || `Gerando questão ${current} de ${total}`;
       if (detail) detail.textContent = state.detail || 'Planejando, redigindo e comparando com as questões anteriores.';
       if (bar) bar.style.width = `${Math.round((current / total) * 100)}%`;
+      const buttons = [
+        document.getElementById('studyGenerationActionPrimary'),
+        document.getElementById('studyGenerationActionSecondary')
+      ];
+      const visibleActions = (Array.isArray(state.actions) ? state.actions : []).slice(0, 2);
+      buttons.forEach((button, index) => {
+        const action = visibleActions[index];
+        if (!button) return;
+        button.style.display = action ? 'inline-flex' : 'none';
+        button.textContent = action?.label || '';
+        button.onclick = action?.onClick || null;
+      });
+      if (actions) actions.style.display = visibleActions.length ? 'flex' : 'none';
     }
 
     function buildQuestionContext(materialText, evidence) {
@@ -12111,6 +12204,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     let disciplineReviewContext = { subject: '', materials: [], materialsLoaded: false };
+    let disciplineReviewLoadSequence = 0;
     let pendingDisciplineReviewQuiz = null;
 
     function splitDisciplineReviewQuizText(value, maxChars = 15000, overlapChars = 600) {
@@ -12278,7 +12372,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         .split(/[^a-z0-9]+/).filter(term => term.length >= 4 && !stop.has(term) && !/^\d+$/.test(term)));
     }
 
-    async function openDisciplineReviewModal(subjectName) {
+    async function openDisciplineReviewModal(subjectName, { preserveInputs = false } = {}) {
       const subject = String(subjectName || '').trim();
       const modal = document.getElementById('disciplineReviewModal');
       const subjectEl = document.getElementById('disciplineReviewSubject');
@@ -12287,19 +12381,83 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const fileEl = document.getElementById('disciplineReviewFile');
       const generateButton = document.getElementById('btnGenerateDisciplineReview');
       if (!modal || !subject) return;
+      const loadId = ++disciplineReviewLoadSequence;
+      const isCurrentLoad = () => loadId === disciplineReviewLoadSequence;
       disciplineReviewContext = { subject, materials: [], materialsLoaded: false };
       if (subjectEl) subjectEl.textContent = `Disciplina: ${subject}`;
       if (statusEl) statusEl.textContent = '⏳ Buscando os documentos desta disciplina no Firestore…';
-      if (textEl) textEl.value = '';
-      if (fileEl) fileEl.value = '';
+      if (!preserveInputs) {
+        if (textEl) textEl.value = '';
+        if (fileEl) fileEl.value = '';
+      }
       if (generateButton) generateButton.disabled = true;
       modal.classList.add('active');
+      let slowNoticeShown = false;
+      let slowWaitTimer = null;
+      const continueWaiting = () => {
+        if (!isCurrentLoad()) return;
+        slowNoticeShown = false;
+        if (statusEl) statusEl.textContent = '⏳ Continuando a espera dos documentos do Firestore…';
+        setStudyGenerationProgress({
+          title: 'Aguardando materiais do Firebase',
+          current: 0,
+          total: 1,
+          detail: `A consulta de ${subject} permanece ativa; nenhum documento será ignorado.`
+        });
+      };
+      const useOnlyBaseText = () => {
+        if (!isCurrentLoad()) return;
+        ++disciplineReviewLoadSequence;
+        if (slowWaitTimer) window.clearTimeout(slowWaitTimer);
+        disciplineReviewContext = { subject, materials: [], materialsLoaded: true };
+        if (generateButton) generateButton.disabled = false;
+        if (statusEl) statusEl.textContent = 'ℹ️ Você escolheu seguir somente com o texto-base. Os documentos complementares ainda não foram confirmados.';
+        setStudyGenerationProgress({ done: true });
+      };
+      const showSlowWaitNotice = () => {
+        if (!isCurrentLoad()) return;
+        slowNoticeShown = true;
+        const actions = [
+          { label: 'Continuar aguardando', onClick: continueWaiting },
+          { label: 'Usar somente texto-base', onClick: useOnlyBaseText }
+        ];
+        if (statusEl) statusEl.textContent = '⏳ A busca está levando mais que o esperado. Ela continua ativa; você pode aguardar ou escolher explicitamente seguir sem complementos.';
+        setStudyGenerationProgress({
+          title: 'Ainda carregando documentos',
+          current: 0,
+          total: 1,
+          detail: 'O Firestore ainda está respondendo. Não fechamos a consulta nem marcamos materiais incompletos como carregados.',
+          actions
+        });
+      };
+      slowWaitTimer = window.setTimeout(showSlowWaitNotice, 25000);
+      setStudyGenerationProgress({
+        title: 'Buscando materiais complementares',
+        current: 0,
+        total: 1,
+        detail: `Consultando os documentos de ${subject} no Firestore. A geração só será liberada após a conferência dos materiais.`
+      });
       try {
-        let timeoutId;
-        const result = await Promise.race([
-          MedTutorFirebaseService.getAuthoritativeSubjectText(subject),
-          new Promise((_, reject) => { timeoutId = window.setTimeout(() => reject(new Error('A consulta ao Firestore excedeu 25 segundos.')), 25000); })
-        ]).finally(() => window.clearTimeout(timeoutId));
+        const result = await MedTutorFirebaseService.getAuthoritativeSubjectText(subject, {
+          strict: true,
+          onProgress: progress => {
+            if (!isCurrentLoad()) return;
+            const total = Math.max(1, Number(progress.total) || 1);
+            const current = Math.min(total, Number(progress.current) || 0);
+            if (statusEl && progress.message) statusEl.textContent = `⏳ ${progress.message}`;
+            setStudyGenerationProgress({
+              title: progress.cached ? 'Materiais validados em cache' : 'Carregando documentos da disciplina',
+              current,
+              total,
+              detail: `${progress.message || 'A consulta ao Firestore continua ativa.'}${slowNoticeShown ? ' Você pode continuar aguardando ou usar explicitamente apenas o texto-base.' : ''}`,
+              actions: slowNoticeShown ? [
+                { label: 'Continuar aguardando', onClick: continueWaiting },
+                { label: 'Usar somente texto-base', onClick: useOnlyBaseText }
+              ] : []
+            });
+          }
+        });
+        if (!isCurrentLoad()) return;
         if (result?.source === 'auth_required') throw new Error('Entre na conta que contém os materiais da disciplina para verificar as fontes complementares.');
         disciplineReviewContext.materials = Array.isArray(result?.materials) ? result.materials : [];
         disciplineReviewContext.materialsLoaded = true;
@@ -12310,8 +12468,19 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         }
         if (generateButton) generateButton.disabled = false;
       } catch (error) {
+        if (!isCurrentLoad()) return;
         console.error('[Revisão MedTutor] Não foi possível carregar os materiais da disciplina:', error);
-        if (statusEl) statusEl.textContent = `⚠️ Não consegui carregar documentos complementares (${error.message || 'erro no Firestore'}). A revisão ainda poderá usar apenas o texto-base.`;
+        disciplineReviewContext.materials = [];
+        disciplineReviewContext.materialsLoaded = false;
+        if (generateButton) generateButton.disabled = true;
+        if (statusEl) {
+          statusEl.innerHTML = `⚠️ Não foi possível confirmar todos os documentos complementares: ${escapeHtml(error.message || 'erro no Firestore')}. A geração completa ficou bloqueada para não produzir uma revisão com fontes faltando.<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;"><button id="retryDisciplineReviewMaterials" class="btn-outline-action" type="button">🔁 Tentar carregar novamente</button><button id="useDisciplineReviewBaseOnly" class="btn-outline-action" type="button">Usar somente texto-base</button></div>`;
+          document.getElementById('retryDisciplineReviewMaterials')?.addEventListener('click', () => openDisciplineReviewModal(subject, { preserveInputs: true }));
+          document.getElementById('useDisciplineReviewBaseOnly')?.addEventListener('click', useOnlyBaseText);
+        }
+      } finally {
+        if (slowWaitTimer) window.clearTimeout(slowWaitTimer);
+        if (isCurrentLoad()) setStudyGenerationProgress({ done: true });
       }
     }
 
