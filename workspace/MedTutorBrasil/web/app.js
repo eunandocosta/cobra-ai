@@ -2205,7 +2205,10 @@
                 origem_pergunta: q.sourceQuestionOrigin || q.origem_pergunta || '',
                 eixo_aprendizagem: q.learningAxis || q.eixo_aprendizagem || '',
                 inspiracao_material: !!(q.materialInspired || q.inspiracao_material || q.sourceQuestionOrigin || q.origem_pergunta),
-                modo_geracao: q.generationMode || q.modo_geracao || 'sections'
+                modo_geracao: q.generationMode || q.modo_geracao || 'sections',
+                ...(q.sourceMaterialId ? { sourceMaterialId: q.sourceMaterialId } : {}),
+                ...(q.sourceType ? { sourceType: q.sourceType } : {}),
+                ...(q.sourceRange ? { sourceRange: q.sourceRange } : {})
               };
               const fingerprint = firestoreFingerprint(payload);
               if (registry[docId] === fingerprint) return;
@@ -2623,7 +2626,10 @@
                   sourceQuestionOrigin: q.sourceQuestionOrigin || q.origem_pergunta || '',
                   learningAxis: q.learningAxis || q.eixo_aprendizagem || '',
                   materialInspired: !!(q.materialInspired || q.inspiracao_material || q.sourceQuestionOrigin || q.origem_pergunta),
-                  generationMode: q.generationMode || q.modo_geracao || 'sections'
+                  generationMode: q.generationMode || q.modo_geracao || 'sections',
+                  sourceMaterialId: q.sourceMaterialId || '',
+                  sourceType: q.sourceType || '',
+                  sourceRange: q.sourceRange || null
                 });
               });
               if (cloudQ.length > 0) {
@@ -8003,18 +8009,23 @@ ${cleanText}
       const total = normalizeStudyQuestionCount(count);
       const batchSize = 10;
       let consecutiveEmptyBatches = 0;
-      const authoredSourceQuestions = extractAuthoredQuestionsFromMaterial(materialText);
-      let disciplineQuestionBank = [];
-      try {
-        const bank = await MedTutorFirebaseService.getDisciplineQuestionBank(metadata.subjectName || '');
-        disciplineQuestionBank = bank.questions || [];
-        logQuizGenerationDebug('discipline_question_bank_loaded', {
-          subject: metadata.subjectName || '',
-          samples: disciplineQuestionBank.length,
-          source: bank.profile ? 'firestore_or_cache' : 'empty'
-        });
-      } catch (error) {
-        console.warn('[Banco didático] Não foi possível carregar o perfil da disciplina:', error);
+      const authoredSourceQuestions = Array.isArray(config.authoredSourceQuestions)
+        ? config.authoredSourceQuestions
+        : extractAuthoredQuestionsFromMaterial(materialText);
+      let disciplineQuestionBank = Array.isArray(config.disciplineQuestionBank) ? config.disciplineQuestionBank : null;
+      if (!disciplineQuestionBank) {
+        disciplineQuestionBank = [];
+        try {
+          const bank = await MedTutorFirebaseService.getDisciplineQuestionBank(metadata.subjectName || '');
+          disciplineQuestionBank = bank.questions || [];
+          logQuizGenerationDebug('discipline_question_bank_loaded', {
+            subject: metadata.subjectName || '',
+            samples: disciplineQuestionBank.length,
+            source: bank.profile ? 'firestore_or_cache' : 'empty'
+          });
+        } catch (error) {
+          console.warn('[Banco didático] Não foi possível carregar o perfil da disciplina:', error);
+        }
       }
       logQuizGenerationDebug('authored_questions_scanned', { found: authoredSourceQuestions.length, requestedItems: total });
 
@@ -12100,6 +12111,166 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     let disciplineReviewContext = { subject: '', materials: [], materialsLoaded: false };
+    let pendingDisciplineReviewQuiz = null;
+
+    function splitDisciplineReviewQuizText(value, maxChars = 15000, overlapChars = 600) {
+      const text = String(value || '').trim();
+      if (!text) return [];
+      const chunks = [];
+      let start = 0;
+      while (start < text.length) {
+        let end = Math.min(text.length, start + maxChars);
+        if (end < text.length) {
+          const paragraph = text.lastIndexOf('\n\n', end);
+          const sentence = Math.max(text.lastIndexOf('. ', end), text.lastIndexOf('? ', end), text.lastIndexOf('! ', end));
+          const boundary = Math.max(paragraph, sentence);
+          if (boundary > start + Math.floor(maxChars * 0.55)) end = boundary + (boundary === paragraph ? 2 : 1);
+        }
+        const chunkText = text.slice(start, end).trim();
+        if (chunkText) chunks.push({ start, end, text: chunkText });
+        if (end >= text.length) break;
+        start = Math.max(start + 1, end - overlapChars);
+      }
+      return chunks;
+    }
+
+    function getSharedQuestionTextForDedup(question) {
+      return String(question?.question || question?.pergunta || question?.flashcard?.front || question?.title || '').trim();
+    }
+
+    async function generateQuizForDisciplineReview(context, result) {
+      const { subject, docs } = context;
+      const sourceIds = new Set((result.sourceMaterialIds || []).map(String));
+      const sourceNames = new Set((result.sources || []).map(name => normalizeStudyComparisonText(name)));
+      const selectedDocs = docs.filter(doc => doc.anchor ||
+        (doc.id && sourceIds.has(String(doc.id))) ||
+        (!doc.id && sourceNames.has(normalizeStudyComparisonText(doc.name))));
+      const verifiedDocs = selectedDocs.filter(doc => String(doc.text || '').trim().length >= 80);
+      if (!verifiedDocs.length) throw new Error('A revisão não retornou fontes verificáveis para montar o quiz.');
+
+      const chunks = verifiedDocs.flatMap(doc => {
+        const sourceQuestions = extractAuthoredQuestionsFromMaterial(doc.text);
+        return splitDisciplineReviewQuizText(doc.text).map(chunk => ({ ...chunk, doc, sourceQuestions }));
+      });
+      if (!chunks.length) throw new Error('Os documentos da revisão não contêm trechos utilizáveis para questões.');
+      const existingForSubject = sharedQuestionsBank.filter(item => isSameCurriculumSubject(item.subject || item.disciplina, subject));
+      let disciplineQuestionBank = [];
+      try {
+        const bank = await MedTutorFirebaseService.getDisciplineQuestionBank(subject);
+        disciplineQuestionBank = bank.questions || [];
+      } catch (error) {
+        console.warn('[Revisão MedTutor] Banco de estilo indisponível; questões serão baseadas apenas nas fontes selecionadas:', error);
+      }
+      const created = [];
+      const gaps = [];
+      const globalOffset = Math.max(0, existingForSubject.length);
+
+      for (let index = 0; index < chunks.length; index += 1) {
+        const { doc, text, start, end, sourceQuestions } = chunks[index];
+        const normalizedChunk = normalizeStudyComparisonText(text);
+        const authored = sourceQuestions.filter(question => {
+          const normalizedQuestion = normalizeStudyComparisonText(question);
+          const identifyingPrefix = normalizedQuestion.slice(0, Math.min(100, normalizedQuestion.length));
+          return identifyingPrefix.length >= 35 && normalizedChunk.includes(identifyingPrefix);
+        });
+        const authoredPending = authored.filter(question => ![...existingForSubject, ...created].some(existing =>
+          calculateLocalSimilarity(question, getSharedQuestionTextForDedup(existing)) >= 0.72
+        ));
+        const requested = Math.max(1, Math.ceil(text.length / 12000), authoredPending.length + (authoredPending.length ? 1 : 0));
+        setStudyGenerationProgress({
+          title: 'Lendo integralmente as fontes para o quiz',
+          current: index + 1,
+          total: chunks.length,
+          detail: `${doc.name}: trecho ${index + 1}/${chunks.length} (${start + 1}–${end} caracteres). Sem usar conteúdo de outros assuntos.`
+        });
+        const generated = await generateStudyItemsSequentially(text, {
+          materialName: doc.name,
+          subjectName: subject,
+          disease: doc.name
+        }, {
+          generationMode: 'science_based',
+          difficulty: 'balanced',
+          sectionOffset: globalOffset + index,
+          disciplineQuestionBank,
+          authoredSourceQuestions: authored,
+          customInstructions: 'Gere questões e pares de estudo exclusivamente com fatos explícitos neste trecho do documento identificado no metadado. Cubra objetivos distintos; não use conhecimento externo nem conteúdo de outros trechos. Questões autorais presentes neste trecho e ausentes do deck devem ser reaproveitadas com redação integral, sem perder enunciado, contexto ou dados. Preserve resposta aberta e autocontida. Este é um fragmento com sobreposição para continuidade; não repita fatos já evidenciados nos itens aceitos.',
+          acceptedStudyItems: [...existingForSubject, ...created]
+        }, requested, [...existingForSubject, ...created]);
+        const unique = filterUniqueStudyItems(generated || [], [...existingForSubject, ...created]);
+        if (!unique.length) {
+          gaps.push({ source: doc.name, start, end });
+          continue;
+        }
+        unique.forEach(item => {
+          item.subject = subject;
+          item.disciplina = subject;
+          item.slideName = doc.name;
+          item.materialName = doc.name;
+          if (doc.id) item.sourceMaterialId = String(doc.id);
+          item.sourceType = 'discipline_review';
+          item.sourceRange = { start, end };
+          item.materialInspired = true;
+          if (!item.sourceQuestionOrigin) item.sourceQuestionOrigin = 'inspirada_na_fonte';
+        });
+        created.push(...unique);
+      }
+
+      if (created.length) {
+        created.reverse().forEach(item => sharedQuestionsBank.unshift(item));
+        if (typeof MedTutorFirebaseService !== 'undefined') {
+          await MedTutorFirebaseService.saveAllQuestions(sharedQuestionsBank);
+        } else {
+          saveSharedQuestionsBank();
+        }
+        currentStudySubject = resolveCanonicalCurriculumSubjectName(subject);
+        currentQuizSlideFilter = 'all';
+        renderSharedStudyItems();
+        renderCurriculumGrid();
+        renderSlideSelectors();
+        renderSceBars();
+        updateSubjectFilterMenus();
+      }
+      setStudyGenerationProgress({ done: true });
+      return { created: created.length, totalChunks: chunks.length, gaps };
+    }
+
+    async function retryDisciplineReviewQuiz() {
+      if (!pendingDisciplineReviewQuiz) return;
+      const action = document.getElementById('disciplineReviewQuizRetry');
+      if (action) { action.disabled = true; action.textContent = '⏳ Tentando novamente…'; }
+      try {
+        const summary = await generateQuizForDisciplineReview(pendingDisciplineReviewQuiz.context, pendingDisciplineReviewQuiz.result);
+        pendingDisciplineReviewQuiz = summary.gaps.length
+          ? pendingDisciplineReviewQuiz
+          : null;
+        const target = document.getElementById('disciplineReviewQuizStatus');
+        if (target) target.textContent = summary.gaps.length
+          ? `⚠️ ${summary.created} questão(ões) salvas; ${summary.gaps.length} trecho(s) ainda não produziram questão nova validada.`
+          : summary.created
+            ? `✅ Quiz criado: ${summary.created} questão(ões) novas, salvas na disciplina e disponíveis em Quizzes e Flashcards.`
+            : '✅ O material foi percorrido; não havia questões novas e distintas para acrescentar.';
+        if (!pendingDisciplineReviewQuiz) document.getElementById('disciplineReviewQuizRetry')?.remove();
+        if (summary.created) showToast(`📝 ${summary.created} novas questões foram adicionadas ao deck de ${disciplineReviewContext.subject || currentStudySubject}.`);
+      } catch (error) {
+        const target = document.getElementById('disciplineReviewQuizStatus');
+        if (target) target.textContent = `⚠️ O quiz ainda não pôde ser concluído: ${error.message}`;
+      } finally {
+        if (action) { action.disabled = false; action.textContent = '🔁 Tentar gerar o quiz novamente'; }
+        setStudyGenerationProgress({ done: true });
+      }
+    }
+
+    function renderDisciplineReviewQuizStatus(summary, retryAvailable = false, subject = '') {
+      const unresolved = summary.gaps?.length || 0;
+      const status = unresolved
+        ? `⚠️ ${summary.created} questão(ões) salvas; ${unresolved} trecho(s) não produziram questão nova validada. O deck foi deduplicado e permanece disponível.`
+        : summary.created
+          ? `✅ Quiz criado: ${summary.created} questão(ões) novas, salvas na disciplina e disponíveis em Quizzes e Flashcards.`
+          : '✅ O material foi percorrido, mas não havia questões novas e distintas para acrescentar; questões já existentes não foram duplicadas.';
+      const retry = retryAvailable ? '<button id="disciplineReviewQuizRetry" class="btn-outline-action" type="button" onclick="retryDisciplineReviewQuiz()" style="margin-top:9px;">🔁 Tentar gerar o quiz novamente</button>' : '';
+      const safeSubject = escapeHtml(subject || currentStudySubject || '');
+      return `<section style="margin:14px auto;padding:12px 14px;max-width:820px;border:1px solid ${unresolved ? '#d97706' : '#00c878'};border-radius:8px;background:#f8fafc;color:#263238;font:10pt Arial,sans-serif;"><strong>Quiz vinculado à revisão</strong><div id="disciplineReviewQuizStatus" style="margin-top:5px;">${escapeHtml(status)}</div>${retry}<div style="margin-top:10px;"><button class="btn-outline-action primary" data-subject="${safeSubject}" type="button" onclick="closeModals(); openSubjectInTab(this.dataset.subject, 'quizzes');">Abrir quiz da disciplina</button></div></section>`;
+    }
 
     function getReviewTopicTerms(value) {
       const stop = new Set('a ao aos aquela aquele as ate com como da das de dela dele depois do dos e em entre era essa esse esta este foi foram ha isso mais mas muito na nas nem no nos o os ou para pela pelo por porque qual quando que se sem ser sua suas seu seus tambem tem ter um uma uns umas'.split(/\s+/));
@@ -12194,6 +12365,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         return { material, matches: matches.length };
       });
       const candidateMaterials = scoped.map(({ material, matches }) => ({
+        id: material.id || material.materialId || '',
         name: material.name || 'Aula sem título',
         subject,
         text: matches >= threshold && (matches >= 3 || matches / Math.max(1, sourceTerms.size) >= 0.2)
@@ -12222,9 +12394,37 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         console.info(`[Revisão MedTutor] Revisão gerada com ${result.generatorEngine || 'IA'} ${result.generatorModel || ''} com sucesso.`, {
           disciplina: subject,
           fontesUsadas: result.sources?.length || 1,
-          materiaisDescartados: result.excludedMaterials?.length || 0
+          materiaisDescartados: result.excludedMaterials?.length || 0,
+          leituraIntegral: result.coverage || null
         });
-        document.getElementById('disciplineReviewModal')?.classList.remove('active');
+        const docs = [
+          { name: sourceName, text: sourceText, id: '', anchor: true },
+          ...candidateMaterials.filter(material => material.text).map(material => ({
+            name: material.name,
+            text: material.text,
+            id: material.id,
+            anchor: false
+          }))
+        ];
+        pendingDisciplineReviewQuiz = { context: { subject, docs }, result };
+        if (button) button.textContent = '⏳ Revisão pronta; agora lendo as fontes para criar o quiz…';
+        if (statusEl) statusEl.textContent = `✅ Revisão concluída após leitura integral de ${result.coverage?.chunks || 'todos os'} trechos. ⏳ Agora o quiz está sendo gerado e comparado com o deck existente (${docs.length} fonte(s) autorizada(s))…`;
+        let quizSummary;
+        let quizError = null;
+        try {
+          quizSummary = await generateQuizForDisciplineReview(pendingDisciplineReviewQuiz.context, result);
+          pendingDisciplineReviewQuiz = quizSummary.gaps.length ? pendingDisciplineReviewQuiz : null;
+          console.info('[Revisão MedTutor] Quiz associado à revisão', {
+            subject,
+            newQuestions: quizSummary.created,
+            scannedChunks: quizSummary.totalChunks,
+            chunksWithoutUniqueQuestion: quizSummary.gaps.length
+          });
+      } catch (error) {
+          quizError = error;
+          setStudyGenerationProgress({ done: true });
+          console.error('[Revisão MedTutor] Revisão concluída, mas o quiz não terminou:', error);
+        }
         const reader = document.getElementById('readerModal');
         const titleEl = document.getElementById('readerModalTitle');
         const subtitleEl = document.getElementById('readerModalSubtitle');
@@ -12232,10 +12432,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (!reader || !contentEl) throw new Error('A janela de leitura não está disponível.');
         activeAcademicReportData = result;
         if (titleEl) titleEl.textContent = result.title || `Revisão • ${subject}`;
-        if (subtitleEl) subtitleEl.textContent = `Revisão estritamente baseada na fonte • ${result.generatorEngine || ''} ${result.generatorModel || ''}`;
+        if (subtitleEl) subtitleEl.textContent = `Leitura integral de ${result.coverage?.documents || docs.length} documento(s) / ${result.coverage?.chunks || '—'} trechos • ${result.generatorEngine || ''} ${result.generatorModel || ''}`;
         const safeSources = (result.sources || []).map(name => `<li>${escapeHtml(name)}</li>`).join('');
         const sourceNote = `<section style="margin:16px auto;padding:10px 14px;max-width:820px;border:1px solid #d5dce5;border-radius:6px;background:#f8fafc;color:#334155;font:10pt Arial,sans-serif;"><strong>Fontes efetivamente utilizadas</strong><ul style="margin:6px 0 0;padding-left:20px;">${safeSources || `<li>${escapeHtml(sourceName)}</li>`}</ul></section>`;
-        contentEl.innerHTML = `${sourceNote}${window.AcademicReportRenderer.render(result.markdown || '', { title: result.title, subject })}`;
+        const quizNotice = quizError
+          ? `<section style="margin:14px auto;padding:12px 14px;max-width:820px;border:1px solid #d97706;border-radius:8px;background:#f8fafc;color:#263238;font:10pt Arial,sans-serif;"><strong>Quiz vinculado à revisão</strong><div id="disciplineReviewQuizStatus" style="margin-top:5px;">A revisão foi concluída, mas a geração do quiz falhou: ${escapeHtml(quizError.message)}.</div><button id="disciplineReviewQuizRetry" class="btn-outline-action" type="button" onclick="retryDisciplineReviewQuiz()" style="margin-top:9px;">🔁 Tentar gerar o quiz novamente</button><div style="margin-top:10px;"><button class="btn-outline-action primary" data-subject="${escapeHtml(subject)}" type="button" onclick="closeModals(); openSubjectInTab(this.dataset.subject, 'quizzes');">Abrir quiz da disciplina</button></div></section>`
+          : renderDisciplineReviewQuizStatus(quizSummary, !!pendingDisciplineReviewQuiz, subject);
+        contentEl.innerHTML = `${quizNotice}${sourceNote}${window.AcademicReportRenderer.render(result.markdown || '', { title: result.title, subject })}`;
+        document.getElementById('disciplineReviewModal')?.classList.remove('active');
         reader.classList.add('active');
       } catch (error) {
         console.error('[Revisão MedTutor] Revisão falhou.', { disciplina: subject, erro: error.message });
@@ -12249,6 +12453,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     window.loadDisciplineReviewFile = loadDisciplineReviewFile;
     window.closeDisciplineReviewModal = closeDisciplineReviewModal;
     window.generateDisciplineReview = generateDisciplineReview;
+    window.retryDisciplineReviewQuiz = retryDisciplineReviewQuiz;
 
     async function printAcademicReport() {
       const container = document.getElementById('readerModalContent');
