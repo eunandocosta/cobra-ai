@@ -6,6 +6,22 @@ const crypto = require('node:crypto');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
 const AcademicReportRenderer = require('../../../web/academic-report-renderer');
 const { normalizeTopicText, selectTopicallyRelevantMaterials } = require('./revision-relevance');
+const { withTransientAiRetry, mapWithConcurrency } = require('./revision-pipeline');
+
+function revisionChunkConcurrency() {
+  const configured = Number.parseInt(process.env.REVISION_MAX_CONCURRENCY || '2', 10);
+  return Math.max(1, Math.min(3, Number.isFinite(configured) ? configured : 2));
+}
+
+function logAiRetry({ label, attempt, delay, error }) {
+  console.warn('[Revisão MedTutor] Falha transitória; repetindo etapa', {
+    etapa: label,
+    tentativa: attempt,
+    esperaMs: delay,
+    status: error?.status || error?.statusCode || error?.response?.status || null,
+    code: error?.code || null
+  });
+}
 
 function provider() {
   const configured = String(process.env.REPORT_AI_PROVIDER || '').trim().toLowerCase();
@@ -84,7 +100,10 @@ class RevisionService {
             // correta. Use o mesmo teto já adotado pelo gerador de relatórios.
             generationConfig: { temperature: 0.15, maxOutputTokens: 65536 }
           });
-          const result = await runWithAiLimit(() => model.generateContent(prompt));
+          const result = await withTransientAiRetry(
+            () => runWithAiLimit(() => model.generateContent(prompt)),
+            { label: `Gemini ${selectedModel}`, onRetry: logAiRetry }
+          );
           const candidate = result.response.candidates?.[0];
           if (candidate?.finishReason === 'MAX_TOKENS') throw new Error(`O modelo ${selectedModel} atingiu o limite de saída; a etapa não será considerada completa.`);
           const text = String(result.response.text() || '').trim();
@@ -108,13 +127,16 @@ class RevisionService {
         try {
           if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurada no ambiente.');
           const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-          const result = await runWithAiLimit(() => client.responses.create({
-            model: modelName,
-            instructions: system,
-            input: prompt,
-            max_output_tokens: 16000,
-            store: false
-          }));
+          const result = await withTransientAiRetry(
+            () => runWithAiLimit(() => client.responses.create({
+              model: modelName,
+              instructions: system,
+              input: prompt,
+              max_output_tokens: 16000,
+              store: false
+            })),
+            { label: `OpenAI ${modelName}`, onRetry: logAiRetry }
+          );
           if (result.status === 'incomplete' || result.incomplete_details?.reason) {
             throw new Error(`A etapa da revisão foi interrompida pelo limite de saída (${result.incomplete_details?.reason || 'incomplete'}).`);
           }
@@ -170,27 +192,33 @@ class RevisionService {
       totalChunks,
       sourceChars: documents.reduce((sum, document) => sum + document.text.length, 0)
     });
+    const readingJobs = documents.flatMap(document => document.chunks.map((chunk, index) => ({
+      document,
+      chunk,
+      index,
+      label: `${document.anchor ? 'FONTE-ÂNCORA' : 'COMPLEMENTO PERTINENTE'}: ${document.name}, trecho ${index + 1}/${document.chunks.length}`
+    })));
     let processedChunks = 0;
-    for (const document of documents) {
-      for (let index = 0; index < document.chunks.length; index += 1) {
-        const chunk = document.chunks[index];
+    const concurrency = revisionChunkConcurrency();
+    console.info('[Revisão MedTutor] Concorrência limitada de leitura', { concurrency });
+    const chunkResults = await mapWithConcurrency(readingJobs, concurrency, async job => {
+      const { document, chunk, index, label } = job;
+      const prompt = `DISCIPLINA (metadado): ${discipline}\nFONTE: ${label}\nIntervalo aproximado de caracteres no documento: ${chunk.start + 1}–${chunk.end}.\nEste trecho se sobrepõe levemente ao anterior/próximo para não cortar uma ideia. Não duplique conteúdo repetido pela sobreposição.\n\nLEIA E REGISTRE TODOS OS FATOS EXPLÍCITOS DESTE TRECHO:\n<fonte>\n${chunk.content}\n</fonte>\n\nRetorne as notas completas deste trecho. Não conclua o assunto nem use fontes externas.`;
+      try {
+        const notes = await generateText(readingSystem, prompt);
         processedChunks += 1;
-        const label = `${document.anchor ? 'FONTE-ÂNCORA' : 'COMPLEMENTO PERTINENTE'}: ${document.name}, trecho ${index + 1}/${document.chunks.length}`;
-        const prompt = `DISCIPLINA (metadado): ${discipline}\nFONTE: ${label}\nIntervalo aproximado de caracteres no documento: ${chunk.start + 1}–${chunk.end}.\nEste trecho se sobrepõe levemente ao anterior/próximo para não cortar uma ideia. Não duplique conteúdo repetido pela sobreposição.\n\nLEIA E REGISTRE TODOS OS FATOS EXPLÍCITOS DESTE TRECHO:\n<fonte>\n${chunk.content}\n</fonte>\n\nRetorne as notas completas deste trecho. Não conclua o assunto nem use fontes externas.`;
-        try {
-          const notes = await generateText(readingSystem, prompt);
-          readingLedger.push({ label, notes });
-          console.info('[Revisão MedTutor] Trecho integral lido', {
-            progress: `${processedChunks}/${totalChunks}`,
-            source: document.name,
-            chunk: index + 1,
-            chars: chunk.content.length
-          });
-        } catch (error) {
-          throw new Error(`A leitura integral foi interrompida em ${label}. Nenhum trecho foi ignorado. Detalhe: ${error.message}`);
-        }
+        console.info('[Revisão MedTutor] Trecho integral lido', {
+          progress: `${processedChunks}/${totalChunks}`,
+          source: document.name,
+          chunk: index + 1,
+          chars: chunk.content.length
+        });
+        return { label, notes };
+      } catch (error) {
+        throw new Error(`A leitura integral foi interrompida em ${label}. Nenhum trecho foi ignorado. Detalhe: ${error.message}`);
       }
-    }
+    });
+    readingLedger.push(...chunkResults);
 
     let reducedLedger = readingLedger;
     let reductionPass = 0;
@@ -223,7 +251,7 @@ class RevisionService {
     }
 
     const ledgerText = reducedLedger.map(entry => `### ${entry.label}\n${entry.notes}`).join('\n\n');
-    const prompt = `DISCIPLINA (apenas metadado, não é evidência): ${discipline}\nFONTE-ÂNCORA: ${sourceName}\n\nA seguir estão notas produzidas após leitura integral e sequencial de ${totalChunks} trechos de ${documents.length} documento(s). Use o inventário inteiro; não deixe de fora tópicos presentes nas notas. A fonte-âncora define o limite temático.\n\n${ledgerText}\n\nProduza uma revisão minuciosa que cubra todas as informações sustentadas, agrupando repetições causadas por sobreposição sem perder detalhes exclusivos. Dê destaque às definições, estruturas, relações, mecanismos, manifestações e tratamentos/exames somente quando constarem nas notas. Inclua recuperação ativa com respostas comentadas baseada nas notas. Finalize com "Fontes utilizadas" contendo apenas os documentos efetivamente lidos.`;
+    const prompt = `DISCIPLINA (apenas metadado, não é evidência): ${discipline}\nFONTE-ÂNCORA: ${sourceName}\n\nA seguir estão notas produzidas após leitura integral em ${totalChunks} trechos de ${documents.length} documento(s). Use o inventário inteiro; não deixe de fora tópicos presentes nas notas. A fonte-âncora define o limite temático.\n\n${ledgerText}\n\nProduza uma revisão minuciosa que cubra todas as informações sustentadas, agrupando repetições causadas por sobreposição sem perder detalhes exclusivos. Dê destaque às definições, estruturas, relações, mecanismos, manifestações e tratamentos/exames somente quando constarem nas notas. Inclua recuperação ativa com respostas comentadas baseada nas notas. Finalize com "Fontes utilizadas" contendo apenas os documentos efetivamente lidos.`;
     let markdown = await generateText(reviewSystem, prompt);
     if (!markdown) throw new Error('A IA retornou uma revisão vazia.');
     const auditPrompt = `Faça uma auditoria de cobertura da revisão abaixo usando TODO o inventário de notas. Compare tópico por tópico, definição por definição, classificação, relação, ressalva, exemplo, número e exceção. Corrija a revisão para reinserir qualquer informação explícita das notas que tenha sido omitida ou simplificada em excesso. Não acrescente fatos externos nem extrapole o escopo da fonte-âncora. Preserve estrutura, título e recuperação ativa, e devolva o documento completo corrigido em Markdown puro. Se o conteúdo já estiver completo, devolva-o sem mudanças substantivas.\n\nINVENTÁRIO INTEGRAL:\n${ledgerText}\n\nREVISÃO PARA AUDITAR:\n${markdown}`;
@@ -247,6 +275,7 @@ class RevisionService {
       excludedMaterials: rejected.length,
       sourceChars: anchor.length,
       totalChunks,
+      chunkConcurrency: concurrency,
       processedChunks,
       totalReadChars: documents.reduce((sum, document) => sum + document.text.length, 0)
     });
