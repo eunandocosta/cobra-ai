@@ -25036,6 +25036,30 @@ Para cada material, retorne um objeto no JSON com:
       if (sidebar) sidebar.classList.toggle('collapsed');
     }
 
+    const APP_SIDEBAR_COLLAPSED_KEY = 'medtutor_app_sidebar_collapsed';
+    function setAppSidebarCollapsed(collapsed) {
+      const appRoot = document.querySelector('.app-root');
+      const toggle = document.querySelector('.sidebar-collapse-btn');
+      if (!appRoot || !toggle) return;
+      appRoot.classList.toggle('sidebar-collapsed', collapsed);
+      const label = collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral';
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('title', label);
+      try { localStorage.setItem(APP_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    }
+
+    function toggleAppSidebar() {
+      const root = document.querySelector('.app-root');
+      if (!root || !window.matchMedia('(min-width: 1281px)').matches) return;
+      setAppSidebarCollapsed(!root.classList.contains('sidebar-collapsed'));
+    }
+
+    window.toggleAppSidebar = toggleAppSidebar;
+    try {
+      if (localStorage.getItem(APP_SIDEBAR_COLLAPSED_KEY) === '1') setAppSidebarCollapsed(true);
+    } catch (e) {}
+
     // Em telas compactas o histórico é uma gaveta: inicia fechado para não cobrir
     // a conversa e continua disponível pelo botão de menu já existente.
     function setupMobileChatDrawer() {

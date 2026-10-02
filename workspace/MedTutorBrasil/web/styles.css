@@ -131,17 +131,115 @@
       position: relative;
     }
 
-    /* A antiga navegação lateral foi substituída pela barra inferior. */
+    /* Navegação lateral para telas amplas; vira navegação inferior em telas compactas. */
     .sidebar {
-      display: none;
+      width: 270px;
+      flex: 0 0 270px;
+      background: var(--nav-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 16px;
+      gap: 24px;
+      z-index: 10;
+      overflow: hidden;
+      transition: width .24s ease, flex-basis .24s ease, padding .24s ease;
+    }
+
+    .sidebar-collapse-btn {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+      padding: 0;
+      color: var(--text-secondary);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: color .2s ease, background .2s ease, border-color .2s ease;
+    }
+
+    .sidebar-collapse-btn:hover {
+      color: var(--neon);
+      background: var(--neon-subtle);
+      border-color: var(--border-accent);
+    }
+
+    .sidebar-toggle-icon { overflow: visible; }
+    .sidebar-toggle-icon .toggle-line {
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: transform .22s ease, opacity .16s ease;
+    }
+
+    /* Aberta: X. Recolhida: três linhas de menu. */
+    .sidebar-toggle-icon .toggle-line-top { transform: translateY(6px) rotate(45deg); }
+    .sidebar-toggle-icon .toggle-line-middle { opacity: 0; transform: scaleX(.35); }
+    .sidebar-toggle-icon .toggle-line-bottom { transform: translateY(-6px) rotate(-45deg); }
+
+    .app-root.sidebar-collapsed .sidebar {
+      width: 78px;
+      flex-basis: 78px;
+      padding-left: 12px;
+      padding-right: 12px;
+      align-items: center;
+    }
+
+    .app-root.sidebar-collapsed .brand {
+      width: 100%;
+      padding: 0;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .app-root.sidebar-collapsed .brand-text { display: none; }
+    .app-root.sidebar-collapsed .sidebar-collapse-btn { margin: 0; }
+    .app-root.sidebar-collapsed .sidebar-toggle-icon .toggle-line-top,
+    .app-root.sidebar-collapsed .sidebar-toggle-icon .toggle-line-bottom { transform: none; }
+    .app-root.sidebar-collapsed .sidebar-toggle-icon .toggle-line-middle { opacity: 1; transform: none; }
+
+    .app-root.sidebar-collapsed .nav-list,
+    .app-root.sidebar-collapsed .sidebar-footer { width: 100%; }
+
+    .app-root.sidebar-collapsed .nav-link {
+      justify-content: center;
+      width: 50px;
+      height: 48px;
+      padding: 0;
+      gap: 0;
+      font-size: 0;
+    }
+
+    .app-root.sidebar-collapsed .nav-link .icon,
+    .app-root.sidebar-collapsed .sidebar-settings-btn .icon {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+    }
+
+    .app-root.sidebar-collapsed .sidebar-settings-btn {
+      width: 50px;
+      height: 48px;
+      min-width: 0;
+      padding: 0;
+      justify-content: center;
+      font-size: 0;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 0 8px;
+      gap: 10px;
+      padding: 0;
     }
+
+    .brand-text { min-width: 0; flex: 1; }
+    .brand-logo .icon { width: 24px; height: 24px; }
 
     .brand-logo {
       width: 38px;
@@ -5854,7 +5952,7 @@
 
     /* Navegação inferior de recursos: usada em desktop e mobile. */
     .mobile-bottom-nav {
-      display: flex;
+      display: none;
       flex: 0 0 72px;
       height: 72px;
       background: var(--nav-bg);
@@ -6948,13 +7046,12 @@
         height: 72px;
         border: 2px solid #38f790;
         border-radius: 22px;
-        color: #071b12;
-        background: #38f790;
-        font-size: 52px;
-        font-weight: 300;
-        line-height: 1;
+        color: #38f790;
+        background: rgba(0, 255, 102, 0.12);
         box-shadow: 0 0 0 9px rgba(56, 247, 144, .12);
       }
+
+      .pwa-boot-mark .icon { width: 38px; height: 38px; stroke: currentColor; stroke-width: 1.8; }
 
       .pwa-boot-splash strong {
         margin-top: 10px;
@@ -6973,6 +7070,8 @@
        polegadas físicas não são expostas de forma confiável pelo navegador.
        ========================================================= */
     @media (max-width: 1280px) {
+      .sidebar { display: none; }
+
       .doubts-fab {
         top: auto;
         bottom: calc(78px + env(safe-area-inset-bottom));

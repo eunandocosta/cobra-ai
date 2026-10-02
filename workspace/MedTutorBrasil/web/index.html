@@ -25,12 +25,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261002-bottom-resource-nav-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261002-adaptive-navigation-v2">
 </head>
 <body class="route-resolving" data-route="resolving">
 
   <div class="pwa-boot-splash" id="pwaBootSplash" aria-hidden="true">
-    <div class="pwa-boot-mark">+</div>
+    <div class="pwa-boot-mark" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
     <strong>MedTutor Brasil</strong>
     <span>Preparando seu espaço de estudo</span>
   </div>
@@ -38,15 +38,18 @@
   <div class="app-root">
 
     <!-- SIDEBAR DESKTOP / WEB / WINDOWS -->
-    <aside class="sidebar" id="appSidebar" aria-hidden="true">
+    <aside class="sidebar" id="appSidebar">
       <div class="brand">
         <div class="brand-logo">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </div>
         <div class="brand-text">
           <h1>MedTutor Brasil</h1>
           <span>Materiais de estudo</span>
         </div>
+        <button class="sidebar-collapse-btn" type="button" onclick="toggleAppSidebar()" aria-label="Recolher menu lateral" aria-expanded="true" title="Recolher menu lateral">
+          <svg class="icon sidebar-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="toggle-line toggle-line-top" d="M4 6h16"/><path class="toggle-line toggle-line-middle" d="M4 12h16"/><path class="toggle-line toggle-line-bottom" d="M4 18h16"/></svg>
+        </button>
       </div>
 
       <nav class="nav-list">
@@ -3572,7 +3575,7 @@
        ========================================================= -->
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
-  <script defer src="/app.min.js?v=20261002-bottom-resource-nav-v1"></script>
+  <script defer src="/app.min.js?v=20261002-adaptive-navigation-v2"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
