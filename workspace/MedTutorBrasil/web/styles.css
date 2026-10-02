@@ -10038,3 +10038,68 @@
       bottom: calc(134px + env(safe-area-inset-bottom));
     }
   }
+
+  /* O chat é uma área de trabalho, não um cartão centralizado como as demais abas. */
+  .view-content.chat-view-active {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .view-content.chat-view-active > #tab-chat {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .view-content.chat-view-active #tab-chat .chat-container-split {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .view-content.chat-view-active #tab-chat .chat-main-area,
+  .view-content.chat-view-active #tab-chat .chat-layout {
+    min-height: 0;
+  }
+
+  .view-content.chat-view-active #tab-chat .chat-flow {
+    max-width: 1100px;
+  }
+
+  .view-content.chat-view-active #tab-chat .gemini-input-pill-container {
+    max-width: 1000px;
+  }
+
+  @media (max-width: 1280px) {
+    .view-content.chat-view-active {
+      padding: 0;
+    }
+
+    .view-content.chat-view-active #tab-chat .chat-container-split {
+      height: 100%;
+      min-height: 0;
+      border-radius: 0;
+    }
+
+    .view-content.chat-view-active #tab-chat .chat-flow {
+      max-width: 100%;
+      padding: 14px 16px 24px;
+    }
+
+    .view-content.chat-view-active #tab-chat .gemini-bottom-dock {
+      padding-right: 14px;
+      padding-left: 14px;
+    }
+  }

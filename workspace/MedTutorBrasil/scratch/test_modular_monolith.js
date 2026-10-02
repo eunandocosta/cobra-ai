@@ -31,6 +31,7 @@ console.log('[PASS] index.js livre de regras de negócio acopladas');
 
 // O diretório de colegas deve vir de contas reais, nunca de perfis de demonstração.
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf-8');
+const styleSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8');
 const curriculumSubjectAliases = appSource.match(/function getCurriculumSubjectAliases\(value\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const sameCurriculumSubject = appSource.match(/function isSameCurriculumSubject\(first, second\) \{[\s\S]*?\n    \}/)?.[0] || '';
 const uniqueCurriculumDisciplines = appSource.match(/function getUniqueCurriculumDisciplines\(disciplines = \[\]\) \{[\s\S]*?\n    \}/)?.[0] || '';
@@ -185,6 +186,9 @@ console.log('[PASS] Renomeação de matérias por semestre lê o Firestore, most
 console.log('[PASS] Recarregar preserva a rota solicitada e aguarda confirmação segura do Firebase Auth');
 const chatSaveMethod = appSource.match(/async saveChatSessions\(sessionsArray\)[\s\S]*?(?=\/\/ Upload de imagem)/)?.[0] || '';
 assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
+assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
+assert(appSource.includes("const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
+assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';
 assert(cloudSessionMethod.includes('MedTutorAuthService.accessGranted === true'), 'leituras e escritas do Firestore devem aguardar a liberação do cupom');
 console.log('[PASS] Modal de ativação do cupom acessível e pronto para receber o código');

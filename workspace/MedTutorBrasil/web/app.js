@@ -1159,7 +1159,7 @@
     const FIRESTORE_TEXT_CHUNK_SIZE = 160000;
     // A cópia local abre imediatamente. A checagem de versão remota é leve e a
     // leitura completa das coleções só ocorre quando a versão mudou.
-    const FIRESTORE_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+    const lastCloudRevisionCheckAt = Object.create(null);
 
     function firestoreFingerprint(value) {
       const text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -1177,6 +1177,22 @@
 
     function saveFirestoreSyncRegistry(uid, scope, registry) {
       try { localStorage.setItem(`medtutor_firestore_sync_${scope}_${uid}`, JSON.stringify(registry)); } catch (error) {}
+    }
+
+    function mergeChatMessageHistory(localMessages, cloudMessages) {
+      const byId = new Map();
+      [...(Array.isArray(localMessages) ? localMessages : []), ...(Array.isArray(cloudMessages) ? cloudMessages : [])]
+        .filter(message => message && typeof message === 'object')
+        .forEach((message, index) => {
+          const key = String(message.id || `${message.role || ''}:${message.timestamp || ''}:${message.text || message.html || index}`);
+          const prior = byId.get(key);
+          const currentTime = Date.parse(message.timestamp || '') || 0;
+          const priorTime = Date.parse(prior?.timestamp || '') || 0;
+          if (!prior || currentTime >= priorTime) byId.set(key, message);
+        });
+      return [...byId.values()]
+        .sort((a, b) => (Date.parse(a.timestamp || '') || 0) - (Date.parse(b.timestamp || '') || 0))
+        .slice(-100);
     }
 
     const verifiedStudyResetVersions = Object.create(null);
@@ -1351,6 +1367,10 @@
 
       getMaterialsCacheHydratedKey(uid) {
         return `medtutor_firestore_materials_cache_hydrated_v1_${uid}`;
+      },
+
+      getChatsCacheHydratedKey(uid) {
+        return `medtutor_firestore_chats_cache_hydrated_v1_${uid}`;
       },
 
       async markCloudDataRevision(uid) {
@@ -2340,14 +2360,16 @@
         } catch (e) {}
 
         // 2. Cloud Firestore
-        if (firestoreDb && isFirebaseCloudActive && MedTutorAuthService.accessGranted === true) {
+        if (MedTutorAuthService.accessGranted === true && this.hasAuthenticatedCloudSession(uid)) {
           try {
-            const batch = firestoreDb.batch();
             const colRef = firestoreDb.collection('users').doc(uid).collection('historico_chats');
             const registry = getFirestoreSyncRegistry(uid, 'chats');
+            const operations = [];
             let changedCount = 0;
+            const currentIds = new Set();
             sessionsArray.forEach(session => {
               const docId = session.id || ('chat_' + Math.random().toString(36).substring(2, 9));
+              currentIds.add(docId);
               const docRef = colRef.doc(docId);
               const payload = {
                 id: docId,
@@ -2355,17 +2377,33 @@
                 disciplina: session.subject || '',
                 mensagens: (session.messages || []).slice(-100), // Proteção de payload
                 memoria_compacta: session.compactMemory || '',
-                tokensConsumidos: session.tokensUsed || 0
+                tokensConsumidos: session.tokensUsed || 0,
+                fixado: !!session.isPinned,
+                criadoEm: session.createdAt || session.updatedAt || new Date().toISOString()
               };
               const fingerprint = firestoreFingerprint(payload);
               if (registry[docId] === fingerprint) return;
-              batch.set(docRef, { ...payload, atualizadoEm: new Date().toISOString() }, { merge: true });
+              operations.push({ type: 'set', ref: docRef, data: { ...payload, atualizadoEm: session.updatedAt || new Date().toISOString() } });
               registry[docId] = fingerprint;
               changedCount++;
             });
-            if (changedCount > 0) await batch.commit();
+            Object.keys(registry).forEach(docId => {
+              if (currentIds.has(docId)) return;
+              operations.push({ type: 'delete', ref: colRef.doc(docId) });
+              delete registry[docId];
+              changedCount++;
+            });
+            for (let start = 0; start < operations.length; start += 400) {
+              const batch = firestoreDb.batch();
+              operations.slice(start, start + 400).forEach(operation => {
+                if (operation.type === 'delete') batch.delete(operation.ref);
+                else batch.set(operation.ref, operation.data, { merge: true });
+              });
+              await batch.commit();
+            }
             saveFirestoreSyncRegistry(uid, 'chats', registry);
-            console.info(`[Firestore] ${changedCount} de ${sessionsArray.length} conversa(s) sincronizada(s).`);
+            if (changedCount > 0) await this.markCloudDataRevision(uid);
+            console.info(`[Firestore] ${changedCount} alteração(ões) de chat sincronizada(s); ${sessionsArray.length} conversa(s) local(is).`);
           } catch (e) {
             console.warn('[Firestore] Erro ao sincronizar chats:', e);
           }
@@ -2479,6 +2517,7 @@
       async loadAllDataFromPersistence() {
         const uid = this.getUserId();
         let studyResetMarker = '';
+        let chatsNeedCloudUpload = false;
         let hasLocalMaterialsCache = Array.isArray(chatDriveMaterials) && chatDriveMaterials.length > 0;
         let localResetStateVerified = !this.hasAuthenticatedCloudSession(uid);
         if (!localResetStateVerified) {
@@ -2519,29 +2558,30 @@
           console.warn('[MedTutor] Falha na leitura do IndexedDB:', e);
         }
 
-        // 2. A cópia local abre o app sem custo. A leitura completa da nuvem é
-        // limitada por tempo para não reler toda a biblioteca a cada F5.
+        // 2. A cópia local abre o app imediatamente. A cada inicialização
+        // verificamos somente o perfil para detectar mudanças em outro aparelho;
+        // as coleções grandes só são lidas quando a revisão remota mudar.
         // Versão separada para executar uma recuperação segura única após a
         // correção que passou a preservar bancos locais e respostas parciais.
-        const refreshKey = `medtutor_firestore_last_refresh_recovery_v2_${uid}`;
         const revisionKey = this.getCloudDataRevisionKey(uid);
-        const lastRefreshAt = Number(localStorage.getItem(refreshKey) || 0);
         const materialsCacheHydrated = localStorage.getItem(this.getMaterialsCacheHydratedKey(uid)) === 'true';
+        const chatsCacheHydrated = localStorage.getItem(this.getChatsCacheHydratedKey(uid)) === 'true';
         const needsInitialMaterialsHydration = !materialsCacheHydrated && !hasLocalMaterialsCache;
         const shouldRefreshCloud = this.hasAuthenticatedCloudSession(uid)
-          && (Date.now() - lastRefreshAt >= FIRESTORE_REFRESH_INTERVAL_MS || needsInitialMaterialsHydration);
+          && (Date.now() - Number(lastCloudRevisionCheckAt[uid] || 0) >= 30_000 || needsInitialMaterialsHydration);
         if (shouldRefreshCloud) {
           try {
             const userDoc = await firestoreDb.collection('users').doc(uid).get();
+            lastCloudRevisionCheckAt[uid] = Date.now();
             const remoteRevision = String(userDoc.data()?.medtutor_dados_revision || '');
             const localRevision = String(localStorage.getItem(revisionKey) || '');
-            // A abertura periódica consulta somente o perfil. As três coleções
-            // grandes são lidas apenas no primeiro acesso ou quando outra sessão
-            // efetivamente alterou os dados do estudante.
+            // A abertura consulta somente o perfil. As coleções grandes são
+            // lidas apenas no primeiro acesso ou após alteração em outro aparelho.
             // Um cache vazio ainda não validado precisa de uma leitura remota,
             // mesmo que o número de revisão local coincida com o do perfil.
             const requiresFullCloudRead = !localRevision
               || (remoteRevision && remoteRevision !== localRevision)
+              || !chatsCacheHydrated
               || (!materialsCacheHydrated && !hasLocalMaterialsCache);
             if (userDoc.exists) {
               MedTutorAuthService.userProfile = userDoc.data();
@@ -2723,9 +2763,87 @@
                 await MedTutorLocalDB.set('questions', uid, sharedQuestionsBank);
               }
             }
+
+            // O histórico também é dado multi-dispositivo: carregue-o quando a
+            // revisão remota mudar e una mensagens locais ainda não sincronizadas.
+            const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get();
+            // Marca apenas depois de uma leitura concluída. Isso faz com que
+            // instalações antigas importem o histórico uma vez, mesmo se a
+            // revisão legada do perfil disser que materiais já estão atuais.
+            try { localStorage.setItem(this.getChatsCacheHydratedKey(uid), 'true'); } catch (error) {}
+            const localChatsById = new Map((Array.isArray(chatSessions) ? chatSessions : []).map(session => [session.id, session]));
+            const remoteChatsById = new Map();
+            const remoteChatRegistry = {};
+            chatsSnap.forEach(doc => {
+              const data = doc.data() || {};
+              const remoteSession = {
+                id: data.id || doc.id,
+                title: data.titulo || 'Atendimento Clínico',
+                subject: data.disciplina || '',
+                messages: Array.isArray(data.mensagens) ? data.mensagens : [],
+                compactMemory: data.memoria_compacta || '',
+                tokensUsed: Number(data.tokensConsumidos) || 0,
+                isPinned: !!data.fixado,
+                createdAt: data.criadoEm || data.atualizadoEm || new Date().toISOString(),
+                updatedAt: data.atualizadoEm || data.criadoEm || new Date().toISOString()
+              };
+              remoteChatsById.set(remoteSession.id, remoteSession);
+              const payload = {
+                id: remoteSession.id,
+                titulo: remoteSession.title,
+                disciplina: remoteSession.subject,
+                mensagens: remoteSession.messages.slice(-100),
+                memoria_compacta: remoteSession.compactMemory,
+                tokensConsumidos: remoteSession.tokensUsed,
+                fixado: remoteSession.isPinned,
+                criadoEm: remoteSession.createdAt
+              };
+              remoteChatRegistry[remoteSession.id] = firestoreFingerprint(payload);
+            });
+
+            const mergedChats = new Map(remoteChatsById);
+            localChatsById.forEach((localSession, id) => {
+              const cloudSession = remoteChatsById.get(id);
+              if (!cloudSession) {
+                const isDisposableEmptyPlaceholder = remoteChatsById.size > 0
+                  && !(localSession.messages || []).length
+                  && !localSession.isPinned
+                  && ['Discussão Clínica Geral', 'Novo Chat'].includes(localSession.title || '');
+                if (isDisposableEmptyPlaceholder) return;
+                mergedChats.set(id, localSession);
+                chatsNeedCloudUpload = true;
+                return;
+              }
+              const localUpdatedAt = Date.parse(localSession.updatedAt || localSession.createdAt || '') || 0;
+              const cloudUpdatedAt = Date.parse(cloudSession.updatedAt || cloudSession.createdAt || '') || 0;
+              const latestSession = localUpdatedAt > cloudUpdatedAt ? localSession : cloudSession;
+              const mergedMessages = mergeChatMessageHistory(localSession.messages, cloudSession.messages);
+              if (localUpdatedAt > cloudUpdatedAt || mergedMessages.length > cloudSession.messages.length) chatsNeedCloudUpload = true;
+              mergedChats.set(id, {
+                ...cloudSession,
+                ...latestSession,
+                id,
+                messages: mergedMessages,
+                updatedAt: new Date(Math.max(localUpdatedAt, cloudUpdatedAt) || Date.now()).toISOString()
+              });
+            });
+
+            chatSessions = [...mergedChats.values()].sort((a, b) =>
+              (Date.parse(b.updatedAt || b.createdAt || '') || 0) - (Date.parse(a.updatedAt || a.createdAt || '') || 0)
+            );
+            saveFirestoreSyncRegistry(uid, 'chats', remoteChatRegistry);
+            await MedTutorLocalDB.set('chats', uid, chatSessions);
+            try { localStorage.setItem('medtutor_chat_sessions', JSON.stringify(chatSessions)); } catch (error) {}
+            const activeChat = chatSessions.find(session => session.id === currentChatSessionId);
+            if (!activeChat?.messages?.length && chatSessions.length) {
+              currentChatSessionId = chatSessions.find(session => (session.messages || []).length)?.id || chatSessions[0].id;
+            }
+            if (typeof renderChatHistorySidebar === 'function') renderChatHistorySidebar();
+            if (typeof loadCurrentChatMessages === 'function') loadCurrentChatMessages();
+
             try { localStorage.setItem(revisionKey, remoteRevision || 'legacy-v1'); } catch (error) {}
             }
-            try { localStorage.setItem(refreshKey, String(Date.now())); } catch (error) {}
+            if (chatsNeedCloudUpload) await this.saveChatSessions(chatSessions);
           } catch (cloudErr) {
             console.warn('[Firestore] Erro ao sincronizar leitura com nuvem:', cloudErr);
           }
@@ -3161,6 +3279,7 @@
       const targetTab = document.getElementById('tab-' + tabId);
       if (!targetTab) return;
       currentTab = tabId;
+      document.querySelector('.view-content')?.classList.toggle('chat-view-active', tabId === 'chat');
       document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
       document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
