@@ -17536,11 +17536,8 @@ DIRETRIZES CIRÚRGICAS:
     // 6.2.2 Gerador do Índice Descritivo do Material Analisado
     function generateDescriptiveIndexForMaterial(text, fileName, diseaseTopic, matchedSubject) {
       const fText = (text || '').normalize('NFC');
-      const fName = (fileName || '').normalize('NFC');
-      const lowerText = fText.toLowerCase();
-      const lowerName = fName.toLowerCase();
-      const effectiveTopic = diseaseTopic || extractDiseaseFromFilename(fName) || 'Clínica Geral';
-      const effectiveSubj = matchedSubject || 'Medicina / Clínica Médica';
+      const effectiveTopic = diseaseTopic || '';
+      const effectiveSubj = matchedSubject || '';
 
       // 1. Deteção de Conceitos-Chave e Entidades Clínicas no Texto e Nome
       const candidateConcepts = [];
@@ -17605,36 +17602,13 @@ DIRETRIZES CIRÚRGICAS:
       ];
 
       for (const item of conceptDictionary) {
-        if (item.re.test(fText) || item.re.test(fName) || item.re.test(effectiveTopic)) {
+        // O índice só pode mapear evidência presente no texto extraído do
+        // arquivo. Nome de arquivo, disciplina e classificação são metadados,
+        // não fontes de conceitos.
+        if (item.re.test(fText)) {
           if (!candidateConcepts.includes(item.term)) {
             candidateConcepts.push(item.term);
           }
-        }
-      }
-
-      // Fallbacks de conceitos contextualizados se o texto for sintético ou sem termos explícitos
-      if (candidateConcepts.length < 3) {
-        const isNeuroConcept = lowerText.includes('neuro') || lowerName.includes('neuro') || lowerText.includes('tronco') || lowerName.includes('tronco') || lowerText.includes('mesenc') || lowerText.includes('ponte') || lowerText.includes('bulbo') || effectiveTopic.toLowerCase().includes('neuro') || effectiveTopic.toLowerCase().includes('tronco') || effectiveSubj.toLowerCase().includes('neuro');
-        if (isNeuroConcept) {
-          ['Neuroanatomia do Tronco', 'Nervos Cranianos (III-XII)', 'Síndromes Alternas', 'Vias Motoras e Sensitivas', 'Formação Reticular & SARA'].forEach(c => {
-            if (!candidateConcepts.includes(c)) candidateConcepts.push(c);
-          });
-        } else if (lowerText.includes('dermat') || lowerName.includes('dermat') || effectiveTopic.toLowerCase().includes('psor') || effectiveTopic.toLowerCase().includes('dermat')) {
-          ['Semiologia Dermatológica', 'Sinal de Auspitz', 'Lesões Elementares', 'Corticoide Tópico', 'Placas Eritematodescamativas'].forEach(c => {
-            if (!candidateConcepts.includes(c)) candidateConcepts.push(c);
-          });
-        } else if (lowerText.includes('cardio') || lowerName.includes('cardio') || effectiveTopic.toLowerCase().includes('card') || effectiveTopic.toLowerCase().includes('ecg')) {
-          ['Fração de Ejeção', 'Eletrocardiograma (ECG)', 'BNP / Biomarcadores', 'Terapia Guideline-Directed', 'Estratificação de Risco'].forEach(c => {
-            if (!candidateConcepts.includes(c)) candidateConcepts.push(c);
-          });
-        } else if (lowerText.includes('pneumo') || effectiveTopic.toLowerCase().includes('pulm') || effectiveTopic.toLowerCase().includes('asma')) {
-          ['Espirometria', 'Broncodilatador de Resgate', 'Manejo Ambulatorial', 'Sinais de Desconforto'].forEach(c => {
-            if (!candidateConcepts.includes(c)) candidateConcepts.push(c);
-          });
-        } else {
-          ['Raciocínio Clínico', 'Critérios Diagnósticos', 'Propedêutica Armada', 'Conduta Baseada em Evidências'].forEach(c => {
-            if (!candidateConcepts.includes(c)) candidateConcepts.push(c);
-          });
         }
       }
 
@@ -17667,7 +17641,17 @@ DIRETRIZES CIRÚRGICAS:
         }
       }
 
-      if (extractedSections.length < 3) {
+      if (extractedSections.length === 0 && keyConcepts.length > 0) {
+        extractedSections = keyConcepts.map(concept => ({
+          title: concept,
+          description: 'Conceito identificado explicitamente no texto extraído do arquivo.'
+        }));
+      }
+
+      // Os antigos modelos de eixos por especialidade foram desativados: eles
+      // completavam o índice com tópicos típicos da disciplina, mesmo ausentes
+      // dos arquivos enviados.
+      if (false && extractedSections.length < 3) {
         const isNeuro = effectiveTopic.toLowerCase().includes('neuro') || effectiveTopic.toLowerCase().includes('tronco') || effectiveTopic.toLowerCase().includes('mesenc') || effectiveTopic.toLowerCase().includes('ponte') || effectiveTopic.toLowerCase().includes('bulbo') || effectiveTopic.toLowerCase().includes('cativeiro') || effectiveTopic.toLowerCase().includes('wallenberg') || effectiveSubj.toLowerCase().includes('neuro');
         const isDerm = effectiveTopic.toLowerCase().includes('psor') || effectiveTopic.toLowerCase().includes('dermat') || effectiveSubj.toLowerCase().includes('dermat');
         const isCardio = effectiveTopic.toLowerCase().includes('card') || effectiveTopic.toLowerCase().includes('arritmia') || effectiveTopic.toLowerCase().includes('ecg') || effectiveTopic.toLowerCase().includes('infarto') || effectiveSubj.toLowerCase().includes('cardio');
@@ -17853,7 +17837,9 @@ DIRETRIZES CIRÚRGICAS:
         description: s.description || 'Tópico de alta relevância curricular e clínica.'
       }));
 
-      const summaryText = `Mapeamento estruturado de ${sections.length} eixos temáticos essenciais para estudo aprofundado, raciocínio diagnóstico e revisão direcionada para a ementa de ${effectiveSubj}.`;
+      const summaryText = sections.length || keyConcepts.length
+        ? `Mapeamento baseado exclusivamente no texto extraído do arquivo: ${sections.length} seção(ões) identificada(s) e ${keyConcepts.length} conceito(s) explícito(s).`
+        : 'O texto extraído não contém títulos de seção ou conceitos reconhecidos suficientes para mapear. Nenhum tópico externo foi acrescentado.';
 
       return {
         summaryText,
@@ -18190,7 +18176,7 @@ DIRETRIZES CIRÚRGICAS:
       if (justEl) justEl.textContent = analysis.justification;
 
       // Recupera ou gera índice descritivo estruturado do material analisado
-      const descriptiveIndex = material.descriptiveIndex || generateDescriptiveIndexForMaterial(
+      const descriptiveIndex = generateDescriptiveIndexForMaterial(
         material.text || '',
         material.fileName || '',
         material.disease || analysis.diseaseTopic,
@@ -18562,7 +18548,7 @@ DIRETRIZES CIRÚRGICAS:
       const finalDisease = diseaseName || extractDiseaseFromFilename(finalTitle) || 'Clínica Geral';
 
       // Cria o objeto de material com metadados e ancoragem na ementa
-      const descIndex = currentMat.descriptiveIndex || generateDescriptiveIndexForMaterial(
+      const descIndex = generateDescriptiveIndexForMaterial(
         currentMat.text || '',
         currentMat.fileName || '',
         finalDisease,
