@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261002-adaptive-navigation-v2">
+  <link rel="stylesheet" href="/styles.css?v=20261002-gamification-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -96,6 +96,10 @@
           Chat Científico & Revisão
         </div>
         <div class="topbar-actions">
+          <button class="gamification-topbar" id="gamificationTopbar" type="button" onclick="openGamificationModal()" title="Ver nível, XP e critérios de pontuação" aria-label="Progresso de gamificação">
+            <span class="gamification-topbar-copy"><strong id="gamificationLevelLabel">Nível 1</strong><small id="gamificationXpLabel">0 XP</small></span>
+            <span class="gamification-progress-track" aria-hidden="true"><span class="gamification-progress-fill" id="gamificationProgressFill"></span></span>
+          </button>
           <button class="btn-outline-action primary" id="btnUniversalUpload" onclick="openGeneralUploadModal()" title="Fazer Upload de Materiais de Estudo (PDFs, Slides, Anotações ou Google Drive)">
             <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Upload de Material</span>
@@ -3570,12 +3574,41 @@
     </div>
   </div>
 
+  <div class="modal-overlay gamification-modal-overlay" id="gamificationModal" onclick="handleGamificationBackdrop(event)" aria-modal="true" role="dialog" aria-labelledby="gamificationModalTitle" aria-hidden="true">
+    <section class="modal-window gamification-modal-window" onclick="event.stopPropagation()">
+      <header class="modal-head">
+        <div>
+          <h2 id="gamificationModalTitle" style="margin:0">Seu progresso de estudo</h2>
+          <small style="color:var(--text-secondary)">Pontos reconhecem a prática; maestria continua baseada no desempenho e na repetição espaçada.</small>
+        </div>
+        <button class="btn-close-modal" type="button" onclick="closeGamificationModal()" aria-label="Fechar">✕</button>
+      </header>
+      <div class="gamification-modal-level">
+        <div class="gamification-level-mark" aria-hidden="true">✦</div>
+        <div class="gamification-level-details">
+          <strong id="gamificationModalLevel">Nível 1</strong>
+          <span id="gamificationModalXp">0 XP total</span>
+          <div class="gamification-progress-track"><span class="gamification-progress-fill" id="gamificationModalProgressFill"></span></div>
+          <small id="gamificationModalNextLevel">150 XP para o próximo nível</small>
+        </div>
+      </div>
+      <div class="gamification-rules-grid">
+        <article><h3>Flashcards</h3><p>No dia: fácil <b>8 XP</b> · intermediário <b>10 XP</b> · difícil <b>12 XP</b>.</p><p>Atrasados: <b>6 / 7 / 8 XP</b>, respectivamente. Cartões estudados antes da data recebem o valor-base, sem bônus de deck.</p></article>
+        <article><h3>Quiz</h3><p>Fácil <b>2 XP</b> · Intermediário <b>3 XP</b> · Difícil <b>4 XP</b></p><p>Errar não remove XP. Cada questão pontua no máximo uma vez por dia.</p></article>
+        <article><h3>Deck completo</h3><p>Concluir os flashcards previstos da disciplina: <b>+8 XP</b> no dia ou <b>+4 XP</b> se atrasados.</p><p>Bônus único por disciplina, fila e dia.</p></article>
+        <article><h3>Combo de estudo</h3><p>Ações de estudo em até 30 minutos: <b>+1 XP</b> a partir da 3ª e <b>+2 XP</b> a partir da 5ª.</p><p>Bônus de combo limitado a 20 XP por dia.</p></article>
+      </div>
+      <p class="gamification-level-note">O nível 2 exige 150 XP; a meta do próximo nível aumenta 75 XP a cada nível. XP mede prática, não substitui a maestria nem a retenção. Sons não estão incluídos nesta versão.</p>
+    </section>
+  </div>
+
   <!-- =========================================================
        JAVASCRIPT: TEMA, SIMILARIDADE LOCAL, WAZE & DRIVE
        ========================================================= -->
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
-  <script defer src="/app.min.js?v=20261002-adaptive-navigation-v2"></script>
+  <script defer src="/gamification-rules.js?v=20261002-gamification-v1"></script>
+  <script defer src="/app.min.js?v=20261002-gamification-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

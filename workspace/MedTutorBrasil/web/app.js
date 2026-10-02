@@ -447,6 +447,8 @@
 
         if (!await this.resolveAccessForUser(user)) return false;
 
+        if (typeof MedTutorGamification !== 'undefined') MedTutorGamification.hydrate(user.uid);
+
         this.setAuthScreenState('hidden');
         this.authStartupCompleted = true;
         this.clearAuthResolutionTimeout();
@@ -1302,6 +1304,25 @@
             console.warn('[Firestore] Erro ao salvar perfil na nuvem:', e);
           }
         }
+      },
+
+      async loadGamificationProgress(uid) {
+        if (!this.hasAuthenticatedCloudSession(uid)) return null;
+        const snapshot = await firestoreDb.collection('users').doc(uid).get();
+        return snapshot.exists ? snapshot.data()?.gamification || null : null;
+      },
+
+      async commitGamificationEvent(uid, event) {
+        if (!this.hasAuthenticatedCloudSession(uid)) throw new Error('Sessão em nuvem indisponível.');
+        const profileRef = firestoreDb.collection('users').doc(uid);
+        return firestoreDb.runTransaction(async transaction => {
+          const snapshot = await transaction.get(profileRef);
+          if (!snapshot.exists) throw new Error('Perfil em nuvem não encontrado para salvar o progresso.');
+          const remoteState = MedTutorGamificationRules.normalizeState(snapshot.data()?.gamification);
+          const result = MedTutorGamificationRules.applyEvent(remoteState, event, Number(event.createdAt) || Date.now());
+          if (!result.duplicate) transaction.set(profileRef, { gamification: result.state }, { merge: true });
+          return result;
+        });
       },
 
       // Salva a Grade Curricular em users/{userId}/grade_curricular/{disciplineId}
@@ -2875,6 +2896,231 @@
         }
       }
     };
+
+    const MedTutorGamification = {
+      state: MedTutorGamificationRules.createInitialState(),
+      uid: 'local',
+      queue: Promise.resolve(),
+      storageKey(uid = this.uid) { return `medtutor_gamification_v1_${uid || 'local'}`; },
+      pendingKey(uid = this.uid) { return `medtutor_gamification_pending_v1_${uid || 'local'}`; },
+
+      readLocalState(uid) {
+        try { return MedTutorGamificationRules.normalizeState(JSON.parse(localStorage.getItem(this.storageKey(uid)) || 'null')); }
+        catch (error) { return MedTutorGamificationRules.createInitialState(); }
+      },
+
+      saveLocalState() {
+        try { localStorage.setItem(this.storageKey(), JSON.stringify(this.state)); } catch (error) {}
+      },
+
+      readPending(uid = this.uid) {
+        try {
+          const pending = JSON.parse(localStorage.getItem(this.pendingKey(uid)) || '[]');
+          return Array.isArray(pending) ? pending : [];
+        } catch (error) { return []; }
+      },
+
+      writePending(pending, uid = this.uid) {
+        try {
+          if (pending.length) localStorage.setItem(this.pendingKey(uid), JSON.stringify(pending.slice(-300)));
+          else localStorage.removeItem(this.pendingKey(uid));
+        } catch (error) {}
+      },
+
+      async hydrate(uid = 'local') {
+        this.uid = uid || 'local';
+        this.state = this.readLocalState(this.uid);
+        this.render();
+        if (this.uid === 'local' || !MedTutorFirebaseService.hasAuthenticatedCloudSession(this.uid)) return;
+        try {
+          const remote = await MedTutorFirebaseService.loadGamificationProgress(this.uid);
+          if (remote) this.state = MedTutorGamificationRules.normalizeState(remote);
+          this.saveLocalState();
+          this.render();
+          await this.syncPending();
+        } catch (error) {
+          console.info('[Gamificação] Progresso local mantido até a sincronização em nuvem ficar disponível.');
+        }
+      },
+
+      async syncPending() {
+        if (this.uid === 'local' || !MedTutorFirebaseService.hasAuthenticatedCloudSession(this.uid)) return false;
+        const pending = this.readPending();
+        if (!pending.length) return true;
+        const remaining = [];
+        for (const event of pending) {
+          try {
+            const result = await MedTutorFirebaseService.commitGamificationEvent(this.uid, event);
+            this.state = MedTutorGamificationRules.normalizeState(result.state);
+          } catch (error) {
+            remaining.push(event, ...pending.slice(pending.indexOf(event) + 1));
+            break;
+          }
+        }
+        this.writePending(remaining);
+        this.saveLocalState();
+        this.render();
+        return remaining.length === 0;
+      },
+
+      award(event, { quiet = false } = {}) {
+        const task = this.queue.then(() => this.processAward(event, quiet));
+        this.queue = task.catch(() => null);
+        return task;
+      },
+
+      async processAward(event, quiet) {
+        const normalized = { ...event, dayKey: event.dayKey || getLocalDateKey(), createdAt: Number(event.createdAt) || Date.now() };
+        if (!normalized.eventId || this.state.recentEventIds.includes(normalized.eventId)) return null;
+        let result;
+        if (this.uid !== 'local' && MedTutorFirebaseService.hasAuthenticatedCloudSession(this.uid)) {
+          try {
+            if (!await this.syncPending()) throw new Error('Há progresso offline anterior aguardando sincronização.');
+            result = await MedTutorFirebaseService.commitGamificationEvent(this.uid, normalized);
+          } catch (error) {
+            result = MedTutorGamificationRules.applyEvent(this.state, normalized, normalized.createdAt);
+            const pending = this.readPending();
+            if (!pending.some(item => item.eventId === normalized.eventId)) pending.push(normalized);
+            this.writePending(pending);
+          }
+        } else {
+          result = MedTutorGamificationRules.applyEvent(this.state, normalized, normalized.createdAt);
+        }
+        this.state = MedTutorGamificationRules.normalizeState(result.state);
+        this.saveLocalState();
+        this.render();
+        if (!quiet && !result.duplicate) this.showReward(result.award, normalized);
+        return result;
+      },
+
+      render() {
+        const level = MedTutorGamificationRules.getLevel(this.state.totalXp);
+        const progress = Math.max(0, Math.min(100, (level.xpIntoLevel / level.xpToNextLevel) * 100));
+        const topLevel = document.getElementById('gamificationLevelLabel');
+        const topXp = document.getElementById('gamificationXpLabel');
+        const topProgress = document.getElementById('gamificationProgressFill');
+        if (topLevel) topLevel.textContent = `Nível ${level.level}`;
+        if (topXp) topXp.textContent = `${this.state.totalXp} XP`;
+        if (topProgress) topProgress.style.width = `${progress}%`;
+        const modalLevel = document.getElementById('gamificationModalLevel');
+        const modalXp = document.getElementById('gamificationModalXp');
+        const modalProgress = document.getElementById('gamificationModalProgressFill');
+        const modalNext = document.getElementById('gamificationModalNextLevel');
+        if (modalLevel) modalLevel.textContent = `Nível ${level.level}`;
+        if (modalXp) modalXp.textContent = `${this.state.totalXp} XP total`;
+        if (modalProgress) modalProgress.style.width = `${progress}%`;
+        if (modalNext) modalNext.textContent = `${level.xpToNextLevel - level.xpIntoLevel} XP para o próximo nível`;
+      },
+
+      showReward(award, event) {
+        if (!award || !award.earnedXp) return;
+        let card = document.getElementById('gamificationRewardCard');
+        if (!card) {
+          card = document.createElement('div');
+          card.id = 'gamificationRewardCard';
+          card.className = 'gamification-reward-card';
+          card.setAttribute('role', 'status');
+          card.setAttribute('aria-live', 'polite');
+          card.innerHTML = '<strong></strong><span></span>';
+          document.body.appendChild(card);
+        }
+        const title = card.querySelector('strong');
+        const detail = card.querySelector('span');
+        const activityLabel = event.kind === 'quiz' ? 'Questão respondida' : 'Flashcard revisado';
+        const extras = [];
+        if (award.comboBonus) extras.push(`combo +${award.comboBonus}`);
+        if (award.deckBonus) extras.push(`deck da disciplina +${award.deckBonus}`);
+        if (title) title.textContent = award.levelUp ? `🏅 Novo nível ${award.level}!` : `✨ +${award.earnedXp} XP · ${activityLabel}`;
+        if (detail) detail.textContent = award.levelUp
+          ? `${this.state.totalXp} XP acumulados. ${extras.length ? extras.join(' · ') : 'Continue avançando no seu ritmo.'}`
+          : (extras.length ? extras.join(' · ') : `${this.state.totalXp} XP acumulados · combo ${award.combo}`);
+        card.classList.toggle('is-level-up', award.levelUp);
+        clearTimeout(this.rewardTimer);
+        this.rewardTimer = setTimeout(() => card?.remove(), 4200);
+      }
+    };
+
+    function openGamificationModal() {
+      const modal = document.getElementById('gamificationModal');
+      if (!modal) return;
+      MedTutorGamification.render();
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeGamificationModal() {
+      const modal = document.getElementById('gamificationModal');
+      if (!modal) return;
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function handleGamificationBackdrop(event) {
+      if (event?.target?.id === 'gamificationModal') closeGamificationModal();
+    }
+
+    function makeGamificationEventId(kind, itemId, dayKey = getLocalDateKey()) {
+      return `${dayKey}:${kind}:${encodeURIComponent(String(itemId || 'item')).slice(0, 150)}`;
+    }
+
+    function awardQuizGamification(item, { quiet = false } = {}) {
+      if (!item?.id) return Promise.resolve(null);
+      return MedTutorGamification.award({
+        eventId: makeGamificationEventId('quiz', item.id),
+        kind: 'quiz',
+        difficulty: item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel || getFlashcardDifficultyLabel(item)
+      }, { quiet });
+    }
+
+    function buildFlashcardGamificationEvent(item, now = new Date()) {
+      if (!item?.id) return null;
+      const dayKey = getLocalDateKey(now);
+      const today = getStartOfDay(now);
+      const due = item?.srs?.dueDate ? new Date(item.srs.dueDate) : null;
+      const queue = getFlashcardQueueKey(item, now);
+      const bucket = queue === 'due' && due && !Number.isNaN(due.getTime()) && due < today ? 'overdue'
+        : (queue === 'due' || queue === 'new' ? 'today' : 'practice');
+      const subject = String(item.subject || currentStudySubject || 'Geral').trim();
+      const normalizedSubject = typeof normalizeStudyComparisonText === 'function'
+        ? normalizeStudyComparisonText(subject)
+        : subject.toLowerCase().replace(/\s+/g, ' ').trim();
+      const subjectKey = normalizedSubject.slice(0, 120) || 'geral';
+      let deck;
+      if (bucket !== 'practice') {
+        const expectedCardIds = (sharedQuestionsBank || []).filter(candidate => {
+          const candidateSubject = String(candidate.subject || currentStudySubject || 'Geral').trim();
+          const normalizedCandidate = typeof normalizeStudyComparisonText === 'function'
+            ? normalizeStudyComparisonText(candidateSubject)
+            : candidateSubject.toLowerCase().replace(/\s+/g, ' ').trim();
+          if (normalizedCandidate !== normalizedSubject || !candidate.id) return false;
+          const candidateQueue = getFlashcardQueueKey(candidate, now);
+          if (bucket === 'today') {
+            if (candidateQueue === 'new') return true;
+            const candidateDue = candidate?.srs?.dueDate ? new Date(candidate.srs.dueDate) : null;
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return candidateQueue === 'due' && (!candidateDue || Number.isNaN(candidateDue.getTime()) || (candidateDue >= today && candidateDue < tomorrow));
+          }
+          const candidateDue = candidate?.srs?.dueDate ? new Date(candidate.srs.dueDate) : null;
+          return candidateQueue === 'due' && candidateDue && !Number.isNaN(candidateDue.getTime()) && candidateDue < today;
+        }).map(candidate => String(candidate.id));
+        deck = { subjectKey, bucket, cardId: String(item.id), expectedCardIds };
+      }
+      return {
+        eventId: makeGamificationEventId('flashcard', item.id, dayKey),
+        dayKey,
+        kind: 'flashcard',
+        difficulty: item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel || getFlashcardDifficultyLabel(item),
+        reviewStatus: bucket === 'overdue' ? 'overdue' : 'today',
+        deck,
+        createdAt: now.getTime()
+      };
+    }
+
+    window.openGamificationModal = openGamificationModal;
+    window.closeGamificationModal = closeGamificationModal;
+    window.handleGamificationBackdrop = handleGamificationBackdrop;
+    window.addEventListener('online', () => MedTutorGamification.syncPending());
 
     function switchAuthTab(mode) {
       const tabLogin = document.getElementById('tabAuthLogin');
@@ -15517,9 +15763,12 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       let correctCount = 0;
       const areaStats = {};
+      const answeredItems = [];
+      const levelBeforeExam = MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp).level;
 
       list.forEach(item => {
         const userChoice = quizExamState.userChoices[item.id];
+        if (typeof userChoice === 'number') answeredItems.push(item);
         const isCorrect = userChoice === item.correctIndex;
         if (isCorrect) correctCount++;
 
@@ -15539,6 +15788,23 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       saveSharedQuestionsBank();
       renderSceBars();
+
+      if (answeredItems.length) {
+        Promise.all(answeredItems.map(item => awardQuizGamification(item, { quiet: true }))).then(results => {
+          const earned = results.reduce((total, result) => total + (result?.award?.earnedXp || 0), 0);
+          if (earned > 0) {
+            const level = MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp);
+            MedTutorGamification.showReward({
+              earnedXp: earned,
+              comboBonus: 0,
+              deckBonus: 0,
+              combo: MedTutorGamification.state.combo,
+              level: level.level,
+              levelUp: level.level > levelBeforeExam
+            }, { kind: 'quiz' });
+          }
+        });
+      }
 
       const total = list.length;
       const scorePct = Math.round((correctCount / total) * 100);
@@ -15784,6 +16050,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
       saveSharedQuestionsBank();
       renderSceBars();
+      awardQuizGamification(item);
 
       renderQuizFeedbackHtml(item, isCorrect, optIdx);
 
@@ -24599,8 +24866,10 @@ Para cada material, retorne um objeto no JSON com:
 
     function applyFlashcardSrsRating(item, rating) {
       if (!item || ![1, 2, 3, 4].includes(Number(rating))) return null;
+      const gamificationEvent = buildFlashcardGamificationEvent(item);
       item.srs = calculateSrsNext(item.srs, Number(rating));
       saveSharedQuestionsBank();
+      if (gamificationEvent) MedTutorGamification.award(gamificationEvent);
       const ratingNames = { 1: 'Repetir', 2: 'Difícil', 3: 'Bom', 4: 'Fácil' };
       showToast(`🧠 ${ratingNames[rating]}: Próxima revisão em ${item.srs.interval} dia${item.srs.interval > 1 ? 's' : ''}.`);
       if (typeof AppExpenseTracker !== 'undefined') {
@@ -32607,6 +32876,7 @@ function escapeHtmlText(str) {
     restoreStudyNavigationState();
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)
+    MedTutorGamification.hydrate(MedTutorAuthService?.currentUser?.uid || 'local');
     if (typeof MedTutorAuthService !== 'undefined') {
       MedTutorAuthService.init();
     }

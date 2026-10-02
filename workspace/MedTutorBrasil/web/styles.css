@@ -346,6 +346,29 @@
       gap: 8px;
     }
 
+    .gamification-topbar {
+      width: 132px;
+      min-width: 132px;
+      padding: 5px 9px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+      color: var(--text-primary);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .18s ease, background .18s ease;
+    }
+
+    .gamification-topbar:hover { border-color: var(--neon); background: var(--neon-subtle); }
+    .gamification-topbar-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; }
+    .gamification-topbar-copy strong { color: var(--neon); font-size: 10.5px; white-space: nowrap; }
+    .gamification-topbar-copy small { color: var(--text-secondary); font-size: 9.5px; white-space: nowrap; }
+    .gamification-progress-track { display: block; height: 4px; overflow: hidden; background: var(--bg-base); border: 1px solid var(--border); border-radius: 999px; }
+    .gamification-progress-fill { display: block; width: 0; height: 100%; background: var(--neon); border-radius: inherit; transition: width .35s ease; }
+
     /* Botão de Ajuda Universal (?) */
     .btn-help-icon {
       background: transparent;
@@ -5665,6 +5688,29 @@
       overflow-y: auto;
     }
 
+    .gamification-modal-window { max-width: 620px; }
+    .gamification-modal-level { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--border-accent); border-radius: 14px; background: var(--neon-subtle); }
+    .gamification-level-mark { width: 46px; height: 46px; display: grid; place-items: center; flex: 0 0 46px; color: var(--neon); border: 1px solid var(--border-accent); border-radius: 14px; font-size: 22px; }
+    .gamification-level-details { display: grid; gap: 5px; width: 100%; min-width: 0; }
+    .gamification-level-details strong { color: var(--neon); font-size: 17px; }
+    .gamification-level-details > span, .gamification-level-details > small { color: var(--text-secondary); font-size: 11px; }
+    .gamification-level-details .gamification-progress-track { height: 7px; }
+    .gamification-rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .gamification-rules-grid article { padding: 13px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; }
+    .gamification-rules-grid h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 13px; }
+    .gamification-rules-grid p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+    .gamification-rules-grid b { color: var(--neon); }
+    .gamification-level-note { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+
+    .gamification-reward-card { position: fixed; top: 74px; right: 22px; z-index: 100500; width: min(340px, calc(100vw - 28px)); padding: 13px 15px; border: 1px solid var(--border-accent); border-radius: 13px; color: var(--text-primary); background: var(--bg-card); box-shadow: 0 12px 36px rgba(0,0,0,.34); animation: gamificationRewardEnter .24s ease-out both; pointer-events: none; }
+    .gamification-reward-card strong { display: block; color: var(--neon); font-size: 13px; }
+    .gamification-reward-card span { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+    .gamification-reward-card.is-level-up { border-color: rgba(255, 190, 75, .75); }
+    .gamification-reward-card.is-level-up strong { color: #ffc35a; }
+    @keyframes gamificationRewardEnter { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    @media (prefers-reduced-motion: reduce) { .gamification-reward-card { animation: none; } }
+
     .modal-head {
       display: flex;
       justify-content: space-between;
@@ -7312,6 +7358,22 @@
         padding: 0;
         justify-content: center;
       }
+
+      .topbar-actions > .gamification-topbar {
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        padding: 4px 5px;
+        gap: 3px;
+        text-align: center;
+      }
+
+      .gamification-topbar-copy { justify-content: center; }
+      .gamification-topbar-copy strong { font-size: 8px; }
+      .gamification-topbar-copy small { display: none; }
+      .gamification-modal-window { padding: 20px; }
+      .gamification-rules-grid { grid-template-columns: 1fr; }
+      .gamification-reward-card { top: calc(66px + env(safe-area-inset-top)); right: 12px; }
 
       .topbar-actions > .btn-outline-action > span,
       .topbar-actions > .btn-help-icon,
