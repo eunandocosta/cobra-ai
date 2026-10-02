@@ -1795,7 +1795,7 @@
       flex-wrap: wrap;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 1280px) {
       .study-nav-arrow {
         display: none;
       }
@@ -2795,7 +2795,7 @@
       color: #c9d1d9;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 1280px) {
       .gemini-prompt-cards-grid {
         grid-template-columns: 1fr;
       }
@@ -2872,7 +2872,7 @@
       font-weight: 600;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 1280px) {
       .academic-article-container {
         padding: 16px 14px;
       }
@@ -5842,7 +5842,7 @@
       to { opacity: 0; transform: translateY(12px) scale(.98); }
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 1280px) {
       .request-feedback,
       .toast-popup {
         right: 12px;
@@ -6970,10 +6970,11 @@
     }
 
     /* =========================================================
-       CAMADA MOBILE — não altera a composição desktop.
-       Ativada somente em celulares e pensada para Safari iOS e Chrome Android.
+       CAMADA MOBILE — viewport compacto usa navegação e composição de celular.
+       1280px CSS é o proxy responsivo para dispositivos/telas abaixo de ~12";
+       polegadas físicas não são expostas de forma confiável pelo navegador.
        ========================================================= */
-    @media (max-width: 768px) {
+    @media (max-width: 1280px) {
       .doubts-fab {
         top: auto;
         bottom: calc(78px + env(safe-area-inset-bottom));
@@ -7669,12 +7670,9 @@
       }
     }
 
-    /* =========================================================
-       OTIMIZAÇÕES EXCLUSIVAS PARA TABLETS E IPADS (768px a 1024px)
-       Garante máxima legibilidade, alvos de toque amplos (Touch Targets >= 44px)
-       e rolagem suave com suporte a Apple Pencil e gestos no iPad/iOS.
-       ========================================================= */
-    @media (min-width: 768px) and (max-width: 1024px) {
+    /* Telas touch grandes mantêm alvos amplos sem sobrescrever a camada
+       móvel aplicada até 1280px de viewport. */
+    @media (min-width: 1281px) and (max-width: 1440px) and (pointer: coarse) {
       /* 1. Touch Targets & Manipulação de gestos no iPad */
       button, .btn-outline-action, .tab-btn, .nav-item, input[type="button"], input[type="submit"] {
         touch-action: manipulation;
@@ -10014,7 +10012,29 @@
         font-family: "Times New Roman", Times, serif !important;
       }
 
-      .academic-article-container .report-list-subalineas > li::before {
-        content: "— " !important;
-      }
+    .academic-article-container .report-list-subalineas > li::before {
+      content: "— " !important;
     }
+  }
+
+  /* Mantém os atalhos flutuantes acima da navegação móvel.
+     Esta regra fica após os estilos-base para não perder a cascata do FAB Colegas. */
+  @media (max-width: 1280px) {
+    .classmates-fab,
+    .doubts-fab {
+      position: fixed;
+      z-index: 9000;
+      top: auto;
+      right: 12px;
+      left: auto;
+      min-height: 44px;
+    }
+
+    .doubts-fab {
+      bottom: calc(78px + env(safe-area-inset-bottom));
+    }
+
+    .classmates-fab {
+      bottom: calc(134px + env(safe-area-inset-bottom));
+    }
+  }
