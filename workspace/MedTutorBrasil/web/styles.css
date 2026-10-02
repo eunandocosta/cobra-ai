@@ -131,16 +131,9 @@
       position: relative;
     }
 
-    /* Modo Desktop / Web / Windows: Sidebar Ampla */
+    /* A antiga navegação lateral foi substituída pela barra inferior. */
     .sidebar {
-      width: 270px;
-      background: var(--nav-bg);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      padding: 24px 16px;
-      gap: 24px;
-      z-index: 10;
+      display: none;
     }
 
     .brand {
@@ -5859,15 +5852,17 @@
       .toast-popup.is-leaving { animation: none; }
     }
 
-    /* Mobile Bottom Navigation */
+    /* Navegação inferior de recursos: usada em desktop e mobile. */
     .mobile-bottom-nav {
-      display: none;
-      height: 60px;
+      display: flex;
+      flex: 0 0 72px;
+      height: 72px;
       background: var(--nav-bg);
       border-top: 1px solid var(--border);
-      justify-content: space-around;
+      justify-content: center;
       align-items: center;
       z-index: 20;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.16);
     }
 
     .mobile-nav-btn {
@@ -5882,9 +5877,12 @@
       font-size: 10px;
       font-weight: 600;
       cursor: pointer;
-      flex: 1;
+      flex: 0 1 148px;
       height: 100%;
+      min-width: 0;
     }
+
+    .mobile-nav-btn:hover { color: var(--text-primary); background: var(--neon-subtle); }
 
     .mobile-nav-btn.active {
       color: var(--neon);
@@ -6443,7 +6441,7 @@
       position: fixed;
       z-index: 9000;
       right: 22px;
-      bottom: 22px;
+      bottom: 90px;
       display: inline-flex;
       align-items: center;
       gap: 7px;
@@ -7265,6 +7263,7 @@
       }
 
       .mobile-nav-btn {
+        flex: 1;
         min-width: 44px;
         min-height: 44px;
         padding: 5px 2px;
@@ -9020,7 +9019,7 @@
       position: fixed;
       z-index: 9000;
       right: 136px;
-      bottom: 22px;
+      bottom: 90px;
       display: inline-flex;
       align-items: center;
       gap: 7px;

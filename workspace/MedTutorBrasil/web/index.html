@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261002-chat-flow-width-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261002-bottom-resource-nav-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -38,7 +38,7 @@
   <div class="app-root">
 
     <!-- SIDEBAR DESKTOP / WEB / WINDOWS -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="appSidebar" aria-hidden="true">
       <div class="brand">
         <div class="brand-logo">
           <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
@@ -50,34 +50,34 @@
       </div>
 
       <nav class="nav-list">
-        <button class="nav-link active" onclick="navigateTab('chat', this)">
+        <button class="nav-link active" onclick="navigateTab('chat', this)" title="Chat Científico" aria-label="Chat Científico">
           <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           Chat Científico
         </button>
-        <button class="nav-link" onclick="navigateTab('flashcards', this)">
+        <button class="nav-link" onclick="navigateTab('flashcards', this)" title="Flashcards" aria-label="Flashcards">
           <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
           Flashcards
         </button>
-        <button class="nav-link" onclick="navigateTab('quizzes', this)">
+        <button class="nav-link" onclick="navigateTab('quizzes', this)" title="Quizzes & Casos" aria-label="Quizzes & Casos">
           <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           Quizzes & Casos
         </button>
-        <button class="nav-link" onclick="navigateTab('curriculum', this)">
+        <button class="nav-link" onclick="navigateTab('curriculum', this)" title="Matérias Curriculares" aria-label="Matérias Curriculares">
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           Matérias Curriculares
         </button>
-        <button class="nav-link" onclick="navigateTab('sce', this)">
+        <button class="nav-link" onclick="navigateTab('sce', this)" title="SCE & Waze de Estudos" aria-label="SCE & Waze de Estudos">
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
           SCE & Waze de Estudos
         </button>
-        <button class="nav-link" onclick="navigateTab('challenges', this)">
+        <button class="nav-link" onclick="navigateTab('challenges', this)" title="Desafios" aria-label="Desafios">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5l-6 6"/><path d="M8 8l-4-4"/><path d="M5 3L3 5"/></svg>
           Desafios
         </button>
       </nav>
 
       <div class="sidebar-footer">
-        <button class="btn-outline-action" onclick="openConfigModal()">
+        <button class="btn-outline-action sidebar-settings-btn" onclick="openConfigModal()" title="Configurações" aria-label="Configurações">
           <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Configurações
         </button>
@@ -3572,7 +3572,7 @@
        ========================================================= -->
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
-  <script defer src="/app.min.js?v=20261002-source-only-descriptive-index"></script>
+  <script defer src="/app.min.js?v=20261002-bottom-resource-nav-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
