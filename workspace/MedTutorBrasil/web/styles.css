@@ -10048,7 +10048,7 @@
     min-width: 0;
     min-height: 0;
     margin: 0;
-    padding: 0;
+    padding: 0 !important;
     overflow: hidden;
   }
 
@@ -10066,7 +10066,9 @@
     height: 100%;
     min-height: 0;
     margin: 0;
-    border-radius: 0;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
   }
 
   .view-content.chat-view-active #tab-chat .chat-main-area,
@@ -10084,7 +10086,7 @@
 
   @media (max-width: 1280px) {
     .view-content.chat-view-active {
-      padding: 0;
+      padding: 0 !important;
     }
 
     .view-content.chat-view-active #tab-chat .chat-container-split {
@@ -10101,5 +10103,28 @@
     .view-content.chat-view-active #tab-chat .gemini-bottom-dock {
       padding-right: 14px;
       padding-left: 14px;
+    }
+  }
+
+  /* No celular, os FABs ficam empilhados acima da navegação — nunca sobre ela.
+     Reserva-se a mesma faixa no compositor para não cobrir o campo de mensagem. */
+  @media (max-width: 767px) {
+    .doubts-fab,
+    .classmates-fab {
+      right: 12px !important;
+      left: auto !important;
+      min-height: 44px;
+    }
+
+    .doubts-fab {
+      bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .classmates-fab {
+      bottom: calc(128px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .view-content.chat-view-active #tab-chat .gemini-bottom-dock {
+      padding-bottom: calc(112px + env(safe-area-inset-bottom));
     }
   }
