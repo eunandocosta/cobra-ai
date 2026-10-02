@@ -5219,7 +5219,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       material.clinicalImages = uploadedImages;
       material.imageStorageProvider = [...storageProviders].join(' + ') || 'Armazenamento em nuvem';
       material.visualAssociations = visualAssociations;
-      material.markdownText = `${material.markdownText || material.text || ''}\n\n## Figuras do Material Original\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Figura ${index + 1}`}](${image.imageUrl})\n*Figura ${index + 1}: extraída do PDF/slide enviado pelo estudante.*${image.visualAssociation ? `\n\n**Associação didática:** ${image.visualAssociation}` : ''}${image.studyQuestion ? `\n\n**Pergunta de recuperação:** ${image.studyQuestion}` : ''}`).join('\n\n')}`;
+      material.markdownText = `${material.markdownText || material.text || ''}\n\n## Imagens extraídas do material\n\n${uploadedImages.map((image, index) => `![${image.clinicalLabel || image.title || `Imagem ${index + 1}`}](${image.imageUrl})\n*Imagem extraída ${index + 1}${image.page ? ` — página de origem ${image.page}` : ''}; a numeração é apenas a ordem de extração, não a numeração original do documento.*${image.visualAssociation ? `\n\n**Associação didática:** ${image.visualAssociation}` : ''}${image.studyQuestion ? `\n\n**Pergunta de recuperação:** ${image.studyQuestion}` : ''}`).join('\n\n')}`;
       material.text = material.markdownText;
       await saveChatDriveMaterials();
       if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
@@ -5278,7 +5278,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     function buildVisualAssociationsMarkdown(associations) {
       if (!Array.isArray(associations) || !associations.length) return '';
-      return `\n\n## Associação Visual do Material\n\n${associations.map((item, index) => `### Figura ${item.sourcePage || index + 1}: ${item.title || 'Marco visual'}\n\n**Estruturas/marcos visíveis:** ${(item.visibleStructures || []).join(', ') || 'Não identificados com segurança.'}\n\n${item.association || ''}\n\n${item.caution ? `> Atenção: ${item.caution}\n\n` : ''}**Pergunta de recuperação:** ${item.studyQuestion || 'Quais estruturas e relações podem ser reconhecidas nesta figura?'}`).join('\n\n')}`;
+      return `\n\n## Associação Visual do Material\n\n${associations.map((item, index) => `### Imagem extraída ${index + 1}${item.sourcePage ? ` — página de origem ${item.sourcePage}` : ''}: ${item.title || 'Marco visual'}\n\n**Estruturas/marcos visíveis:** ${(item.visibleStructures || []).join(', ') || 'Não identificados com segurança.'}\n\n${item.association || ''}\n\n${item.caution ? `> Atenção: ${item.caution}\n\n` : ''}**Pergunta de recuperação:** ${item.studyQuestion || 'Quais estruturas e relações podem ser reconhecidas nesta imagem?'}`).join('\n\n')}`;
     }
 
     async function enrichUploadedMaterialWithVisualAssociations(material, sourceFile) {
@@ -5429,39 +5429,15 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           : (rawStructuredMd || text);
         const pedagogicalData = metadata.pedagogicalSynthesis || null;
 
-        // Se o texto citar figuras clínicas sem imagens físicas, cria referências estruturadas
-        let sampleImages = [...rawImages];
-        if (sampleImages.length === 0) {
-          const lowerText = text.toLowerCase();
-          if (lowerText.includes('ecg') || lowerText.includes('eletrocardiograma')) {
-            sampleImages.push({
-              name: 'ecg_tracado_clinico.png',
-              title: 'ECG: Traçado de 12 Derivações',
-              width: 900,
-              height: 520,
-              originalSizeKB: 4800
-            });
-          }
-          if (lowerText.includes('rx') || lowerText.includes('radiografia') || lowerText.includes('raio x')) {
-            sampleImages.push({
-              name: 'radiografia_torax_pa.png',
-              title: 'Radiografia de Tórax em PA',
-              width: 850,
-              height: 700,
-              originalSizeKB: 5200
-            });
-          }
-        }
-
         // 2. Filtro de figuras clínicas e descarte de ícones
-        const filterResult = filterAndProcessClinicalImages(sampleImages);
+        const filterResult = filterAndProcessClinicalImages(rawImages);
         const processedImages = filterResult.clinicalImages.map(img => compressImageToWebP(img));
 
         // 3. Inserção de links inline no Markdown: ![Figura Clínica: ECG](url)
         if (processedImages.length > 0) {
-          structuredMarkdown += `\n\n## Figuras Clínicas & Exames Complementares Vinculados\n\n`;
+          structuredMarkdown += `\n\n## Imagens extraídas do material\n\n`;
           processedImages.forEach((cImg, idx) => {
-            structuredMarkdown += `### Figura ${idx + 1}: ${cImg.clinicalLabel}\n`;
+            structuredMarkdown += `### Imagem extraída ${idx + 1}${cImg.page ? ` — página de origem ${cImg.page}` : ''}: ${cImg.clinicalLabel}\n`;
             structuredMarkdown += `![${cImg.title}](${cImg.src || 'data:image/webp;base64,placeholder'})\n`;
             structuredMarkdown += `*Dimensões: ${cImg.width}x${cImg.height}px • Formato WebP Otimizado (${cImg.compressedSizeKB} KB • Redução de ${cImg.reductionPercent}%)*\n\n`;
           });
@@ -6193,7 +6169,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         dLower.includes('radiolog') || dLower.includes('raio-x') || dLower.includes('tomograf') ||
         sLower.includes('dermatolog') || sLower.includes('radiolog') || sLower.includes('patolog')
       );
-      const paginaOrigemPdf = 1 + ((idx * 3) % 18);
+      // Nunca invente página de origem: só a extração real do documento pode
+      // preencher esse metadado e orientar a associação de uma imagem.
+      const paginaOrigemPdf = null;
 
       let vignette = '';
       let question = '';
@@ -7705,6 +7683,28 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return true;
     }
 
+    function removeUnsupportedVisualLocator(stem) {
+      const locator = /\b(?:figura|fig\.?|imagem|prancha|tabela|quadro|diagrama|esquema|slide|p[aá]gina)\s*(?:(?:n[º°o.]?\s*)?\d+|abaixo|acima|anterior|seguinte|a seguir|anexa?|do material)\b/i;
+      const prepositionalLocator = /\b(?:n[oa]|em|conforme|segundo)\s+(?:a|o)?\s*(?:figura|fig\.?|imagem|prancha|diagrama|esquema|slide|p[aá]gina)\b/i;
+      const hasLocator = value => locator.test(String(value || '')) || prepositionalLocator.test(String(value || ''));
+      let clean = String(stem || '').replace(/\s+/g, ' ').trim();
+      if (!hasLocator(clean)) return clean;
+      const resource = '(?:figura|fig\\.?|imagem|prancha|tabela|quadro|diagrama|esquema|slide|p[aá]gina)';
+      const suffixPatterns = [
+        new RegExp(`\\s*,?\\s*(?:(?:[ée]|est[aá]|foi|foram|s[aã]o)\\s+)?(?:evidenciad[oa]s?|mostrad[oa]s?|representad[oa]s?|ilustrad[oa]s?|identificad[oa]s?|indicad[oa]s?|observad[oa]s?|apontad[oa]s?)\\s+(?:n[oa]|em|pel[oa])\\s+${resource}\\s*(?:n[º°o.]?\\s*)?\\d*[^?]*\\??\\s*$`, 'i'),
+        new RegExp(`\\s*,?\\s*(?:conforme|segundo|de acordo com)\\s+(?:a|o)?\\s*${resource}\\s*(?:n[º°o.]\\s*)?\\d*[^?]*\\??\\s*$`, 'i'),
+        new RegExp(`\\s+(?:n[oa]|em|pel[oa])\\s+${resource}\\s*(?:n[º°o.]\\s*)?\\d*[^?]*\\??\\s*$`, 'i')
+      ];
+      for (const pattern of suffixPatterns) {
+        const candidate = clean.replace(pattern, '').replace(/[\s,;:–—-]+$/g, '').trim();
+        const remainsVague = /\b(?:apresentad[oa]s?|mostrad[oa]s?|representad[oa]s?|ilustrad[oa]s?|identificad[oa]s?|indicad[oa]s?|observad[oa]s?|apontad[oa]s?|visualizad[oa]s?|localizad[oa]s?|exibid[oa]s?|aparece[mn]?|compare(?:\s+as?)?|qual(?:\s+estrutura)?|quais(?:\s+estruturas)?|estrutura[s]?|componentes?)\s*$/i.test(candidate);
+        if (candidate !== clean && candidate.length >= 18 && !hasLocator(candidate) && !remainsVague) {
+          return `${candidate.replace(/[?.!]+$/g, '').trim()}?`;
+        }
+      }
+      return null;
+    }
+
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
       const acceptedStudyItems = config.acceptedStudyItems || [];
       const previousQuestions = acceptedStudyItems.map(item => item.question || item.pergunta || '').filter(Boolean).slice(-30);
@@ -7751,12 +7751,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           return null;
         }
         const items = data.map(item => {
-          const sharedStem = sanitizeSharedQuestionStem(item.question || item.pergunta || '');
+          const sharedStem = removeUnsupportedVisualLocator(sanitizeSharedQuestionStem(item.question || item.pergunta || ''));
           const isAuthoredReuse = item.sourceQuestionOrigin === 'reaproveitada_da_fonte'
             || item.origem_pergunta === 'reaproveitada_da_fonte';
           if (isAuthoredReuse) {
-            if (sharedStem.length < 18 || String(item.sourceQuestionText || '').trim().length < 18) return null;
-          } else if (!isSharedQuestionStemValid(sharedStem)) return null;
+            if (!sharedStem || sharedStem.length < 18 || String(item.sourceQuestionText || '').trim().length < 18) return null;
+          } else if (!sharedStem || !isSharedQuestionStemValid(sharedStem)) return null;
           const itemDiff = ['iniciante', 'intermediario', 'avancado'].includes(item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             ? (item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             : 'iniciante';
@@ -8032,7 +8032,7 @@ ${cleanText}
             learningFocus: item.foco_aprendizagem || (idx < Math.ceil(count * 0.4) ? 'fundamentos' : (idx < Math.ceil(count * 0.75) ? 'mecanismo_consequencia' : 'aplicacao_clinica')),
             examStyle: examStyle,
             requer_imagem: false,
-            pagina_origem_pdf: 1,
+            pagina_origem_pdf: null,
             vignette: '',
             question: qText,
             pergunta: qText,
@@ -14521,7 +14521,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (visualBadge) {
         if (item.requer_imagem) {
           visualBadge.style.display = 'inline-block';
-          visualBadge.textContent = `📷 Imagem (Slide Pág. ${item.pagina_origem_pdf || 1})`;
+          visualBadge.textContent = item.pagina_origem_pdf
+            ? `📷 Imagem do material (pág. ${item.pagina_origem_pdf})`
+            : '📷 Imagem de apoio';
         } else {
           visualBadge.style.display = 'none';
         }
@@ -14985,6 +14987,19 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
       if (btnSubmit) {
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = '⚡ Gerar Pergunta com Novo Contexto';
+      }
+
+      if (newQuestionData && (typeof newQuestionData.question === 'string' || typeof newQuestionData.pergunta === 'string')) {
+        const safeDerivedStem = removeUnsupportedVisualLocator(newQuestionData.question || newQuestionData.pergunta);
+        const safeDerivedFront = removeUnsupportedVisualLocator(newQuestionData.flashcard?.front || safeDerivedStem || '');
+        if (!safeDerivedStem || !safeDerivedFront || !isSharedQuestionStemValid(safeDerivedStem)) {
+          console.warn('[Pergunta derivada] Questão descartada: o enunciado depende de um recurso visual não vinculado ao card.');
+          newQuestionData = null;
+        } else {
+          newQuestionData.question = safeDerivedStem;
+          newQuestionData.pergunta = safeDerivedStem;
+          newQuestionData.flashcard = { ...(newQuestionData.flashcard || {}), front: safeDerivedFront };
+        }
       }
 
       if (newQuestionData && (typeof newQuestionData.question === 'string' || typeof newQuestionData.pergunta === 'string')) {
@@ -15533,7 +15548,7 @@ Retorne EXCLUSIVAMENTE um JSON:
               ` : ''}
               ${item.requer_imagem ? `
                 <span style="font-size: 10px; font-weight: 700; background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); padding: 2px 6px; border-radius: 4px;">
-                  📷 Análise Visual (Pág. ${item.pagina_origem_pdf || 1})
+                  📷 Análise Visual${item.pagina_origem_pdf ? ` (pág. ${item.pagina_origem_pdf})` : ''}
                 </span>
               ` : ''}
               <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
@@ -27495,6 +27510,8 @@ Linha 04: __________________________________________________
         });
 
         if (options.length >= 2) {
+          const safeQuestion = removeUnsupportedVisualLocator(qPrompt.trim() || `Questão sobre ${bookletTitle}`);
+          if (!safeQuestion) return;
           const qId = `q-${bookletId}-${questionsList.length + 1}`;
           const qNum = questionsList.length + 1;
           const gab = gabaritoMap[qNum] || { correctIndex: 0 };
@@ -27505,7 +27522,7 @@ Linha 04: __________________________________________________
             qNum: qNum,
             level: level,
             vignette: vignette.trim(),
-            question: qPrompt.trim() || `Questão sobre ${bookletTitle}`,
+            question: safeQuestion,
             options: options.slice(0, 5),
             correctIndex: (gab.correctIndex >= 0 && gab.correctIndex < options.length) ? gab.correctIndex : 0,
             explanation: gab.snippet || 'Conforme diretrizes clínicas e fundamentos anatômicos canônicos.',
@@ -28405,7 +28422,7 @@ Linha 04: __________________________________________________
 
       // Executa análise e transformação por IA (Gemini ou Heurística Local)
       const visualMarkdown = visualAssociations.length
-        ? `# Associação Visual do Material\n\n${visualAssociations.map((item, index) => `## Figura ${index + 1}: ${item.title}\n\n**Estruturas/marcos visíveis:** ${(item.visibleStructures || []).join(', ') || 'Não identificados com segurança.'}\n\n${item.association}\n\n${item.caution ? `> Atenção: ${item.caution}\n\n` : ''}**Recuperação ativa:** ${item.studyQuestion || 'Quais estruturas e relações podem ser reconhecidas nesta figura?'}\n`).join('\n')}`
+        ? `# Associação Visual do Material\n\n${visualAssociations.map((item, index) => `## Imagem extraída ${index + 1}${item.sourcePage ? ` — página de origem ${item.sourcePage}` : ''}: ${item.title}\n\n**Estruturas/marcos visíveis:** ${(item.visibleStructures || []).join(', ') || 'Não identificados com segurança.'}\n\n${item.association}\n\n${item.caution ? `> Atenção: ${item.caution}\n\n` : ''}**Recuperação ativa:** ${item.studyQuestion || 'Quais estruturas e relações podem ser reconhecidas nesta imagem?'}\n`).join('\n')}`
         : '';
       let analysisResult;
       if (extractedText && extractedText.trim().length >= 20) {
@@ -28907,10 +28924,12 @@ ${textSample}
           const options = optMatches.slice(0, 4).map(o => o.text);
           const qNum = existingQuestions.length + 1;
           const correctIdx = (typeof gabaritoMap[qNum] === 'number') ? gabaritoMap[qNum] : 0;
+          const safePrompt = removeUnsupportedVisualLocator(promptRaw || `Questão ${qNum} sobre ${cleanTitle}`);
+          if (!safePrompt) return;
 
           existingQuestions.push({
             source: 'reused',
-            question: promptRaw || `Questão ${qNum} sobre ${cleanTitle}`,
+            question: safePrompt,
             vignette: detectedDocVignette || (promptRaw.length > 120 ? promptRaw.substring(0, 100) + '...' : ''),
             options: options,
             correctIndex: correctIdx,
@@ -28944,6 +28963,7 @@ ${textSample}
         let qPrompt = (dMatch[4] || '').trim();
         let qAnswer = (dMatch[5] || '').trim();
 
+        qPrompt = removeUnsupportedVisualLocator(qPrompt) || '';
         if (qPrompt.length >= 10 && qAnswer.length >= 5) {
           // Evita duplicatas se já tiver sido capturada
           const isDup = existingQuestions.some(eq => eq.question && eq.question.includes(qPrompt.substring(0, 30)));

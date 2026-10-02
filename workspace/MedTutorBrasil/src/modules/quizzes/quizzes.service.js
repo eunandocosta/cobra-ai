@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
+const { removeUnsupportedVisualLocator } = require('./visual-reference.guard');
 
 function questionTokenSet(value) {
   return new Set(String(value || '')
@@ -545,6 +546,7 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 8. Não use rótulos editoriais como "caso 1" ou "caso clínico X" sem contexto. Quando uma questão da fonte referir-se a um caso numerado, encontre os dados clínicos correspondentes no material e incorpore-os ao enunciado, sem citar a numeração. Não apague a questão apenas para retirar o rótulo; se não houver contexto suficiente, omita só essa questão e preserve as demais válidas.
 9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real. Cada pergunta precisa ser uma frase interrogativa completa, iniciar com letra maiúscula e terminar com "?". Não devolva fragmentos de frases, continuações entre parênteses, reticências ou trechos iniciados por conjunções/preposições; se não conseguir reconstruir o enunciado completo com a fonte, omita somente essa questão.
 10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com os opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
+10a. NÃO CITE FIGURAS, IMAGENS, TABELAS, QUADROS, DIAGRAMAS, SLIDES OU PÁGINAS NO ENUNCIADO. O estudante não tem necessariamente acesso ao recurso visual citado, e o sistema não vincula com segurança cada questão à figura exata. Transforme a pergunta para cobrar somente o conceito textual explícito; se ela depender essencialmente de um recurso visual não descrito no texto, omita apenas essa questão.
 11. ALTA QUALIDADE DOS DISTRATORES MÉDICOS:
     - Todas as 4 alternativas (1 correta e 3 distratores) devem pertencer rigorosamente ao mesmo universo anatomofisiológico ou clínico do tema.
     - É EXPRESSAMENTE PROIBIDO criar distratores ingênuos, caricatos ou absurdos (ex.: em questão sobre exame de líquor, NUNCA use 'eletroencefalograma' ou 'biópsia de nervo'; use alternativas e diagnósticos diferenciais reais do contexto neurológico).
@@ -899,12 +901,13 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const sharedStem = canReuseSource
           ? addCaseContextToQuestion(sourceQuestion, materialText)
           : sanitizeSharedQuestionStem(question?.pergunta);
+        const safeStem = removeUnsupportedVisualLocator(sharedStem);
         const sourceStructure = canReuseSource ? extractAuthoredQuestionStructure(sourceQuestion) : null;
         const sourceHasAnsweredOptions = sourceStructure?.options.length === 4
           && sourceStructure.correctIndex >= 0 && sourceStructure.correctIndex < 4;
         return {
           ...question,
-          pergunta: sharedStem,
+          pergunta: safeStem,
           ...(sourceHasAnsweredOptions ? {
             alternativas: sourceStructure.options,
             gabarito: ['A', 'B', 'C', 'D'][sourceStructure.correctIndex],
@@ -917,6 +920,10 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           sourceQuestionText: canReuseSource ? sourceQuestion : ''
         };
       }).filter(question => {
+        if (!question.pergunta) {
+          console.warn('⚠️ [Quiz Engine] Questão descartada individualmente: não foi possível deixá-la autocontida após validar o contexto e os localizadores visuais.');
+          return false;
+        }
         // Questões autorais precisam conservar o enunciado mesmo quando a
         // heurística de itens novos rejeitaria expressões como "no caso 1".
         // A extração já identificou esse texto como pergunta; validamos sua
@@ -1261,6 +1268,7 @@ DIRETRIZES OBRIGATÓRIAS:
    - Se houver caso clínico / vinheta descrita no material (ex: "Sebastião, 58 anos, sofreu trauma de crânio, pior cefaleia da vida, rigidez de nuca..."), PRESERVE E ATRIBUA essa vinheta às respectivas questões!
    - Cada questão deve ser convertida em um item de Quiz com exatamente 4 opções técnicas (A, B, C, D). A alternativa correta deve refletir fielmente o gabarito/resposta oficial do material, e as outras 3 devem ser distratores médicos verossímeis e instrutivos.
    - Forneça justificativa e ponto-chave de memorização usando apenas informações presentes na fonte.
+   - Não cite Figura, Imagem, Tabela, Quadro, Diagrama, Slide ou Página no enunciado: esse recurso pode não acompanhar a questão. Se o conceito não puder ser perguntado sem depender dele, omita somente o item.
    - Marque essas questões com "source": "reused".
 
 3. TRANSFORMAÇÃO DE TEORIA DIDÁTICA ("text_only" ou "both"):
@@ -1344,7 +1352,8 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
           ? item.correctIndex 
           : 0;
 
-        const sharedStem = sanitizeSharedQuestionStem(item.question || `Questão ${index + 1} sobre ${parsed.clinicalSubject || targetSubject}`);
+        const sharedStem = removeUnsupportedVisualLocator(sanitizeSharedQuestionStem(item.question || `Questão ${index + 1} sobre ${parsed.clinicalSubject || targetSubject}`));
+        if (!sharedStem) return null;
         if (!isSharedQuestionStemValid(sharedStem)) return null;
         return {
           source: isReused ? 'reused' : 'generated_from_text',
@@ -1361,6 +1370,9 @@ Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
           difficulty: ['iniciante', 'intermediario', 'avancado'].includes(item.difficulty) ? item.difficulty : 'iniciante'
         };
       }).filter(Boolean);
+
+      reusedCount = cleanItems.filter(item => item.source === 'reused').length;
+      genCount = cleanItems.filter(item => item.source === 'generated_from_text').length;
 
       console.log(`✅ [Quiz Engine - Analisar Material] Sucesso: Tipo "${parsed.detectedType}", ${reusedCount} reaproveitadas, ${genCount} geradas.`);
 
@@ -1424,6 +1436,7 @@ DIRETRIZES DE ESCRITA:
 2. Crie 4 alternativas de múltipla escolha (sem prefixar 'A)', 'B)', etc.) com distratores plausíveis e APENAS 1 alternativa correta.
 3. Elabore a justificativa com: por que a resposta correta está certa, análise dos distratores e uma pérola clínica ("take-home message").
 4. Elabore o título e o formato de Flashcard para revisão espaçada.
+5. Não cite Figura, Imagem, Tabela, Quadro, Diagrama, Slide ou Página no enunciado nem no flashcard frontal; a questão precisa ser respondível sem consultar um recurso que pode não estar anexado.
 
 Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.`;
 
@@ -1484,6 +1497,13 @@ Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.
         }
 
         if (parsedCandidate && (parsedCandidate.question || parsedCandidate.quizOptions)) {
+          const safeQuestion = removeUnsupportedVisualLocator(parsedCandidate.question || '');
+          const safeFlashcardFront = removeUnsupportedVisualLocator(parsedCandidate.flashcardFront || parsedCandidate.question || '');
+          if (!safeQuestion || !safeFlashcardFront) {
+            throw new Error('A questão dependia de uma figura, tabela, slide ou página que não acompanha o enunciado.');
+          }
+          parsedCandidate.question = safeQuestion;
+          parsedCandidate.flashcardFront = safeFlashcardFront;
           parsed = parsedCandidate;
           usedModel = candidateModel;
           break;

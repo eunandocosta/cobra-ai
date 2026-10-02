@@ -61,6 +61,22 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     console.log('  [PASS] Referência a caso é substituída pelos achados correspondentes da fonte');
     console.log('  [PASS] Questão inspirada permanece adicional');
 
+    mockQuestions = [
+      makeQuestion('Qual estrutura anexa da pele, responsável pela produção de secreção holócrina, é evidenciada na Figura 2 do material original?', 0, 'inspirada_na_fonte', 'Glândula sebácea'),
+      makeQuestion('Qual estrutura está indicada na Figura 2?', 0, 'inspirada_na_fonte', 'Estrutura visual')
+    ];
+    const visualReferenceQuestions = await quizzesService.generateQuestions({
+      materialText: 'As glândulas sebáceas produzem secreção holócrina.',
+      quantidade: 2,
+      generationMode: 'science_based',
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(visualReferenceQuestions.length, 1, 'A questão impossível deve ser descartada sem eliminar as demais');
+    assert.strictEqual(visualReferenceQuestions[0].question, 'Qual estrutura anexa da pele, responsável pela produção de secreção holócrina?');
+    assert(!/Figura\s*2/i.test(visualReferenceQuestions[0].question), 'A referência à figura ausente deve sair do enunciado');
+    console.log('  [PASS] Referência a figura removida quando o enunciado continua completo');
+    console.log('  [PASS] Questão dependente exclusivamente de figura é descartada individualmente');
+
     const withoutCaseDetails = await quizzesService.generateQuestions({
       materialText: `${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
       quantidade: 1,
