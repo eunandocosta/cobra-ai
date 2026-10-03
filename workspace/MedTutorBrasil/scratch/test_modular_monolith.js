@@ -148,7 +148,10 @@ const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261002-model-cascade-v1', 'o bundle deve invalidar o cache após mudanças na cascata de modelos');
+assert(appBundleVersion === '20261002-gamification-audio-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(sceReviewMarkup.includes('id="gamificationSoundsToggle"') && sceReviewMarkup.includes('id="gamificationAlertsToggle"'), 'configurações devem expor controles independentes para sons e alertas de gamificação');
+assert(appSource.includes('medtutor_gamification_sounds_v1') && appSource.includes('medtutor_gamification_alerts_v1'), 'preferências de som e alertas devem persistir entre sessões');
+assert(appSource.includes("MedTutorGamificationPreferences.play('levelUp')") && appSource.includes("outcome: isCorrect ? 'correct' : 'incorrect'"), 'subida de nível e respostas de quiz devem acionar os sons correspondentes');
 assert(appSource.includes("frontImageEl.innerHTML = renderStudySupportImage(item, { asStimulus: true });"), 'a frente do flashcard deve renderizar a figura sem revelar a explicação do gabarito');
 const sceReviewCardRenderer = appSource.match(/function renderSceReviewCard\(card, index\) \{[\s\S]*?\n    \}/)?.[0] || '';
 assert(sceReviewCardRenderer.includes('${stimulusImage}') && sceReviewCardRenderer.indexOf('${stimulusImage}') < sceReviewCardRenderer.indexOf('class="sce-review-answer"'), 'a figura do card SCE deve aparecer na frente, fora do gabarito oculto');

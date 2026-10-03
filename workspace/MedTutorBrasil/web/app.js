@@ -2897,6 +2897,58 @@
       }
     };
 
+    const MedTutorGamificationPreferences = {
+      keys: { sounds: 'medtutor_gamification_sounds_v1', alerts: 'medtutor_gamification_alerts_v1' },
+      audio: {},
+      enabled(kind) {
+        try { return localStorage.getItem(this.keys[kind]) !== 'false'; }
+        catch (error) { return true; }
+      },
+      setEnabled(kind, enabled) {
+        try { localStorage.setItem(this.keys[kind], String(Boolean(enabled))); } catch (error) {}
+        this.render();
+        if (kind === 'alerts' && !enabled) document.getElementById('gamificationRewardCard')?.remove();
+      },
+      render() {
+        [['sounds', 'gamificationSoundsToggle'], ['alerts', 'gamificationAlertsToggle']].forEach(([kind, id]) => {
+          const button = document.getElementById(id);
+          if (!button) return;
+          const enabled = this.enabled(kind);
+          button.textContent = enabled ? 'Ativados' : 'Desativados';
+          button.setAttribute('aria-pressed', String(enabled));
+          button.classList.toggle('primary', enabled);
+        });
+      },
+      play(type) {
+        if (!this.enabled('sounds')) return;
+        const sources = {
+          correct: '/assets/audio/gamification/correct.wav',
+          incorrect: '/assets/audio/gamification/incorrect.wav',
+          levelUp: '/assets/audio/gamification/level-up.wav'
+        };
+        if (!sources[type]) return;
+        try {
+          let audio = this.audio[type];
+          if (!audio) {
+            audio = new Audio(sources[type]);
+            audio.preload = 'none';
+            audio.volume = type === 'incorrect' ? 0.32 : 0.42;
+            this.audio[type] = audio;
+          }
+          audio.currentTime = 0;
+          const playback = audio.play();
+          if (playback?.catch) playback.catch(() => {});
+        } catch (error) {
+          // O feedback sonoro é opcional e não pode interromper o estudo.
+        }
+      }
+    };
+
+    function toggleGamificationPreference(kind) {
+      if (!MedTutorGamificationPreferences.keys[kind]) return;
+      MedTutorGamificationPreferences.setEnabled(kind, !MedTutorGamificationPreferences.enabled(kind));
+    }
+
     const MedTutorGamification = {
       state: MedTutorGamificationRules.createInitialState(),
       uid: 'local',
@@ -3013,7 +3065,10 @@
       },
 
       showReward(award, event) {
-        if (!award || !award.earnedXp) return;
+        if (award?.levelUp) MedTutorGamificationPreferences.play('levelUp');
+        else if (event?.outcome === 'correct') MedTutorGamificationPreferences.play('correct');
+        else if (event?.outcome === 'incorrect') MedTutorGamificationPreferences.play('incorrect');
+        if (!MedTutorGamificationPreferences.enabled('alerts') || !award || !award.earnedXp) return;
         let card = document.getElementById('gamificationRewardCard');
         if (!card) {
           card = document.createElement('div');
@@ -3063,11 +3118,12 @@
       return `${dayKey}:${kind}:${encodeURIComponent(String(itemId || 'item')).slice(0, 150)}`;
     }
 
-    function awardQuizGamification(item, { quiet = false } = {}) {
+    function awardQuizGamification(item, { quiet = false, outcome = null } = {}) {
       if (!item?.id) return Promise.resolve(null);
       return MedTutorGamification.award({
         eventId: makeGamificationEventId('quiz', item.id),
         kind: 'quiz',
+        ...(outcome ? { outcome } : {}),
         difficulty: item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel || getFlashcardDifficultyLabel(item)
       }, { quiet });
     }
@@ -3574,6 +3630,7 @@
     // 3. Modais & Sistema de Confirmação e Stepper de IA
     function openConfigModal() { 
       if (typeof AppExpenseTracker !== 'undefined') AppExpenseTracker.updateConfigModalUI();
+      MedTutorGamificationPreferences.render();
       document.getElementById('configModal').classList.add('active'); 
     }
     function openSyllabusModal() { 
@@ -15724,7 +15781,9 @@ Retorne EXCLUSIVAMENTE um JSON:
         : (evaluationResult.score === 0.5
           ? `⚠️ Resposta Parcialmente Correta (${evaluationResult.accuracy}% • +0,5 pt)`
           : `❌ Resposta Insuficiente (${evaluationResult.accuracy}% • 0,0 pt)`);
-      showToast(toastMsg);
+      if (evaluationResult.score >= 0.5) MedTutorGamificationPreferences.play('correct');
+      else MedTutorGamificationPreferences.play('incorrect');
+      if (MedTutorGamificationPreferences.enabled('alerts')) showToast(toastMsg);
     }
 
     // 4.3 Modos de Quiz: Tutor (Feedback Imediato) vs Simulado ENARE (Cronometrado)
@@ -16072,7 +16131,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
       saveSharedQuestionsBank();
       renderSceBars();
-      awardQuizGamification(item);
+      awardQuizGamification(item, { outcome: isCorrect ? 'correct' : 'incorrect' });
 
       renderQuizFeedbackHtml(item, isCorrect, optIdx);
 

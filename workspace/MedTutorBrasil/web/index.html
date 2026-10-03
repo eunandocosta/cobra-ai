@@ -1596,6 +1596,22 @@
           <button class="btn-outline-action" onclick="toggleTheme()">Alternar</button>
         </div>
 
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
+          <div>
+            <div style="font-weight: 700; font-size: 14px;">Sons de gamificação</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Efeitos para respostas corretas/incorretas e subida de nível</div>
+          </div>
+          <button class="btn-outline-action" id="gamificationSoundsToggle" type="button" onclick="toggleGamificationPreference('sounds')" aria-pressed="true">Ativados</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
+          <div>
+            <div style="font-weight: 700; font-size: 14px;">Alertas visuais de gamificação</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Mostra ou oculta os cartões temporários de XP e subida de nível</div>
+          </div>
+          <button class="btn-outline-action" id="gamificationAlertsToggle" type="button" onclick="toggleGamificationPreference('alerts')" aria-pressed="true">Ativados</button>
+        </div>
+
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
           <div>
             <div style="font-weight: 700; font-size: 14px;">Cota da IA Gratuita (Gemini 2.5 Flash)</div>
@@ -3608,7 +3624,7 @@
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261002-gamification-v1"></script>
-  <script defer src="/app.min.js?v=20261002-model-cost-v1"></script>
+  <script defer src="/app.min.js?v=20261002-gamification-audio-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
