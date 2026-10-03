@@ -5709,14 +5709,14 @@
     .gamification-rules-grid b { color: var(--neon); }
     .gamification-level-note { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
 
-    .gamification-reward-card { position: fixed; top: 74px; right: 22px; z-index: 100500; width: min(286px, calc(100vw - 28px)); min-height: 66px; display: flex; align-items: center; gap: 12px; overflow: hidden; padding: 11px 15px 14px; border: 1px solid rgba(0,255,115,.48); border-radius: 16px; color: var(--text-primary); background: linear-gradient(140deg, #14251a, #101914 72%); box-shadow: 0 15px 42px rgba(0,0,0,.48), 0 0 28px rgba(0,237,120,.15); animation: gamificationRewardPop .56s cubic-bezier(.18,.9,.25,1.3) both; pointer-events: none; }
+    .gamification-reward-card { position: fixed; top: auto; right: 22px; bottom: 24px; z-index: 100500; width: min(286px, calc(100vw - 28px)); min-height: 66px; display: flex; align-items: center; gap: 12px; overflow: hidden; padding: 11px 15px 14px; border: 1px solid rgba(0,255,115,.48); border-radius: 16px; color: var(--text-primary); background: linear-gradient(140deg, #14251a, #101914 72%); box-shadow: 0 15px 42px rgba(0,0,0,.48), 0 0 28px rgba(0,237,120,.15); animation: gamificationRewardPop .56s cubic-bezier(.18,.9,.25,1.3) both; pointer-events: none; }
     .gamification-reward-icon { flex: 0 0 38px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: var(--neon); background: rgba(0,255,115,.12); font-size: 22px; }
     .gamification-reward-copy { display: grid; min-width: 0; gap: 2px; }
     .gamification-reward-copy small { color: var(--text-secondary); font-size: 10px; font-weight: 650; }
     .gamification-reward-copy strong { display: flex; align-items: baseline; gap: 4px; color: var(--neon); font-size: 24px; font-weight: 820; line-height: 1.1; font-variant-numeric: tabular-nums; }
     .gamification-reward-value { display: inline-block; min-width: 1.5ch; text-align: right; }
     .gamification-reward-unit { font-size: 12px; font-weight: 720; letter-spacing: .01em; }
-    .gamification-reward-timer { position: absolute; inset: auto 0 0; height: 3px; background: rgba(0,255,115,.15); transform-origin: left; animation: gamificationRewardTimer 3.6s linear both; }
+    .gamification-reward-timer { position: absolute; inset: auto 0 0; height: 3px; background: rgba(0,255,115,.15); transform-origin: left; animation: gamificationRewardTimer 5s linear both; }
     .gamification-reward-card.is-leaving { animation: gamificationRewardLeave .26s ease-in both; }
     @keyframes gamificationRewardPop { 0% { opacity: 0; transform: translateY(-18px) scale(.76); filter: blur(5px); } 63% { opacity: 1; transform: translateY(3px) scale(1.055); filter: blur(0); } 82% { transform: translateY(-2px) scale(.985); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes gamificationRewardLeave { to { opacity: 0; transform: translateY(-8px) scale(.96); } }
@@ -5754,7 +5754,7 @@
     @keyframes levelUpNumberReveal { from { clip-path: circle(0% at 50% 50%); opacity: .3; transform: scale(.88); } to { clip-path: circle(75% at 50% 50%); opacity: 1; transform: scale(1); } }
     @keyframes levelUpFirework { 0%,8% { transform: rotate(var(--angle)) scaleY(0); } 43%,62% { transform: rotate(var(--angle)) scaleY(1); } 100% { transform: rotate(var(--angle)) scaleY(0); } }
     @keyframes levelUpRayDot { 0%,30%,100% { opacity: 0; } 48%,68% { opacity: 1; } }
-    @media (max-width: 700px) { .gamification-reward-card { top: calc(68px + env(safe-area-inset-top)); right: 12px; } }
+    @media (max-width: 700px) { .gamification-reward-card { right: 12px; bottom: calc(20px + env(safe-area-inset-bottom)); } }
     @media (max-width: 520px) { .level-up-overlay { padding: 10px; } .level-up-card { padding: 20px 16px 17px; border-radius: 20px; } .level-up-mark { width: 43px; height: 43px; margin-bottom: 10px; } .level-up-kicker { font-size: 11px; } .level-up-heading { font-size: 19px; } .level-up-transition { margin-top: 11px; } .level-up-hero { min-height: 126px; } .level-up-hero strong { font-size: clamp(82px, 23vw, 106px); } .level-up-progress-copy, .level-up-progress-copy strong { font-size: 9.5px; } .level-up-remaining { font-size: 10.5px; margin-bottom: 12px; } .level-up-stats { gap: 7px; margin-bottom: 14px; } .level-up-stats article { min-height: 58px; padding: 8px 5px; border-radius: 11px; } .level-up-stats article strong { font-size: 15px; } .level-up-continue { min-height: 48px; padding-inline: 8px; font-size: 11.5px; } }
     @media (max-height: 560px) { .level-up-card { max-height: calc(100dvh - 16px); padding: 14px 20px; } .level-up-mark { display: none; } .level-up-transition { margin: 8px 0 0; } .level-up-hero { min-height: 82px; } .level-up-hero strong { font-size: clamp(58px, 14vh, 84px); } .level-up-stats { margin-bottom: 10px; } .level-up-continue { min-height: 42px; } }
 
@@ -7422,7 +7422,7 @@
       .gamification-topbar-copy small { display: none; }
       .gamification-modal-window { padding: 20px; }
       .gamification-rules-grid { grid-template-columns: 1fr; }
-      .gamification-reward-card { top: calc(66px + env(safe-area-inset-top)); right: 12px; }
+      .gamification-reward-card { right: 12px; bottom: calc(20px + env(safe-area-inset-bottom)); }
 
       .topbar-actions > .btn-outline-action > span,
       .topbar-actions > .btn-help-icon,

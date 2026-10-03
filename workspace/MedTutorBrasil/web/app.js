@@ -3329,12 +3329,13 @@
           timer.setAttribute('aria-hidden', 'true');
           card.append(icon, copy, timer);
           document.body.appendChild(card);
+          positionGamificationRewardCard();
           animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
           clearTimeout(this.rewardTimer);
           this.rewardTimer = setTimeout(() => {
             card.classList.add('is-leaving');
             setTimeout(() => card.remove(), 260);
-          }, 3600);
+          }, 5000);
         });
       }
     };
@@ -3346,6 +3347,21 @@
       if (hours && minutes) return `${hours} h ${minutes} min`;
       if (hours) return `${hours} h`;
       return `${totalMinutes} min`;
+    }
+
+    function positionGamificationRewardCard() {
+      const reward = document.getElementById('gamificationRewardCard');
+      if (!reward) return;
+      const expense = document.getElementById('discreteExpensePopup');
+      const expenseVisible = expense && expense.style.display !== 'none' && expense.getBoundingClientRect().height > 0;
+      if (expenseVisible) {
+        const expenseRect = expense.getBoundingClientRect();
+        reward.style.bottom = `${Math.max(24, Math.ceil(window.innerHeight - expenseRect.top + 12))}px`;
+        reward.style.right = `${Math.max(12, Math.ceil(window.innerWidth - expenseRect.right))}px`;
+      } else {
+        reward.style.bottom = '';
+        reward.style.right = '';
+      }
     }
 
     let levelUpReturnFocus = null;
@@ -8010,6 +8026,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           this.schedulePopupDismissal(popup);
         };
 
+        positionGamificationRewardCard();
         this.schedulePopupDismissal(popup);
       },
 
@@ -8026,7 +8043,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           popup.style.opacity = '0';
           popup.style.transform = 'translateY(12px)';
           setTimeout(() => {
-            if (popup && popup.style.opacity === '0') popup.style.display = 'none';
+            if (popup && popup.style.opacity === '0') {
+              popup.style.display = 'none';
+              positionGamificationRewardCard();
+            }
           }, 350);
         }
       }
