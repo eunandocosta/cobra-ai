@@ -1,0 +1,28 @@
+.material-symbol-font {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: inherit;
+  font-family: 'Material Symbols Rounded', sans-serif;
+  font-size: 1.12em;
+  font-style: normal;
+  font-weight: 400;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  font-variant-ligatures: common-ligatures;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.material-symbol-font.icon {
+  fill: currentColor;
+  stroke: none;
+  transition: color .2s ease, transform .2s ease;
+}
