@@ -33,6 +33,8 @@ console.log('[PASS] index.js livre de regras de negócio acopladas');
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf-8');
 const styleSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8');
 const webIndexMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
+const serviceWorkerSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'service-worker.js'), 'utf-8');
+const productionMiddlewareSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'shared', 'production.middleware.js'), 'utf-8');
 assert(styleSource.includes('width: 270px;') && styleSource.includes('.app-root.sidebar-collapsed .sidebar'), 'telas amplas devem manter sidebar lateral expansível e recolhível');
 assert(/\.app-root\.sidebar-collapsed \.nav-link \.icon,[\s\S]*?font-size: 20px;[\s\S]*?flex: 0 0 20px;/.test(styleSource), 'ícones Material da sidebar devem manter tamanho explícito quando font-size: 0 oculta os rótulos no modo recolhido');
 assert(/@media \(max-width: 1280px\)\s*\{\s*\.sidebar\s*\{\s*display:\s*none;/.test(styleSource), 'telas compactas devem ocultar a sidebar lateral');
@@ -150,6 +152,7 @@ assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceRevie
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
 assert(appBundleVersion === '20261003-xp-level-reward-v6', 'o bundle deve invalidar o cache após mudanças no app');
+assert(serviceWorkerSource.includes("medtutor-static-v94") && serviceWorkerSource.includes('/app.min.js?v=20261003-xp-level-reward-v6') && serviceWorkerSource.includes('/styles.css?v=20261003-xp-level-reward-v6') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
 const materialIconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf-8');
 const materialIconsCss = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.css'), 'utf-8');
 assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('/material-icons.js?v=20261003-material-symbols-v1'), 'a interface do app deve carregar ícones Material Symbols Rounded subsetados pelo Google Fonts');

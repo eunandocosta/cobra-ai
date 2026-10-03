@@ -36,6 +36,9 @@ function staticCacheHeaders(req, res, next) {
   const path = req.pathname || new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store');
+  } else if (path === '/service-worker.js') {
+    // O navegador deve sempre verificar se há um service worker atualizado.
+    res.setHeader('Cache-Control', 'no-cache');
   } else if (/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(req.headers.host || '')) {
     // Durante desenvolvimento, nunca reutilize bundles antigos após uma alteração.
     res.setHeader('Cache-Control', 'no-store, max-age=0');
