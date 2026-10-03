@@ -1,6 +1,7 @@
 // Serviço Universal de Ementas & Sequenciamento Cognitivo (MedTutor Brasil)
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
+const { GENERAL_FLASH_MODELS, generateContentWithFallback } = require('../../shared/gemini-model-fallback');
 
 const universalCurriculumSchema = {
   type: SchemaType.OBJECT,
@@ -131,18 +132,18 @@ class EmentasService {
     }
 
     const genAI = this._getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_BALANCED || "gemini-3.5-flash",
+    const modelOptions = {
       systemInstruction: SYSTEM_CURRICULUM_PROMPT,
       generationConfig: {
         temperature: 0.1,
         responseMimeType: "application/json",
         responseSchema: universalCurriculumSchema,
       }
-    });
+    };
 
     const prompt = `Analise o documento e estruture a matriz curricular exata desta faculdade de Medicina:\n\n"""\n${rawText.slice(0, 150000)}\n"""`;
-    const result = await runWithAiLimit(() => model.generateContent(prompt));
+    const generated = await generateContentWithFallback(genAI, modelOptions, prompt, GENERAL_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+    const result = generated.result;
     const parsed = JSON.parse(result.response.text());
 
     if (!parsed || !Array.isArray(parsed.periods) || parsed.periods.length === 0) {
@@ -173,6 +174,7 @@ class EmentasService {
     }
 
     return {
+      model: generated.modelName,
       metadata: this.institutionMetadata,
       curriculum: this.currentCurriculum
     };
@@ -216,14 +218,13 @@ class EmentasService {
     const flatSubjects = candidates.map(subject => `[${subject.period || 'Período não informado'}] ${subject.name}${subject.description ? ` — ${subject.description}` : ''}`);
 
     const genAI = this._getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_BALANCED || "gemini-3.5-flash",
+    const modelOptions = {
       generationConfig: {
         temperature: 0.1,
         responseMimeType: "application/json",
         responseSchema: materialClassificationSchema,
       }
-    });
+    };
 
     const prompt = `
 Alinhe o material "${materialName}" com a matriz curricular e a escala de 9 fases pedagógicas:
@@ -253,7 +254,8 @@ REGRAS ABSOLUTAS:
 - Se o material for visual ou curto, seja conservador e use apenas evidências disponíveis.
 `;
 
-    const res = await runWithAiLimit(() => model.generateContent(prompt));
+    const generated = await generateContentWithFallback(genAI, modelOptions, prompt, GENERAL_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+    const res = generated.result;
     const parsed = JSON.parse(res.response.text());
     const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
     const rawTarget = normalize(parsed.targetSubject);
@@ -264,6 +266,7 @@ REGRAS ABSOLUTAS:
     }
 
     return {
+      model: generated.modelName,
       pedagogicalPhase: Math.min(9, Math.max(1, Number(parsed.pedagogicalPhase) || 5)),
       targetSubject: matchedSubject.name,
       period: matchedSubject.period,

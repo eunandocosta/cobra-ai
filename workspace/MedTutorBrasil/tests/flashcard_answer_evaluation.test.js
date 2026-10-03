@@ -5,15 +5,13 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
 
 (async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
-  const originalModel = process.env.MODEL_FAST;
   const originalGetModel = GoogleGenerativeAI.prototype.getGenerativeModel;
   let capturedPrompt = '';
 
   try {
     process.env.GEMINI_API_KEY = 'test-api-key';
-    process.env.MODEL_FAST = 'gemini-flashcard-evaluation-test';
     GoogleGenerativeAI.prototype.getGenerativeModel = function (options) {
-      assert.strictEqual(options.model, 'gemini-flashcard-evaluation-test');
+      assert.strictEqual(options.model, 'gemini-3.5-flash-lite');
       return {
         generateContent: async prompt => {
           capturedPrompt = prompt;
@@ -45,7 +43,6 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;
-    if (originalModel === undefined) delete process.env.MODEL_FAST; else process.env.MODEL_FAST = originalModel;
   }
 })().catch(error => {
   console.error('❌ Teste de avaliação discursiva falhou:', error);

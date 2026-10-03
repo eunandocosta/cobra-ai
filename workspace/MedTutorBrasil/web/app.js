@@ -7293,10 +7293,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     // Proibido qualquer trava ou corte artificial de tokens na geração de artigos e respostas.
     // Modelos oficiais com janela de saída expandida (até 65.536 tokens no Gemini 2.5):
     const GEMINI_CONFIG_2026 = {
-      models: ['gemini-3.5-flash-lite', 'gemini-3.5-flash'],
-      primaryModel: 'gemini-3.5-flash',
-      fallbackModel: 'gemini-3.5-flash-lite',
-      questionModels: ['gemini-3.5-flash-lite', 'gemini-3.5-flash'],
+      models: ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'],
+      primaryModel: 'gemini-3.5-flash-lite',
+      fallbackModel: 'gemini-3.5-flash',
+      questionModels: ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'],
       flashLiteModel: 'gemini-3.5-flash-lite',
       pricing: {
         'gemini-3.5-flash-lite': {
@@ -7308,6 +7308,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           label: 'Gemini 3.5 Flash (Alta Velocidade & Raciocínio Clínico)',
           inputPerMillion: 0.10,
           outputPerMillion: 0.30,
+        },
+        'gemini-3.6-flash': {
+          label: 'Gemini 3.6 Flash (Fallback)',
+          inputPerMillion: 0.75,
+          outputPerMillion: 3.75,
+          cachedInputPerMillion: 0.075,
         },
         'gemini-3.7-flash': {
           label: 'Gemini 3.7 Flash (Servidor)',
@@ -10087,9 +10093,8 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
             }
           }
 
-          const candidateModels = (typeof GEMINI_CONFIG_2026 !== 'undefined' && Array.isArray(GEMINI_CONFIG_2026.models) && GEMINI_CONFIG_2026.models.length > 0)
-            ? GEMINI_CONFIG_2026.models
-            : ['gemini-3.5-flash'];
+          // Relatórios mantêm sua escolha explícita: Gemini 3.7 Flash.
+          const candidateModels = ['gemini-3.7-flash'];
 
           for (const model of candidateModels) {
             try {
@@ -19134,7 +19139,7 @@ DIRETRIZES CIRÚRGICAS:
 
         const candidateModels = (typeof GEMINI_CONFIG_2026 !== 'undefined' && Array.isArray(GEMINI_CONFIG_2026.models) && GEMINI_CONFIG_2026.models.length > 0)
           ? GEMINI_CONFIG_2026.models
-          : ['gemini-3.5-flash'];
+          : ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'];
 
         const systemInstruction = `Você é um tutor médico de excelência. O estudante fez upload de um material de estudo (slides, apostila, anotações ou PDF).
 Sua missão é ler atentamente o texto extraído e produzir uma TRANSCRIÇÃO, TRADUÇÃO E SÍNTESE PEDAGÓGICA COMPLETA em Markdown, orientada à compreensão antes da prática clínica.
@@ -22626,7 +22631,7 @@ Para cada material, retorne um objeto no JSON com:
         } else {
           const models = (typeof GEMINI_CONFIG_2026 !== 'undefined' && GEMINI_CONFIG_2026.models) 
             ? GEMINI_CONFIG_2026.models 
-            : ['gemini-3.5-flash'];
+            : ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'];
 
           for (const model of models) {
             try {
@@ -26682,7 +26687,7 @@ Para cada material, retorne um objeto no JSON com:
         let trackedModel = 'local-heuristic';
         const candidateModels = (typeof GEMINI_CONFIG_2026 !== 'undefined' && Array.isArray(GEMINI_CONFIG_2026.models) && GEMINI_CONFIG_2026.models.length > 0)
           ? GEMINI_CONFIG_2026.models
-          : ['gemini-3.5-flash'];
+            : ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'];
 
         // A chave fica exclusivamente no servidor. O chat usa o Gemini do .env
         // e envia o material selecionado pelo estudante somente com sua autorização.
@@ -29208,7 +29213,7 @@ ${textSample}
         }
       };
 
-      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+      const models = GEMINI_CONFIG_2026.models;
       for (const model of models) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;

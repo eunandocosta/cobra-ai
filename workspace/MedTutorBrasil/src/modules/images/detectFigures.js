@@ -5,6 +5,7 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 const { runWithAiLimit } = require('../../shared/ai-limiter.js');
+const { IMAGE_FLASH_MODELS, generateContentWithFallback } = require('../../shared/gemini-model-fallback.js');
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -31,14 +32,13 @@ const figureDetectionSchema = {
 
 export async function detectFiguresOnSlide(pageImageBuffer) {
   const genAI = getGenAI();
-  const model = genAI.getGenerativeModel({
-    model: process.env.MODEL_FAST || "gemini-3.5-flash-lite",
+  const modelOptions = {
     generationConfig: {
       temperature: 0.1,
       responseMimeType: "application/json",
       responseSchema: figureDetectionSchema
     }
-  });
+  };
 
   const prompt = `
 Identifique APENAS ilustrações clínicas, anatômicas, esquemas fisiopatológicos, gráficos ou fotos médicas presentes nesta imagem.
@@ -46,10 +46,11 @@ IGNORE: títulos de slides, textos explicativos, cabeçalhos, rodapés e logotip
 Retorne as coordenadas normalizadas de 0 a 1000 da região onde está a figura.
 `;
 
-  const result = await runWithAiLimit(() => model.generateContent([
+  const generated = await generateContentWithFallback(genAI, modelOptions, [
     prompt,
     { inlineData: { data: pageImageBuffer.toString("base64"), mimeType: "image/webp" } }
-  ]));
+  ], IMAGE_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+  const result = generated.result;
 
   return JSON.parse(result.response.text());
 }

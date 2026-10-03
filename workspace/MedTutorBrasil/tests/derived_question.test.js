@@ -77,24 +77,7 @@ const quizzesController = require('../src/modules/quizzes/quizzes.controller');
     assert(result.question.generatorModel, 'Deve indicar o modelo gerador');
     console.log(`  [PASS] Geração real concluída com sucesso com o modelo: ${result.question.generatorModel}`);
 
-    // Teste 5: Resiliência de cascata quando o primeiro modelo falha
-    console.log('  [INFO] Testando resiliência da cascata com falha simulada no primeiro modelo...');
-    const originalReasoning = process.env.MODEL_REASONING;
-    try {
-      process.env.MODEL_REASONING = 'modelo-inexistente-para-forcar-fallback';
-      const cascadeResult = await quizzesService.generateDerivedQuestion({
-        originalQuestion: 'Criança de 3 anos com estridor laríngeo e tosse ladrante.',
-        originalExplanation: 'Laringotraqueobronquite aguda (crupe viral). Corticoterapia oral com dexametasona é o tratamento de escolha.',
-        contexts: ['Paciente apresenta estridor também em repouso e tiragem subcostal.'],
-        subject: 'Pediatria',
-        topic: 'Crupe Viral / Emergências Pediátricas'
-      });
-      assert.strictEqual(cascadeResult.success, true, 'Deve suceder mesmo com falha no primeiro modelo');
-      assert.notStrictEqual(cascadeResult.question.generatorModel, 'modelo-inexistente-para-forcar-fallback', 'Não deve ser o modelo que falhou');
-      console.log(`  [PASS] Cascata recuperou com sucesso usando o modelo: ${cascadeResult.question.generatorModel}`);
-    } finally {
-      process.env.MODEL_REASONING = originalReasoning;
-    }
+    console.log('  [INFO] A ordem da cascata e o fallback por indisponibilidade são validados em gemini-model-fallback.test.js sem chamadas pagas.');
   }
 
   console.log('🎉 Todos os testes de Pergunta Derivada foram concluídos com sucesso!\n');

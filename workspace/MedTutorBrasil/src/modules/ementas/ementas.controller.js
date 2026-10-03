@@ -10,7 +10,7 @@ class EmentasController {
         return res.status(400).json({ error: 'Texto da ementa ausente ou insuficiente.' });
       }
 
-      console.log(`🤖 [Backend] Enviando ementa ao Gemini (${process.env.MODEL_BALANCED || 'gemini-3.5-flash'})...`);
+      console.log('🤖 [Backend] Enviando ementa ao Gemini (prioridade Flash econômica)...');
       const result = await ementasService.parseAndHarmonizeSyllabus(targetText);
 
       return res.json({
@@ -18,7 +18,7 @@ class EmentasController {
         metadata: result.metadata,
         curriculum: result.curriculum,
         engine: 'gemini-server',
-        model: process.env.MODEL_BALANCED || 'gemini-3.5-flash'
+        model: result.model
       });
     } catch (err) {
       console.error('❌ [Backend] Erro ao processar ementa no Gemini:', err.message);
@@ -33,7 +33,7 @@ class EmentasController {
       return res.json({
         success: true,
         engine: 'gemini-server',
-        model: process.env.MODEL_BALANCED || 'gemini-3.5-flash',
+        model: classification.model,
         ...classification
       });
     } catch (err) {

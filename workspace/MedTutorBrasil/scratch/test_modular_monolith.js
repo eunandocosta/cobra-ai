@@ -148,7 +148,7 @@ const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261002-gamification-v1', 'o bundle deve invalidar o cache após mudanças na gamificação');
+assert(appBundleVersion === '20261002-model-cascade-v1', 'o bundle deve invalidar o cache após mudanças na cascata de modelos');
 assert(appSource.includes("frontImageEl.innerHTML = renderStudySupportImage(item, { asStimulus: true });"), 'a frente do flashcard deve renderizar a figura sem revelar a explicação do gabarito');
 const sceReviewCardRenderer = appSource.match(/function renderSceReviewCard\(card, index\) \{[\s\S]*?\n    \}/)?.[0] || '';
 assert(sceReviewCardRenderer.includes('${stimulusImage}') && sceReviewCardRenderer.indexOf('${stimulusImage}') < sceReviewCardRenderer.indexOf('class="sce-review-answer"'), 'a figura do card SCE deve aparecer na frente, fora do gabarito oculto');
@@ -193,8 +193,8 @@ assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a
 assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
 assert(appSource.includes("const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
 assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
-assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261002-gamification-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
-assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261002-gamification-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
+assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261002-model-cascade-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
+assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261002-model-cascade-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
 assert(styleSource.includes('bottom: calc(128px + env(safe-area-inset-bottom)) !important') && styleSource.includes('padding-bottom: calc(112px + env(safe-area-inset-bottom))'), 'os FABs de celular devem ficar acima da navegação e fora do compositor');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';
 assert(cloudSessionMethod.includes('MedTutorAuthService.accessGranted === true'), 'leituras e escritas do Firestore devem aguardar a liberação do cupom');

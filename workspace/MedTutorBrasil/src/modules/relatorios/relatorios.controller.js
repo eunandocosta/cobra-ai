@@ -15,7 +15,7 @@ class RelatoriosController {
       const status = upstreamStatus >= 400 && upstreamStatus < 600 ? 502 : 500;
       const diagnostic = {
         provider: err?.provider || String(process.env.REPORT_AI_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'gemini')).toLowerCase(),
-        model: err?.model || (process.env.OPENAI_REPORT_MODEL || process.env.MODEL_REASONING || 'não informado'),
+        model: err?.model || (process.env.OPENAI_REPORT_MODEL || process.env.REPORT_GEMINI_MODEL || 'gemini-3.7-flash'),
         code: String(err?.code || err?.type || 'report-generation-failed'),
         upstreamStatus: upstreamStatus || null
       };

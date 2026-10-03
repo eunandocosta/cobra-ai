@@ -7,6 +7,7 @@ const { runWithAiLimit } = require('../../shared/ai-limiter');
 const AcademicReportRenderer = require('../../../web/academic-report-renderer');
 const { normalizeTopicText, selectTopicallyRelevantMaterials } = require('./revision-relevance');
 const { withTransientAiRetry, mapWithConcurrency } = require('./revision-pipeline');
+const { GENERAL_FLASH_MODELS } = require('../../shared/gemini-model-fallback');
 
 function revisionChunkConcurrency() {
   const configured = Number.parseInt(process.env.REVISION_MAX_CONCURRENCY || '2', 10);
@@ -29,7 +30,7 @@ function provider() {
 }
 
 function geminiModels() {
-  return [...new Set(['gemini-3.7-flash', process.env.REPORT_GEMINI_MODEL, process.env.MODEL_REASONING, 'gemini-2.5-flash', 'gemini-2.0-flash'].filter(Boolean))];
+  return [...GENERAL_FLASH_MODELS];
 }
 
 function modelUnavailable(error) {

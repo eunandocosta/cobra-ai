@@ -1,5 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
+const { GENERAL_FLASH_MODELS, sendChatMessageWithFallback } = require('../../shared/gemini-model-fallback');
 
 const MAX_USER_PROMPTS_PER_SESSION = 100;
 const MAX_MESSAGE_CHARS = 6_000;
@@ -165,11 +166,10 @@ Estruture o documento de forma formal, completa e pronta para impressão/exporta
 `;
     }
 
-    // Usa exclusivamente o modelo configurado e validado no servidor.
-    const chatModel = process.env.MODEL_CHAT || process.env.MODEL_BALANCED || process.env.MODEL_FAST || 'gemini-3.5-flash';
+    // Chat segue a cascata econômica de modelos Flash, com fallback quando
+    // um endpoint ainda não estiver habilitado para a chave do servidor.
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: chatModel,
+    const chatOptions = {
       systemInstruction,
       generationConfig: {
         temperature: 0.3,
@@ -178,12 +178,7 @@ Estruture o documento de forma formal, completa e pronta para impressão/exporta
           thinkingBudget: 1024*1.5 // Pensamento rápido para raciocínio clínico sem travar a interface
         }
       }
-    });
-
-    // Inicia a sessão de chat mantendo o histórico de turnos anteriores
-    const chat = model.startChat({
-      history: session.history
-    });
+    };
 
     // Anexa o material de estudo apenas se for a primeira mensagem ou se houver material novo
     let promptPayload = message;
@@ -198,7 +193,9 @@ Dúvida do aluno: ${message}
     }
 
     try {
-      const result = await runWithAiLimit(() => chat.sendMessage(promptPayload));
+      const generated = await sendChatMessageWithFallback(genAI, chatOptions, session.history, promptPayload, GENERAL_FLASH_MODELS, (chat, payload) => runWithAiLimit(() => chat.sendMessage(payload)));
+      const result = generated.result;
+      const chatModel = generated.modelName;
       const replyText = result.response.text();
       const usage = result.response.usageMetadata || {};
 

@@ -325,7 +325,7 @@ class RelatoriosService {
     }
     const requestedModel = requestedProvider === 'openai'
       ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5')
-      : (process.env.MODEL_REASONING || 'gemini-3.7-flash');
+      : (process.env.REPORT_GEMINI_MODEL || 'gemini-3.7-flash');
     console.info(`🧠 [Relatórios] Utilizando ${getReportEngineLabel(requestedProvider, requestedModel)} para gerar este relatório.`, {
       arquivo: cleanTitle,
       disciplina: cleanSubject,
@@ -480,7 +480,7 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
             motivo: openaiError?.message || 'erro não informado'
           });
           generatorEngine = 'gemini-fallback';
-          generatorModel = process.env.MODEL_REASONING || 'gemini-3.7-flash';
+          generatorModel = process.env.REPORT_GEMINI_MODEL || 'gemini-3.7-flash';
           try {
             generatedMarkdown = await generateWithGemini();
           } catch (geminiError) {
@@ -536,7 +536,7 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
       return reportData;
 
     } catch (error) {
-      console.error(`❌ [Relatórios] Relatório gerado com ${getReportEngineLabel(requestedProvider, requestedProvider === 'openai' ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5') : (process.env.MODEL_REASONING || 'gemini-3.7-flash'))} falhou.`, {
+      console.error(`❌ [Relatórios] Relatório gerado com ${getReportEngineLabel(requestedProvider, requestedProvider === 'openai' ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5') : (process.env.REPORT_GEMINI_MODEL || 'gemini-3.7-flash'))} falhou.`, {
         arquivo: cleanTitle,
         provider: requestedProvider,
         code: error?.code || error?.type || 'report-generation-failed',
@@ -549,7 +549,7 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
       reportError.provider = requestedProvider;
       reportError.model = requestedProvider === 'openai'
         ? (process.env.OPENAI_REPORT_MODEL || 'gpt-5')
-        : (process.env.MODEL_REASONING || 'gemini-3.7-flash');
+        : (process.env.REPORT_GEMINI_MODEL || 'gemini-3.7-flash');
       throw reportError;
     }
   }

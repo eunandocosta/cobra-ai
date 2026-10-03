@@ -43,13 +43,13 @@ class ImagensController {
       const diagnostic = {
         arquivo: String(fileName || 'Material visual').slice(0, 180),
         pagina: Number(page) || 1,
-        modelo: process.env.MODEL_REASONING || 'gemini-3.7-flash',
+        modelosPrioritarios: ['gemini-3.5-flash', 'gemini-3.6-flash'],
         bytesImagem: Math.round((image.data.length * 3) / 4)
       };
       console.log('🧠 [Gemini Visual] Iniciando análise autorizada:', diagnostic);
       const association = await imagensService.analyzeVisualAssociation({ image, fileName, subject, page });
       console.log('✅ [Gemini Visual] Análise concluída:', { ...diagnostic, materialVisual: association.isVisualStudyMaterial, estruturas: association.visibleStructures.length });
-      return res.json({ success: true, association });
+      return res.json({ success: true, association, model: association.model });
     } catch (err) {
       console.error('❌ [ImagensController] Erro na associação visual:', err);
       return res.status(500).json({ error: 'Erro ao interpretar o material visual', details: err.message });
@@ -63,7 +63,7 @@ class ImagensController {
         return res.status(400).json({ error: 'Texto do material insuficiente para mapeamento.' });
       }
       const mapping = await imagensService.analyzeMaterialMapping({ text, fileName, subject });
-      return res.json({ success: true, mapping });
+      return res.json({ success: true, mapping, model: mapping.model });
     } catch (err) {
       console.error('❌ [ImagensController] Erro no mapeamento Gemini:', err);
       return res.status(500).json({ error: 'Erro ao mapear material com Gemini', details: err.message });

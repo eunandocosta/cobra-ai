@@ -7,15 +7,13 @@ const quizzesController = require('../src/modules/quizzes/quizzes.controller');
 (async () => {
   console.log('🧪 Testando sugestão pedagógica de geração...');
   const originalApiKey = process.env.GEMINI_API_KEY;
-  const originalModel = process.env.MODEL_FAST;
   const originalGetModel = GoogleGenerativeAI.prototype.getGenerativeModel;
   let capturedPrompt = '';
 
   try {
     process.env.GEMINI_API_KEY = 'test-api-key';
-    process.env.MODEL_FAST = 'gemini-test-fast';
     GoogleGenerativeAI.prototype.getGenerativeModel = function (options) {
-      assert.strictEqual(options.model, 'gemini-test-fast');
+      assert.strictEqual(options.model, 'gemini-3.5-flash-lite');
       return {
         generateContent: async prompt => {
           capturedPrompt = prompt;
@@ -38,9 +36,9 @@ const quizzesController = require('../src/modules/quizzes/quizzes.controller');
     assert.strictEqual(result.generationMode, 'science_based');
     assert.strictEqual(result.suggestedCount, 12);
     assert.strictEqual(result.difficulty, 'balanced');
-    assert.strictEqual(result.model, 'gemini-test-fast');
+    assert.strictEqual(result.model, 'gemini-3.5-flash-lite');
     assert(capturedPrompt.includes('Conteúdo real distribuído'));
-    console.log('  [PASS] Serviço usa o modelo configurado e valida a recomendação estruturada');
+    console.log('  [PASS] Serviço prioriza Flash-Lite para recomendação e valida saída estruturada');
 
     await assert.rejects(
       () => quizzesService.recommendStudyGeneration({ materials: [{ name: 'Aula', text: 'curto' }] }),
@@ -64,7 +62,6 @@ const quizzesController = require('../src/modules/quizzes/quizzes.controller');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;
-    if (originalModel === undefined) delete process.env.MODEL_FAST; else process.env.MODEL_FAST = originalModel;
   }
   console.log('🎉 Testes de sugestão pedagógica concluídos.');
 })().catch(error => {

@@ -5,6 +5,7 @@
 const https = require('https');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
+const { IMAGE_FLASH_MODELS, generateContentWithFallback } = require('../../shared/gemini-model-fallback');
 
 const CACHE_TTL_MS = Number(process.env.IMAGE_CACHE_TTL_MS || 30 * 60 * 1000);
 const MAX_CACHE_ENTRIES = Number(process.env.IMAGE_CACHE_MAX_ENTRIES || 250);
@@ -53,23 +54,24 @@ class ImagensService {
       throw new Error('Imagem visual inválida ou acima do limite seguro de análise.');
     }
 
-    const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_REASONING || 'gemini-3.7-flash',
+    const modelOptions = {
       generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 2048 }
-    });
+    };
     const prompt = `Você é um docente de anatomia e educação médica. Analise SOMENTE a imagem de uma página/slide que o estudante autorizou enviar.
 Arquivo: ${String(fileName).slice(0, 180)} | Disciplina: ${String(subject).slice(0, 180)} | Página/imagem: ${Number(page) || 1}.
 
 Determine se é predominantemente visual (marcos anatômicos, lâmina, esquema, radiografia, figura ou slide com pouco texto) e, se for, descreva apenas o que está claramente visível. Não invente rótulos ilegíveis nem faça diagnóstico clínico a partir de imagem isolada.
 Retorne JSON puro com: isVisualStudyMaterial (boolean), title (string curto), visibleStructures (array até 8 strings), association (string didática de 2-4 frases ligando estrutura, localização e função), caution (string curta sobre incerteza, se houver), studyQuestion (pergunta aberta que pode ser respondida pela imagem).`;
-    const result = await runWithAiLimit(() => model.generateContent([
+    const generated = await generateContentWithFallback(genAI, modelOptions, [
       { text: prompt },
       { inlineData: { mimeType, data } }
-    ]));
+    ], IMAGE_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+    const result = generated.result;
     const raw = result.response.text().replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
     let parsed;
     try { parsed = JSON.parse(raw); } catch (_) { throw new Error('O Gemini retornou uma associação visual inválida.'); }
     return {
+      model: generated.modelName,
       isVisualStudyMaterial: Boolean(parsed.isVisualStudyMaterial),
       title: String(parsed.title || `Figura ${page}`).slice(0, 180),
       visibleStructures: Array.isArray(parsed.visibleStructures) ? parsed.visibleStructures.map(item => String(item).slice(0, 180)).slice(0, 8) : [],
@@ -82,16 +84,17 @@ Retorne JSON puro com: isVisualStudyMaterial (boolean), title (string curto), vi
   async analyzeMaterialMapping({ text, fileName = 'Material', subject = '' }) {
     const genAI = getGenAI();
     if (!genAI) throw new Error('GEMINI_API_KEY não configurada no servidor.');
-    const model = genAI.getGenerativeModel({
-      model: process.env.MODEL_REASONING || 'gemini-3.7-flash',
+    const modelOptions = {
       generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 1024 }
-    });
+    };
     const prompt = `Você organiza materiais de graduação médica. Leia o trecho fornecido e retorne JSON puro com suggestedTitle, diseaseTopic, subjectHint e justification. Não trate o nome do arquivo como estrutura anatômica e não invente conteúdo ausente.\nArquivo: ${String(fileName).slice(0, 180)}\nDisciplina sugerida: ${String(subject).slice(0, 180)}\nTexto:\n${String(text).slice(0, 100000)}`;
-    const result = await runWithAiLimit(() => model.generateContent(prompt));
+    const generated = await generateContentWithFallback(genAI, modelOptions, prompt, IMAGE_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+    const result = generated.result;
     const raw = result.response.text().replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
     let parsed;
     try { parsed = JSON.parse(raw); } catch (_) { throw new Error('O Gemini retornou um mapeamento inválido.'); }
     return {
+      model: generated.modelName,
       suggestedTitle: String(parsed.suggestedTitle || '').slice(0, 220),
       diseaseTopic: String(parsed.diseaseTopic || '').slice(0, 220),
       subjectHint: String(parsed.subjectHint || '').slice(0, 220),
@@ -579,13 +582,12 @@ Retorne JSON puro com: isVisualStudyMaterial (boolean), title (string curto), vi
     }
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash-lite',
+      const modelOptions = {
         generationConfig: {
           temperature: 0.1,
           responseMimeType: 'application/json'
         }
-      });
+      };
 
       const maxEval = isReport ? 6 : 4;
       const candidatesToEval = cleanCandidates.slice(0, maxEval);
@@ -627,7 +629,8 @@ Retorne JSON no formato:
   ]
 }`;
 
-      const res = await runWithAiLimit(() => model.generateContent(prompt));
+      const generated = await generateContentWithFallback(genAI, modelOptions, prompt, IMAGE_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+      const res = generated.result;
       const resText = res.response.text();
       const parsed = JSON.parse(resText);
 
@@ -708,13 +711,12 @@ Retorne JSON no formato:
     }
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash-lite',
+      const modelOptions = {
         generationConfig: {
           temperature: 0.1,
           responseMimeType: 'application/json'
         }
-      });
+      };
 
       const promptData = validGroups.map(g => ({
         entityKey: g.entityKey,
@@ -756,7 +758,8 @@ Retorne JSON no formato:
   ]
 }`;
 
-      const res = await runWithAiLimit(() => model.generateContent(prompt));
+      const generated = await generateContentWithFallback(genAI, modelOptions, prompt, IMAGE_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+      const res = generated.result;
       const parsed = JSON.parse(res.response.text());
       const approvedItems = Array.isArray(parsed.curatedEntities) ? parsed.curatedEntities : [];
 
