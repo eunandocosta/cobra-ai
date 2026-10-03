@@ -2933,26 +2933,44 @@
         });
       },
       play(type) {
-        if (!this.enabled('sounds')) return;
+        if (!this.enabled('sounds')) return Promise.resolve(false);
         const sources = {
           correct: '/assets/audio/gamification/correct.wav',
           incorrect: '/assets/audio/gamification/incorrect.wav',
           levelUp: '/assets/audio/gamification/level-up.wav'
         };
-        if (!sources[type]) return;
+        if (!sources[type]) return Promise.resolve(false);
         try {
           let audio = this.audio[type];
           if (!audio) {
             audio = new Audio(sources[type]);
-            audio.preload = 'none';
+            audio.preload = 'auto';
             audio.volume = type === 'incorrect' ? 0.32 : 0.42;
             this.audio[type] = audio;
           }
           audio.currentTime = 0;
+          const playbackStarted = new Promise(resolve => {
+            let settled = false;
+            const finish = started => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(fallbackTimer);
+              audio.removeEventListener('playing', onPlaying);
+              audio.removeEventListener('error', onError);
+              resolve(started);
+            };
+            const onPlaying = () => finish(true);
+            const onError = () => finish(false);
+            const fallbackTimer = setTimeout(() => finish(false), 240);
+            audio.addEventListener('playing', onPlaying, { once: true });
+            audio.addEventListener('error', onError, { once: true });
+          });
           const playback = audio.play();
           if (playback?.catch) playback.catch(() => {});
+          return playbackStarted;
         } catch (error) {
           // O feedback sonoro é opcional e não pode interromper o estudo.
+          return Promise.resolve(false);
         }
       }
     };
@@ -3057,6 +3075,99 @@
       }
     };
 
+    let topbarXpAnimationActive = false;
+    let topbarXpAnimationToken = 0;
+
+    function animateCasinoCounter(element, fromValue, toValue, duration = 1100, formatter = value => Math.floor(value).toLocaleString('pt-BR')) {
+      if (!element) return;
+      const from = Math.max(0, Number(fromValue) || 0);
+      const to = Math.max(0, Number(toValue) || 0);
+      const startedAt = performance.now();
+      let lastPaintAt = 0;
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion || from === to) {
+        element.textContent = formatter(to);
+        return;
+      }
+      const tick = now => {
+        const rawProgress = Math.min(1, (now - startedAt) / duration);
+        const eased = 1 - Math.pow(1 - rawProgress, 3.5);
+        if (rawProgress >= 1) {
+          element.textContent = formatter(to);
+          return;
+        }
+        if (now - lastPaintAt >= 42) {
+          lastPaintAt = now;
+          const expected = from + (to - from) * eased;
+          const jitter = Math.min(Math.max(0, to - from), (to - from) * .16 * (1 - eased));
+          const displayed = Math.max(0, Math.min(to, Math.round(expected + (Math.random() * 2 - 1) * jitter)));
+          element.textContent = formatter(displayed);
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
+    function animateGamificationTopbar(previousState, nextState) {
+      const topLevel = document.getElementById('gamificationLevelLabel');
+      const topXp = document.getElementById('gamificationXpLabel');
+      const topProgress = document.getElementById('gamificationProgressFill');
+      const topbar = document.getElementById('gamificationTopbar');
+      if (!topXp || !topProgress) return;
+      const previousLevel = MedTutorGamificationRules.getLevel(previousState.totalXp);
+      const nextLevel = MedTutorGamificationRules.getLevel(nextState.totalXp);
+      const previousProgress = (previousLevel.xpIntoLevel / previousLevel.xpToNextLevel) * 100;
+      const nextProgress = (nextLevel.xpIntoLevel / nextLevel.xpToNextLevel) * 100;
+      const duration = 1750;
+      const startedAt = performance.now();
+      const token = ++topbarXpAnimationToken;
+      let lastPaintAt = 0;
+      topbarXpAnimationActive = true;
+      topbar?.classList.add('is-xp-counting');
+      if (topLevel) topLevel.textContent = previousLevel.level === nextLevel.level
+        ? `Nível ${nextLevel.level}` : `Nível ${previousLevel.level} → ${nextLevel.level}`;
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion) {
+        topXp.textContent = `${nextState.totalXp.toLocaleString('pt-BR')} XP`;
+        topProgress.style.width = `${nextProgress}%`;
+        if (topLevel) topLevel.textContent = `Nível ${nextLevel.level}`;
+        topbarXpAnimationActive = false;
+        topbar?.classList.remove('is-xp-counting');
+        return;
+      }
+      const tick = now => {
+        if (token !== topbarXpAnimationToken) return;
+        const rawProgress = Math.min(1, (now - startedAt) / duration);
+        const eased = 1 - Math.pow(1 - rawProgress, 3.2);
+        let progress;
+        if (previousLevel.level < nextLevel.level) {
+          progress = eased < .66
+            ? previousProgress + (100 - previousProgress) * (eased / .66)
+            : nextProgress * ((eased - .66) / .34);
+        } else {
+          progress = previousProgress + (nextProgress - previousProgress) * eased;
+        }
+        topProgress.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+        if (rawProgress >= 1) {
+          topXp.textContent = `${nextState.totalXp.toLocaleString('pt-BR')} XP`;
+          topProgress.style.width = `${nextProgress}%`;
+          if (topLevel) topLevel.textContent = `Nível ${nextLevel.level}`;
+          topbarXpAnimationActive = false;
+          topbar?.classList.remove('is-xp-counting');
+          return;
+        }
+        if (now - lastPaintAt >= 48) {
+          lastPaintAt = now;
+          const expected = previousState.totalXp + (nextState.totalXp - previousState.totalXp) * eased;
+          const noise = (nextState.totalXp - previousState.totalXp) * .2 * (1 - eased);
+          const displayed = Math.max(0, Math.min(nextState.totalXp, Math.round(expected + (Math.random() * 2 - 1) * noise)));
+          topXp.textContent = `${displayed.toLocaleString('pt-BR')} XP`;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
     const MedTutorGamification = {
       state: MedTutorGamificationRules.createInitialState(),
       uid: 'local',
@@ -3134,6 +3245,7 @@
       async processAward(event, quiet) {
         const normalized = { ...event, dayKey: event.dayKey || getLocalDateKey(), createdAt: Number(event.createdAt) || Date.now() };
         if (!normalized.eventId || this.state.recentEventIds.includes(normalized.eventId)) return null;
+        const previousState = MedTutorGamificationRules.normalizeState(this.state);
         let result;
         if (this.uid !== 'local' && MedTutorFirebaseService.hasAuthenticatedCloudSession(this.uid)) {
           try {
@@ -3150,20 +3262,25 @@
         }
         this.state = MedTutorGamificationRules.normalizeState(result.state);
         this.saveLocalState();
-        this.render();
-        if (!quiet && !result.duplicate) this.showReward(result.award, normalized);
+        this.render({ transitionFromState: previousState });
+        if (!quiet && !result.duplicate) this.showReward(result.award, normalized, previousState.totalXp);
         return result;
       },
 
-      render() {
+      render({ transitionFromState = null } = {}) {
         const level = MedTutorGamificationRules.getLevel(this.state.totalXp);
         const progress = Math.max(0, Math.min(100, (level.xpIntoLevel / level.xpToNextLevel) * 100));
         const topLevel = document.getElementById('gamificationLevelLabel');
         const topXp = document.getElementById('gamificationXpLabel');
         const topProgress = document.getElementById('gamificationProgressFill');
-        if (topLevel) topLevel.textContent = `Nível ${level.level}`;
-        if (topXp) topXp.textContent = `${this.state.totalXp} XP`;
-        if (topProgress) topProgress.style.width = `${progress}%`;
+        const shouldAnimateTopbar = transitionFromState && transitionFromState.totalXp !== this.state.totalXp;
+        if (shouldAnimateTopbar) {
+          animateGamificationTopbar(transitionFromState, this.state);
+        } else if (!topbarXpAnimationActive) {
+          if (topLevel) topLevel.textContent = `Nível ${level.level}`;
+          if (topXp) topXp.textContent = `${this.state.totalXp.toLocaleString('pt-BR')} XP`;
+          if (topProgress) topProgress.style.width = `${progress}%`;
+        }
         const modalLevel = document.getElementById('gamificationModalLevel');
         const modalXp = document.getElementById('gamificationModalXp');
         const modalProgress = document.getElementById('gamificationModalProgressFill');
@@ -3182,41 +3299,36 @@
         if (timeStudy) timeStudy.textContent = formatGamificationStudyTime(this.state.totalStudySeconds);
       },
 
-      showReward(award, event) {
-        if (award?.levelUp) MedTutorGamificationPreferences.play('levelUp');
-        else if (event?.outcome === 'correct') MedTutorGamificationPreferences.play('correct');
-        else if (event?.outcome === 'incorrect') MedTutorGamificationPreferences.play('incorrect');
+      showReward(award, event, previousTotalXp = this.state.totalXp - (Number(award?.earnedXp) || 0)) {
+        const soundType = award?.levelUp ? 'levelUp' : (event?.outcome === 'correct' ? 'correct' : (event?.outcome === 'incorrect' ? 'incorrect' : null));
+        const soundStarted = soundType ? MedTutorGamificationPreferences.play(soundType) : Promise.resolve(false);
         if (!award) return;
         if (award.levelUp) {
-          document.getElementById('gamificationRewardCard')?.remove();
-          showLevelUpModal(award);
+          soundStarted.finally(() => {
+            document.getElementById('gamificationRewardCard')?.remove();
+            showLevelUpModal(award, previousTotalXp);
+          });
           return;
         }
         if (!MedTutorGamificationPreferences.enabled('alerts')) return;
         if (!award.earnedXp) return;
-        let card = document.getElementById('gamificationRewardCard');
-        if (!card) {
-          card = document.createElement('div');
+        soundStarted.finally(() => {
+          document.getElementById('gamificationRewardCard')?.remove();
+          const card = document.createElement('div');
           card.id = 'gamificationRewardCard';
           card.className = 'gamification-reward-card';
           card.setAttribute('role', 'status');
           card.setAttribute('aria-live', 'polite');
-          card.innerHTML = '<strong></strong><span></span>';
+          card.setAttribute('aria-label', `Você ganhou ${award.earnedXp} XP`);
+          card.innerHTML = '<span class="gamification-reward-icon material-symbols-outlined" aria-hidden="true">auto_awesome</span><span class="gamification-reward-copy"><small>XP conquistado</small><strong><span class="gamification-reward-value" aria-hidden="true">+0</span> XP</strong></span><span class="gamification-reward-timer" aria-hidden="true"></span>';
           document.body.appendChild(card);
-        }
-        const title = card.querySelector('strong');
-        const detail = card.querySelector('span');
-        const activityLabel = event.kind === 'quiz' ? 'Questão respondida' : 'Flashcard revisado';
-        const extras = [];
-        if (award.comboBonus) extras.push(`combo +${award.comboBonus}`);
-        if (award.deckBonus) extras.push(`deck da disciplina +${award.deckBonus}`);
-        if (title) title.textContent = award.levelUp ? `🏅 Novo nível ${award.level}!` : `✨ +${award.earnedXp} XP · ${activityLabel}`;
-        if (detail) detail.textContent = award.levelUp
-          ? `${this.state.totalXp} XP acumulados. ${extras.length ? extras.join(' · ') : 'Continue avançando no seu ritmo.'}`
-          : (extras.length ? extras.join(' · ') : `${this.state.totalXp} XP acumulados · combo ${award.combo}`);
-        card.classList.toggle('is-level-up', award.levelUp);
-        clearTimeout(this.rewardTimer);
-        this.rewardTimer = setTimeout(() => card?.remove(), 4200);
+          animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
+          clearTimeout(this.rewardTimer);
+          this.rewardTimer = setTimeout(() => {
+            card.classList.add('is-leaving');
+            setTimeout(() => card.remove(), 260);
+          }, 3600);
+        });
       }
     };
 
@@ -3230,15 +3342,53 @@
     }
 
     let levelUpReturnFocus = null;
-    function showLevelUpModal(award) {
+    let levelUpPreviousAppInert = false;
+    let levelUpPreviousBodyOverflow = '';
+    function showLevelUpModal(award, previousTotalXp = 0) {
       const modal = document.getElementById('levelUpModal');
       if (!modal) return;
       MedTutorGamification.render();
+      const previousLevel = MedTutorGamificationRules.getLevel(previousTotalXp);
+      const currentLevel = MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp);
       const levelLabel = document.getElementById('levelUpNewLevel');
-      if (levelLabel) levelLabel.textContent = `Nível ${award.level || MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp).level}`;
+      const transition = document.getElementById('levelUpTransition');
+      const progressLabel = document.getElementById('levelUpProgressLabel');
+      const progressValue = document.getElementById('levelUpProgressValue');
+      const progressTrack = document.getElementById('levelUpProgressTrack');
+      const progressFill = document.getElementById('levelUpProgressFill');
+      const totalXp = document.getElementById('levelUpTotalXp');
+      const remainingXp = document.getElementById('levelUpXpRemaining');
+      const finalProgress = Math.max(0, Math.min(100, (currentLevel.xpIntoLevel / currentLevel.xpToNextLevel) * 100));
+      if (levelLabel) levelLabel.textContent = String(award.level || currentLevel.level);
+      if (transition) transition.innerHTML = `Nível ${previousLevel.level} <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span> Nível ${currentLevel.level}`;
+      if (progressLabel) progressLabel.textContent = `Progresso para o nível ${currentLevel.level + 1}`;
+      if (progressValue) progressValue.textContent = `${currentLevel.xpIntoLevel.toLocaleString('pt-BR')} / ${currentLevel.xpToNextLevel.toLocaleString('pt-BR')} XP`;
+      if (progressTrack) progressTrack.setAttribute('aria-valuenow', String(Math.round(finalProgress)));
+      if (remainingXp) remainingXp.textContent = `${(currentLevel.xpToNextLevel - currentLevel.xpIntoLevel).toLocaleString('pt-BR')} XP`;
+      if (totalXp) totalXp.textContent = `${previousTotalXp.toLocaleString('pt-BR')} XP`;
+      if (progressFill) {
+        progressFill.style.transition = 'none';
+        progressFill.style.width = '0%';
+      }
+      const appRoot = document.querySelector('.app-root');
+      if (appRoot) {
+        levelUpPreviousAppInert = appRoot.inert;
+        appRoot.inert = true;
+      }
+      levelUpPreviousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
       levelUpReturnFocus = document.activeElement;
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
+      animateCasinoCounter(totalXp, previousTotalXp, MedTutorGamification.state.totalXp, 1500, value => `${Math.floor(value).toLocaleString('pt-BR')} XP`);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (progressFill) {
+            progressFill.style.transition = 'width 1.65s cubic-bezier(.16,.72,.2,1)';
+            progressFill.style.width = `${finalProgress}%`;
+          }
+        });
+      });
       requestAnimationFrame(() => document.getElementById('levelUpContinueButton')?.focus());
     }
 
@@ -3247,13 +3397,21 @@
       if (!modal) return;
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
+      const appRoot = document.querySelector('.app-root');
+      if (appRoot) appRoot.inert = levelUpPreviousAppInert;
+      document.body.style.overflow = levelUpPreviousBodyOverflow;
       if (levelUpReturnFocus?.isConnected) levelUpReturnFocus.focus();
       levelUpReturnFocus = null;
     }
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && document.getElementById('levelUpModal')?.classList.contains('active')) {
-        closeLevelUpModal();
+      const modal = document.getElementById('levelUpModal');
+      if (!modal?.classList.contains('active')) return;
+      if (event.key === 'Escape') event.preventDefault();
+      if (event.key === 'Tab') {
+        const continueButton = document.getElementById('levelUpContinueButton');
+        event.preventDefault();
+        continueButton?.focus();
       }
     });
 
@@ -3328,6 +3486,7 @@
         eventId: makeGamificationEventId('flashcard', item.id, dayKey),
         dayKey,
         kind: 'flashcard',
+        outcome: 'correct',
         difficulty: item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel || getFlashcardDifficultyLabel(item),
         reviewStatus: bucket === 'overdue' ? 'overdue' : 'today',
         deck,

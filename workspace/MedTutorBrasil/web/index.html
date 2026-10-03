@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261003-level-up-fredoka-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261003-xp-level-reward-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -3623,15 +3623,25 @@
 
   <div class="level-up-overlay" id="levelUpModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="levelUpHeader">
     <section class="level-up-card">
+      <div class="level-up-mark" aria-hidden="true"><span class="material-symbols-outlined">military_tech</span></div>
+      <p class="level-up-kicker">Sua jornada continua evoluindo</p>
       <h2 class="level-up-heading" id="levelUpHeader">Você passou de nível, parabéns!</h2>
+      <div class="level-up-transition" id="levelUpTransition" aria-live="polite">Nível 1 <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span> Nível 2</div>
       <div class="level-up-hero" aria-live="polite">
-        <span class="level-up-level-label">Seu novo nível</span>
-        <strong id="levelUpNewLevel">Nível 2</strong>
+        <div class="level-up-fireworks" aria-hidden="true">
+          <span class="level-up-ray" style="--angle:0deg;--delay:.08s"></span><span class="level-up-ray" style="--angle:30deg;--delay:.12s"></span><span class="level-up-ray" style="--angle:60deg;--delay:.16s"></span><span class="level-up-ray" style="--angle:90deg;--delay:.20s"></span><span class="level-up-ray" style="--angle:120deg;--delay:.24s"></span><span class="level-up-ray" style="--angle:150deg;--delay:.28s"></span><span class="level-up-ray" style="--angle:180deg;--delay:.32s"></span><span class="level-up-ray" style="--angle:210deg;--delay:.36s"></span><span class="level-up-ray" style="--angle:240deg;--delay:.40s"></span><span class="level-up-ray" style="--angle:270deg;--delay:.44s"></span><span class="level-up-ray" style="--angle:300deg;--delay:.48s"></span><span class="level-up-ray" style="--angle:330deg;--delay:.52s"></span>
+        </div>
+        <strong id="levelUpNewLevel">2</strong>
       </div>
-      <div class="level-up-stats" aria-label="Seu progresso">
-        <article><span>XP total</span><strong id="levelUpTotalXp">0 XP</strong></article>
-        <article><span>Falta para o próximo nível</span><strong id="levelUpXpRemaining">0 XP</strong></article>
-        <article><span>Tempo ativo de estudo</span><strong id="levelUpStudyTime">0 min</strong></article>
+      <div class="level-up-progress-copy">
+        <span id="levelUpProgressLabel">Progresso para o nível 3</span>
+        <strong id="levelUpProgressValue">0 / 225 XP</strong>
+      </div>
+      <div class="level-up-progress-track" role="progressbar" id="levelUpProgressTrack" aria-label="Progresso para o próximo nível" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="levelUpProgressFill"></span></div>
+      <p class="level-up-remaining">Faltam <strong id="levelUpXpRemaining">225 XP</strong> para o próximo nível</p>
+      <div class="level-up-stats" aria-label="Resumo da jornada">
+        <article><strong id="levelUpTotalXp">0 XP</strong><span>XP total</span></article>
+        <article><strong id="levelUpStudyTime">0 min</strong><span>Tempo ativo de estudo</span></article>
       </div>
       <button class="level-up-continue" id="levelUpContinueButton" type="button" onclick="closeLevelUpModal()">Vamos continuar aprendendo juntos!</button>
     </section>
@@ -3644,7 +3654,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261003-study-time-v1"></script>
   <script defer src="/material-icons.js?v=20261003-material-symbols-v1"></script>
-  <script defer src="/app.min.js?v=20261003-level-up-study-time-v1"></script>
+  <script defer src="/app.min.js?v=20261003-xp-level-reward-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
