@@ -3328,7 +3328,7 @@
           timer.className = 'gamification-reward-timer';
           timer.setAttribute('aria-hidden', 'true');
           card.append(icon, copy, timer);
-          ensureAppNotificationStack().appendChild(card);
+          registerAppNotification(card);
           animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
           clearTimeout(this.rewardTimer);
           this.rewardTimer = setTimeout(() => {
@@ -3357,6 +3357,27 @@
         document.body.appendChild(stack);
       }
       return stack;
+    }
+
+    function registerAppNotification(notification) {
+      if (!notification) return;
+      const stack = ensureAppNotificationStack();
+      notification.dataset.notificationCreatedAt = String(Date.now());
+      if (notification.parentElement !== stack) stack.appendChild(notification);
+      sortAppNotificationStack(stack);
+    }
+
+    function sortAppNotificationStack(stack = ensureAppNotificationStack()) {
+      const notifications = Array.from(stack.children);
+      notifications.sort((a, b) => {
+        const createdAtA = Number(a.dataset.notificationCreatedAt) || 0;
+        const createdAtB = Number(b.dataset.notificationCreatedAt) || 0;
+        if (createdAtA !== createdAtB) return createdAtB - createdAtA;
+        const keyA = `${a.id || ''} ${typeof a.className === 'string' ? a.className : ''}`.trim().toLocaleLowerCase();
+        const keyB = `${b.id || ''} ${typeof b.className === 'string' ? b.className : ''}`.trim().toLocaleLowerCase();
+        return keyA.localeCompare(keyB);
+      });
+      notifications.forEach(notification => stack.appendChild(notification));
     }
 
     let levelUpReturnFocus = null;
@@ -7964,6 +7985,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const cumStr = this.formatUSD(record.cumulativeUSD);
 
         popup.style.display = 'block';
+        registerAppNotification(popup);
         popup.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
             <div style="display: flex; align-items: center; gap: 6px;">
