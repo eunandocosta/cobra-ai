@@ -199,8 +199,9 @@ assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a
 assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
 assert(appSource.includes("const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
 assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
-assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261003-level-up-study-time-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
-assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261003-level-up-study-time-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
+assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261003-level-up-fredoka-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
+assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261003-level-up-fredoka-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
+assert(webIndexMarkup.includes('family=Fredoka:wght@600;700') && styleSource.includes("font-family: 'Fredoka', 'Plus Jakarta Sans'"), 'o nível novo deve usar tipografia arredondada própria, com fallback da fonte principal');
 assert(styleSource.includes('bottom: calc(128px + env(safe-area-inset-bottom)) !important') && styleSource.includes('padding-bottom: calc(112px + env(safe-area-inset-bottom))'), 'os FABs de celular devem ficar acima da navegação e fora do compositor');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';
 assert(cloudSessionMethod.includes('MedTutorAuthService.accessGranted === true'), 'leituras e escritas do Firestore devem aguardar a liberação do cupom');

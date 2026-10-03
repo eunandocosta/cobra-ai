@@ -4,7 +4,7 @@ const APP_SHELL = [
   '/index.html',
   '/landing.html',
   '/landing.css?v=20260922-landing-v1',
-  '/styles.css?v=20261003-level-up-study-time-v1',
+  '/styles.css?v=20261003-level-up-fredoka-v1',
   '/academic-report-renderer.js?v=20260922-report-print-v5',
   '/exam-study-planner.js?v=20260927-sce-review-deck-v2',
   '/gamification-rules.js?v=20261003-study-time-v1',

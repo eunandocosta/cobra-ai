@@ -5717,7 +5717,7 @@
     .level-up-heading { flex: 0 0 auto; margin: 0; text-align: center; color: var(--text-primary); font-size: clamp(20px, 3.4vw, 30px); line-height: 1.25; }
     .level-up-hero { flex: 1 0 180px; min-height: 180px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 12px 0; text-align: center; }
     .level-up-level-label { color: var(--text-secondary); font-size: clamp(13px, 1.7vw, 16px); letter-spacing: .12em; text-transform: uppercase; }
-    .level-up-hero strong { color: var(--neon); font-size: clamp(76px, 17vw, 172px); line-height: .98; letter-spacing: -.065em; text-shadow: 0 0 34px rgba(0,255,115,.23); }
+    .level-up-hero strong { color: var(--neon); font-family: 'Fredoka', 'Plus Jakarta Sans', sans-serif; font-size: clamp(76px, 17vw, 172px); font-weight: 700; line-height: .98; letter-spacing: -.035em; text-shadow: 0 0 34px rgba(0,255,115,.28); }
     .level-up-stats { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .level-up-stats article { min-width: 0; min-height: 78px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 12px 9px; text-align: center; border: 1px solid var(--border); border-radius: 15px; background: var(--bg-surface); }
     .level-up-stats article span { color: var(--text-secondary); font-size: clamp(10px, 1.4vw, 13px); line-height: 1.25; }
