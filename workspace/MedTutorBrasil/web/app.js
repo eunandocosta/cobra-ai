@@ -3328,8 +3328,7 @@
           timer.className = 'gamification-reward-timer';
           timer.setAttribute('aria-hidden', 'true');
           card.append(icon, copy, timer);
-          document.body.appendChild(card);
-          positionGamificationRewardCard();
+          ensureAppNotificationStack().appendChild(card);
           animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
           clearTimeout(this.rewardTimer);
           this.rewardTimer = setTimeout(() => {
@@ -3349,19 +3348,15 @@
       return `${totalMinutes} min`;
     }
 
-    function positionGamificationRewardCard() {
-      const reward = document.getElementById('gamificationRewardCard');
-      if (!reward) return;
-      const expense = document.getElementById('discreteExpensePopup');
-      const expenseVisible = expense && expense.style.display !== 'none' && expense.getBoundingClientRect().height > 0;
-      if (expenseVisible) {
-        const expenseRect = expense.getBoundingClientRect();
-        reward.style.bottom = `${Math.max(24, Math.ceil(window.innerHeight - expenseRect.top + 12))}px`;
-        reward.style.right = `${Math.max(12, Math.ceil(window.innerWidth - expenseRect.right))}px`;
-      } else {
-        reward.style.bottom = '';
-        reward.style.right = '';
+    function ensureAppNotificationStack() {
+      let stack = document.getElementById('appNotificationStack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'appNotificationStack';
+        stack.setAttribute('aria-label', 'Notificações do aplicativo');
+        document.body.appendChild(stack);
       }
+      return stack;
     }
 
     let levelUpReturnFocus = null;
@@ -7958,8 +7953,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           popup = document.createElement('div');
           popup.id = 'discreteExpensePopup';
           popup.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 99999; background: rgba(13, 19, 33, 0.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1.5px solid rgba(0, 229, 255, 0.35); border-radius: 14px; padding: 12px 16px; max-width: 360px; width: calc(100vw - 48px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.15); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #ffffff; opacity: 0; transform: translateY(12px); transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: auto;';
-          document.body.appendChild(popup);
+          ensureAppNotificationStack().appendChild(popup);
         }
+        if (popup.parentElement !== ensureAppNotificationStack()) ensureAppNotificationStack().appendChild(popup);
 
         const isFree = record.costUSD === 0 && !record.unpriced;
         const costColor = isFree ? '#00ff66' : (record.unpriced ? '#ffbb00' : 'var(--neon)');
@@ -8026,7 +8022,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           this.schedulePopupDismissal(popup);
         };
 
-        positionGamificationRewardCard();
         this.schedulePopupDismissal(popup);
       },
 
@@ -8045,7 +8040,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           setTimeout(() => {
             if (popup && popup.style.opacity === '0') {
               popup.style.display = 'none';
-              positionGamificationRewardCard();
             }
           }, 350);
         }
