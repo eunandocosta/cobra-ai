@@ -20,6 +20,24 @@ function run() {
   assert.strictEqual(levelThree.level, 3);
 
   let state = rules.createInitialState();
+  assert.strictEqual(state.totalStudySeconds, 0);
+  let timeResult = rules.applyStudyTimeProgress(state, 'session-study-001', 35, 1000);
+  state = timeResult.state;
+  assert.strictEqual(timeResult.deltaSeconds, 35);
+  assert.strictEqual(state.totalStudySeconds, 35);
+  timeResult = rules.applyStudyTimeProgress(state, 'session-study-001', 35, 2000);
+  assert.strictEqual(timeResult.duplicate, true);
+  assert.strictEqual(state.totalStudySeconds, 35);
+  timeResult = rules.applyStudyTimeProgress(state, 'session-study-001', 80, 3000);
+  assert.strictEqual(timeResult.deltaSeconds, 45);
+  state = timeResult.state;
+  timeResult = rules.applyStudyTimeProgress(state, 'session-study-002', 20, 4000);
+  assert.strictEqual(timeResult.deltaSeconds, 20);
+  state = timeResult.state;
+  assert.strictEqual(state.totalStudySeconds, 100);
+  assert.strictEqual(rules.applyStudyTimeProgress(state, 'invalid', 100, 5000).deltaSeconds, 0);
+
+  state = rules.createInitialState();
   let outcome;
   const expected = ['c1', 'c2'];
   outcome = rules.applyEvent(state, {

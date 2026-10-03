@@ -25,7 +25,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261002-model-cascade-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261003-level-up-study-time-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -3606,6 +3606,7 @@
           <span id="gamificationModalXp">0 XP total</span>
           <div class="gamification-progress-track"><span class="gamification-progress-fill" id="gamificationModalProgressFill"></span></div>
           <small id="gamificationModalNextLevel">150 XP para o próximo nível</small>
+          <small class="gamification-study-time">Tempo ativo registrado: <strong id="gamificationModalStudyTime">0 min</strong></small>
         </div>
       </div>
       <div class="gamification-rules-grid">
@@ -3614,7 +3615,23 @@
         <article><h3>Deck completo</h3><p>Concluir os flashcards previstos da disciplina: <b>+8 XP</b> no dia ou <b>+4 XP</b> se atrasados.</p><p>Bônus único por disciplina, fila e dia.</p></article>
         <article><h3>Combo de estudo</h3><p>Ações de estudo em até 30 minutos: <b>+1 XP</b> a partir da 3ª e <b>+2 XP</b> a partir da 5ª.</p><p>Bônus de combo limitado a 20 XP por dia.</p></article>
       </div>
-      <p class="gamification-level-note">O nível 2 exige 150 XP; a meta do próximo nível aumenta 75 XP a cada nível. XP mede prática, não substitui a maestria nem a retenção. Sons não estão incluídos nesta versão.</p>
+      <p class="gamification-level-note">O nível 2 exige 150 XP; a meta do próximo nível aumenta 75 XP a cada nível. XP mede prática, não substitui maestria nem retenção. O tempo considera atividade nas áreas de estudo com a página visível e interação recente; pode ser menor que o tempo real de leitura passiva.</p>
+    </section>
+  </div>
+
+  <div class="level-up-overlay" id="levelUpModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="levelUpHeader">
+    <section class="level-up-card">
+      <h2 class="level-up-heading" id="levelUpHeader">Você passou de nível, parabéns!</h2>
+      <div class="level-up-hero" aria-live="polite">
+        <span class="level-up-level-label">Seu novo nível</span>
+        <strong id="levelUpNewLevel">Nível 2</strong>
+      </div>
+      <div class="level-up-stats" aria-label="Seu progresso">
+        <article><span>XP total</span><strong id="levelUpTotalXp">0 XP</strong></article>
+        <article><span>Falta para o próximo nível</span><strong id="levelUpXpRemaining">0 XP</strong></article>
+        <article><span>Tempo ativo de estudo</span><strong id="levelUpStudyTime">0 min</strong></article>
+      </div>
+      <button class="level-up-continue" id="levelUpContinueButton" type="button" onclick="closeLevelUpModal()">Vamos continuar aprendendo juntos!</button>
     </section>
   </div>
 
@@ -3623,8 +3640,8 @@
        ========================================================= -->
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
-  <script defer src="/gamification-rules.js?v=20261002-gamification-v1"></script>
-  <script defer src="/app.min.js?v=20261002-gamification-audio-v1"></script>
+  <script defer src="/gamification-rules.js?v=20261003-study-time-v1"></script>
+  <script defer src="/app.min.js?v=20261003-level-up-study-time-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

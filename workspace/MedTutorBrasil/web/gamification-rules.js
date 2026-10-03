@@ -12,6 +12,7 @@
   const COMBO_SESSION_GAP_MS = 30 * 60 * 1000;
   const MAX_STORED_DECKS = 20;
   const MAX_RECENT_EVENTS = 500;
+  const MAX_STUDY_SESSIONS = 250;
 
   function normalizeDifficulty(value) {
     const normalized = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -34,6 +35,8 @@
     return {
       version: 1,
       totalXp: 0,
+      totalStudySeconds: 0,
+      studySessionProgress: {},
       combo: 0,
       lastActivityAt: null,
       lastActivityDay: '',
@@ -51,11 +54,41 @@
       ...state,
       version: 1,
       totalXp: Math.max(0, Math.floor(Number(state.totalXp) || 0)),
+      totalStudySeconds: Math.max(0, Math.floor(Number(state.totalStudySeconds) || 0)),
+      studySessionProgress: normalizeStudySessionProgress(state.studySessionProgress),
       combo: Math.max(0, Math.floor(Number(state.combo) || 0)),
       comboBonusAwardedToday: Math.max(0, Math.min(DAILY_COMBO_BONUS_CAP, Math.floor(Number(state.comboBonusAwardedToday) || 0))),
       recentEventIds: Array.isArray(state.recentEventIds) ? state.recentEventIds.map(String).slice(-MAX_RECENT_EVENTS) : [],
       dailyDecks: state.dailyDecks && typeof state.dailyDecks === 'object' ? state.dailyDecks : {}
     };
+  }
+
+  function normalizeStudySessionProgress(value) {
+    if (!value || typeof value !== 'object') return {};
+    return Object.fromEntries(Object.entries(value)
+      .filter(([id, entry]) => /^[a-z0-9-]{8,80}$/i.test(id) && entry && typeof entry === 'object')
+      .map(([id, entry]) => [id, {
+        seconds: Math.max(0, Math.floor(Number(entry.seconds) || 0)),
+        updatedAt: Math.max(0, Number(entry.updatedAt) || 0)
+      }])
+      .sort((a, b) => a[1].updatedAt - b[1].updatedAt)
+      .slice(-MAX_STUDY_SESSIONS));
+  }
+
+  function applyStudyTimeProgress(previousState, sessionId, cumulativeSeconds, now = Date.now()) {
+    const state = normalizeState(previousState);
+    const id = String(sessionId || '').trim();
+    const targetSeconds = Math.max(0, Math.floor(Number(cumulativeSeconds) || 0));
+    if (!/^[a-z0-9-]{8,80}$/i.test(id) || !targetSeconds) return { state, duplicate: true, deltaSeconds: 0 };
+
+    const previousSeconds = state.studySessionProgress[id]?.seconds || 0;
+    const deltaSeconds = Math.max(0, targetSeconds - previousSeconds);
+    if (!deltaSeconds) return { state, duplicate: true, deltaSeconds: 0 };
+
+    state.totalStudySeconds += deltaSeconds;
+    state.studySessionProgress[id] = { seconds: targetSeconds, updatedAt: Number(now) || Date.now() };
+    state.studySessionProgress = normalizeStudySessionProgress(state.studySessionProgress);
+    return { state, duplicate: false, deltaSeconds };
   }
 
   function getLevel(totalXp) {
@@ -157,6 +190,7 @@
     baseXp,
     createInitialState,
     normalizeState,
+    applyStudyTimeProgress,
     getLevel,
     applyEvent
   };

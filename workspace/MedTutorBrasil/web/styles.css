@@ -5694,6 +5694,8 @@
     .gamification-level-details { display: grid; gap: 5px; width: 100%; min-width: 0; }
     .gamification-level-details strong { color: var(--neon); font-size: 17px; }
     .gamification-level-details > span, .gamification-level-details > small { color: var(--text-secondary); font-size: 11px; }
+    .gamification-level-details .gamification-study-time { margin-top: 2px; }
+    .gamification-study-time strong { color: var(--text-primary); font-weight: 600; }
     .gamification-level-details .gamification-progress-track { height: 7px; }
     .gamification-rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .gamification-rules-grid article { padding: 13px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; }
@@ -5709,7 +5711,27 @@
     .gamification-reward-card.is-level-up strong { color: #ffc35a; }
     @keyframes gamificationRewardEnter { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-    @media (prefers-reduced-motion: reduce) { .gamification-reward-card { animation: none; } }
+    .level-up-overlay { position: fixed; inset: 0; z-index: 100600; display: none; place-items: center; padding: clamp(12px, 3vh, 28px); background: rgba(2, 8, 6, .84); backdrop-filter: blur(10px); }
+    .level-up-overlay.active { display: grid; animation: levelUpBackdropIn .2s ease-out both; }
+    .level-up-card { width: min(760px, 100%); height: min(760px, calc(100dvh - 24px)); min-height: min(510px, calc(100dvh - 24px)); box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; padding: clamp(20px, 4vw, 42px); overflow-y: auto; border: 1px solid rgba(0, 255, 115, .38); border-radius: 28px; color: var(--text-primary); background: radial-gradient(ellipse at 50% 35%, rgba(0, 255, 115, .11), transparent 54%), var(--bg-card); box-shadow: 0 30px 100px rgba(0,0,0,.58), 0 0 55px rgba(0,255,115,.12); animation: levelUpCardIn .32s cubic-bezier(.2,.8,.2,1) both; }
+    .level-up-heading { flex: 0 0 auto; margin: 0; text-align: center; color: var(--text-primary); font-size: clamp(20px, 3.4vw, 30px); line-height: 1.25; }
+    .level-up-hero { flex: 1 0 180px; min-height: 180px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 12px 0; text-align: center; }
+    .level-up-level-label { color: var(--text-secondary); font-size: clamp(13px, 1.7vw, 16px); letter-spacing: .12em; text-transform: uppercase; }
+    .level-up-hero strong { color: var(--neon); font-size: clamp(76px, 17vw, 172px); line-height: .98; letter-spacing: -.065em; text-shadow: 0 0 34px rgba(0,255,115,.23); }
+    .level-up-stats { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .level-up-stats article { min-width: 0; min-height: 78px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 12px 9px; text-align: center; border: 1px solid var(--border); border-radius: 15px; background: var(--bg-surface); }
+    .level-up-stats article span { color: var(--text-secondary); font-size: clamp(10px, 1.4vw, 13px); line-height: 1.25; }
+    .level-up-stats article strong { color: var(--text-primary); font-size: clamp(14px, 2vw, 20px); line-height: 1.1; }
+    .level-up-stats article:first-child strong { color: var(--neon); }
+    .level-up-continue { flex: 0 0 auto; align-self: center; width: min(480px, 100%); min-height: 54px; margin-top: clamp(18px, 3vh, 30px); padding: 12px 22px; border: 1px solid var(--neon); border-radius: 15px; color: #06140c; background: var(--neon); font: inherit; font-weight: 750; cursor: pointer; box-shadow: 0 8px 28px rgba(0,255,115,.18); transition: transform .16s ease, filter .16s ease, box-shadow .16s ease; }
+    .level-up-continue:hover { transform: translateY(-2px); filter: brightness(1.08); box-shadow: 0 12px 34px rgba(0,255,115,.27); }
+    .level-up-continue:focus-visible { outline: 3px solid var(--text-primary); outline-offset: 3px; }
+    @keyframes levelUpBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes levelUpCardIn { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @media (max-width: 520px) { .level-up-card { border-radius: 20px; } .level-up-stats { gap: 7px; } .level-up-stats article { min-height: 72px; padding: 9px 5px; border-radius: 12px; } .level-up-continue { font-size: 14px; } }
+    @media (max-height: 560px) { .level-up-card { min-height: 0; padding: 18px; } .level-up-hero { flex-basis: 100px; min-height: 100px; } .level-up-hero strong { font-size: clamp(58px, 14vh, 96px); } .level-up-continue { min-height: 46px; margin-top: 12px; } }
+
+    @media (prefers-reduced-motion: reduce) { .gamification-reward-card, .level-up-overlay.active, .level-up-card { animation: none; } .level-up-continue { transition: none; } }
 
     .modal-head {
       display: flex;

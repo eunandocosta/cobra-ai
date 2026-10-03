@@ -1325,6 +1325,19 @@
         });
       },
 
+      async commitStudyTime(uid, sessionId, cumulativeSeconds) {
+        if (!this.hasAuthenticatedCloudSession(uid)) throw new Error('Sessão em nuvem indisponível.');
+        const profileRef = firestoreDb.collection('users').doc(uid);
+        return firestoreDb.runTransaction(async transaction => {
+          const snapshot = await transaction.get(profileRef);
+          if (!snapshot.exists) throw new Error('Perfil em nuvem não encontrado para salvar o tempo de estudo.');
+          const previous = MedTutorGamificationRules.normalizeState(snapshot.data()?.gamification);
+          const result = MedTutorGamificationRules.applyStudyTimeProgress(previous, sessionId, cumulativeSeconds, Date.now());
+          if (!result.duplicate) transaction.set(profileRef, { gamification: result.state }, { merge: true });
+          return result;
+        });
+      },
+
       // Salva a Grade Curricular em users/{userId}/grade_curricular/{disciplineId}
       async saveCurriculum(curriculumArray) {
         if (!Array.isArray(curriculumArray)) return;
@@ -2949,6 +2962,101 @@
       MedTutorGamificationPreferences.setEnabled(kind, !MedTutorGamificationPreferences.enabled(kind));
     }
 
+    const MedTutorStudyTimeTracker = {
+      intervalId: null,
+      session: null,
+      lastInteractionAt: 0,
+      lastLocalSaveAt: 0,
+      lastCloudSyncAt: 0,
+      syncPromise: null,
+      idleLimitMs: 120000,
+      tickMs: 1000,
+      cloudSyncMs: 30000,
+      localSaveMs: 5000,
+      sessionKey(uid) { return `medtutor_study_timer_${uid || 'local'}`; },
+      isStudyView() { return ['flashcards', 'quizzes', 'sce'].includes(currentTab); },
+      canCount(now = Date.now()) {
+        return this.isStudyView()
+          && document.visibilityState === 'visible'
+          && now - this.lastInteractionAt <= this.idleLimitMs;
+      },
+      loadSession(uid = MedTutorGamification.uid) {
+        if (this.session?.uid === uid) return this.session;
+        let saved = null;
+        try { saved = JSON.parse(sessionStorage.getItem(this.sessionKey(uid)) || 'null'); } catch (error) {}
+        const validId = /^[a-z0-9-]{8,80}$/i.test(String(saved?.id || ''));
+        this.session = {
+          uid,
+          id: validId ? saved.id : (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`),
+          cumulativeSeconds: Math.max(0, Math.floor(Number(saved?.cumulativeSeconds) || 0))
+        };
+        this.persistSession();
+        return this.session;
+      },
+      persistSession() {
+        if (!this.session) return;
+        try { sessionStorage.setItem(this.sessionKey(this.session.uid), JSON.stringify({ id: this.session.id, cumulativeSeconds: this.session.cumulativeSeconds })); } catch (error) {}
+      },
+      markActive() {
+        this.lastInteractionAt = Date.now();
+      },
+      onViewChanged(tabId) {
+        if (['flashcards', 'quizzes', 'sce'].includes(tabId)) this.markActive();
+        else this.flush({ force: true });
+      },
+      async flush({ force = false } = {}) {
+        const session = this.session || this.loadSession();
+        if (!force && Date.now() - this.lastCloudSyncAt < this.cloudSyncMs) return;
+        if (this.syncPromise) return this.syncPromise;
+        this.persistSession();
+        MedTutorGamification.saveLocalState();
+        if (session.uid === 'local' || !MedTutorFirebaseService.hasAuthenticatedCloudSession(session.uid)) return;
+        this.lastCloudSyncAt = Date.now();
+        this.syncPromise = MedTutorFirebaseService.commitStudyTime(session.uid, session.id, session.cumulativeSeconds)
+          .then(result => {
+            MedTutorGamification.state = MedTutorGamificationRules.normalizeState(result.state);
+            MedTutorGamification.saveLocalState();
+            MedTutorGamification.render();
+          })
+          .catch(() => { this.lastCloudSyncAt = 0; })
+          .finally(() => { this.syncPromise = null; });
+        return this.syncPromise;
+      },
+      tick() {
+        const now = Date.now();
+        if (!this.canCount(now)) {
+          if (now - this.lastLocalSaveAt >= this.localSaveMs) this.flush();
+          return;
+        }
+        const session = this.loadSession();
+        session.cumulativeSeconds += 1;
+        const result = MedTutorGamificationRules.applyStudyTimeProgress(MedTutorGamification.state, session.id, session.cumulativeSeconds, now);
+        MedTutorGamification.state = result.state;
+        MedTutorGamification.render();
+        if (now - this.lastLocalSaveAt >= this.localSaveMs) {
+          this.lastLocalSaveAt = now;
+          this.persistSession();
+          MedTutorGamification.saveLocalState();
+        }
+        if (now - this.lastCloudSyncAt >= this.cloudSyncMs) this.flush({ force: true });
+      },
+      init() {
+        if (this.intervalId || typeof window === 'undefined') return;
+        this.loadSession();
+        this.lastInteractionAt = Date.now();
+        const activityEvents = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+        activityEvents.forEach(type => window.addEventListener(type, () => this.markActive(), { passive: true }));
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') this.flush({ force: true });
+          else this.markActive();
+        });
+        window.addEventListener('pagehide', () => this.flush({ force: true }));
+        window.addEventListener('focus', () => this.markActive());
+        window.addEventListener('online', () => this.flush({ force: true }));
+        this.intervalId = setInterval(() => this.tick(), this.tickMs);
+      }
+    };
+
     const MedTutorGamification = {
       state: MedTutorGamificationRules.createInitialState(),
       uid: 'local',
@@ -2983,6 +3091,7 @@
         this.uid = uid || 'local';
         this.state = this.readLocalState(this.uid);
         this.render();
+        MedTutorStudyTimeTracker.loadSession(this.uid);
         if (this.uid === 'local' || !MedTutorFirebaseService.hasAuthenticatedCloudSession(this.uid)) return;
         try {
           const remote = await MedTutorFirebaseService.loadGamificationProgress(this.uid);
@@ -2990,6 +3099,7 @@
           this.saveLocalState();
           this.render();
           await this.syncPending();
+          MedTutorStudyTimeTracker.flush({ force: true });
         } catch (error) {
           console.info('[Gamificação] Progresso local mantido até a sincronização em nuvem ficar disponível.');
         }
@@ -3062,13 +3172,28 @@
         if (modalXp) modalXp.textContent = `${this.state.totalXp} XP total`;
         if (modalProgress) modalProgress.style.width = `${progress}%`;
         if (modalNext) modalNext.textContent = `${level.xpToNextLevel - level.xpIntoLevel} XP para o próximo nível`;
+        const modalHours = document.getElementById('gamificationModalStudyTime');
+        if (modalHours) modalHours.textContent = formatGamificationStudyTime(this.state.totalStudySeconds);
+        const timeTotal = document.getElementById('levelUpTotalXp');
+        const timeRemaining = document.getElementById('levelUpXpRemaining');
+        const timeStudy = document.getElementById('levelUpStudyTime');
+        if (timeTotal) timeTotal.textContent = `${this.state.totalXp.toLocaleString('pt-BR')} XP`;
+        if (timeRemaining) timeRemaining.textContent = `${(level.xpToNextLevel - level.xpIntoLevel).toLocaleString('pt-BR')} XP`;
+        if (timeStudy) timeStudy.textContent = formatGamificationStudyTime(this.state.totalStudySeconds);
       },
 
       showReward(award, event) {
         if (award?.levelUp) MedTutorGamificationPreferences.play('levelUp');
         else if (event?.outcome === 'correct') MedTutorGamificationPreferences.play('correct');
         else if (event?.outcome === 'incorrect') MedTutorGamificationPreferences.play('incorrect');
-        if (!MedTutorGamificationPreferences.enabled('alerts') || !award || !award.earnedXp) return;
+        if (!award) return;
+        if (award.levelUp) {
+          document.getElementById('gamificationRewardCard')?.remove();
+          showLevelUpModal(award);
+          return;
+        }
+        if (!MedTutorGamificationPreferences.enabled('alerts')) return;
+        if (!award.earnedXp) return;
         let card = document.getElementById('gamificationRewardCard');
         if (!card) {
           card = document.createElement('div');
@@ -3094,6 +3219,43 @@
         this.rewardTimer = setTimeout(() => card?.remove(), 4200);
       }
     };
+
+    function formatGamificationStudyTime(seconds) {
+      const totalMinutes = Math.floor(Math.max(0, Number(seconds) || 0) / 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours && minutes) return `${hours} h ${minutes} min`;
+      if (hours) return `${hours} h`;
+      return `${totalMinutes} min`;
+    }
+
+    let levelUpReturnFocus = null;
+    function showLevelUpModal(award) {
+      const modal = document.getElementById('levelUpModal');
+      if (!modal) return;
+      MedTutorGamification.render();
+      const levelLabel = document.getElementById('levelUpNewLevel');
+      if (levelLabel) levelLabel.textContent = `Nível ${award.level || MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp).level}`;
+      levelUpReturnFocus = document.activeElement;
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => document.getElementById('levelUpContinueButton')?.focus());
+    }
+
+    function closeLevelUpModal() {
+      const modal = document.getElementById('levelUpModal');
+      if (!modal) return;
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+      if (levelUpReturnFocus?.isConnected) levelUpReturnFocus.focus();
+      levelUpReturnFocus = null;
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && document.getElementById('levelUpModal')?.classList.contains('active')) {
+        closeLevelUpModal();
+      }
+    });
 
     function openGamificationModal() {
       const modal = document.getElementById('gamificationModal');
@@ -3581,6 +3743,7 @@
       const targetTab = document.getElementById('tab-' + tabId);
       if (!targetTab) return;
       currentTab = tabId;
+      MedTutorStudyTimeTracker.onViewChanged(tabId);
       document.querySelector('.view-content')?.classList.toggle('chat-view-active', tabId === 'chat');
       document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -32958,6 +33121,7 @@ function escapeHtmlText(str) {
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)
     MedTutorGamification.hydrate(MedTutorAuthService?.currentUser?.uid || 'local');
+    MedTutorStudyTimeTracker.init();
     if (typeof MedTutorAuthService !== 'undefined') {
       MedTutorAuthService.init();
     }

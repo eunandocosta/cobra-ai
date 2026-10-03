@@ -148,7 +148,10 @@ const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261002-gamification-audio-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(appBundleVersion === '20261003-level-up-study-time-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(sceReviewMarkup.includes('id="levelUpModal"') && /id="levelUpContinueButton"[^>]*>Vamos continuar aprendendo juntos!/.test(sceReviewMarkup), 'a subida de nível deve abrir um painel central com CTA de continuidade');
+assert(appSource.includes('MedTutorStudyTimeTracker.init()') && appSource.includes("['flashcards', 'quizzes', 'sce'].includes(currentTab)"), 'o tempo de estudo deve ser rastreado apenas nas áreas de estudo');
+assert(appSource.includes('commitStudyTime') && appSource.includes('applyStudyTimeProgress'), 'o tempo ativo deve sincronizar em nuvem de forma idempotente');
 assert(sceReviewMarkup.includes('id="gamificationSoundsToggle"') && sceReviewMarkup.includes('id="gamificationAlertsToggle"'), 'configurações devem expor controles independentes para sons e alertas de gamificação');
 assert(appSource.includes('medtutor_gamification_sounds_v1') && appSource.includes('medtutor_gamification_alerts_v1'), 'preferências de som e alertas devem persistir entre sessões');
 assert(appSource.includes("MedTutorGamificationPreferences.play('levelUp')") && appSource.includes("outcome: isCorrect ? 'correct' : 'incorrect'"), 'subida de nível e respostas de quiz devem acionar os sons correspondentes');
@@ -196,8 +199,8 @@ assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a
 assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
 assert(appSource.includes("const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
 assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
-assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261002-model-cascade-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
-assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261002-model-cascade-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
+assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261003-level-up-study-time-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
+assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261003-level-up-study-time-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
 assert(styleSource.includes('bottom: calc(128px + env(safe-area-inset-bottom)) !important') && styleSource.includes('padding-bottom: calc(112px + env(safe-area-inset-bottom))'), 'os FABs de celular devem ficar acima da navegação e fora do compositor');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';
 assert(cloudSessionMethod.includes('MedTutorAuthService.accessGranted === true'), 'leituras e escritas do Firestore devem aguardar a liberação do cupom');
