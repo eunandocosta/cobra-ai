@@ -3328,7 +3328,7 @@
           timer.className = 'gamification-reward-timer';
           timer.setAttribute('aria-hidden', 'true');
           card.append(icon, copy, timer);
-          registerAppNotification(card);
+          ensureAppNotificationStack().appendChild(card);
           animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
           clearTimeout(this.rewardTimer);
           this.rewardTimer = setTimeout(() => {
@@ -3357,27 +3357,6 @@
         document.body.appendChild(stack);
       }
       return stack;
-    }
-
-    function registerAppNotification(notification) {
-      if (!notification) return;
-      const stack = ensureAppNotificationStack();
-      notification.dataset.notificationCreatedAt = String(Date.now());
-      if (notification.parentElement !== stack) stack.appendChild(notification);
-      sortAppNotificationStack(stack);
-    }
-
-    function sortAppNotificationStack(stack = ensureAppNotificationStack()) {
-      const notifications = Array.from(stack.children);
-      notifications.sort((a, b) => {
-        const createdAtA = Number(a.dataset.notificationCreatedAt) || 0;
-        const createdAtB = Number(b.dataset.notificationCreatedAt) || 0;
-        if (createdAtA !== createdAtB) return createdAtB - createdAtA;
-        const keyA = `${a.id || ''} ${typeof a.className === 'string' ? a.className : ''}`.trim().toLocaleLowerCase();
-        const keyB = `${b.id || ''} ${typeof b.className === 'string' ? b.className : ''}`.trim().toLocaleLowerCase();
-        return keyA.localeCompare(keyB);
-      });
-      notifications.forEach(notification => stack.appendChild(notification));
     }
 
     let levelUpReturnFocus = null;
@@ -7859,7 +7838,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         if (this.history.length > 60) this.history.pop();
 
         if (typeof document !== 'undefined' && document.body) {
-          this.showDiscreteExpensePopup(record);
           this.updateConfigModalUI();
         }
 
@@ -7875,20 +7853,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       formatBRL(val) {
         if (val === 0) return 'R$ 0,0000';
         return `R$ ${val.toFixed(5)}`;
-      },
-
-      _escape(str) {
-        if (!str) return '';
-        if (typeof escapeHtml === 'function') return escapeHtml(str);
-        return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
-      },
-
-      showLastExpensePopup() {
-        if (this.history.length > 0) {
-          this.showDiscreteExpensePopup(this.history[0]);
-        } else if (typeof showToast === 'function') {
-          showToast('Nenhuma ação registrada nesta sessão ainda.');
-        }
       },
 
       resetSession() {
@@ -7967,105 +7931,6 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         }
       },
 
-      showDiscreteExpensePopup(record) {
-        if (typeof document === 'undefined') return;
-        let popup = document.getElementById('discreteExpensePopup');
-        if (!popup) {
-          popup = document.createElement('div');
-          popup.id = 'discreteExpensePopup';
-          popup.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 99999; background: rgba(13, 19, 33, 0.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1.5px solid rgba(0, 229, 255, 0.35); border-radius: 14px; padding: 12px 16px; max-width: 360px; width: calc(100vw - 48px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.15); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #ffffff; opacity: 0; transform: translateY(12px); transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: auto;';
-          ensureAppNotificationStack().appendChild(popup);
-        }
-        if (popup.parentElement !== ensureAppNotificationStack()) ensureAppNotificationStack().appendChild(popup);
-
-        const isFree = record.costUSD === 0 && !record.unpriced;
-        const costColor = isFree ? '#00ff66' : (record.unpriced ? '#ffbb00' : 'var(--neon)');
-        const costStr = record.unpriced ? 'Não estimado' : this.formatUSD(record.costUSD);
-        const brlStr = record.unpriced ? 'modelo sem tarifa cadastrada' : this.formatBRL(record.costBRL);
-        const cumStr = this.formatUSD(record.cumulativeUSD);
-
-        popup.style.display = 'block';
-        registerAppNotification(popup);
-        popup.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 13px;">💸</span>
-              <span style="font-size: 11px; font-weight: 800; color: ${costColor}; text-transform: uppercase; letter-spacing: 0.4px;">
-                ${record.unpriced ? 'Custo não estimado' : (isFree ? 'Custo Zero (Free Tier / Local)' : 'Estimativa de custo (tarifa padrão)')}
-              </span>
-            </div>
-            <button onclick="AppExpenseTracker.hideDiscreteExpensePopup()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 14px; line-height: 1;" title="Fechar">✕</button>
-          </div>
-
-          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 2px; line-height: 1.3;">
-            ${this._escape(record.actionName)}
-          </div>
-
-          <div style="font-size: 10.5px; color: var(--text-secondary); margin-bottom: 8px;">
-            <span style="color: var(--neon); font-weight: 600;">${this._escape(record.modelLabel)}</span>
-          </div>
-
-          <div style="background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 7px 10px; font-size: 11px; display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px;">
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-muted);">Tokens processados:</span>
-              <span style="font-weight: 600; color: #ffffff;">${record.inputTokens.toLocaleString('pt-BR')} in / ${record.outputTokens.toLocaleString('pt-BR')} out</span>
-            </div>
-            ${record.cachedTokens > 0 ? `
-            <div style="display: flex; justify-content: space-between; color: var(--neon);">
-              <span>⚡ Context Caching (~75% desc):</span>
-              <strong>${record.cachedTokens.toLocaleString('pt-BR')} cached (${this.formatBRL(record.savingsBRL || 0)})</strong>
-            </div>` : ''}
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: var(--text-muted);">Custo desta ação:</span>
-              <span style="font-weight: 800; color: ${costColor};">${costStr} <small style="color: var(--text-secondary); font-weight: 500;">(${brlStr})</small></span>
-            </div>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--text-muted); border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 5px;">
-            <span>Sessão: ${this.sessionActionCount} ação(ões)</span>
-            <span>Total Acumulado: <strong style="color: var(--neon);">${cumStr}</strong></span>
-          </div>
-        `;
-
-        if (typeof requestAnimationFrame === 'function') {
-          requestAnimationFrame(() => {
-            popup.style.opacity = '1';
-            popup.style.transform = 'translateY(0)';
-          });
-        } else {
-          popup.style.opacity = '1';
-          popup.style.transform = 'translateY(0)';
-        }
-
-        popup.onmouseenter = () => {
-          if (this.popupTimeout) clearTimeout(this.popupTimeout);
-        };
-        popup.onmouseleave = () => {
-          this.schedulePopupDismissal(popup);
-        };
-
-        this.schedulePopupDismissal(popup);
-      },
-
-      schedulePopupDismissal(popup) {
-        if (this.popupTimeout) clearTimeout(this.popupTimeout);
-        this.popupTimeout = setTimeout(() => {
-          this.hideDiscreteExpensePopup();
-        }, 5500);
-      },
-
-      hideDiscreteExpensePopup() {
-        const popup = document.getElementById('discreteExpensePopup');
-        if (popup) {
-          popup.style.opacity = '0';
-          popup.style.transform = 'translateY(12px)';
-          setTimeout(() => {
-            if (popup && popup.style.opacity === '0') {
-              popup.style.display = 'none';
-            }
-          }, 350);
-        }
-      }
     };
 
     // =========================================================================

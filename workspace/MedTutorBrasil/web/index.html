@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261003-xp-level-reward-v5">
+  <link rel="stylesheet" href="/styles.css?v=20261003-xp-level-reward-v6">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -1721,14 +1721,9 @@
               </div>
             </div>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn-outline-action" style="flex: 1; justify-content: center; font-size: 11.5px;" onclick="AppExpenseTracker.showLastExpensePopup()">
-              🔔 Exibir Último Popup
-            </button>
-            <button class="btn-outline-action" style="flex: 1; justify-content: center; font-size: 11.5px;" onclick="AppExpenseTracker.resetSession()">
-              🔄 Resetar Métricas
-            </button>
-          </div>
+          <button class="btn-outline-action" style="width: 100%; justify-content: center; font-size: 11.5px;" onclick="AppExpenseTracker.resetSession()">
+            🔄 Resetar Métricas
+          </button>
         </div>
 
         <!-- PERSISTÊNCIA EM NUVEM: FIREBASE FIRESTORE & CLOUD STORAGE -->
@@ -3654,7 +3649,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261003-study-time-v1"></script>
   <script defer src="/material-icons.js?v=20261003-material-symbols-v1"></script>
-  <script defer src="/app.min.js?v=20261003-xp-level-reward-v5"></script>
+  <script defer src="/app.min.js?v=20261003-xp-level-reward-v6"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
