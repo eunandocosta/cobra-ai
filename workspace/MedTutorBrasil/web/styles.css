@@ -219,6 +219,9 @@
     .app-root.sidebar-collapsed .sidebar-settings-btn .icon {
       width: 20px;
       height: 20px;
+      /* O texto do botão fica em font-size: 0 para esconder o rótulo;
+         fixe o tamanho do glifo Material, que herda em/em dessa fonte. */
+      font-size: 20px;
       flex: 0 0 20px;
     }
 

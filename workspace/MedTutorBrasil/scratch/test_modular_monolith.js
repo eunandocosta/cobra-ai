@@ -34,6 +34,7 @@ const appSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), '
 const styleSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8');
 const webIndexMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf-8');
 assert(styleSource.includes('width: 270px;') && styleSource.includes('.app-root.sidebar-collapsed .sidebar'), 'telas amplas devem manter sidebar lateral expansível e recolhível');
+assert(/\.app-root\.sidebar-collapsed \.nav-link \.icon,[\s\S]*?font-size: 20px;[\s\S]*?flex: 0 0 20px;/.test(styleSource), 'ícones Material da sidebar devem manter tamanho explícito quando font-size: 0 oculta os rótulos no modo recolhido');
 assert(/@media \(max-width: 1280px\)\s*\{\s*\.sidebar\s*\{\s*display:\s*none;/.test(styleSource), 'telas compactas devem ocultar a sidebar lateral');
 assert(/\.mobile-bottom-nav\s*\{\s*display:\s*none;/.test(styleSource) && /\.mobile-bottom-nav\s*\{\s*display:\s*flex;/.test(styleSource) && (webIndexMarkup.match(/class="mobile-nav-btn\b/g) || []).length === 6, 'os seis recursos devem estar acessíveis pela navegação inferior em telas compactas');
 const curriculumSubjectAliases = appSource.match(/function getCurriculumSubjectAliases\(value\) \{[\s\S]*?\n    \}/)?.[0] || '';
