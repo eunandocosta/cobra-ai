@@ -149,7 +149,7 @@ const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261003-xp-level-reward-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(appBundleVersion === '20261003-xp-level-reward-v2', 'o bundle deve invalidar o cache após mudanças no app');
 const materialIconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf-8');
 const materialIconsCss = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.css'), 'utf-8');
 assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('/material-icons.js?v=20261003-material-symbols-v1'), 'a interface do app deve carregar ícones Material Symbols Rounded subsetados pelo Google Fonts');
@@ -167,6 +167,7 @@ assert(appSource.includes('medtutor_gamification_sounds_v1') && appSource.includ
 assert(appSource.includes("award?.levelUp ? 'levelUp'") && appSource.includes("event?.outcome === 'correct' ? 'correct'") && appSource.includes("outcome: isCorrect ? 'correct' : 'incorrect'"), 'subida de nível e respostas corretas/incorretas devem iniciar os sons correspondentes');
 assert(appSource.includes('function animateGamificationTopbar(previousState, nextState)') && appSource.includes('function animateCasinoCounter('), 'o total e a barra de XP devem avançar com animação durante a recompensa');
 assert(appSource.includes('outcome: \'correct\'') && appSource.includes('gamification-reward-value'), 'a revisão de flashcard deve sincronizar o aviso de XP com o som e a contagem animada');
+assert(appSource.includes("createMaterialIcon('auto_awesome', 'gamification-reward-icon', '22px')") && appSource.includes('gamification-reward-unit'), 'o aviso de XP deve usar o ícone Material real e manter a unidade fora da contagem animada');
 assert(sceReviewMarkup.includes('class="level-up-fireworks"') && sceReviewMarkup.includes('id="levelUpTransition"') && sceReviewMarkup.includes('id="levelUpProgressTrack"'), 'a passagem de nível deve mostrar transição, fogos discretos e progresso acumulado');
 assert(sceReviewMarkup.includes('XP total') && sceReviewMarkup.includes('Tempo ativo de estudo') && !sceReviewMarkup.includes('id="levelUpCloseButton"'), 'o modal de nível mantém apenas dados da jornada e CTA, sem botão de fechar separado');
 assert(appSource.includes("frontImageEl.innerHTML = renderStudySupportImage(item, { asStimulus: true });"), 'a frente do flashcard deve renderizar a figura sem revelar a explicação do gabarito');
@@ -213,8 +214,8 @@ assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a
 assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
 assert(appSource.includes("const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
 assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
-assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261003-xp-level-reward-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
-assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261003-xp-level-reward-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
+assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261003-xp-level-reward-v2'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
+assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261003-xp-level-reward-v2'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
 assert(webIndexMarkup.includes('family=Fredoka:wght@600;700') && styleSource.includes("font-family: 'Fredoka', 'Plus Jakarta Sans'"), 'o nível novo deve usar tipografia arredondada própria, com fallback da fonte principal');
 assert(styleSource.includes('bottom: calc(128px + env(safe-area-inset-bottom)) !important') && styleSource.includes('padding-bottom: calc(112px + env(safe-area-inset-bottom))'), 'os FABs de celular devem ficar acima da navegação e fora do compositor');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';

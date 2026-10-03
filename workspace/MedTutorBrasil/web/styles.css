@@ -5715,6 +5715,7 @@
     .gamification-reward-copy small { color: var(--text-secondary); font-size: 10px; font-weight: 650; }
     .gamification-reward-copy strong { display: flex; align-items: baseline; gap: 4px; color: var(--neon); font-size: 24px; font-weight: 820; line-height: 1.1; font-variant-numeric: tabular-nums; }
     .gamification-reward-value { display: inline-block; min-width: 1.5ch; text-align: right; }
+    .gamification-reward-unit { font-size: 12px; font-weight: 720; letter-spacing: .01em; }
     .gamification-reward-timer { position: absolute; inset: auto 0 0; height: 3px; background: rgba(0,255,115,.15); transform-origin: left; animation: gamificationRewardTimer 3.6s linear both; }
     .gamification-reward-card.is-leaving { animation: gamificationRewardLeave .26s ease-in both; }
     @keyframes gamificationRewardPop { 0% { opacity: 0; transform: translateY(-18px) scale(.76); filter: blur(5px); } 63% { opacity: 1; transform: translateY(3px) scale(1.055); filter: blur(0); } 82% { transform: translateY(-2px) scale(.985); } 100% { opacity: 1; transform: translateY(0) scale(1); } }

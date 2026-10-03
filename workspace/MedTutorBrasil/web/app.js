@@ -3320,7 +3320,14 @@
           card.setAttribute('role', 'status');
           card.setAttribute('aria-live', 'polite');
           card.setAttribute('aria-label', `Você ganhou ${award.earnedXp} XP`);
-          card.innerHTML = '<span class="gamification-reward-icon material-symbols-outlined" aria-hidden="true">auto_awesome</span><span class="gamification-reward-copy"><small>XP conquistado</small><strong><span class="gamification-reward-value" aria-hidden="true">+0</span> XP</strong></span><span class="gamification-reward-timer" aria-hidden="true"></span>';
+          const icon = createMaterialIcon('auto_awesome', 'gamification-reward-icon', '22px');
+          const copy = document.createElement('span');
+          copy.className = 'gamification-reward-copy';
+          copy.innerHTML = '<small>XP conquistado</small><strong><span class="gamification-reward-value" aria-hidden="true">+0</span><span class="gamification-reward-unit" aria-hidden="true">XP</span></strong>';
+          const timer = document.createElement('span');
+          timer.className = 'gamification-reward-timer';
+          timer.setAttribute('aria-hidden', 'true');
+          card.append(icon, copy, timer);
           document.body.appendChild(card);
           animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
           clearTimeout(this.rewardTimer);
