@@ -7291,7 +7291,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     // =========================================================================
     // Diretriz do usuário: Priorizar texto 100% completo a qualquer custo.
     // Proibido qualquer trava ou corte artificial de tokens na geração de artigos e respostas.
-    // Modelos oficiais com janela de saída expandida (até 65.536 tokens no Gemini 2.5):
+    // Estimativas de custo padrão por milhão de tokens (USD). O custo real pode
+    // ser zero no Free Tier e pode variar por modalidade/grounding.
     const GEMINI_CONFIG_2026 = {
       models: ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'],
       primaryModel: 'gemini-3.5-flash-lite',
@@ -7300,23 +7301,25 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       flashLiteModel: 'gemini-3.5-flash-lite',
       pricing: {
         'gemini-3.5-flash-lite': {
-          label: 'Gemini 3.5 Flash-Lite (Motor Especializado em Quizzes, Flashcards & Agilidade - Free Tier / Baixo Custo)',
-          inputPerMillion: 0.03,
-          outputPerMillion: 0.09,
+          label: 'Gemini 3.5 Flash-Lite (estimativa, tarifa padrão)',
+          inputPerMillion: 0.30,
+          outputPerMillion: 2.50,
+          cachedInputPerMillion: 0.03,
         },
         'gemini-3.5-flash': {
-          label: 'Gemini 3.5 Flash (Alta Velocidade & Raciocínio Clínico)',
-          inputPerMillion: 0.10,
-          outputPerMillion: 0.30,
+          label: 'Gemini 3.5 Flash (estimativa, tarifa padrão)',
+          inputPerMillion: 1.50,
+          outputPerMillion: 9.00,
+          cachedInputPerMillion: 0.15,
         },
         'gemini-3.6-flash': {
-          label: 'Gemini 3.6 Flash (Fallback)',
+          label: 'Gemini 3.6 Flash (estimativa, tarifa padrão)',
           inputPerMillion: 0.75,
           outputPerMillion: 3.75,
           cachedInputPerMillion: 0.075,
         },
         'gemini-3.7-flash': {
-          label: 'Gemini 3.7 Flash (Servidor)',
+          label: 'Gemini 3.7 Flash (estimativa, tarifa padrão)',
           inputPerMillion: 0.75,
           outputPerMillion: 3.75,
           cachedInputPerMillion: 0.075,
@@ -7367,7 +7370,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       },
 
       calculateCost(modelKey, inputTokens, outputTokens, cachedTokens = 0) {
-        const rates = GEMINI_CONFIG_2026.pricing[modelKey] || GEMINI_CONFIG_2026.pricing['gemini-3.5-flash-lite'] || GEMINI_CONFIG_2026.pricing['gemini-3.5-flash'];
+        const normalizedModel = this.normalizeModelKey(modelKey);
+        const rates = GEMINI_CONFIG_2026.pricing[normalizedModel];
+        // Não atribua silenciosamente o preço do Flash-Lite a modelos
+        // desconhecidos (por exemplo, um provedor OpenAI configurado à parte).
+        if (!rates) return { costUSD: 0, savingsUSD: 0, unpriced: true, modelKey: normalizedModel };
         const nonCachedInput = Math.max(0, inputTokens - cachedTokens);
         const regularInputCost = (nonCachedInput / 1000000) * rates.inputPerMillion;
         const cachedInputCost = (cachedTokens / 1000000) * (rates.cachedInputPerMillion || (rates.inputPerMillion * 0.25));
@@ -7379,13 +7386,22 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
         return {
           costUSD: actualCost,
-          savingsUSD
+          savingsUSD,
+          unpriced: false,
+          modelKey: normalizedModel
         };
       },
 
+      normalizeModelKey(model) {
+        const value = String(model || '').toLowerCase().replace(/_/g, '-');
+        if (value.includes('local') || value.includes('heuristic')) return 'local-heuristic';
+        const match = value.match(/gemini-3\.[567]-flash(?:-lite)?/);
+        return match ? match[0] : value;
+      },
+
       recordAction({ actionName, model = 'gemini-3.5-flash', inputTokens = 0, outputTokens = 0, cachedTokens = 0, isLocal = false }) {
-        const modelKey = isLocal ? 'local-heuristic' : model;
-        const { costUSD, savingsUSD } = this.calculateCost(modelKey, inputTokens, outputTokens, cachedTokens);
+        const requestedModelKey = isLocal ? 'local-heuristic' : this.normalizeModelKey(model);
+        const { costUSD, savingsUSD, unpriced, modelKey } = this.calculateCost(requestedModelKey, inputTokens, outputTokens, cachedTokens);
         const costBRL = costUSD * GEMINI_CONFIG_2026.usdToBrlRate;
         const savingsBRL = savingsUSD * GEMINI_CONFIG_2026.usdToBrlRate;
 
@@ -7408,13 +7424,14 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           timestamp: new Date(),
           actionName,
           model: modelKey,
-          modelLabel: (GEMINI_CONFIG_2026.pricing[modelKey] || {}).label || modelKey,
+          modelLabel: unpriced ? `Preço não cadastrado (${String(model || 'modelo desconhecido')})` : ((GEMINI_CONFIG_2026.pricing[modelKey] || {}).label || modelKey),
           inputTokens,
           outputTokens,
           cachedTokens,
           totalTokens: inputTokens + outputTokens,
           costUSD,
           costBRL,
+          unpriced,
           savingsUSD,
           savingsBRL,
           cumulativeUSD: this.sessionTotalCostUSD
@@ -7542,10 +7559,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           document.body.appendChild(popup);
         }
 
-        const isFree = record.costUSD === 0;
-        const costColor = isFree ? '#00ff66' : 'var(--neon)';
-        const costStr = this.formatUSD(record.costUSD);
-        const brlStr = this.formatBRL(record.costBRL);
+        const isFree = record.costUSD === 0 && !record.unpriced;
+        const costColor = isFree ? '#00ff66' : (record.unpriced ? '#ffbb00' : 'var(--neon)');
+        const costStr = record.unpriced ? 'Não estimado' : this.formatUSD(record.costUSD);
+        const brlStr = record.unpriced ? 'modelo sem tarifa cadastrada' : this.formatBRL(record.costBRL);
         const cumStr = this.formatUSD(record.cumulativeUSD);
 
         popup.style.display = 'block';
@@ -7554,7 +7571,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             <div style="display: flex; align-items: center; gap: 6px;">
               <span style="font-size: 13px;">💸</span>
               <span style="font-size: 11px; font-weight: 800; color: ${costColor}; text-transform: uppercase; letter-spacing: 0.4px;">
-                ${isFree ? 'Custo Zero (Free Tier / Local)' : 'Controle de Gastos (Gemini 2026)'}
+                ${record.unpriced ? 'Custo não estimado' : (isFree ? 'Custo Zero (Free Tier / Local)' : 'Estimativa de custo (tarifa padrão)')}
               </span>
             </div>
             <button onclick="AppExpenseTracker.hideDiscreteExpensePopup()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 14px; line-height: 1;" title="Fechar">✕</button>
@@ -7580,7 +7597,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             </div>` : ''}
             <div style="display: flex; justify-content: space-between;">
               <span style="color: var(--text-muted);">Custo desta ação:</span>
-              <span style="font-weight: 800; color: #00ff66;">${costStr} <small style="color: var(--text-secondary); font-weight: 500;">(${brlStr})</small></span>
+              <span style="font-weight: 800; color: ${costColor};">${costStr} <small style="color: var(--text-secondary); font-weight: 500;">(${brlStr})</small></span>
             </div>
           </div>
 
