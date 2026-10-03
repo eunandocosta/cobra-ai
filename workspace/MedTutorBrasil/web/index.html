@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261003-xp-level-reward-v6">
+  <link rel="stylesheet" href="/styles.css?v=20261003-xp-notification-layout-v7">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -105,6 +105,15 @@
           <button class="btn-outline-action primary" id="btnUniversalUpload" onclick="openGeneralUploadModal()" title="Fazer Upload de Materiais de Estudo (PDFs, Slides, Anotações ou Google Drive)">
             <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Upload de Material</span>
+          </button>
+          <button class="topbar-utility-action" id="btnOpenClassmates" type="button" onclick="openClassmatesModal()" aria-controls="modalClassmates" aria-label="Abrir comunidade de colegas da faculdade" title="Colegas">
+            <svg class="topbar-utility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>
+            <span class="topbar-utility-label">Colegas</span>
+            <span class="classmates-fab-badge" id="classmatesFabBadge" style="display:none">0</span>
+          </button>
+          <button class="topbar-utility-action" id="btnOpenDoubts" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir caderno de dúvidas" title="Dúvidas">
+            <svg class="topbar-utility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            <span class="topbar-utility-label">Dúvidas</span>
           </button>
           <button class="btn-outline-action" id="btnTopbarSyllabus" onclick="openSyllabusModal()" title="Importar ementa da sua faculdade">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -3205,18 +3214,6 @@
     </div>
   </div>
 
-  <!-- BOTÃO FLUTUANTE DE COLEGAS (AO LADO DE DÚVIDAS) -->
-  <button class="classmates-fab" id="btnOpenClassmates" type="button" onclick="openClassmatesModal()" aria-controls="modalClassmates" aria-label="Abrir comunidade de colegas da faculdade">
-    <span class="classmates-fab-icon">👥</span>
-    <span>Colegas</span>
-    <span class="classmates-fab-badge" id="classmatesFabBadge" style="display: none;">0</span>
-  </button>
-
-  <!-- CADERNO PESSOAL DE DÚVIDAS -->
-  <button class="doubts-fab" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir caderno de dúvidas">
-    <span class="doubts-fab-icon">?</span>
-    <span>Dúvidas</span>
-  </button>
   <aside class="doubts-drawer" id="doubtsDrawer" aria-hidden="true" aria-label="Caderno de dúvidas">
     <div class="doubts-drawer-header">
       <button class="doubts-icon-button" id="doubtsBackButton" type="button" onclick="goBackInDoubtsDrawer()" aria-label="Voltar" style="display:none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/><path d="M8 12h10"/></svg></button>
@@ -3649,7 +3646,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261003-study-time-v1"></script>
   <script defer src="/material-icons.js?v=20261003-material-symbols-v1"></script>
-  <script defer src="/app.min.js?v=20261003-xp-level-reward-v6"></script>
+  <script defer src="/app.min.js?v=20261003-xp-notification-layout-v7"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');

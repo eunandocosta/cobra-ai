@@ -349,6 +349,37 @@
       gap: 8px;
     }
 
+    /* Ações globais ficam no cabeçalho, fora da área dos cartões e avisos. */
+    .topbar-utility-action {
+      position: relative;
+      min-width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      color: var(--text-secondary);
+      background: var(--bg-card);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: color .18s ease, border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+    .topbar-utility-action:hover,
+    .topbar-utility-action:focus-visible {
+      color: var(--neon);
+      border-color: rgba(0, 237, 120, .55);
+      background: var(--neon-subtle);
+    }
+    .topbar-utility-action:active { transform: scale(.96); }
+    .topbar-utility-icon { width: 19px; height: 19px; flex: 0 0 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .topbar-utility-action .classmates-fab-badge { position: absolute; top: -5px; right: -5px; min-width: 16px; box-sizing: border-box; padding: 1px 4px; border: 2px solid var(--bg-surface); border-radius: 999px; color: #07150d; background: var(--neon); font-size: 9px; line-height: 1.2; text-align: center; }
+
     .gamification-topbar {
       width: 132px;
       min-width: 132px;
@@ -5712,7 +5743,8 @@
     #appNotificationStack { position: fixed; z-index: 100500; right: 24px; bottom: 24px; width: min(360px, calc(100vw - 48px)); display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; }
     #appNotificationStack .gamification-reward-card { position: relative; top: auto; right: auto; bottom: auto; flex: 0 0 auto; }
     .gamification-reward-card { position: relative; width: min(286px, calc(100vw - 28px)); min-height: 66px; display: flex; align-items: center; gap: 12px; overflow: hidden; padding: 11px 15px 14px; border: 1px solid rgba(0,255,115,.48); border-radius: 16px; color: var(--text-primary); background: linear-gradient(140deg, #14251a, #101914 72%); box-shadow: 0 15px 42px rgba(0,0,0,.48), 0 0 28px rgba(0,237,120,.15); animation: gamificationRewardPop .56s cubic-bezier(.18,.9,.25,1.3) both; pointer-events: none; }
-    .gamification-reward-icon { flex: 0 0 38px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: var(--neon); background: rgba(0,255,115,.12); font-size: 22px; }
+    .gamification-reward-icon { flex: 0 0 38px; width: 38px; height: 38px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; color: var(--neon); background: rgba(0,255,115,.12); }
+    .gamification-reward-icon svg { width: 23px; height: 23px; fill: currentColor; }
     .gamification-reward-copy { display: grid; min-width: 0; gap: 2px; }
     .gamification-reward-copy small { color: var(--text-secondary); font-size: 10px; font-weight: 650; }
     .gamification-reward-copy strong { display: flex; align-items: baseline; gap: 4px; color: var(--neon); font-size: 24px; font-weight: 820; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -6632,33 +6664,6 @@
       display: none;
     }
 
-    .doubts-fab {
-      position: fixed;
-      z-index: 9000;
-      right: 22px;
-      bottom: 90px;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      min-height: 48px;
-      padding: 8px 15px 8px 8px;
-      border: 1px solid rgba(0, 229, 255, .42);
-      border-radius: 999px;
-      color: var(--text-primary);
-      background: rgba(8, 36, 29, .95);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-    }
-
-    .doubts-fab:hover {
-      border-color: var(--neon);
-      color: var(--neon);
-    }
-
-    .doubts-fab-icon,
     .doubts-icon-button {
       display: grid;
       place-items: center;
@@ -7168,22 +7173,6 @@
        ========================================================= */
     @media (max-width: 1280px) {
       .sidebar { display: none; }
-
-      .doubts-fab {
-        top: auto;
-        bottom: calc(78px + env(safe-area-inset-bottom));
-        right: 12px;
-        left: auto;
-        min-height: 44px;
-      }
-
-      .classmates-fab {
-        top: auto;
-        bottom: calc(136px + env(safe-area-inset-bottom));
-        right: 12px;
-        left: auto;
-        min-height: 44px;
-      }
 
       /* O modal de leitura precisa caber entre as áreas seguras do telefone;
          título, badges e ações quebram sem sair da viewport. */
@@ -9224,48 +9213,6 @@
       margin: 12px 0;
     }
 
-    /* =========================================================
-       BOTÃO FLUTUANTE DE COLEGAS (AO LADO DE DÚVIDAS)
-       ========================================================= */
-    .classmates-fab {
-      position: fixed;
-      z-index: 9000;
-      right: 136px;
-      bottom: 90px;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      min-height: 48px;
-      padding: 8px 15px 8px 8px;
-      border: 1px solid rgba(0, 229, 255, .42);
-      border-radius: 999px;
-      color: var(--text-primary);
-      background: rgba(8, 36, 29, .95);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-      transition: all 0.2s ease;
-    }
-
-    .classmates-fab:hover {
-      border-color: var(--neon);
-      color: var(--neon);
-      box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
-      transform: translateY(-1px);
-    }
-
-    .classmates-fab-icon {
-      display: grid;
-      place-items: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: rgba(0, 229, 255, 0.15);
-      font-size: 14px;
-    }
-
     .classmates-fab-badge {
       background: var(--neon);
       color: #06170d;
@@ -10228,26 +10175,12 @@
     }
   }
 
-  /* Mantém os atalhos flutuantes acima da navegação móvel.
-     Esta regra fica após os estilos-base para não perder a cascata do FAB Colegas. */
+  /* Atalhos de colegas e dúvidas ficam no cabeçalho; o aviso de XP permanece
+     acima da navegação móvel e longe do compositor. */
   @media (max-width: 1280px) {
-    .classmates-fab,
-    .doubts-fab {
-      position: fixed;
-      z-index: 9000;
-      top: auto;
-      right: 12px;
-      left: auto;
-      min-height: 44px;
-    }
-
-    .doubts-fab {
-      bottom: calc(78px + env(safe-area-inset-bottom));
-    }
-
-    .classmates-fab {
-      bottom: calc(134px + env(safe-area-inset-bottom));
-    }
+    .topbar-utility-action { width: 40px; min-width: 40px; height: 40px; padding: 0; }
+    .topbar-utility-label { display: none; }
+    #appNotificationStack { bottom: calc(76px + env(safe-area-inset-bottom)); }
   }
 
   /* O chat é uma área de trabalho, não um cartão centralizado como as demais abas. */
@@ -10317,25 +10250,7 @@
     }
   }
 
-  /* No celular, os FABs ficam empilhados acima da navegação — nunca sobre ela.
-     Reserva-se a mesma faixa no compositor para não cobrir o campo de mensagem. */
-  @media (max-width: 767px) {
-    .doubts-fab,
-    .classmates-fab {
-      right: 12px !important;
-      left: auto !important;
-      min-height: 44px;
-    }
-
-    .doubts-fab {
-      bottom: calc(74px + env(safe-area-inset-bottom)) !important;
-    }
-
-    .classmates-fab {
-      bottom: calc(128px + env(safe-area-inset-bottom)) !important;
-    }
-
-    .view-content.chat-view-active #tab-chat .gemini-bottom-dock {
-      padding-bottom: calc(112px + env(safe-area-inset-bottom));
-    }
+  @media (max-width: 390px) {
+    .topbar-utility-action { width: 34px; min-width: 34px; height: 36px; }
+    .topbar-utility-icon { width: 18px; height: 18px; flex-basis: 18px; }
   }

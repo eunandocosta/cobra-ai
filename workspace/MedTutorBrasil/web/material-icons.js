@@ -59,7 +59,7 @@
   ];
 
   function shouldPreserveSvg(svg) {
-    return Boolean(svg.closest('.brand-logo, .brand-mark, .cta-mark, .footer-brand, .auth-logo-badge, .pwa-boot-mark, .google-icon, .sidebar-toggle-icon, .chat-message, .chat-response, .message-content, .report-content, .report-preview, .report-body, .flashcard-question, .flashcard-answer, .quiz-question, .quiz-explanation, .study-material-content'));
+    return Boolean(svg.closest('.brand-logo, .brand-mark, .cta-mark, .footer-brand, .auth-logo-badge, .pwa-boot-mark, .google-icon, .sidebar-toggle-icon, .topbar-utility-icon, .chat-message, .chat-response, .message-content, .report-content, .report-preview, .report-body, .flashcard-question, .flashcard-answer, .quiz-question, .quiz-explanation, .study-material-content'));
   }
 
   function inferIconName(element) {

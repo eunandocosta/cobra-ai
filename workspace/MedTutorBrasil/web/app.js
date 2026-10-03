@@ -3301,41 +3301,44 @@
 
       showReward(award, event, previousTotalXp = this.state.totalXp - (Number(award?.earnedXp) || 0)) {
         const soundType = award?.levelUp ? 'levelUp' : (event?.outcome === 'correct' ? 'correct' : (event?.outcome === 'incorrect' ? 'incorrect' : null));
-        const soundStarted = soundType ? MedTutorGamificationPreferences.play(soundType) : Promise.resolve(false);
         if (!award) return;
+        // Áudio é apenas complementar: autoplay/bloqueio de rede nunca pode impedir
+        // que o feedback visual da recompensa apareça.
+        if (soundType) MedTutorGamificationPreferences.play(soundType).catch(() => false);
         if (award.levelUp) {
-          soundStarted.finally(() => {
-            document.getElementById('gamificationRewardCard')?.remove();
-            showLevelUpModal(award, previousTotalXp);
-          });
+          document.getElementById('gamificationRewardCard')?.remove();
+          showLevelUpModal(award, previousTotalXp);
           return;
         }
         if (!MedTutorGamificationPreferences.enabled('alerts')) return;
         if (!award.earnedXp) return;
-        soundStarted.finally(() => {
-          document.getElementById('gamificationRewardCard')?.remove();
-          const card = document.createElement('div');
-          card.id = 'gamificationRewardCard';
-          card.className = 'gamification-reward-card';
-          card.setAttribute('role', 'status');
-          card.setAttribute('aria-live', 'polite');
-          card.setAttribute('aria-label', `Você ganhou ${award.earnedXp} XP`);
-          const icon = createMaterialIcon('auto_awesome', 'gamification-reward-icon', '22px');
-          const copy = document.createElement('span');
-          copy.className = 'gamification-reward-copy';
-          copy.innerHTML = '<small>XP conquistado</small><strong><span class="gamification-reward-value" aria-hidden="true">+0</span><span class="gamification-reward-unit" aria-hidden="true">XP</span></strong>';
-          const timer = document.createElement('span');
-          timer.className = 'gamification-reward-timer';
-          timer.setAttribute('aria-hidden', 'true');
-          card.append(icon, copy, timer);
-          ensureAppNotificationStack().appendChild(card);
-          animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
-          clearTimeout(this.rewardTimer);
-          this.rewardTimer = setTimeout(() => {
-            card.classList.add('is-leaving');
-            setTimeout(() => card.remove(), 260);
-          }, 5000);
-        });
+        document.getElementById('gamificationRewardCard')?.remove();
+        const card = document.createElement('div');
+        card.id = 'gamificationRewardCard';
+        card.className = 'gamification-reward-card';
+        card.setAttribute('role', 'status');
+        card.setAttribute('aria-live', 'polite');
+        card.setAttribute('aria-label', `Você ganhou ${award.earnedXp} XP`);
+        const icon = document.createElement('span');
+        icon.className = 'gamification-reward-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        // SVG de contingência evita que a ligadura "auto_awesome" apareça como
+        // texto caso a fonte remota do Google demore ou não carregue.
+        icon.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2Zm7 12 .9 3.1L23 18l-3.1.9L19 22l-.9-3.1L15 18l3.1-.9L19 14Z"/></svg>';
+        const copy = document.createElement('span');
+        copy.className = 'gamification-reward-copy';
+        copy.innerHTML = '<small>XP conquistado</small><strong><span class="gamification-reward-value" aria-hidden="true">+0</span><span class="gamification-reward-unit" aria-hidden="true">XP</span></strong>';
+        const timer = document.createElement('span');
+        timer.className = 'gamification-reward-timer';
+        timer.setAttribute('aria-hidden', 'true');
+        card.append(icon, copy, timer);
+        ensureAppNotificationStack().appendChild(card);
+        animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
+        clearTimeout(this.rewardTimer);
+        this.rewardTimer = setTimeout(() => {
+          card.classList.add('is-leaving');
+          setTimeout(() => card.remove(), 260);
+        }, 5000);
       }
     };
 
