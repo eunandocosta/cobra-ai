@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261005-announcements-v2">
+  <link rel="stylesheet" href="/styles.css?v=20261005-admin-menu-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -166,6 +166,11 @@
                 <svg class="icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
                 <span>Sincronizar na Nuvem</span>
               </button>
+              <div class="user-dropdown-divider" id="adminMenuDivider" hidden></div>
+              <a class="user-dropdown-item admin-menu-entry" id="adminPanelMenuEntry" href="/anuncios#annAdmin" hidden>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.7 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.8 7.5-9.5V6L12 3Z"/><path d="M9 12h6M12 9v6"/></svg>
+                <span>Painel de Administração</span>
+              </a>
               <div class="user-dropdown-divider"></div>
               <button class="user-dropdown-item danger" onclick="MedTutorAuthService.signOut()">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -3646,7 +3651,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1"></script>
   <script defer src="/material-icons.js?v=20261004-material-symbols-v2"></script>
-  <script defer src="/app.min.js?v=20261005-quiz-mistake-xp-v1"></script>
+  <script defer src="/app.min.js?v=20261005-admin-menu-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-v1"></script>
   <script>
     window.addEventListener('load', () => {

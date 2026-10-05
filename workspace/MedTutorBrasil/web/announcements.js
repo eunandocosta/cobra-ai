@@ -123,7 +123,12 @@
     try {
       const result = await request('/api/announcements/admin/status');
       adminPanel.hidden = result.isAdmin !== true;
-      if (result.isAdmin === true) await loadEmailCampaigns();
+      if (result.isAdmin === true) {
+        await loadEmailCampaigns();
+        if (location.hash === '#annAdmin') {
+          requestAnimationFrame(() => adminPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }
+      }
     } catch (_) {
       adminPanel.hidden = true;
     }

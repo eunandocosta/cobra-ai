@@ -6653,6 +6653,20 @@
       transition: background 0.15s ease;
     }
 
+    .user-dropdown-item[hidden],
+    .user-dropdown-divider[hidden] {
+      display: none !important;
+    }
+
+    .admin-menu-entry {
+      color: var(--neon);
+      text-decoration: none;
+    }
+
+    .admin-menu-entry .icon {
+      flex: 0 0 auto;
+    }
+
     .user-dropdown-item:hover {
       background: var(--bg-surface);
     }

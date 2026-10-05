@@ -255,6 +255,9 @@
       accessResolveUid: '',
       cloudRefreshPromise: null,
       cloudRefreshUid: '',
+      adminMenuStatusUid: '',
+      adminMenuCheckedAt: 0,
+      adminMenuStatusPromise: null,
 
       setAuthScreenState(state) {
         const authScreen = document.getElementById('authScreenContainer');
@@ -935,6 +938,56 @@
         const btnSyllabus = document.getElementById('btnTopbarSyllabus');
         if (btnSyllabus) {
           btnSyllabus.style.display = isUniverso ? 'none' : 'inline-flex';
+        }
+        this.refreshAdminMenuVisibility();
+      },
+
+      async refreshAdminMenuVisibility(force = false) {
+        const entry = document.getElementById('adminPanelMenuEntry');
+        const divider = document.getElementById('adminMenuDivider');
+        if (!entry) return;
+
+        const user = firebaseAuth?.currentUser;
+        const uid = user?.uid || '';
+        if (!uid || this.authMode !== 'firebase' || !this.authStateResolved) {
+          entry.hidden = true;
+          if (divider) divider.hidden = true;
+          this.adminMenuStatusUid = '';
+          this.adminMenuCheckedAt = 0;
+          return;
+        }
+
+        if (!force && this.adminMenuStatusUid === uid && Date.now() - this.adminMenuCheckedAt < 60000) return;
+        if (this.adminMenuStatusUid && this.adminMenuStatusUid !== uid) {
+          entry.hidden = true;
+          if (divider) divider.hidden = true;
+        }
+        if (this.adminMenuStatusPromise) return this.adminMenuStatusPromise;
+
+        const requestedUid = uid;
+        this.adminMenuStatusPromise = (async () => {
+          let isAdmin = false;
+          try {
+            const response = await fetch('/api/announcements/admin/status', { cache: 'no-store' });
+            if (response.ok) {
+              const result = await response.json();
+              isAdmin = result?.isAdmin === true;
+            }
+          } catch (error) {
+            // Falha fechada: indisponibilidade do endpoint não concede acesso visual.
+          }
+          if (firebaseAuth?.currentUser?.uid === requestedUid && this.currentUser?.uid === requestedUid) {
+            entry.hidden = !isAdmin;
+            if (divider) divider.hidden = !isAdmin;
+            this.adminMenuStatusUid = requestedUid;
+            this.adminMenuCheckedAt = Date.now();
+          }
+        })();
+
+        try {
+          await this.adminMenuStatusPromise;
+        } finally {
+          this.adminMenuStatusPromise = null;
         }
       },
 
@@ -3758,6 +3811,7 @@
       if (event) event.stopPropagation();
       const dropdown = document.getElementById('userProfileDropdown');
       if (dropdown) dropdown.classList.toggle('active');
+      MedTutorAuthService.refreshAdminMenuVisibility(true);
     }
 
     document.addEventListener('click', (e) => {
