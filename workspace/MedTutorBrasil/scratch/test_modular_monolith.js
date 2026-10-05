@@ -151,16 +151,16 @@ const sceReviewMarkup = fs.readFileSync(path.join(__dirname, '..', 'web', 'index
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261003-xp-notification-layout-v7', 'o bundle deve invalidar o cache após mudanças no app');
-assert(serviceWorkerSource.includes("medtutor-static-v95") && serviceWorkerSource.includes('/app.min.js?v=20261003-xp-notification-layout-v7') && serviceWorkerSource.includes('/styles.css?v=20261003-xp-notification-layout-v7') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
+assert(appBundleVersion === '20261005-quiz-source-grounding-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(serviceWorkerSource.includes("medtutor-static-v99") && serviceWorkerSource.includes('/app.min.js?v=20261005-quiz-source-grounding-v1') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
 const materialIconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf-8');
 const materialIconsCss = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.css'), 'utf-8');
-assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('/material-icons.js?v=20261003-material-symbols-v1'), 'a interface do app deve carregar ícones Material Symbols Rounded subsetados pelo Google Fonts');
+assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('/material-icons.js?v=20261004-material-symbols-v2'), 'a interface do app deve carregar ícones Material Symbols Rounded subsetados pelo Google Fonts');
 assert(materialIconScript.includes('new MutationObserver') && materialIconScript.includes('convertSvg') && materialIconScript.includes('convertLeadingEmoji'), 'ícones estáticos e controles dinâmicos devem ser migrados ao sistema Material');
 assert(materialIconScript.includes('.brand-logo') && materialIconScript.includes('.google-icon') && materialIconsCss.includes("font-family: 'Material Symbols Rounded'"), 'logotipos permanecem intactos e os símbolos usam a família Material dedicada');
 for (const page of ['login.html', 'landing.html']) {
   const markup = fs.readFileSync(path.join(__dirname, '..', 'web', page), 'utf-8');
-  assert(markup.includes('/material-icons.js?v=20261003-material-symbols-v1') && markup.includes('family=Material+Symbols+Rounded'), `${page} deve compartilhar os ícones Material do app`);
+  assert(markup.includes('/material-icons.js?v=20261004-material-symbols-v2') && markup.includes('family=Material+Symbols+Rounded'), `${page} deve compartilhar os ícones Material do app`);
 }
 assert(sceReviewMarkup.includes('id="levelUpModal"') && /id="levelUpContinueButton"[^>]*>Vamos continuar aprendendo juntos!/.test(sceReviewMarkup), 'a subida de nível deve abrir um painel central com CTA de continuidade');
 assert(appSource.includes('MedTutorStudyTimeTracker.init()') && appSource.includes("['flashcards', 'quizzes', 'sce'].includes(currentTab)"), 'o tempo de estudo deve ser rastreado apenas nas áreas de estudo');

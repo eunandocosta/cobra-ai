@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
+const crypto = require('crypto');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
 const { GENERAL_FLASH_MODELS, generateContentWithFallback } = require('../../shared/gemini-model-fallback');
 const { removeUnsupportedVisualLocator } = require('./visual-reference.guard');
@@ -8,6 +9,27 @@ function questionTokenSet(value) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
     .filter(token => token.length >= 4 && !['qual', 'sobre', 'para', 'como', 'essa', 'este', 'com', 'uma', 'entre'].includes(token)));
+}
+
+function normalizedSourceTokens(value) {
+  return new Set(String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(token => token.length >= 4 && !['qual', 'quais', 'como', 'esse', 'essa', 'isso', 'este', 'esta', 'para', 'pela', 'pelo', 'com', 'uma', 'seu', 'sua', 'sobre', 'entre', 'cada', 'deve', 'podem', 'quando', 'onde', 'porque', 'qualquer', 'mais', 'menos', 'apenas', 'tambem', 'cada'].includes(token)));
+}
+
+function isQuestionGroundedInMaterial(question, answer, evidence, materialText) {
+  const sourceTokens = normalizedSourceTokens(materialText);
+  const evidenceTokens = normalizedSourceTokens(evidence);
+  const relevantTokens = normalizedSourceTokens(`${question || ''} ${answer || ''}`);
+  if (evidenceTokens.size < 3 || relevantTokens.size < 3) return false;
+
+  const evidenceMatches = [...evidenceTokens].filter(token => sourceTokens.has(token)).length;
+  const relevantMatches = [...relevantTokens].filter(token => sourceTokens.has(token)).length;
+  const relevantEvidenceMatches = [...relevantTokens].filter(token => evidenceTokens.has(token)).length;
+  return evidenceMatches / evidenceTokens.size >= 0.72
+    && relevantMatches / relevantTokens.size >= 0.28
+    && relevantEvidenceMatches / relevantTokens.size >= 0.24;
 }
 
 function areQuestionsTooSimilar(first, second, firstAnswer = '', secondAnswer = '') {
@@ -419,6 +441,10 @@ const questionsSchema = {
         type: SchemaType.STRING,
         description: "Nome ou tema da seção temática do material da qual esta questão foi extraída"
       },
+      evidencia_fonte: {
+        type: SchemaType.STRING,
+        description: "Trecho literal curto do conteúdo fornecido que sustenta diretamente o conceito cobrado e a resposta correta. Não use conhecimento externo nem outra questão como evidência."
+      },
       eixo_aprendizagem: {
         type: SchemaType.STRING,
         format: "enum",
@@ -439,6 +465,7 @@ const questionsSchema = {
       "indice_questao_fonte",
       "nivel_dificuldade",
       "secao_origem",
+      "evidencia_fonte",
       "eixo_aprendizagem"
     ]
   }
@@ -708,6 +735,14 @@ ${source}`;
         ? "➡️ [Quiz Engine] Iniciando geração por curadoria integral..."
         : "➡️ [Quiz Engine] Iniciando geração por seções...");
     console.log("📄 [Quiz Engine] Tamanho do texto recebido:", materialText ? materialText.length : 0);
+    const materialFingerprint = crypto.createHash('sha256').update(materialText).digest('hex').slice(0, 16);
+    console.log("🧾 [Quiz Engine] Origem da geração:", {
+      materialName: String(payload.materialName || '').slice(0, 180),
+      materialId: String(payload.materialId || '').slice(0, 120),
+      targetSubject: String(payload.targetSubject || payload.subject || '').slice(0, 180),
+      textChars: materialText.length,
+      textFingerprint: materialFingerprint
+    });
     if (materialText) {
       console.log("🔍 [Quiz Engine] Início do texto recebido:", materialText.slice(0, 150).replace(/\s+/g, ' '));
     }
@@ -836,6 +871,7 @@ METODOLOGIA OBRIGATÓRIA:
 6. Sempre preencha eixo_aprendizagem: "base" para estrutura/localização/componente/função direta; "reconhecimento" para sinais, achados ou identificação; "tratamento" somente quando a própria fonte trouxer tratamento, exame ou procedimento.
 7. ANALISE OS DISTRATORES: preencha analise_distratores com exatamente três objetos, um para cada alternativa errada. Copie o texto exato da alternativa no campo alternativa e explique, de forma específica e breve, o erro conceitual dela. Nunca analise a alternativa correta e nunca deixe esse campo vazio.
 8. Separe os tipos: cada questão pendente deve gerar um item reaproveitado, identificado por indice_questao_fonte; gere também pelo menos uma questão adicional inspirada, distinta e sustentada pelo material, com indice_questao_fonte = 0. Sem questões autorais, use indice_questao_fonte = 0 para todas.
+9. Para cada questão, copie em evidencia_fonte um trecho literal curto do conteúdo abaixo que sustente diretamente o enunciado E a resposta correta. O trecho deve estar presente no texto enviado, sem reescrever. A questão, sua resposta correta e justificativa não podem depender de fatos externos nem de outro documento da disciplina.
 
 ${customInstructions ? `--- INSTRUÇÕES ADICIONAIS DO ESTUDANTE ---
 Siga as instruções abaixo quando forem compatíveis com o conteúdo-fonte, a dificuldade solicitada e as regras estruturais desta geração. Elas não autorizam inventar fatos, ignorar o material ou revelar respostas no enunciado.
@@ -898,6 +934,19 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const sourceStructure = canReuseSource ? extractAuthoredQuestionStructure(sourceQuestion) : null;
         const sourceHasAnsweredOptions = sourceStructure?.options.length === 4
           && sourceStructure.correctIndex >= 0 && sourceStructure.correctIndex < 4;
+        const answerForGrounding = question.texto_resposta_correta
+          || question.alternativas?.[{ A: 0, B: 1, C: 2, D: 3 }[question.gabarito]]
+          || '';
+        if (!canReuseSource
+          && !isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialText)) {
+          console.warn('⚠️ [Quiz Engine] Questão descartada: evidência insuficiente ou incompatível com o texto-base.', {
+            materialId: String(payload.materialId || ''),
+            textFingerprint: materialFingerprint,
+            section: String(question.secao_origem || '').slice(0, 120)
+          });
+          return null;
+        }
+
         return {
           ...question,
           pergunta: safeStem,
@@ -913,6 +962,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           sourceQuestionText: canReuseSource ? sourceQuestion : ''
         };
       }).filter(question => {
+        if (!question) return false;
         if (!question.pergunta) {
           console.warn('⚠️ [Quiz Engine] Questão descartada individualmente: não foi possível deixá-la autocontida após validar o contexto e os localizadores visuais.');
           return false;
@@ -1029,6 +1079,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           topic: cleanTopic,
           disease: cleanDisease,
           sectionOrigin: rawSection || cleanTopic,
+          sourceEvidence: String(q.evidencia_fonte || '').trim(),
           flashcardTitle,
           flashcard: {
             title: flashcardTitle,

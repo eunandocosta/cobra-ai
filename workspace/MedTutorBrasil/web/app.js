@@ -8427,12 +8427,25 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         ? config.difficulty
         : 'balanced';
       try {
-        logQuizGenerationDebug('backend_generation_started', { requestedItems: count, requestedDifficulty, previousCount: previousQuestions.length, previousAnswersCount: previousQuestionAnswers.length, authoredQuestionsFound: authoredSourceQuestions.length });
+        logQuizGenerationDebug('backend_generation_started', {
+          requestedItems: count,
+          requestedDifficulty,
+          previousCount: previousQuestions.length,
+          previousAnswersCount: previousQuestionAnswers.length,
+          authoredQuestionsFound: authoredSourceQuestions.length,
+          materialName: metadata.materialName || '',
+          materialId: metadata.materialId || metadata.id || '',
+          subjectName: metadata.subjectName || '',
+          sourceTextChars: String(materialText || '').length
+        });
         const response = await fetch('/api/quizzes/gerar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             materialText,
+            materialName: metadata.materialName || '',
+            materialId: metadata.materialId || metadata.id || '',
+            targetSubject: metadata.subjectName || '',
             quantidade: count,
             difficulty: requestedDifficulty,
             previousQuestions,

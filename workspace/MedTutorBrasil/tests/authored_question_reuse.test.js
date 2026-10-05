@@ -28,7 +28,8 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     indice_questao_fonte: sourceIndex,
     nivel_dificuldade: 'iniciante',
     secao_origem: 'Vias sensitivas',
-    eixo_aprendizagem: 'base'
+    eixo_aprendizagem: 'base',
+    evidencia_fonte: 'As fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.'
   });
 
   try {
@@ -42,7 +43,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
 
     mockQuestions = [
       makeQuestion('No caso 1, qual estrutura anatômica conduz as fibras da coluna dorsal até o bulbo?', 0, 'reaproveitada_da_fonte', 'Fascículo grácil e cuneiforme'),
-      makeQuestion('Como a organização das colunas dorsais se relaciona ao trajeto sensitivo?', 0, 'inspirada_na_fonte', 'Transmissão de propriocepção e tato discriminativo')
+      { ...makeQuestion('Por qual região da medula as fibras sobem até os núcleos grácil e cuneiforme?', 0, 'inspirada_na_fonte', 'Pelas colunas dorsais, ipsilateralmente'), evidencia_fonte: 'As fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.' }
     ];
     const generated = await quizzesService.generateQuestions({
       materialText: `Caso 1: Homem de 19 anos apresenta perda sensitiva vibratória distal.\n${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
@@ -62,7 +63,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     console.log('  [PASS] Questão inspirada permanece adicional');
 
     mockQuestions = [
-      makeQuestion('Qual estrutura anexa da pele, responsável pela produção de secreção holócrina, é evidenciada na Figura 2 do material original?', 0, 'inspirada_na_fonte', 'Glândula sebácea'),
+      { ...makeQuestion('Qual glândula produz secreção holócrina, conforme a Figura 2?', 0, 'inspirada_na_fonte', 'Glândula sebácea'), evidencia_fonte: 'As glândulas sebáceas produzem secreção holócrina.' },
       makeQuestion('Qual estrutura está indicada na Figura 2?', 0, 'inspirada_na_fonte', 'Estrutura visual')
     ];
     const visualReferenceQuestions = await quizzesService.generateQuestions({
@@ -72,11 +73,14 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
       difficulty: 'balanced'
     });
     assert.strictEqual(visualReferenceQuestions.length, 1, 'A questão impossível deve ser descartada sem eliminar as demais');
-    assert.strictEqual(visualReferenceQuestions[0].question, 'Qual estrutura anexa da pele, responsável pela produção de secreção holócrina?');
+    assert.strictEqual(visualReferenceQuestions[0].question, 'Qual glândula produz secreção holócrina?');
     assert(!/Figura\s*2/i.test(visualReferenceQuestions[0].question), 'A referência à figura ausente deve sair do enunciado');
     console.log('  [PASS] Referência a figura removida quando o enunciado continua completo');
     console.log('  [PASS] Questão dependente exclusivamente de figura é descartada individualmente');
 
+    mockQuestions = [
+      { ...makeQuestion('Como as fibras percorrem as colunas dorsais até o bulbo?', 0, 'inspirada_na_fonte', 'Sobem ipsilateralmente pelas colunas dorsais'), evidencia_fonte: 'As fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.' }
+    ];
     const withoutCaseDetails = await quizzesService.generateQuestions({
       materialText: `${sourceLine}\nAs fibras sobem ipsilateralmente pelas colunas dorsais até os núcleos grácil e cuneiforme no bulbo.`,
       quantidade: 1,
@@ -90,7 +94,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     mockQuestions = [
       makeQuestion('sintoma do paciente está associado a cada um deles?', 0, 'inspirada_na_fonte', 'Relação anatômico-funcional'),
       makeQuestion('(ipsilateral) ou do lado oposto (contralateral) à lesão?', 0, 'inspirada_na_fonte', 'Depende do nível de decussação'),
-      makeQuestion('Como a decussação da via determina o lado do déficit sensitivo?', 0, 'inspirada_na_fonte', 'A decussação define se o déficit é ipsilateral ou contralateral')
+      { ...makeQuestion('Para qual lado seguem as fibras após cruzar na decussação sensitiva?', 0, 'inspirada_na_fonte', 'Pelo lado oposto'), evidencia_fonte: 'As fibras da via cruzam na decussação sensitiva e seguem pelo lado oposto.' }
     ];
     const completeQuestions = await quizzesService.generateQuestions({
       materialText: 'As fibras da via cruzam na decussação sensitiva e seguem pelo lado oposto.',
@@ -99,8 +103,33 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
       difficulty: 'balanced'
     });
     assert.strictEqual(completeQuestions.length, 1, 'Fragmentos devem ser descartados individualmente');
-    assert.strictEqual(completeQuestions[0].question, 'Como a decussação da via determina o lado do déficit sensitivo?');
+    assert.strictEqual(completeQuestions[0].question, 'Para qual lado seguem as fibras após cruzar na decussação sensitiva?');
     console.log('  [PASS] Fragmentos iniciados em minúscula ou parênteses são descartados; questão completa é mantida');
+
+    mockQuestions = [
+      {
+        ...makeQuestion('Qual é a ordem correta da paramentação cirúrgica?', 0, 'nova_a_partir_da_fonte', 'Gorro, máscara e óculos, avental estéril e luvas estéreis'),
+        secao_origem: 'Paramentação cirúrgica',
+        evidencia_fonte: 'Gorro primeiro; máscara e óculos; avental estéril; luvas estéreis.'
+      },
+      {
+        ...makeQuestion('Qual trato conduz as fibras da coluna dorsal até o bulbo?', 0, 'nova_a_partir_da_fonte', 'Fascículo grácil e cuneiforme'),
+        secao_origem: 'Vias sensitivas',
+        evidencia_fonte: 'Gorro primeiro; máscara e óculos; avental estéril; luvas estéreis.'
+      }
+    ];
+    const groundedBatch = await quizzesService.generateQuestions({
+      materialText: 'Paramentação cirúrgica: gorro primeiro, cobrindo todo o cabelo; máscara e óculos; avental estéril; luvas estéreis por último.',
+      materialName: 'Biossegurança cirúrgica',
+      materialId: 'material-biosseguranca',
+      targetSubject: 'Clínica Médica',
+      quantidade: 2,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(groundedBatch.length, 1, 'Questão de outro assunto deve ser rejeitada, mesmo se o modelo disser que veio da fonte');
+    assert.match(groundedBatch[0].question, /paramentação/i);
+    assert.strictEqual(groundedBatch[0].sourceEvidence, 'Gorro primeiro; máscara e óculos; avental estéril; luvas estéreis.');
+    console.log('  [PASS] Questão fora do tema é rejeitada individualmente por falta de evidência alinhada ao texto-base');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;
