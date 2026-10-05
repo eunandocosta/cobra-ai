@@ -4,6 +4,9 @@ const router = express.Router();
 
 router.get('/', controller.listPublished);
 router.get('/admin/status', controller.adminStatus);
+router.get('/admin/users', controller.listAdminUsers);
+router.get('/admin/next-version', controller.nextVersion);
+router.patch('/admin/users/:uid/role', controller.updateUserRole);
 router.get('/admin/email-campaigns', controller.listEmailCampaigns);
 router.post('/:id/email/retry', controller.retryEmailCampaign);
 router.get('/me/email-preference', controller.emailPreference);
@@ -11,6 +14,7 @@ router.post('/me/email-preference', controller.updateEmailPreference);
 router.post('/unsubscribe', controller.unsubscribe);
 router.get('/me/unseen', controller.unseen);
 router.post('/me/:id/read', controller.markRead);
+router.post('/me/:id/answer', controller.answerPrompt);
 router.post('/', controller.publish);
 
 module.exports = router;

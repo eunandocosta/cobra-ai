@@ -38,35 +38,75 @@ async function requireAdmin(req) {
 function serializeAnnouncement(doc) {
   const data = doc.data() || {};
   const publishedAt = data.publishedAt?.toDate?.() || (data.publishedAt ? new Date(data.publishedAt) : null);
+  const kind = data.kind === 'notice' ? 'notice' : 'update';
   return {
     id: doc.id,
-    version: String(data.version || ''),
+    kind,
+    version: kind === 'update' ? String(data.version || '') : '',
     title: String(data.title || ''),
     description: String(data.description || ''),
     bannerUrl: data.bannerUrl ? String(data.bannerUrl) : '',
     bannerAlt: data.bannerAlt ? String(data.bannerAlt) : '',
+    channels: { inApp: data.channels?.inApp !== false, email: data.channels?.email === true },
+    emailConsentPrompt: data.emailConsentPrompt === true,
+    promptResponseRequired: data.promptResponseRequired === true,
+    promptText: String(data.promptText || ''),
     publishedAt: publishedAt && Number.isFinite(publishedAt.getTime()) ? publishedAt.toISOString() : null
   };
 }
 
-function slugVersion(version) {
-  return version.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function versionParts(value) {
+  const match = String(value || '').match(/^v?(\d+)\.(\d+)(?:\.\d+)?$/i);
+  return match ? [Number(match[1]), Number(match[2])] : [0, 0];
 }
 
 function validatePayload(body = {}) {
-  const version = String(body.version || '').trim();
+  const kind = body.kind === 'notice' ? 'notice' : body.kind === 'update' || !body.kind ? 'update' : '';
   const title = String(body.title || '').trim();
   const description = String(body.description || '').trim();
   const bannerUrl = String(body.bannerUrl || '').trim();
   const bannerAlt = String(body.bannerAlt || '').trim();
-  if (!/^v\d+\.\d+(?:\.\d+)?$/i.test(version)) throw Object.assign(new Error('Use uma versão como v1.12 ou v1.12.1.'), { statusCode: 400 });
+  const channels = { inApp: body.channels?.inApp === true, email: body.channels?.email === true };
+  const emailConsentPrompt = body.emailConsentPrompt === true;
+  const promptResponseRequired = body.promptResponseRequired === true;
+  const promptText = String(body.promptText || '').trim();
+  if (!kind) throw Object.assign(new Error('Selecione aviso ou atualização.'), { statusCode: 400 });
   if (!title || title.length > 160) throw Object.assign(new Error('Informe um título de até 160 caracteres.'), { statusCode: 400 });
   if (!description || description.length > 30000) throw Object.assign(new Error('Informe a descrição detalhada (até 30.000 caracteres).'), { statusCode: 400 });
+  if (!channels.inApp) throw Object.assign(new Error('A publicação no painel é obrigatória; o e-mail é um canal adicional.'), { statusCode: 400 });
+  if (emailConsentPrompt && !channels.inApp) throw Object.assign(new Error('A pergunta de consentimento exige publicação no painel.'), { statusCode: 400 });
+  if (promptText.length > 300) throw Object.assign(new Error('A pergunta deve ter até 300 caracteres.'), { statusCode: 400 });
   if (bannerUrl && (!/^https:\/\//i.test(bannerUrl) || bannerUrl.length > 2048)) {
     throw Object.assign(new Error('O banner deve ser uma URL HTTPS válida ou ficar vazio.'), { statusCode: 400 });
   }
   if (bannerAlt.length > 300) throw Object.assign(new Error('O texto alternativo do banner deve ter até 300 caracteres.'), { statusCode: 400 });
-  return { version, title, description, bannerUrl, bannerAlt };
+  return { kind, title, description, bannerUrl, bannerAlt, channels, emailConsentPrompt, promptResponseRequired, promptText };
+}
+
+function maskEmail(value) {
+  const email = String(value || '');
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '';
+  return `${local.slice(0, 1)}${local.length > 1 ? '***' : '**'}@${domain}`;
+}
+
+function serializeUser(doc) {
+  const data = doc.data() || {};
+  const dateString = value => {
+    const date = value?.toDate?.() || (value ? new Date(value) : null);
+    return date && Number.isFinite(date.getTime()) ? date.toISOString() : '';
+  };
+  return {
+    uid: doc.id,
+    name: String(data.nome || 'Estudante').slice(0, 120),
+    maskedEmail: maskEmail(data.email),
+    faculty: String(data.faculdade || '').slice(0, 120),
+    period: String(data.periodo_atual || '').slice(0, 60),
+    cycle: String(data.ciclo || '').slice(0, 60),
+    role: data.role === 'admin' ? 'admin' : 'user',
+    createdAt: dateString(data.data_criacao),
+    lastAccess: dateString(data.ultimo_acesso)
+  };
 }
 
 function respondError(res, error) {
@@ -77,7 +117,7 @@ function respondError(res, error) {
 async function listPublished(req, res) {
   try {
     const snapshot = await getFirebaseFirestore().collection(ANNOUNCEMENTS_COLLECTION).where('published', '==', true).limit(100).get();
-    const announcements = snapshot.docs.map(serializeAnnouncement).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')));
+    const announcements = snapshot.docs.map(serializeAnnouncement).filter(item => item.channels.inApp).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')));
     return res.json({ announcements });
   } catch (error) { return respondError(res, error); }
 }
@@ -95,10 +135,46 @@ async function unseen(req, res) {
     const uid = await authenticatedUid(req);
     const db = getFirebaseFirestore();
     const latest = await db.collection(ANNOUNCEMENTS_COLLECTION).where('published', '==', true).limit(100).get();
-    const newest = latest.docs.map(serializeAnnouncement).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')))[0];
+    const newest = latest.docs.map(serializeAnnouncement).filter(item => item.channels.inApp).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')))[0];
     if (!newest) return res.json({ announcement: null });
     const seen = await db.collection('users').doc(uid).collection('announcement_reads').doc(newest.id).get();
-    return res.json({ announcement: seen.exists ? null : newest });
+    const response = newest.emailConsentPrompt
+      ? await db.collection('users').doc(uid).collection('announcement_responses').doc(newest.id).get()
+      : null;
+    return res.json({ announcement: seen.exists || response?.exists ? null : newest });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function answerPrompt(req, res) {
+  try {
+    const uid = await authenticatedUid(req);
+    const id = String(req.params.id || '').trim();
+    const choice = String(req.body?.choice || '');
+    if (!id || id.length > 160 || !['accepted', 'declined', 'skipped'].includes(choice)) return res.status(400).json({ error: 'Resposta inválida.' });
+    const db = getFirebaseFirestore();
+    const announcement = await db.collection(ANNOUNCEMENTS_COLLECTION).doc(id).get();
+    if (!announcement.exists || announcement.get('published') !== true || announcement.get('emailConsentPrompt') !== true) return res.status(404).json({ error: 'Pergunta de autorização não encontrada.' });
+    if (choice === 'skipped' && announcement.get('promptResponseRequired') === true) return res.status(400).json({ error: 'Escolha uma opção para continuar.' });
+    const { FieldValue } = require('firebase-admin/firestore');
+    const answerRef = db.collection('users').doc(uid).collection('announcement_responses').doc(id);
+    const batch = db.batch();
+    batch.set(answerRef, { announcementId: id, choice, answeredAt: FieldValue.serverTimestamp() });
+    if (choice === 'accepted' || choice === 'declined') {
+      const decoded = await authenticatedUser(req);
+      if (choice === 'accepted' && (decoded.email_verified !== true || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(decoded.email || '')))) {
+        return res.status(403).json({ error: 'Confirme seu e-mail no Firebase antes de autorizar o recebimento.' });
+      }
+      batch.set(db.collection('announcement_email_subscribers').doc(uid), {
+        uid,
+        email: String(decoded.email || '').trim().toLowerCase(),
+        displayName: String(decoded.name || '').slice(0, 120),
+        optIn: choice === 'accepted',
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+    batch.set(db.collection('users').doc(uid).collection('announcement_reads').doc(id), { readAt: FieldValue.serverTimestamp() });
+    await batch.commit();
+    return res.json({ saved: true, choice });
   } catch (error) { return respondError(res, error); }
 }
 
@@ -151,6 +227,66 @@ async function listEmailCampaigns(req, res) {
   } catch (error) { return respondError(res, error); }
 }
 
+async function listAdminUsers(req, res) {
+  try {
+    await requireAdmin(req);
+    const db = getFirebaseFirestore();
+    const collection = db.collection('users');
+    const pageToken = String(req.query.pageToken || '').trim();
+    const { FieldPath } = require('firebase-admin/firestore');
+    let query = collection.orderBy(FieldPath.documentId());
+    if (pageToken && pageToken.length <= 160) {
+      const cursor = await collection.doc(pageToken).get();
+      if (cursor.exists) query = query.startAfter(cursor);
+    }
+    const snapshot = await query.limit(200).get();
+    const users = snapshot.docs.map(serializeUser);
+    return res.json({ users, nextPageToken: snapshot.size === 200 ? snapshot.docs[snapshot.docs.length - 1].id : null });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function updateUserRole(req, res) {
+  try {
+    const adminUid = await requireAdmin(req);
+    const targetUid = String(req.params.uid || '').trim();
+    const role = String(req.body?.role || '');
+    if (!targetUid || targetUid.length > 160 || !['admin', 'user'].includes(role)) return res.status(400).json({ error: 'Escolha um perfil válido.' });
+    if (adminUid === targetUid && role !== 'admin') return res.status(400).json({ error: 'Você não pode remover seu próprio acesso administrativo.' });
+    const db = getFirebaseFirestore();
+    const targetRef = db.collection('users').doc(targetUid);
+    await db.runTransaction(async transaction => {
+      const target = await transaction.get(targetRef);
+      if (!target.exists) throw Object.assign(new Error('Usuário não encontrado.'), { statusCode: 404 });
+      if (target.get('role') === 'admin' && role !== 'admin') {
+        const admins = await transaction.get(db.collection('users').where('role', '==', 'admin'));
+        if (admins.size <= 1) throw Object.assign(new Error('O último administrador não pode ser removido.'), { statusCode: 409 });
+      }
+      transaction.update(targetRef, { role, role_updated_at: new Date().toISOString(), role_updated_by: adminUid });
+    });
+    return res.json({ uid: targetUid, role });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function nextVersion(req, res) {
+  try {
+    await requireAdmin(req);
+    const db = getFirebaseFirestore();
+    const meta = await db.collection('announcement_meta').doc('versioning').get();
+    let current = meta.exists && Number.isInteger(meta.get('lastMajor')) && Number.isInteger(meta.get('lastMinor'))
+      ? [meta.get('lastMajor'), meta.get('lastMinor')]
+      : [1, -1];
+    if (!meta.exists) {
+      const existing = await db.collection(ANNOUNCEMENTS_COLLECTION).get();
+      for (const doc of existing.docs) {
+        const parts = versionParts(doc.get('version'));
+        if (parts[0] > current[0] || (parts[0] === current[0] && parts[1] > current[1])) current = parts;
+      }
+    }
+    const next = current[1] < 0 ? current : [current[0], current[1] + 1];
+    return res.json({ version: `v${next[0]}.${next[1]}` });
+  } catch (error) { return respondError(res, error); }
+}
+
 async function retryEmailCampaign(req, res) {
   try {
     await requireAdmin(req);
@@ -168,29 +304,42 @@ async function publish(req, res) {
     const uid = await requireAdmin(req);
     const data = validatePayload(req.body);
     const db = getFirebaseFirestore();
-    const id = slugVersion(data.version);
-    const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc(id);
-    const emailStatus = announcementEmail.isEmailConfigured() ? 'queued' : 'configuration_required';
-    const campaignRef = db.collection('announcement_email_campaigns').doc(id);
+    const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc();
+    const campaignRef = db.collection('announcement_email_campaigns').doc(ref.id);
     const { FieldValue } = require('firebase-admin/firestore');
+    let publishedData;
+    let emailStatus = data.channels.email ? (announcementEmail.isEmailConfigured() ? 'queued' : 'configuration_required') : 'not_requested';
     await db.runTransaction(async transaction => {
-      const existing = await transaction.get(ref);
-      if (existing.exists) throw Object.assign(new Error('Essa versão já foi publicada.'), { statusCode: 409 });
-      transaction.create(ref, { ...data, published: true, publishedAt: FieldValue.serverTimestamp(), publishedBy: uid });
-      transaction.set(campaignRef, {
-        announcementId: id,
-        status: emailStatus,
-        recipientCount: 0,
-        sentCount: 0,
-        failedCount: 0,
-        recipientsInitialized: false,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
+      let version = '';
+      let askConsent = data.emailConsentPrompt;
+      if (data.kind === 'update') {
+        const versionRef = db.collection('announcement_meta').doc('versioning');
+        const meta = await transaction.get(versionRef);
+        let current = meta.exists && Number.isInteger(meta.get('lastMajor')) && Number.isInteger(meta.get('lastMinor'))
+          ? [meta.get('lastMajor'), meta.get('lastMinor')]
+          : [1, -1];
+        if (!meta.exists) {
+          const existing = await transaction.get(db.collection(ANNOUNCEMENTS_COLLECTION));
+          for (const doc of existing.docs) {
+            const parts = versionParts(doc.get('version'));
+            if (parts[0] > current[0] || (parts[0] === current[0] && parts[1] > current[1])) current = parts;
+          }
+        }
+        const next = current[1] < 0 ? current : [current[0], current[1] + 1];
+        version = `v${next[0]}.${next[1]}`;
+        if (!meta.exists || meta.get('firstUpdateConsentPromptPublished') !== true) askConsent = true;
+        transaction.set(versionRef, { lastMajor: next[0], lastMinor: next[1], firstUpdateConsentPromptPublished: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
+      const asksConsent = askConsent && data.channels.inApp;
+      publishedData = { ...data, version, emailConsentPrompt: asksConsent, promptText: asksConsent ? (data.promptText || 'Você deseja receber novidades e atualizações do MedTutor Brasil por e-mail?') : '', published: true, publishedAt: FieldValue.serverTimestamp(), publishedBy: uid };
+      transaction.create(ref, publishedData);
+      if (data.channels.email) transaction.set(campaignRef, { announcementId: ref.id, status: emailStatus, recipientCount: 0, sentCount: 0, failedCount: 0, recipientsInitialized: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     });
-    if (emailStatus === 'queued') announcementEmail.queueCampaign(id);
-    return res.status(201).json({ announcement: serializeAnnouncement(await ref.get()), emailStatus });
+    if (data.channels.email) {
+      if (emailStatus === 'queued') announcementEmail.queueCampaign(ref.id);
+    }
+    return res.status(201).json({ announcement: serializeAnnouncement(await ref.get()), emailStatus, version: publishedData.version });
   } catch (error) { return respondError(res, error); }
 }
 
-module.exports = { listPublished, adminStatus, unseen, markRead, emailPreference, updateEmailPreference, unsubscribe, listEmailCampaigns, retryEmailCampaign, publish };
+module.exports = { listPublished, adminStatus, unseen, answerPrompt, markRead, emailPreference, updateEmailPreference, unsubscribe, listEmailCampaigns, listAdminUsers, updateUserRole, nextVersion, retryEmailCampaign, publish, serializeUser, validatePayload, versionParts };

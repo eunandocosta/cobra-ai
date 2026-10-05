@@ -44,7 +44,10 @@ function escapeHtml(value) {
 }
 
 function renderEmail(announcement, recipient, config) {
-  const title = `${announcement.version} — ${announcement.title}`;
+  const isNotice = announcement.kind === 'notice';
+  const title = isNotice
+    ? `Aviso da MedTutor Brasil: ${announcement.title}`
+    : `Atualização ${String(announcement.version || '').toUpperCase()} - ${announcement.title}`;
   const paragraphs = String(announcement.description || '').split(/\n\s*\n/).map(value => value.trim()).filter(Boolean);
   const descriptionHtml = paragraphs.map(value => `<p style="margin:0 0 14px;line-height:1.7;color:#35443a;white-space:pre-wrap">${escapeHtml(value)}</p>`).join('');
   const bannerHtml = announcement.bannerUrl
@@ -52,8 +55,9 @@ function renderEmail(announcement, recipient, config) {
     : '';
   const unsubscribeToken = encodeURIComponent(signedUnsubscribeToken(recipient.uid, config.unsubscribeSecret));
   const unsubscribeUrl = `${config.siteUrl}/anuncios?unsubscribe=${unsubscribeToken}`;
-  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f3f7f4;font-family:Arial,sans-serif;color:#142019"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="640" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #dce8df;border-radius:14px;overflow:hidden"><tr><td style="padding:28px 30px 8px"><p style="margin:0 0 8px;color:#008b49;font-size:12px;font-weight:bold;letter-spacing:1px">MEDTUTOR BRASIL · ATUALIZAÇÃO</p><h1 style="margin:0 0 20px;font-size:25px;line-height:1.25">${escapeHtml(title)}</h1>${bannerHtml}${descriptionHtml}<p style="margin:24px 0"><a href="${config.siteUrl}/anuncios?id=${encodeURIComponent(announcement.id)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#00d66b;color:#062014;text-decoration:none;font-weight:bold">Ver atualização no MedTutor</a></p></td></tr><tr><td style="padding:18px 30px;border-top:1px solid #e5ece7;color:#6c7b71;font-size:12px;line-height:1.6">Você recebeu este e-mail porque ativou avisos de atualizações do MedTutor Brasil. <a href="${unsubscribeUrl}" style="color:#52665a">Cancelar recebimento</a>.</td></tr></table></td></tr></table></body></html>`;
-  const text = `${title}\n\n${announcement.description}\n\nVer atualização: ${config.siteUrl}/anuncios?id=${encodeURIComponent(announcement.id)}\n\nCancelar recebimento: ${unsubscribeUrl}`;
+  const category = isNotice ? 'AVISO DA MEDTUTOR BRASIL' : `ATUALIZAÇÃO ${String(announcement.version || '').toUpperCase()}`;
+  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f3f7f4;font-family:Arial,sans-serif;color:#142019"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="640" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;background:#fff;border:1px solid #dce8df;border-radius:14px;overflow:hidden"><tr><td style="padding:28px 30px 8px"><p style="margin:0 0 8px;color:#008b49;font-size:12px;font-weight:bold;letter-spacing:1px">${escapeHtml(category)}</p><h1 style="margin:0 0 20px;font-size:25px;line-height:1.25">${escapeHtml(title)}</h1>${bannerHtml}${descriptionHtml}<p style="margin:24px 0"><a href="${config.siteUrl}/anuncios?id=${encodeURIComponent(announcement.id)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#00d66b;color:#062014;text-decoration:none;font-weight:bold">Ver no MedTutor Brasil</a></p></td></tr><tr><td style="padding:18px 30px;border-top:1px solid #e5ece7;color:#6c7b71;font-size:12px;line-height:1.6">Você recebeu este e-mail porque autorizou o recebimento de comunicações do MedTutor Brasil. <a href="${unsubscribeUrl}" style="color:#52665a">Cancelar recebimento</a>.</td></tr></table></td></tr></table></body></html>`;
+  const text = `${title}\n\n${announcement.description}\n\nVer no MedTutor Brasil: ${config.siteUrl}/anuncios?id=${encodeURIComponent(announcement.id)}\n\nCancelar recebimento: ${unsubscribeUrl}`;
   return { subject: title, html, text, unsubscribeUrl };
 }
 
@@ -240,6 +244,7 @@ module.exports = {
   processEmailCampaign,
   queueCampaign,
   retryCampaign,
+  renderEmail,
   setEmailPreference,
   signedUnsubscribeToken,
   unsubscribe,

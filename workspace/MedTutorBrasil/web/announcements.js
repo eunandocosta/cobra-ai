@@ -21,8 +21,20 @@
   const emailPreferenceStatus = document.getElementById('annEmailPreferenceStatus');
   const campaignList = document.getElementById('annCampaignList');
   const campaignConfig = document.getElementById('annCampaignConfig');
+  const usersList = document.getElementById('annUserList');
+  const usersStatus = document.getElementById('annUserStatus');
+  const userSearch = document.getElementById('annUserSearch');
+  const loadMoreUsersButton = document.getElementById('annLoadMoreUsers');
+  const kindSelect = document.getElementById('annKind');
+  const nextVersionInput = document.getElementById('annNextVersion');
+  const askConsentInput = document.getElementById('annAskConsent');
+  const promptRequiredInput = document.getElementById('annPromptRequired');
+  const promptTextInput = form.elements.promptText;
+  const authLink = document.getElementById('annAuthLink');
   let auth = null;
   let unsubscribeMessage = '';
+  let adminUsers = [];
+  let nextUserPageToken = null;
 
   function escapeText(value) {
     return String(value || '');
@@ -50,7 +62,9 @@
     const heading = document.createElement('header');
     const version = document.createElement('span');
     version.className = 'ann-version';
-    version.textContent = escapeText(item.version);
+    version.textContent = item.kind === 'notice'
+      ? 'Aviso da MedTutor Brasil'
+      : `Atualização ${escapeText(item.version || '—')}`;
     heading.appendChild(version);
     const dateText = formatDate(item.publishedAt);
     if (dateText) {
@@ -61,13 +75,13 @@
       heading.appendChild(date);
     }
     const title = document.createElement('h2');
-    title.textContent = escapeText(item.title);
+    title.textContent = item.kind === 'notice' ? `Aviso da MedTutor Brasil: ${escapeText(item.title)}` : escapeText(item.title);
     article.append(heading, title);
     if (item.bannerUrl) {
       const image = document.createElement('img');
       image.className = 'ann-banner';
       image.src = item.bannerUrl;
-      image.alt = escapeText(item.bannerAlt || `Banner da atualização ${item.version}`);
+      image.alt = escapeText(item.bannerAlt || `Banner ${item.kind === 'notice' ? 'do aviso' : `da atualização ${item.version}`}`);
       image.loading = 'lazy';
       image.referrerPolicy = 'no-referrer';
       article.appendChild(image);
@@ -105,17 +119,31 @@
 
   function collectForm() {
     const data = new FormData(form);
-    return Object.fromEntries(['version', 'title', 'description', 'bannerUrl', 'bannerAlt'].map(key => [key, String(data.get(key) || '').trim()]));
+    return {
+      kind: String(data.get('kind') || 'update'),
+      title: String(data.get('title') || '').trim(),
+      description: String(data.get('description') || '').trim(),
+      bannerUrl: String(data.get('bannerUrl') || '').trim(),
+      bannerAlt: String(data.get('bannerAlt') || '').trim(),
+      channels: { inApp: true, email: data.has('sendEmail') },
+      emailConsentPrompt: data.has('emailConsentPrompt'),
+      promptResponseRequired: data.has('promptResponseRequired'),
+      promptText: String(data.get('promptText') || '').trim()
+    };
   }
 
   function renderPreview(data) {
-    preview.replaceChildren(makeCard({ ...data, publishedAt: new Date().toISOString() }));
+    preview.replaceChildren(makeCard({ ...data, version: data.kind === 'update' ? nextVersionInput.value : '', publishedAt: new Date().toISOString() }));
     preview.hidden = false;
     preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function setupAdmin() {
     emailPreferences.hidden = !auth?.currentUser;
+    if (authLink) {
+      authLink.href = auth?.currentUser ? '/' : '/login';
+      authLink.textContent = auth?.currentUser ? 'Voltar ao app' : 'Entrar';
+    }
     if (!auth?.currentUser) {
       adminPanel.hidden = true;
       return;
@@ -123,8 +151,12 @@
     try {
       const result = await request('/api/announcements/admin/status');
       adminPanel.hidden = result.isAdmin !== true;
+      if (authLink) {
+        authLink.href = auth.currentUser ? '/' : '/login';
+        authLink.textContent = auth.currentUser ? 'Voltar ao app' : 'Entrar';
+      }
       if (result.isAdmin === true) {
-        await loadEmailCampaigns();
+        await Promise.all([loadEmailCampaigns(), loadAdminUsers(), loadNextVersion()]);
         if (location.hash === '#annAdmin') {
           requestAnimationFrame(() => adminPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         }
@@ -191,8 +223,104 @@
     }
   }
 
+  async function loadNextVersion() {
+    try {
+      const result = await request('/api/announcements/admin/next-version');
+      nextVersionInput.value = result.version || 'Automática';
+    } catch (_) { nextVersionInput.value = 'Calculada ao publicar'; }
+  }
+
+  function renderAdminUsers() {
+    if (!usersList) return;
+    const term = String(userSearch?.value || '').trim().toLocaleLowerCase('pt-BR');
+    const matches = adminUsers.filter(user => [user.name, user.maskedEmail, user.faculty, user.period, user.cycle].join(' ').toLocaleLowerCase('pt-BR').includes(term));
+    usersList.replaceChildren();
+    if (!matches.length) {
+      usersList.textContent = term ? 'Nenhum usuário corresponde à busca.' : 'Nenhum perfil encontrado.';
+      return;
+    }
+    for (const user of matches) {
+      const row = document.createElement('article');
+      row.className = 'ann-user-row';
+      const details = document.createElement('div');
+      details.className = 'ann-user-details';
+      const name = document.createElement('strong');
+      name.textContent = user.name || 'Estudante';
+      const meta = document.createElement('p');
+      meta.textContent = [user.maskedEmail, user.faculty, user.period, user.cycle].filter(Boolean).join(' · ') || 'Dados de perfil não informados';
+      const uid = document.createElement('small');
+      uid.textContent = `UID ${user.uid}`;
+      details.append(name, meta, uid);
+      const role = document.createElement('select');
+      role.setAttribute('aria-label', `Papel de ${user.name}`);
+      for (const [value, label] of [['user', 'Usuário'], ['admin', 'Administrador']]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        option.selected = user.role === value;
+        role.appendChild(option);
+      }
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'ann-button secondary';
+      save.textContent = 'Salvar papel';
+      save.disabled = true;
+      const originalRole = user.role;
+      role.addEventListener('change', () => { save.disabled = role.value === originalRole; });
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        usersStatus.textContent = `Atualizando papel de ${user.name}…`;
+        try {
+          await request(`/api/announcements/admin/users/${encodeURIComponent(user.uid)}/role`, { method: 'PATCH', body: JSON.stringify({ role: role.value }) });
+          user.role = role.value;
+          usersStatus.textContent = `Papel de ${user.name} atualizado.`;
+          renderAdminUsers();
+        } catch (error) {
+          usersStatus.textContent = error.message;
+          save.disabled = role.value === originalRole;
+        }
+      });
+      row.append(details, role, save);
+      usersList.appendChild(row);
+    }
+  }
+
+  async function loadAdminUsers(append = false) {
+    if (!auth?.currentUser || adminPanel.hidden) return;
+    usersStatus.textContent = append ? 'Carregando mais usuários…' : 'Carregando usuários…';
+    try {
+      const query = append && nextUserPageToken ? `?pageToken=${encodeURIComponent(nextUserPageToken)}` : '';
+      const result = await request(`/api/announcements/admin/users${query}`);
+      adminUsers = append ? adminUsers.concat(result.users || []) : (result.users || []);
+      nextUserPageToken = result.nextPageToken || null;
+      loadMoreUsersButton.hidden = !nextUserPageToken;
+      usersStatus.textContent = `${adminUsers.length} perfil(is) carregado(s). E-mails aparecem mascarados; credenciais não são consultadas.`;
+      renderAdminUsers();
+    } catch (error) {
+      usersStatus.textContent = error.message;
+    }
+  }
+
+  function updatePromptControls() {
+    const enabled = askConsentInput.checked;
+    promptRequiredInput.disabled = !enabled;
+    promptTextInput.disabled = !enabled;
+  }
+
+  function updateKindControls() {
+    document.getElementById('annVersionField').hidden = kindSelect.value !== 'update';
+    document.getElementById('annFormHeading').textContent = kindSelect.value === 'notice' ? 'Novo aviso' : 'Nova atualização';
+  }
+
   document.getElementById('annPreviewButton').addEventListener('click', () => renderPreview(collectForm()));
   document.getElementById('annRefreshCampaigns').addEventListener('click', loadEmailCampaigns);
+  document.getElementById('annRefreshUsers').addEventListener('click', () => loadAdminUsers());
+  loadMoreUsersButton.addEventListener('click', () => loadAdminUsers(true));
+  userSearch.addEventListener('input', renderAdminUsers);
+  askConsentInput.addEventListener('change', updatePromptControls);
+  kindSelect.addEventListener('change', updateKindControls);
+  updatePromptControls();
+  updateKindControls();
   emailOptIn.addEventListener('change', async () => {
     const requestedOptIn = emailOptIn.checked;
     emailOptIn.disabled = true;
@@ -215,13 +343,21 @@
     adminStatus.textContent = 'Publicando atualização…';
     try {
       const result = await request('/api/announcements', { method: 'POST', body: JSON.stringify(collectForm()) });
-      adminStatus.textContent = result.emailStatus === 'queued'
-        ? 'Atualização publicada; os e-mails para usuários inscritos estão sendo enviados.'
-        : 'Atualização publicada. Configure o provedor de e-mail no servidor para ativar os avisos.';
+      const typeLabel = result.announcement?.kind === 'notice' ? 'Aviso' : `Atualização ${result.version || ''}`;
+      const emailMessage = result.emailStatus === 'queued'
+        ? ' O envio por e-mail aos usuários inscritos foi iniciado.'
+        : result.emailStatus === 'configuration_required'
+          ? ' Para enviar e-mail, configure o provedor no servidor.'
+          : '';
+      adminStatus.textContent = `${typeLabel} publicado no painel.${emailMessage}${result.announcement?.emailConsentPrompt ? ' A pergunta de consentimento será exibida aos usuários.' : ''}`;
       form.reset();
+      kindSelect.value = 'update';
+      document.getElementById('annAskConsent').checked = false;
+      updatePromptControls();
+      updateKindControls();
       preview.hidden = true;
       await loadAnnouncements();
-      await loadEmailCampaigns();
+      await Promise.all([loadEmailCampaigns(), loadNextVersion()]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       adminStatus.textContent = error.message;
@@ -260,6 +396,13 @@
       console.warn('[Anúncios MedTutor] Falha ao inicializar:', error);
     }
   }
+
+  document.getElementById('annAdminTabs')?.addEventListener('click', event => {
+    if (event.target.matches('a[href^="#"]')) {
+      const target = document.querySelector(event.target.getAttribute('href'));
+      if (target) { event.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+  });
 
   init();
 })();

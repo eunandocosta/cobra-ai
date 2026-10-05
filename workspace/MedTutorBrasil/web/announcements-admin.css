@@ -1,0 +1,29 @@
+.ann-admin-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px;padding:0 0 16px;border-bottom:1px solid var(--line)}
+.ann-admin-tabs a{padding:9px 12px;border:1px solid var(--line);border-radius:9px;color:#dce8df;text-decoration:none;font-size:12px;font-weight:700}
+.ann-admin-tabs a:hover{border-color:var(--green);color:var(--green)}
+.ann-admin-section{padding:18px 0;border-bottom:1px solid var(--line);scroll-margin-top:18px}
+.ann-admin-section>.admin-heading h3,.ann-campaigns .admin-heading h3{margin:5px 0 0;font-size:18px}
+.ann-admin-section>.admin-heading p{max-width:700px;margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.ann-distribution,.ann-consent-options{display:grid;gap:10px;margin:0;padding:14px;border:1px solid var(--line);border-radius:11px;background:rgba(7,17,13,.5)}
+.ann-distribution legend,.ann-consent-options legend{padding:0 6px;color:#dce8df;font-size:12px;font-weight:800}
+.ann-admin .ann-distribution label,.ann-admin .ann-consent-options>label{display:flex;grid-template-columns:none;align-items:center;gap:9px;font-size:12px}
+.ann-admin .ann-distribution input[type=checkbox],.ann-admin .ann-consent-options input[type=checkbox]{width:17px;height:17px;min-width:17px;margin:0;accent-color:var(--green)}
+.ann-admin #annVersionField[hidden],.ann-users #annLoadMoreUsers[hidden]{display:none!important}
+.ann-admin .ann-consent-options .ann-prompt-text-label{display:grid;align-items:stretch;gap:7px}
+.ann-admin input:disabled{opacity:.55;cursor:not-allowed}
+.ann-user-search{max-width:500px;margin:0 0 14px}
+.ann-user-list{display:grid;gap:8px}
+.ann-user-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(145px,190px) auto;align-items:center;gap:10px;padding:13px;border:1px solid var(--line);border-radius:10px;background:rgba(7,17,13,.64)}
+.ann-user-details{min-width:0}
+.ann-user-details strong{display:block;color:#edf5ef;font-size:13px;overflow-wrap:anywhere}
+.ann-user-details p{margin:4px 0;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.ann-user-details small{color:#708277;font-size:10px;overflow-wrap:anywhere}
+.ann-users select{min-height:40px;border:1px solid var(--line);border-radius:8px;padding:0 10px;background:#09120d;color:#f2f8f3;font:600 12px inherit}
+.ann-users .ann-button:disabled{opacity:.5;cursor:not-allowed}
+.ann-users #annLoadMoreUsers{margin-top:12px}
+.announcement-first-access-question{margin-top:16px!important;padding:14px;border:1px solid var(--line);border-radius:10px;background:rgba(0,230,111,.05);color:var(--text-primary,#f2f8f3)!important;font-weight:700}
+.announcement-first-access-status{min-height:18px;margin-top:12px!important;color:var(--neon,#00e66f)!important;font-size:12px!important}
+.announcement-first-access-actions .announcement-consent-yes{border-color:var(--neon,#00e66f);background:var(--neon,#00e66f);color:#06110b}
+.announcement-first-access-actions .announcement-consent-no{border-color:rgba(255,255,255,.22)}
+.announcement-first-access-actions button:disabled{opacity:.55;cursor:wait}
+@media(max-width:700px){.ann-user-row{grid-template-columns:1fr 1fr}.ann-user-details{grid-column:1/-1}.ann-user-row .ann-button{width:100%}}

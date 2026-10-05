@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtutor-static-v104';
+const CACHE_NAME = 'medtutor-static-v105';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -6,10 +6,11 @@ const APP_SHELL = [
   '/material-icons.css?v=20261005-material-symbols-v3',
   '/material-icons.js?v=20261004-material-symbols-v2',
   '/landing.css?v=20260922-landing-v1',
-  '/styles.css?v=20261005-settings-layout-v1',
+  '/styles.css?v=20261005-announcements-admin-v1',
   '/academic-report-renderer.js?v=20260922-report-print-v5',
   '/exam-study-planner.js?v=20260927-sce-review-deck-v2',
   '/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1',
+  '/announcement-prompt.js?v=20261005-consent-prompt-v1',
   '/app.min.js?v=20261005-settings-layout-v1',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg'

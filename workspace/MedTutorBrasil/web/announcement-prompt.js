@@ -20,29 +20,78 @@
     dialog.setAttribute('aria-labelledby', 'announcementFirstAccessTitle');
     const version = document.createElement('span');
     version.className = 'announcement-first-access-version';
-    version.textContent = item.version || 'Atualização';
+    version.textContent = item.kind === 'notice' ? 'Aviso da MedTutor Brasil' : `Atualização ${item.version || ''}`;
     const title = document.createElement('h2');
     title.id = 'announcementFirstAccessTitle';
-    title.textContent = item.title || 'Novidades do MedTutor';
+    title.textContent = item.kind === 'notice' ? `Aviso da MedTutor Brasil: ${item.title || ''}` : (item.title || 'Novidades do MedTutor');
     const description = document.createElement('p');
     description.textContent = String(item.description || '').slice(0, 360);
     const actions = document.createElement('div');
     actions.className = 'announcement-first-access-actions';
-    const later = document.createElement('button');
-    later.type = 'button';
-    later.textContent = 'Agora não';
-    later.addEventListener('click', () => {
-      sessionStorage.setItem(key, '1');
-      overlay.remove();
-    });
     const open = document.createElement('a');
     open.href = `/anuncios?id=${encodeURIComponent(item.id)}`;
-    open.textContent = 'Ver atualização';
-    actions.append(later, open);
-    dialog.append(version, title, description, actions);
+    open.textContent = item.kind === 'notice' ? 'Ver aviso' : 'Ver atualização';
+    const responseStatus = document.createElement('p');
+    responseStatus.className = 'announcement-first-access-status';
+    responseStatus.setAttribute('role', 'status');
+    responseStatus.setAttribute('aria-live', 'polite');
+    const consent = item.emailConsentPrompt === true;
+    const respond = async choice => {
+      const buttons = actions.querySelectorAll('button');
+      buttons.forEach(button => { button.disabled = true; });
+      responseStatus.textContent = 'Salvando sua resposta…';
+      try {
+        const token = await firebase.auth().currentUser.getIdToken();
+        const response = await fetch(`/api/announcements/me/${encodeURIComponent(item.id)}/answer`, {
+          method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choice })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Não foi possível salvar sua resposta.');
+        overlay.remove();
+      } catch (error) {
+        responseStatus.textContent = error.message;
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    };
+    if (consent) {
+      const question = document.createElement('p');
+      question.className = 'announcement-first-access-question';
+      question.textContent = item.promptText || 'Você deseja receber novidades e atualizações do MedTutor Brasil por e-mail?';
+      const accept = document.createElement('button');
+      accept.type = 'button';
+      accept.className = 'announcement-consent-yes';
+      accept.textContent = 'Sim, quero receber';
+      accept.addEventListener('click', () => respond('accepted'));
+      const decline = document.createElement('button');
+      decline.type = 'button';
+      decline.className = 'announcement-consent-no';
+      decline.textContent = 'Não, obrigado';
+      decline.addEventListener('click', () => respond('declined'));
+      actions.append(accept, decline);
+      if (item.promptResponseRequired !== true) {
+        const skip = document.createElement('button');
+        skip.type = 'button';
+        skip.textContent = 'Agora não';
+        skip.addEventListener('click', () => respond('skipped'));
+        actions.appendChild(skip);
+      }
+      dialog.appendChild(question);
+      if (item.promptResponseRequired !== true) actions.appendChild(open);
+    } else {
+      const later = document.createElement('button');
+      later.type = 'button';
+      later.textContent = 'Agora não';
+      later.addEventListener('click', () => {
+        sessionStorage.setItem(key, '1');
+        overlay.remove();
+      });
+      actions.append(later, open);
+    }
+    dialog.append(version, title, description, actions, responseStatus);
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
-    open.focus();
+    (actions.querySelector('button') || open).focus();
   }
 
   async function check(user) {
