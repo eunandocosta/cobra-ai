@@ -163,16 +163,17 @@ assert(sceReviewMarkup.includes('id="themeSettingsToggle"') && sceReviewMarkup.i
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261005-progressive-startup-v1', 'o bundle deve invalidar o cache após mudanças no app');
-assert(serviceWorkerSource.includes("medtutor-static-v106") && serviceWorkerSource.includes('/app.min.js?v=20261005-progressive-startup-v1') && serviceWorkerSource.includes('/styles.css?v=20261005-announcements-admin-v1') && serviceWorkerSource.includes('/announcement-prompt.js?v=20261005-consent-prompt-v1') && serviceWorkerSource.includes('/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
+assert(appBundleVersion === '20261005-chat-gemini-picker-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(serviceWorkerSource.includes("medtutor-static-v107") && serviceWorkerSource.includes('/app.min.js?v=20261005-chat-gemini-picker-v1') && serviceWorkerSource.includes('/styles.css?v=20261005-chat-gemini-picker-v1') && serviceWorkerSource.includes('/announcement-prompt.js?v=20261005-consent-prompt-v1') && serviceWorkerSource.includes('/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
 const materialIconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf-8');
 const materialIconsCss = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.css'), 'utf-8');
-assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('/material-icons.js?v=20261004-material-symbols-v2'), 'a interface do app deve carregar ícones Material Symbols Rounded subsetados pelo Google Fonts');
+assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('support_agent') && sceReviewMarkup.includes('id="chatModelPickerButton"') && sceReviewMarkup.includes('>Amigos</span>') && sceReviewMarkup.includes('Caderno de Dúvidas') && !sceReviewMarkup.includes('support-topbar-btn') && sceReviewMarkup.includes('/material-icons.js?v=20261005-descriptive-tooltips-v1'), 'a interface deve oferecer o seletor Gemini, labels explícitos, suporte na sidebar e ícones Material');
+assert(materialIconScript.includes('applyButtonTooltips') && materialIconScript.includes('Encontrar estudantes e adicionar amigos'), 'os controles da interface devem receber dicas de ação descritivas');
 assert(materialIconScript.includes('new MutationObserver') && materialIconScript.includes('convertSvg') && materialIconScript.includes('convertLeadingEmoji'), 'ícones estáticos e controles dinâmicos devem ser migrados ao sistema Material');
 assert(materialIconScript.includes('.brand-logo') && materialIconScript.includes('.google-icon') && materialIconsCss.includes("font-family: 'Material Symbols Rounded'"), 'logotipos permanecem intactos e os símbolos usam a família Material dedicada');
 for (const page of ['login.html', 'landing.html']) {
   const markup = fs.readFileSync(path.join(__dirname, '..', 'web', page), 'utf-8');
-  assert(markup.includes('/material-icons.js?v=20261004-material-symbols-v2') && markup.includes('family=Material+Symbols+Rounded'), `${page} deve compartilhar os ícones Material do app`);
+  assert(markup.includes('/material-icons.js?v=20261005-descriptive-tooltips-v1') && markup.includes('family=Material+Symbols+Rounded'), `${page} deve compartilhar os ícones Material do app`);
 }
 assert(sceReviewMarkup.includes('id="levelUpModal"') && /id="levelUpContinueButton"[^>]*>Vamos continuar aprendendo juntos!/.test(sceReviewMarkup), 'a subida de nível deve abrir um painel central com CTA de continuidade');
 assert(appSource.includes('MedTutorStudyTimeTracker.init()') && appSource.includes("['flashcards', 'quizzes', 'sce'].includes(currentTab)"), 'o tempo de estudo deve ser rastreado apenas nas áreas de estudo');
@@ -233,8 +234,8 @@ assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a
 assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
 assert(appSource.includes("collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
 assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
-assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261005-announcements-admin-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
-assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261005-announcements-admin-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
+assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261005-chat-gemini-picker-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
+assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261005-chat-gemini-picker-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');
 assert(webIndexMarkup.includes('family=Fredoka:wght@600;700') && styleSource.includes("font-family: 'Fredoka', 'Plus Jakarta Sans'"), 'o nível novo deve usar tipografia arredondada própria, com fallback da fonte principal');
 assert(styleSource.includes('.topbar-utility-action { width: 40px;') && styleSource.includes('#appNotificationStack { bottom: calc(76px + env(safe-area-inset-bottom)); }') && !styleSource.includes('.doubts-fab,'), 'Colegas e Dúvidas devem sair da área flutuante inferior, e o aviso de XP deve ficar acima da navegação móvel');
 const cloudSessionMethod = appSource.match(/hasAuthenticatedCloudSession\(uid\)\s*\{[\s\S]*?\n      \},/)?.[0] || '';
@@ -442,6 +443,12 @@ server.listen(TEST_PORT, async () => {
     assert.strictEqual(chatEvidence.statusCode, 200);
     assert(chatEvidence.body.urls.pubmed.includes('pubmed.ncbi.nlm.nih.gov'));
     console.log('[PASS] POST /api/chat/evidencias -> 200 OK (Bases científicas PubMed/SciELO/Sciencedirect integradas)');
+
+    const chatModels = await makeRequest('GET', '/api/chat/models');
+    assert.strictEqual(chatModels.statusCode, 200);
+    assert.strictEqual(chatModels.body.providers?.[0]?.id, 'google');
+    assert(Array.isArray(chatModels.body.providers?.[0]?.models) && chatModels.body.providers[0].models.length > 0);
+    console.log('[PASS] GET /api/chat/models -> catálogo Flash do Google para o seletor');
 
     const chatMsg = await makeRequest('POST', '/api/chat/mensagem', {
       message: 'Explique a anatomia do tronco encefálico',

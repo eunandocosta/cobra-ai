@@ -2,6 +2,15 @@
 const chatService = require('./chat.service');
 
 class ChatController {
+  async listModels(req, res) {
+    try {
+      const models = await chatService.listAvailableModels();
+      return res.json({ providers: [{ id: 'google', label: 'Google Gemini', icon: 'auto_awesome', models }] });
+    } catch (err) {
+      return res.status(500).json({ error: 'Não foi possível carregar as versões Gemini disponíveis.' });
+    }
+  }
+
   async message(req, res) {
     try {
       const result = await chatService.processMessage(req.body || {});

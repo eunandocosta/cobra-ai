@@ -1,10 +1,33 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
-const { GENERAL_FLASH_MODELS, sendChatMessageWithFallback } = require('../../shared/gemini-model-fallback');
+const { sendChatMessageWithFallback } = require('../../shared/gemini-model-fallback');
 
 const MAX_USER_PROMPTS_PER_SESSION = 100;
 const MAX_MESSAGE_CHARS = 6_000;
 const MAX_MATERIAL_CHARS = 120_000;
+const CHAT_MODEL_FALLBACKS = Object.freeze([
+  'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash',
+  'gemini-3.5-flash', 'gemini-3.5-flash-lite'
+]);
+const CHAT_MODEL_CACHE_MS = 15 * 60 * 1000;
+let chatModelCatalogCache = { expiresAt: 0, models: [] };
+
+function compareGeminiVersions(left, right) {
+  const a = left.match(/gemini-(\d+(?:\.\d+)+)-flash(-lite)?/i) || [];
+  const b = right.match(/gemini-(\d+(?:\.\d+)+)-flash(-lite)?/i) || [];
+  const av = (a[1] || '0').split('.').map(Number);
+  const bv = (b[1] || '0').split('.').map(Number);
+  for (let i = 0; i < Math.max(av.length, bv.length); i += 1) {
+    if ((av[i] || 0) !== (bv[i] || 0)) return (bv[i] || 0) - (av[i] || 0);
+  }
+  if (Boolean(a[2]) !== Boolean(b[2])) return a[2] ? 1 : -1;
+  return left.localeCompare(right);
+}
+
+function normalizeChatModelCatalog(models) {
+  return [...new Set((models || []).map(model => String(model || '').replace(/^models\//, '').trim())
+    .filter(model => /^gemini-\d+(?:\.\d+)*-flash(?:-lite)?$/i.test(model)))].sort(compareGeminiVersions);
+}
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -19,6 +42,47 @@ class ChatService {
     this.repository = sessionRepository;
     // Fallback local caso não haja repositório injetado
     this.sessions = new Map();
+  }
+
+  async listAvailableModels() {
+    if (chatModelCatalogCache.expiresAt > Date.now() && chatModelCatalogCache.models.length) {
+      return chatModelCatalogCache.models;
+    }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey && typeof fetch === 'function') {
+      try {
+        const models = [];
+        let pageToken = '';
+        for (let page = 0; page < 4; page += 1) {
+          const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+          url.searchParams.set('key', apiKey);
+          url.searchParams.set('pageSize', '100');
+          if (pageToken) url.searchParams.set('pageToken', pageToken);
+          const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+          if (!response.ok) throw new Error(`Gemini models.list respondeu HTTP ${response.status}`);
+          const payload = await response.json();
+          for (const model of payload.models || []) {
+            if (!(model.supportedGenerationMethods || []).includes('generateContent')) continue;
+            const modelId = String(model.baseModelId || model.name || '').replace(/^models\//, '');
+            if (/\b(preview|exp|experimental|latest|tts|image|live|embedding|robotics|computer-use|deprecated)\b/i.test(modelId)) continue;
+            models.push(modelId);
+          }
+          pageToken = payload.nextPageToken || '';
+          if (!pageToken) break;
+        }
+        const currentCatalog = normalizeChatModelCatalog(models);
+        if (currentCatalog.length) {
+          chatModelCatalogCache = { models: currentCatalog, expiresAt: Date.now() + CHAT_MODEL_CACHE_MS };
+          return currentCatalog;
+        }
+      } catch (error) {
+        console.warn('[ChatService] Não foi possível atualizar o catálogo Gemini; usando catálogo de contingência:', error.message);
+      }
+    }
+    const cached = chatModelCatalogCache.models;
+    const catalog = cached.length ? cached : CHAT_MODEL_FALLBACKS;
+    chatModelCatalogCache = { models: catalog, expiresAt: Date.now() + 60_000 };
+    return catalog;
   }
 
   limitHistory(history, maximumUserPrompts = MAX_USER_PROMPTS_PER_SESSION) {
@@ -68,7 +132,7 @@ class ChatService {
     };
   }
 
-  async processMessage({ sessionId, message, materialContent, subject }) {
+  async processMessage({ sessionId, message, materialContent, subject, model }) {
     if (!message || !message.trim()) {
       throw new Error('A mensagem do usuário não pode estar vazia.');
     }
@@ -169,16 +233,21 @@ Estruture o documento de forma formal, completa e pronta para impressão/exporta
     // Chat segue a cascata econômica de modelos Flash, com fallback quando
     // um endpoint ainda não estiver habilitado para a chave do servidor.
     const genAI = getGenAI();
-    const chatOptions = {
-      systemInstruction,
-      generationConfig: {
+    const chatOptions = { systemInstruction };
+    const requestedModel = String(model || '').trim();
+    const availableModels = await this.listAvailableModels();
+    const selectedModel = availableModels.includes(requestedModel) ? requestedModel : availableModels[0];
+    // Gemini 3.8 Flash usa configuração de geração atualizada; omitir os
+    // parâmetros antigos evita incompatibilidade com o endpoint mais recente.
+    if (!/^gemini-3\.8-flash(?:-lite)?$/i.test(selectedModel)) {
+      chatOptions.generationConfig = {
         temperature: 0.3,
         topP: 0.8,
         thinkingConfig: {
           thinkingBudget: 1024*1.5 // Pensamento rápido para raciocínio clínico sem travar a interface
         }
-      }
-    };
+      };
+    }
 
     // Anexa o material de estudo apenas se for a primeira mensagem ou se houver material novo
     let promptPayload = message;
@@ -193,7 +262,8 @@ Dúvida do aluno: ${message}
     }
 
     try {
-      const generated = await sendChatMessageWithFallback(genAI, chatOptions, session.history, promptPayload, GENERAL_FLASH_MODELS, (chat, payload) => runWithAiLimit(() => chat.sendMessage(payload)));
+      const fallbackModels = availableModels.filter(candidate => compareGeminiVersions(candidate, selectedModel) > 0);
+      const generated = await sendChatMessageWithFallback(genAI, chatOptions, session.history, promptPayload, [selectedModel, ...fallbackModels], (chat, payload) => runWithAiLimit(() => chat.sendMessage(payload)));
       const result = generated.result;
       const chatModel = generated.modelName;
       const replyText = result.response.text();

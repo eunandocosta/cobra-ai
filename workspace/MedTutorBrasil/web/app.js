@@ -7817,6 +7817,106 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     // Proibido qualquer trava ou corte artificial de tokens na geração de artigos e respostas.
     // Estimativas de custo padrão por milhão de tokens (USD). O custo real pode
     // ser zero no Free Tier e pode variar por modalidade/grounding.
+    const CHAT_GEMINI_MODEL_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'];
+    let chatGeminiModels = [...CHAT_GEMINI_MODEL_FALLBACKS];
+    let chatGeminiModelsLoaded = false;
+
+    function getChatModelPreferenceKey() {
+      const uid = firebaseAuth?.currentUser?.uid || 'local';
+      return `medtutor-chat-gemini-model-v1:${uid}`;
+    }
+
+    function getSelectedChatModel() {
+      const saved = localStorage.getItem(getChatModelPreferenceKey());
+      return chatGeminiModels.includes(saved) ? saved : chatGeminiModels[0];
+    }
+
+    function chatGeminiModelLabel(model) {
+      return String(model || '').replace(/^gemini-/i, 'Gemini ').replace(/-flash-lite$/i, ' Flash-Lite').replace(/-flash$/i, ' Flash').replace(/\b(\d+)\.(\d+)\b/g, '$1.$2');
+    }
+
+    function renderChatGeminiModelOptions() {
+      const list = document.getElementById('chatGeminiVersionList');
+      const currentLabel = document.getElementById('chatModelCurrentLabel');
+      if (!list) return;
+      const selected = getSelectedChatModel();
+      if (currentLabel) currentLabel.textContent = chatGeminiModelLabel(selected);
+      const pickerButton = document.getElementById('chatModelPickerButton');
+      if (pickerButton) {
+        pickerButton.title = `Escolher o modelo Google Gemini usado nas respostas do chat. Atual: ${chatGeminiModelLabel(selected)}.`;
+        pickerButton.setAttribute('aria-label', `Modelo de chat selecionado: ${chatGeminiModelLabel(selected)}. Clique para escolher outra versão.`);
+      }
+      list.innerHTML = chatGeminiModels.map((model, index) => `
+        <button class="chat-model-option" type="button" role="option" aria-selected="${model === selected}" onclick="selectChatGeminiModel('${model}')" title="Usar ${chatGeminiModelLabel(model)} nas respostas do chat${index === 0 ? ' (versão estável mais recente disponível)' : ''}">
+          <span>${chatGeminiModelLabel(model)}</span><small>${index === 0 ? 'Mais recente' : (model.endsWith('-lite') ? 'Mais leve' : 'Flash')}</small>
+        </button>`).join('');
+    }
+
+    async function loadChatGeminiModels() {
+      if (chatGeminiModelsLoaded) return;
+      const list = document.getElementById('chatGeminiVersionList');
+      if (list) list.innerHTML = '<div class="chat-model-loading">Carregando versões disponíveis do Google…</div>';
+      let loadedFromServer = false;
+      try {
+        const response = await fetch('/api/chat/models', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const catalog = payload.providers?.find(provider => provider.id === 'google')?.models;
+        if (Array.isArray(catalog) && catalog.length) {
+          chatGeminiModels = catalog;
+          loadedFromServer = true;
+        }
+      } catch (error) {
+        console.warn('[MedTutor Chat] Não foi possível atualizar a lista de modelos Gemini; usando a última lista conhecida.', error);
+      }
+      const key = getChatModelPreferenceKey();
+      if (!chatGeminiModels.includes(localStorage.getItem(key))) localStorage.setItem(key, chatGeminiModels[0]);
+      chatGeminiModelsLoaded = loadedFromServer;
+      renderChatGeminiModelOptions();
+    }
+
+    function toggleChatModelPicker(event) {
+      event?.stopPropagation?.();
+      const button = document.getElementById('chatModelPickerButton');
+      const popover = document.getElementById('chatModelPopover');
+      if (!button || !popover) return;
+      const opening = popover.hidden;
+      popover.hidden = !opening;
+      button.setAttribute('aria-expanded', String(opening));
+      if (opening) loadChatGeminiModels();
+    }
+
+    function toggleChatGeminiVersions(event) {
+      event?.stopPropagation?.();
+      const button = event?.currentTarget || document.querySelector('.chat-model-provider');
+      const list = document.getElementById('chatGeminiVersionList');
+      if (!button || !list) return;
+      list.hidden = !list.hidden;
+      button.setAttribute('aria-expanded', String(!list.hidden));
+      if (!list.hidden) loadChatGeminiModels();
+    }
+
+    function selectChatGeminiModel(model) {
+      if (!chatGeminiModels.includes(model)) return;
+      localStorage.setItem(getChatModelPreferenceKey(), model);
+      renderChatGeminiModelOptions();
+      const popover = document.getElementById('chatModelPopover');
+      const button = document.getElementById('chatModelPickerButton');
+      if (popover) popover.hidden = true;
+      if (button) button.setAttribute('aria-expanded', 'false');
+    }
+
+    document.addEventListener('click', event => {
+      const picker = document.getElementById('chatModelPicker');
+      if (picker && !picker.contains(event.target)) {
+        const popover = document.getElementById('chatModelPopover');
+        const button = document.getElementById('chatModelPickerButton');
+        if (popover) popover.hidden = true;
+        if (button) button.setAttribute('aria-expanded', 'false');
+      }
+    });
+    renderChatGeminiModelOptions();
+
     const GEMINI_CONFIG_2026 = {
       models: ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'],
       primaryModel: 'gemini-3.5-flash-lite',
@@ -7844,6 +7944,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         },
         'gemini-3.7-flash': {
           label: 'Gemini 3.7 Flash (estimativa, tarifa padrão)',
+          inputPerMillion: 0.75,
+          outputPerMillion: 3.75,
+          cachedInputPerMillion: 0.075,
+        },
+        'gemini-3.8-flash': {
+          label: 'Gemini 3.8 Flash (estimativa, tarifa introdutória até 31/12/2026)',
           inputPerMillion: 0.75,
           outputPerMillion: 3.75,
           cachedInputPerMillion: 0.075,
@@ -7919,7 +8025,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       normalizeModelKey(model) {
         const value = String(model || '').toLowerCase().replace(/_/g, '-');
         if (value.includes('local') || value.includes('heuristic')) return 'local-heuristic';
-        const match = value.match(/gemini-3\.[567]-flash(?:-lite)?/);
+        const match = value.match(/gemini-3\.[5678]-flash(?:-lite)?/);
         return match ? match[0] : value;
       },
 
@@ -27211,9 +27317,8 @@ Para cada material, retorne um objeto no JSON com:
         let usedOutputTokens = 380;
         let successfulModel = 'Motor Clínico Local';
         let trackedModel = 'local-heuristic';
-        const candidateModels = (typeof GEMINI_CONFIG_2026 !== 'undefined' && Array.isArray(GEMINI_CONFIG_2026.models) && GEMINI_CONFIG_2026.models.length > 0)
-          ? GEMINI_CONFIG_2026.models
-            : ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+        const selectedChatModel = getSelectedChatModel();
+        const candidateModels = [selectedChatModel, ...chatGeminiModels.filter(model => model !== selectedChatModel && chatGeminiModels.indexOf(model) > chatGeminiModels.indexOf(selectedChatModel))];
 
         // A chave fica exclusivamente no servidor. O chat usa o Gemini do .env
         // e envia o material selecionado pelo estudante somente com sua autorização.
@@ -27228,7 +27333,8 @@ Para cada material, retorne um objeto no JSON com:
               sessionId: `web_${session.id}`,
               message: text,
               materialContent: serverMaterial,
-              subject: evidenceSubject
+              subject: evidenceSubject,
+              model: selectedChatModel
             })
           });
           const backendPayload = await backendResponse.json();

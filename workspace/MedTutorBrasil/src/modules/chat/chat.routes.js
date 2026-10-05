@@ -5,6 +5,7 @@ const { withAccess } = require('../../shared/access.middleware');
 const chatController = require('./chat.controller');
 
 router.post('/mensagem', withAccess((req, res) => chatController.message(req, res)));
+router.get('/models', withAccess((req, res) => chatController.listModels(req, res)));
 router.get('/sessoes/:sessionId', withAccess((req, res) => chatController.getSession(req, res)));
 router.post('/evidencias', withAccess((req, res) => chatController.getEvidence(req, res)));
 

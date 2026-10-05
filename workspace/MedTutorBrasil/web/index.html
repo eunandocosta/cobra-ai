@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded&icon_names=account_balance,add,analytics,arrow_back,arrow_forward,assignment,attach_file,auto_awesome,balance,biotech,bolt,cached,calendar_month,campaign,cancel,cardiology,casino,celebration,chat,chat_bubble,check_circle,child_care,circle,cleaning_services,close,cloud,cloud_sync,content_copy,dark_mode,delete,description,difference,edit,edit_note,emergency,emoji_events,event,explore,favorite,flag,folder,folder_copy,folder_open,genetics,gps_fixed,groups,help,hourglass_top,image,info,inventory_2,key,library_books,lightbulb,link,local_fire_department,local_hospital,location_on,lock,logout,mail,mark_email_unread,medical_services,medication,menu,menu_book,military_tech,monitoring,move_to_inbox,notifications,open_in_new,outbox,payments,person,photo_camera,print,progress_activity,psychology,public,pulmonology,push_pin,quiz,radiology,refresh,rocket_launch,save,school,science,search,settings,shield,skip_next,smart_toy,south_east,sports_martial_arts,square,star,style,swap_horiz,sync,thumb_down,thumb_up,timer,touch_app,upload_file,visibility,warning,waving_hand&display=block" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded&icon_names=account_balance,add,analytics,arrow_back,arrow_forward,assignment,attach_file,auto_awesome,balance,biotech,bolt,cached,calendar_month,campaign,cancel,cardiology,casino,celebration,chat,chat_bubble,check_circle,chevron_right,child_care,circle,cleaning_services,close,cloud,cloud_sync,content_copy,dark_mode,delete,description,difference,edit,edit_note,emergency,emoji_events,event,expand_more,explore,favorite,flag,folder,folder_copy,folder_open,genetics,gps_fixed,groups,help,hourglass_top,image,info,inventory_2,key,library_books,lightbulb,link,local_fire_department,local_hospital,location_on,lock,logout,mail,mark_email_unread,medical_services,medication,menu,menu_book,military_tech,monitoring,move_to_inbox,notifications,open_in_new,outbox,payments,person,photo_camera,print,progress_activity,psychology,public,pulmonology,push_pin,quiz,radiology,refresh,rocket_launch,save,school,science,search,settings,shield,skip_next,smart_toy,south_east,sports_martial_arts,square,star,style,support_agent,swap_horiz,sync,thumb_down,thumb_up,timer,touch_app,upload_file,visibility,warning,waving_hand&display=block" rel="stylesheet">
   <link rel="stylesheet" href="/material-icons.css?v=20261005-material-symbols-v3">
   <!-- PDF.js da Mozilla para descompressão e extração de texto fiel de arquivos PDF da Ementa -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261005-announcements-admin-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261005-chat-gemini-picker-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -82,9 +82,13 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button class="btn-outline-action sidebar-settings-btn" onclick="openConfigModal()" title="Configurações" aria-label="Configurações">
+        <button class="btn-outline-action sidebar-settings-btn" onclick="openConfigModal()" title="Abrir configurações de conta, aparência e preferências" aria-label="Abrir configurações de conta, aparência e preferências">
           <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Configurações
+        </button>
+        <button class="btn-outline-action sidebar-support-btn" onclick="openSupportModal()" title="Abrir suporte e copiar o diagnóstico da última solicitação" aria-label="Abrir suporte e copiar o diagnóstico da última solicitação">
+          <span class="material-symbol-font icon" aria-hidden="true">support_agent</span>
+          <span>Suporte</span>
         </button>
       </div>
     </aside>
@@ -106,14 +110,14 @@
             <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Upload de Material</span>
           </button>
-          <button class="topbar-utility-action" id="btnOpenClassmates" type="button" onclick="openClassmatesModal()" aria-controls="modalClassmates" aria-label="Abrir comunidade de colegas da faculdade" title="Colegas">
+          <button class="topbar-utility-action" id="btnOpenClassmates" type="button" onclick="openClassmatesModal()" aria-controls="modalClassmates" aria-label="Adicionar Amigos: encontrar estudantes e conectar-se" title="Adicionar Amigos: encontrar estudantes e conectar-se">
             <svg class="topbar-utility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>
-            <span class="topbar-utility-label">Colegas</span>
+            <span class="topbar-utility-label">Amigos</span>
             <span class="classmates-fab-badge" id="classmatesFabBadge" style="display:none">0</span>
           </button>
-          <button class="topbar-utility-action" id="btnOpenDoubts" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir caderno de dúvidas" title="Dúvidas">
-            <svg class="topbar-utility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-            <span class="topbar-utility-label">Dúvidas</span>
+          <button class="topbar-utility-action" id="btnOpenDoubts" type="button" onclick="openDoubtsDrawer()" aria-controls="doubtsDrawer" aria-label="Abrir Caderno de Dúvidas e Anotações" title="Abrir seu caderno para registrar e consultar dúvidas e anotações">
+            <span class="material-symbol-font topbar-utility-icon" aria-hidden="true">edit_note</span>
+            <span class="topbar-utility-label">Caderno de Dúvidas</span>
           </button>
           <button class="btn-outline-action" id="btnTopbarSyllabus" onclick="openSyllabusModal()" title="Importar ementa da sua faculdade">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -121,10 +125,6 @@
           </button>
           <button class="btn-help-icon" onclick="openCurrentTabHelp()" title="Ajuda sobre esta tela">
             ?
-          </button>
-          <button class="btn-outline-action support-topbar-btn" onclick="openSupportModal()" title="Abrir suporte e copiar diagnóstico da última solicitação">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v4a3 3 0 0 1-3 3h-2l-3 3v-3H9a3 3 0 0 1-3-3z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
-            <span>Suporte</span>
           </button>
           <button class="btn-outline-action" id="topbarConfigButton" onclick="openConfigModal()" hidden>
             <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -221,7 +221,22 @@
                     <div class="gemini-model-badge">
                       <span class="sparkle-icon">✦</span>
                       <span class="model-name">MedTutor AI</span>
-                      <span class="model-chip">Gemini 2.5 Flash</span>
+                      <div class="chat-model-picker" id="chatModelPicker">
+                        <button class="model-chip" id="chatModelPickerButton" type="button" onclick="toggleChatModelPicker(event)" aria-haspopup="dialog" aria-expanded="false" title="Escolher o modelo Google Gemini usado nas respostas do chat">
+                          <span class="material-symbol-font" aria-hidden="true">auto_awesome</span>
+                          <span id="chatModelCurrentLabel">Gemini 3.8 Flash</span>
+                          <span class="material-symbol-font picker-chevron" aria-hidden="true">expand_more</span>
+                        </button>
+                        <div class="chat-model-popover" id="chatModelPopover" role="dialog" aria-label="Selecionar modelo de inteligência artificial" hidden>
+                          <button class="chat-model-provider" type="button" onclick="toggleChatGeminiVersions(event)" aria-expanded="false">
+                            <span class="material-symbol-font" aria-hidden="true">auto_awesome</span>
+                            <span><strong>Google Gemini</strong><small>Modelos de conversa</small></span>
+                            <span class="material-symbol-font provider-chevron" aria-hidden="true">chevron_right</span>
+                          </button>
+                          <div class="chat-model-version-list" id="chatGeminiVersionList" role="listbox" aria-label="Versões do Google Gemini" hidden></div>
+                          <p class="chat-model-note">A lista é atualizada pelo catálogo oficial do Google. Se uma versão falhar, o chat tenta uma versão anterior disponível.</p>
+                        </div>
+                      </div>
                     </div>
                     <span id="chatHistoryLimitNotice" style="display: none; font-size: 10px; color: var(--text-muted); cursor: help; border-bottom: 1px dotted var(--text-muted);" title="">Histórico: 100</span>
                   </div>
@@ -3649,8 +3664,8 @@
   <script defer src="/academic-report-renderer.js?v=20260922-report-print-v5"></script>
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1"></script>
-  <script defer src="/material-icons.js?v=20261004-material-symbols-v2"></script>
-  <script defer src="/app.min.js?v=20261005-progressive-startup-v1"></script>
+  <script defer src="/material-icons.js?v=20261005-descriptive-tooltips-v1"></script>
+  <script defer src="/app.min.js?v=20261005-chat-gemini-picker-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

@@ -136,6 +136,7 @@
 
   function processRoot(root) {
     if (!root) return;
+    applyButtonTooltips(root);
     if (root.nodeType === Node.ELEMENT_NODE && root.matches('svg')) convertSvg(root);
     if (root.querySelectorAll) root.querySelectorAll('svg').forEach(convertSvg);
     if (root.nodeType === Node.TEXT_NODE) {
@@ -146,6 +147,45 @@
     const textNodes = [];
     while (walker.nextNode()) textNodes.push(walker.currentNode);
     textNodes.forEach(convertLeadingEmoji);
+  }
+
+  function applyButtonTooltips(root) {
+    const selector = 'button, a[role="button"], [role="tab"]';
+    const elements = [];
+    if (root.nodeType === Node.ELEMENT_NODE && root.matches(selector)) elements.push(root);
+    if (root.querySelectorAll) elements.push(...root.querySelectorAll(selector));
+    for (const element of elements) {
+      const visibleContent = element.cloneNode(true);
+      visibleContent.querySelectorAll('.material-symbol-font, svg, [aria-hidden="true"], .classmates-fab-badge').forEach(node => node.remove());
+      const fallbackLabel = visibleContent.innerText || visibleContent.textContent || '';
+      const label = String(element.getAttribute('aria-label') || element.getAttribute('title') || fallbackLabel || element.id || element.className?.baseVal || element.className || '')
+        .replace(/\b(auto_awesome|expand_more|chevron_right|support_agent|add|close|help|menu|settings)\b/g, ' ')
+        .replace(/[+✦?☰×✕]/g, ' ').replace(/\s+/g, ' ').trim();
+      const action = String(element.getAttribute('onclick') || '').toLowerCase();
+      let description = '';
+      if (/openconfigmodal/.test(action)) description = 'Abrir as configurações da conta e das preferências do aplicativo.';
+      else if (/opensupportmodal/.test(action)) description = 'Abrir o suporte e copiar o diagnóstico da última solicitação.';
+      else if (/openclassmatesmodal/.test(action)) description = 'Encontrar estudantes e adicionar amigos à sua rede.';
+      else if (/opendoubtsdrawer/.test(action)) description = 'Abrir o caderno para registrar e consultar dúvidas e anotações.';
+      else if (/navigateTab\(['"]chat/.test(action)) description = 'Abrir o chat científico para conversar com o MedTutor AI.';
+      else if (/navigateTab\(['"]flashcards/.test(action)) description = 'Abrir os flashcards e iniciar uma revisão ativa.';
+      else if (/navigateTab\(['"]quizzes/.test(action)) description = 'Abrir quizzes e casos para praticar o conteúdo.';
+      else if (/navigateTab\(['"]curriculum/.test(action)) description = 'Consultar suas matérias curriculares e materiais.';
+      else if (/navigateTab\(['"]sce/.test(action)) description = 'Abrir seu cronograma e rota de estudos.';
+      else if (/navigateTab\(['"]challenges/.test(action)) description = 'Abrir desafios para estudar com outras pessoas.';
+      else if (/upload|open.?general.?upload/.test(action)) description = 'Enviar um material de estudo para sua biblioteca.';
+      else if (/delete|remove|excluir/.test(action)) description = `Excluir ${label || 'este item'}; esta ação pode não ser reversível.`;
+      else if (/close|dismiss/.test(action)) description = `Fechar ${label || 'esta janela ou aviso'}.`;
+      else if (/toggle/.test(action)) description = `Alternar ${label || 'esta opção'}.`;
+      else if (/save|submit|send|redeem|sync/.test(action)) description = `Confirmar e executar: ${label || 'esta ação'}.`;
+      else if (/open|show|modal|drawer/.test(action)) description = `Abrir ${label || 'este recurso'} para consultar mais opções.`;
+      else if (label) description = `Acessar ou executar: ${label}.`;
+      else description = 'Executar ação deste controle.';
+      if (description) {
+        element.title = description;
+        if (element.matches('button') && !element.hasAttribute('aria-label') && label) element.setAttribute('aria-label', label);
+      }
+    }
   }
 
   function init() {
