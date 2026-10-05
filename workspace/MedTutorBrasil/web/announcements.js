@@ -16,7 +16,13 @@
   const adminStatus = document.getElementById('annAdminStatus');
   const form = document.getElementById('annForm');
   const preview = document.getElementById('annPreview');
+  const emailPreferences = document.getElementById('annEmailPreferences');
+  const emailOptIn = document.getElementById('annEmailOptIn');
+  const emailPreferenceStatus = document.getElementById('annEmailPreferenceStatus');
+  const campaignList = document.getElementById('annCampaignList');
+  const campaignConfig = document.getElementById('annCampaignConfig');
   let auth = null;
+  let unsubscribeMessage = '';
 
   function escapeText(value) {
     return String(value || '');
@@ -87,7 +93,7 @@
     try {
       const result = await request('/api/announcements');
       list.replaceChildren(...(result.announcements || []).map(makeCard));
-      status.textContent = result.announcements?.length ? '' : 'Ainda não há atualizações publicadas.';
+      status.textContent = unsubscribeMessage || (result.announcements?.length ? '' : 'Ainda não há atualizações publicadas.');
       if (result.announcements?.length && auth?.currentUser) {
         const id = new URLSearchParams(location.search).get('id') || result.announcements[0].id;
         await request(`/api/announcements/me/${encodeURIComponent(id)}/read`, { method: 'POST' }).catch(() => {});
@@ -109,27 +115,108 @@
   }
 
   async function setupAdmin() {
-    if (!auth?.currentUser) return;
+    emailPreferences.hidden = !auth?.currentUser;
+    if (!auth?.currentUser) {
+      adminPanel.hidden = true;
+      return;
+    }
     try {
       const result = await request('/api/announcements/admin/status');
       adminPanel.hidden = result.isAdmin !== true;
+      if (result.isAdmin === true) await loadEmailCampaigns();
     } catch (_) {
       adminPanel.hidden = true;
+    }
+    await loadEmailPreference();
+  }
+
+  async function loadEmailPreference() {
+    if (!auth?.currentUser) return;
+    try {
+      const result = await request('/api/announcements/me/email-preference');
+      emailOptIn.checked = result.optIn === true;
+      emailPreferenceStatus.textContent = result.email ? `E-mail cadastrado: ${result.email}` : 'O endereço confirmado da sua conta será usado.';
+    } catch (error) {
+      emailPreferenceStatus.textContent = error.message;
+    }
+  }
+
+  function campaignLabel(statusValue) {
+    return ({ queued: 'Na fila', sending: 'Enviando', sent: 'Concluído', partial: 'Parcial — requer atenção', failed: 'Falhou', configuration_required: 'Provedor não configurado' })[statusValue] || 'Status desconhecido';
+  }
+
+  async function loadEmailCampaigns() {
+    if (!auth?.currentUser || adminPanel.hidden) return;
+    try {
+      const result = await request('/api/announcements/admin/email-campaigns');
+      campaignConfig.textContent = result.configured ? 'Provedor de e-mail configurado no servidor.' : 'Para ativar envios, configure RESEND_API_KEY, ANNOUNCEMENT_FROM_EMAIL e ANNOUNCEMENT_UNSUBSCRIBE_SECRET nos secrets do servidor.';
+      campaignList.replaceChildren();
+      for (const campaign of result.campaigns || []) {
+        const row = document.createElement('article');
+        row.className = 'ann-campaign-row';
+        const details = document.createElement('div');
+        const heading = document.createElement('strong');
+        heading.textContent = campaign.announcementId || campaign.id;
+        const meta = document.createElement('p');
+        meta.textContent = `${campaignLabel(campaign.status)} · ${Number(campaign.sentCount) || 0}/${Number(campaign.recipientCount) || 0} enviados${campaign.failedCount ? ` · ${campaign.failedCount} falhas` : ''}${campaign.lastError ? ` · ${campaign.lastError}` : ''}`;
+        details.append(heading, meta);
+        row.appendChild(details);
+        if (result.configured && ['partial', 'failed', 'configuration_required'].includes(campaign.status)) {
+          const retry = document.createElement('button');
+          retry.type = 'button';
+          retry.className = 'ann-button secondary';
+          retry.textContent = 'Tentar novamente';
+          retry.addEventListener('click', async () => {
+            retry.disabled = true;
+            try {
+              await request(`/api/announcements/${encodeURIComponent(campaign.announcementId || campaign.id)}/email/retry`, { method: 'POST' });
+              await loadEmailCampaigns();
+            } catch (error) {
+              meta.textContent = error.message;
+              retry.disabled = false;
+            }
+          });
+          row.appendChild(retry);
+        }
+        campaignList.appendChild(row);
+      }
+      if (!campaignList.childElementCount) campaignList.textContent = 'Nenhuma campanha de e-mail ainda.';
+    } catch (error) {
+      campaignList.textContent = error.message;
     }
   }
 
   document.getElementById('annPreviewButton').addEventListener('click', () => renderPreview(collectForm()));
+  document.getElementById('annRefreshCampaigns').addEventListener('click', loadEmailCampaigns);
+  emailOptIn.addEventListener('change', async () => {
+    const requestedOptIn = emailOptIn.checked;
+    emailOptIn.disabled = true;
+    emailPreferenceStatus.textContent = 'Salvando preferência…';
+    try {
+      const result = await request('/api/announcements/me/email-preference', { method: 'POST', body: JSON.stringify({ optIn: requestedOptIn }) });
+      emailOptIn.checked = result.optIn === true;
+      emailPreferenceStatus.textContent = result.optIn ? `Avisos ativados para ${result.email}. Você pode cancelar quando quiser.` : 'Avisos por e-mail desativados.';
+    } catch (error) {
+      emailOptIn.checked = !requestedOptIn;
+      emailPreferenceStatus.textContent = error.message;
+    } finally {
+      emailOptIn.disabled = false;
+    }
+  });
   form.addEventListener('submit', async event => {
     event.preventDefault();
     const button = form.querySelector('[type="submit"]');
     button.disabled = true;
     adminStatus.textContent = 'Publicando atualização…';
     try {
-      await request('/api/announcements', { method: 'POST', body: JSON.stringify(collectForm()) });
-      adminStatus.textContent = 'Atualização publicada e disponível na página de anúncios.';
+      const result = await request('/api/announcements', { method: 'POST', body: JSON.stringify(collectForm()) });
+      adminStatus.textContent = result.emailStatus === 'queued'
+        ? 'Atualização publicada; os e-mails para usuários inscritos estão sendo enviados.'
+        : 'Atualização publicada. Configure o provedor de e-mail no servidor para ativar os avisos.';
       form.reset();
       preview.hidden = true;
       await loadAnnouncements();
+      await loadEmailCampaigns();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       adminStatus.textContent = error.message;
@@ -140,6 +227,18 @@
 
   async function init() {
     try {
+      const unsubscribeToken = new URLSearchParams(location.search).get('unsubscribe');
+      if (unsubscribeToken) {
+        try {
+          await request('/api/announcements/unsubscribe', { method: 'POST', body: JSON.stringify({ token: unsubscribeToken }) });
+          unsubscribeMessage = 'Seu e-mail foi removido da lista de avisos.';
+        } catch (error) {
+          unsubscribeMessage = error.message;
+        }
+        const cleanUrl = new URL(location.href);
+        cleanUrl.searchParams.delete('unsubscribe');
+        history.replaceState({}, '', cleanUrl);
+      }
       const config = JSON.parse(localStorage.getItem('medtutor_custom_firebase_config') || 'null') || DEFAULT_FIREBASE_CONFIG;
       if (window.firebase) {
         const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(config);

@@ -10,11 +10,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/announcements.css?v=20261005-v1">
+  <link rel="stylesheet" href="/announcements.css?v=20261005-v2">
   <link rel="stylesheet" href="/announcements-fixes.css?v=20261005-v1">
+  <link rel="stylesheet" href="/announcements-email.css?v=20261005-v1">
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script defer src="/announcements.js?v=20261005-v1"></script>
+  <script defer src="/announcements.js?v=20261005-v2"></script>
 </head>
 <body>
   <header class="ann-header">
@@ -30,6 +31,11 @@
       <h1>Novidades do MedTutor</h1>
       <p>Veja o que mudou, por que mudou e como aproveitar cada atualização.</p>
     </section>
+    <section id="annEmailPreferences" class="ann-email-preferences" hidden aria-labelledby="annEmailHeading">
+      <div><h2 id="annEmailHeading">Avisos por e-mail</h2><p id="annEmailDescription">Receba um e-mail quando uma nova atualização for publicada. Você pode cancelar quando quiser.</p></div>
+      <label class="ann-email-toggle"><input id="annEmailOptIn" type="checkbox"><span>Quero receber atualizações</span></label>
+      <p id="annEmailPreferenceStatus" class="ann-email-status" role="status" aria-live="polite"></p>
+    </section>
     <div id="annStatus" class="ann-status" role="status" aria-live="polite">Carregando atualizações…</div>
     <section id="annList" class="ann-list" aria-label="Atualizações publicadas"></section>
     <section id="annAdmin" class="ann-admin" hidden>
@@ -43,6 +49,11 @@
         <p id="annAdminStatus" class="ann-status" role="status" aria-live="polite"></p>
       </form>
       <div id="annPreview" class="ann-preview" hidden></div>
+      <section class="ann-campaigns" aria-labelledby="annCampaignsHeading">
+        <div class="admin-heading"><div><span class="ann-kicker">DISTRIBUIÇÃO</span><h2 id="annCampaignsHeading">Envio de e-mails</h2></div><button id="annRefreshCampaigns" class="ann-button secondary" type="button">Atualizar status</button></div>
+        <p id="annCampaignConfig" class="ann-form-hint"></p>
+        <div id="annCampaignList" class="ann-campaign-list" aria-live="polite"></div>
+      </section>
     </section>
   </main>
   <footer class="ann-footer"><a href="/">MedTutor Brasil</a><span>Comunicação clara, estudo com direção.</span></footer>

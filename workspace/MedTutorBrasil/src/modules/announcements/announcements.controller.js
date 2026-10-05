@@ -1,4 +1,5 @@
 const { getFirebaseAuth, getFirebaseFirestore } = require('../../shared/firebase-admin');
+const announcementEmail = require('./announcements.email');
 
 const ANNOUNCEMENTS_COLLECTION = 'announcements';
 
@@ -6,7 +7,7 @@ function bearer(req) {
   return String(req.headers.authorization || '').match(/^Bearer\s+(.+)$/i)?.[1] || '';
 }
 
-async function authenticatedUid(req) {
+async function authenticatedUser(req) {
   const token = bearer(req);
   if (!token) {
     const error = new Error('Entre na sua conta para continuar.');
@@ -14,7 +15,11 @@ async function authenticatedUid(req) {
     throw error;
   }
   const decoded = await getFirebaseAuth().verifyIdToken(token);
-  return decoded.uid;
+  return decoded;
+}
+
+async function authenticatedUid(req) {
+  return (await authenticatedUser(req)).uid;
 }
 
 async function requireAdmin(req) {
@@ -81,7 +86,7 @@ async function adminStatus(req, res) {
   try {
     const uid = await authenticatedUid(req);
     const profile = await getFirebaseFirestore().collection('users').doc(uid).get();
-    return res.json({ isAdmin: profile.exists && profile.get('role') === 'admin' });
+    return res.json({ isAdmin: profile.exists && profile.get('role') === 'admin', emailConfigured: announcementEmail.isEmailConfigured() });
   } catch (error) { return respondError(res, error); }
 }
 
@@ -111,6 +116,53 @@ async function markRead(req, res) {
   } catch (error) { return respondError(res, error); }
 }
 
+async function emailPreference(req, res) {
+  try {
+    const user = await authenticatedUser(req);
+    const result = await announcementEmail.getEmailPreference(user.uid);
+    return res.json(result);
+  } catch (error) { return respondError(res, error); }
+}
+
+async function updateEmailPreference(req, res) {
+  try {
+    const user = await authenticatedUser(req);
+    if (typeof req.body?.optIn !== 'boolean') return res.status(400).json({ error: 'Informe uma preferência válida.' });
+    if (req.body.optIn === true && (user.email_verified !== true || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(user.email || '')))) {
+      return res.status(403).json({ error: 'Confirme seu e-mail no Firebase antes de ativar os avisos.' });
+    }
+    const snapshot = await announcementEmail.setEmailPreference(user.uid, user.email || '', user.name || '', req.body.optIn);
+    return res.json({ optIn: snapshot.get('optIn') === true, email: String(snapshot.get('email') || '') });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function unsubscribe(req, res) {
+  try {
+    const success = await announcementEmail.unsubscribe(req.body?.token || req.query?.token);
+    if (!success) return res.status(400).json({ error: 'Link de cancelamento inválido.' });
+    return res.json({ unsubscribed: true });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function listEmailCampaigns(req, res) {
+  try {
+    await requireAdmin(req);
+    return res.json({ configured: announcementEmail.isEmailConfigured(), campaigns: await announcementEmail.listCampaigns() });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function retryEmailCampaign(req, res) {
+  try {
+    await requireAdmin(req);
+    const id = String(req.params.id || '');
+    if (!announcementEmail.isEmailConfigured()) return res.status(503).json({ error: 'Configure o serviço de e-mail no servidor antes de tentar novamente.' });
+    const release = await getFirebaseFirestore().collection(ANNOUNCEMENTS_COLLECTION).doc(id).get();
+    if (!release.exists || release.get('published') !== true) return res.status(404).json({ error: 'Anúncio não encontrado.' });
+    await announcementEmail.retryCampaign(id);
+    return res.status(202).json({ queued: true });
+  } catch (error) { return respondError(res, error); }
+}
+
 async function publish(req, res) {
   try {
     const uid = await requireAdmin(req);
@@ -118,14 +170,27 @@ async function publish(req, res) {
     const db = getFirebaseFirestore();
     const id = slugVersion(data.version);
     const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc(id);
+    const emailStatus = announcementEmail.isEmailConfigured() ? 'queued' : 'configuration_required';
+    const campaignRef = db.collection('announcement_email_campaigns').doc(id);
     const { FieldValue } = require('firebase-admin/firestore');
     await db.runTransaction(async transaction => {
       const existing = await transaction.get(ref);
       if (existing.exists) throw Object.assign(new Error('Essa versão já foi publicada.'), { statusCode: 409 });
       transaction.create(ref, { ...data, published: true, publishedAt: FieldValue.serverTimestamp(), publishedBy: uid });
+      transaction.set(campaignRef, {
+        announcementId: id,
+        status: emailStatus,
+        recipientCount: 0,
+        sentCount: 0,
+        failedCount: 0,
+        recipientsInitialized: false,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
     });
-    return res.status(201).json({ announcement: serializeAnnouncement(await ref.get()) });
+    if (emailStatus === 'queued') announcementEmail.queueCampaign(id);
+    return res.status(201).json({ announcement: serializeAnnouncement(await ref.get()), emailStatus });
   } catch (error) { return respondError(res, error); }
 }
 
-module.exports = { listPublished, adminStatus, unseen, markRead, publish };
+module.exports = { listPublished, adminStatus, unseen, markRead, emailPreference, updateEmailPreference, unsubscribe, listEmailCampaigns, retryEmailCampaign, publish };

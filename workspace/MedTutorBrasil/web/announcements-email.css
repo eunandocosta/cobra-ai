@@ -1,0 +1,15 @@
+.ann-email-preferences,.ann-campaigns{border:1px solid var(--line);border-radius:14px;background:rgba(17,26,20,.78)}
+.ann-email-preferences{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 20px;align-items:center;padding:18px 20px;margin:0 0 20px}
+.ann-email-preferences[hidden]{display:none}
+.ann-email-preferences h2,.ann-campaigns h2{margin:0;font-size:15px}
+.ann-email-preferences p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+.ann-email-toggle{display:flex;align-items:center;gap:9px;color:#dce8df;font-size:12px;font-weight:700;cursor:pointer}
+.ann-email-toggle input{accent-color:var(--green);width:18px;height:18px}
+.ann-email-preferences .ann-email-status{grid-column:1/-1;min-height:16px}
+.ann-campaigns{margin-top:24px;padding:18px}
+.ann-campaigns .admin-heading{margin-bottom:12px}
+.ann-campaign-list{display:grid;gap:8px}
+.ann-campaign-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:9px;background:#09120d}
+.ann-campaign-row strong{font-size:12px;color:#dce8df;overflow-wrap:anywhere}
+.ann-campaign-row p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:600px){.ann-email-preferences{grid-template-columns:1fr;gap:12px;padding:16px}.ann-email-toggle{padding:8px 0}.ann-email-preferences .ann-email-status{grid-column:auto}.ann-campaign-row{align-items:flex-start;flex-direction:column}}

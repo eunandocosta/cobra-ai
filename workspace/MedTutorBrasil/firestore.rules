@@ -255,6 +255,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Preferências, destinatários e estado das campanhas de e-mail são
+    // acessados exclusivamente pelo servidor com Firebase Admin SDK.
+    match /announcement_email_subscribers/{userId} {
+      allow read, write: if false;
+    }
+    match /announcement_email_campaigns/{campaignId} {
+      allow read, write: if false;
+    }
+    match /announcement_email_deliveries/{deliveryId} {
+      allow read, write: if false;
+    }
+    match /announcement_email_batches/{batchId} {
+      allow read, write: if false;
+    }
+
     // 7. Instituições e Ementas Canônicas
     match /instituicoes/{institutionId} {
       allow read: if isAuthenticated();
