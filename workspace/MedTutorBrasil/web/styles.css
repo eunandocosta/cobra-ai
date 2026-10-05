@@ -5752,6 +5752,10 @@
     .gamification-reward-unit { font-size: 12px; font-weight: 720; letter-spacing: .01em; }
     .gamification-reward-timer { position: absolute; inset: auto 0 0; height: 3px; background: rgba(0,255,115,.15); transform-origin: left; animation: gamificationRewardTimer 5s linear both; }
     .gamification-reward-card.is-leaving { animation: gamificationRewardLeave .26s ease-in both; }
+    .gamification-reward-card.is-penalty { border-color: rgba(255, 92, 92, .62); background: linear-gradient(140deg, #2a1719, #171112 72%); box-shadow: 0 15px 42px rgba(0,0,0,.48), 0 0 24px rgba(255,75,75,.12); }
+    .gamification-reward-card.is-penalty .gamification-reward-icon { color: #ff6969; background: rgba(255, 92, 92, .12); }
+    .gamification-reward-card.is-penalty .gamification-reward-copy strong { color: #ff6969; }
+    .gamification-reward-card.is-penalty .gamification-reward-timer { background: rgba(255, 92, 92, .16); }
     @keyframes gamificationRewardPop { 0% { opacity: 0; transform: translateY(-18px) scale(.76); filter: blur(5px); } 63% { opacity: 1; transform: translateY(3px) scale(1.055); filter: blur(0); } 82% { transform: translateY(-2px) scale(.985); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes gamificationRewardLeave { to { opacity: 0; transform: translateY(-8px) scale(.96); } }
     @keyframes gamificationRewardTimer { to { transform: scaleX(0); } }

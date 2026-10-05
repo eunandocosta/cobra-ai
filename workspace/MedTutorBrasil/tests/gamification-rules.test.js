@@ -6,6 +6,7 @@ function run() {
   assert.strictEqual(rules.baseXp({ kind: 'flashcard', difficulty: 'intermediario', reviewStatus: 'today' }), 10);
   assert.strictEqual(rules.baseXp({ kind: 'flashcard', difficulty: 'avancado', reviewStatus: 'overdue' }), 8);
   assert.strictEqual(rules.baseXp({ kind: 'quiz', difficulty: 'avancado' }), 4);
+  assert.deepStrictEqual(rules.QUIZ_MISTAKE_PENALTY_XP, { easy: 1, medium: 2, hard: 3 });
   for (const difficulty of ['easy', 'medium', 'hard']) {
     const flashcard = rules.baseXp({ kind: 'flashcard', difficulty, reviewStatus: 'overdue' });
     const quizMaximum = rules.baseXp({ kind: 'quiz', difficulty }) + 2;
@@ -77,6 +78,35 @@ function run() {
   assert.strictEqual(outcome.award.combo, 1);
   assert.strictEqual(outcome.award.comboBonus, 0);
   assert.strictEqual(outcome.state.comboBonusAwardedToday, 0);
+
+  state = rules.createInitialState();
+  state.totalXp = 20;
+  for (const [index, difficulty, penalty] of [[0, 'easy', 1], [1, 'medium', 2], [2, 'hard', 3]]) {
+    outcome = rules.applyEvent(state, {
+      eventId: `wrong-${index}`,
+      dayKey: '2026-10-03',
+      kind: 'quiz',
+      difficulty,
+      outcome: 'incorrect'
+    }, 3_000_000 + index * 1_000);
+    assert.strictEqual(outcome.award.earnedXp, -penalty, `Resposta errada ${difficulty} deve remover ${penalty} XP`);
+    assert.strictEqual(outcome.award.comboBonus, 0, 'Resposta errada não deve receber bônus de combo');
+    assert.strictEqual(outcome.state.totalXp, state.totalXp - penalty);
+    state = outcome.state;
+  }
+  assert.strictEqual(state.combo, 0, 'Resposta errada deve quebrar o combo');
+  const duplicatePenalty = rules.applyEvent(state, {
+    eventId: 'wrong-2', dayKey: '2026-10-03', kind: 'quiz', difficulty: 'hard', outcome: 'incorrect'
+  }, 3_004_000);
+  assert.strictEqual(duplicatePenalty.duplicate, true, 'Penalidade duplicada deve ser idempotente');
+  assert.strictEqual(duplicatePenalty.state.totalXp, state.totalXp);
+
+  state.totalXp = 1;
+  outcome = rules.applyEvent(state, {
+    eventId: 'wrong-floor', dayKey: '2026-10-03', kind: 'quiz', difficulty: 'hard', outcome: 'incorrect'
+  }, 3_005_000);
+  assert.strictEqual(outcome.award.earnedXp, -1, 'A penalidade deve ser limitada ao XP disponível');
+  assert.strictEqual(outcome.state.totalXp, 0, 'O XP total não pode ficar negativo');
 
   console.log('✅ Regras de XP, níveis, deck diário, combo e idempotência validadas.');
 }

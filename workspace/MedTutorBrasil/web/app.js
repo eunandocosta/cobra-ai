@@ -3324,6 +3324,7 @@
 
       showReward(award, event, previousTotalXp = this.state.totalXp - (Number(award?.earnedXp) || 0)) {
         const soundType = award?.levelUp ? 'levelUp' : (event?.outcome === 'correct' ? 'correct' : (event?.outcome === 'incorrect' ? 'incorrect' : null));
+        const penalty = Number(award?.earnedXp) < 0;
         if (!award) return;
         if (award.levelUp) {
           document.getElementById('gamificationRewardCard')?.remove();
@@ -3340,25 +3341,27 @@
         document.getElementById('gamificationRewardCard')?.remove();
         const card = document.createElement('div');
         card.id = 'gamificationRewardCard';
-        card.className = 'gamification-reward-card';
+        card.className = `gamification-reward-card${penalty ? ' is-penalty' : ''}`;
         card.setAttribute('role', 'status');
         card.setAttribute('aria-live', 'polite');
-        card.setAttribute('aria-label', `Você ganhou ${award.earnedXp} XP`);
+        card.setAttribute('aria-label', penalty ? `Você perdeu ${Math.abs(award.earnedXp)} XP` : `Você ganhou ${award.earnedXp} XP`);
         const icon = document.createElement('span');
         icon.className = 'gamification-reward-icon';
         icon.setAttribute('aria-hidden', 'true');
         // SVG de contingência evita que a ligadura "auto_awesome" apareça como
         // texto caso a fonte remota do Google demore ou não carregue.
-        icon.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2Zm7 12 .9 3.1L23 18l-3.1.9L19 22l-.9-3.1L15 18l3.1-.9L19 14Z"/></svg>';
+        icon.innerHTML = penalty
+          ? '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 4v11.17l4.59-4.58L18 12l-6 6-6-6 1.41-1.41L11 15.17V4h1Zm-7 15h14v2H5v-2Z"/></svg>'
+          : '<svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2Zm7 12 .9 3.1L23 18l-3.1.9L19 22l-.9-3.1L15 18l3.1-.9L19 14Z"/></svg>';
         const copy = document.createElement('span');
         copy.className = 'gamification-reward-copy';
-        copy.innerHTML = '<small>XP conquistado</small><strong><span class="gamification-reward-value" aria-hidden="true">+0</span><span class="gamification-reward-unit" aria-hidden="true">XP</span></strong>';
+        copy.innerHTML = `<small>${penalty ? 'XP perdido' : 'XP conquistado'}</small><strong><span class="gamification-reward-value" aria-hidden="true">${penalty ? '-0' : '+0'}</span><span class="gamification-reward-unit" aria-hidden="true">XP</span></strong>`;
         const timer = document.createElement('span');
         timer.className = 'gamification-reward-timer';
         timer.setAttribute('aria-hidden', 'true');
         card.append(icon, copy, timer);
         ensureAppNotificationStack().appendChild(card);
-        animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
+        animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, Math.abs(award.earnedXp), 850, value => `${penalty ? '-' : '+'}${Math.floor(Math.abs(value)).toLocaleString('pt-BR')}`);
         // O som começa junto da notificação já inserida, sem aguardar rede.
         if (soundType) MedTutorGamificationPreferences.play(soundType).catch(() => false);
         clearTimeout(this.rewardTimer);
@@ -16159,8 +16162,8 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       list.forEach(item => {
         const userChoice = quizExamState.userChoices[item.id];
-        if (typeof userChoice === 'number') answeredItems.push(item);
         const isCorrect = userChoice === item.correctIndex;
+        if (typeof userChoice === 'number') answeredItems.push({ item, outcome: isCorrect ? 'correct' : 'incorrect' });
         if (isCorrect) correctCount++;
 
         // Atualiza estatísticas da questão
@@ -16181,9 +16184,9 @@ Retorne EXCLUSIVAMENTE um JSON:
       renderSceBars();
 
       if (answeredItems.length) {
-        Promise.all(answeredItems.map(item => awardQuizGamification(item, { quiet: true }))).then(results => {
+        Promise.all(answeredItems.map(({ item, outcome }) => awardQuizGamification(item, { quiet: true, outcome }))).then(results => {
           const earned = results.reduce((total, result) => total + (result?.award?.earnedXp || 0), 0);
-          if (earned > 0) {
+          if (earned !== 0) {
             const level = MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp);
             MedTutorGamification.showReward({
               earnedXp: earned,
@@ -16191,8 +16194,8 @@ Retorne EXCLUSIVAMENTE um JSON:
               deckBonus: 0,
               combo: MedTutorGamification.state.combo,
               level: level.level,
-              levelUp: level.level > levelBeforeExam
-            }, { kind: 'quiz' });
+              levelUp: earned > 0 && level.level > levelBeforeExam
+            }, { kind: 'quiz', outcome: earned < 0 ? 'incorrect' : 'correct' });
           }
         });
       }

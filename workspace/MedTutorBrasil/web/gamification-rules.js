@@ -5,6 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createMedTutorGamificationRules() {
   const FLASHCARD_XP = { easy: 8, medium: 10, hard: 12 };
   const QUIZ_XP = { easy: 2, medium: 3, hard: 4 };
+  const QUIZ_MISTAKE_PENALTY_XP = { easy: 1, medium: 2, hard: 3 };
   const OVERDUE_MULTIPLIER = 0.7;
   const DAILY_DECK_BONUS = { today: 8, overdue: 4 };
   const DAILY_COMBO_BONUS_CAP = 20;
@@ -118,15 +119,16 @@
       state.comboBonusAwardedToday = 0;
     }
 
+    const isIncorrectQuiz = event.kind === 'quiz' && event.outcome === 'incorrect';
     const lastActivityAt = Number(state.lastActivityAt) || 0;
-    state.combo = lastActivityAt && state.lastActivityDay === dateKey && now - lastActivityAt <= COMBO_SESSION_GAP_MS
+    state.combo = isIncorrectQuiz ? 0 : (lastActivityAt && state.lastActivityDay === dateKey && now - lastActivityAt <= COMBO_SESSION_GAP_MS
       ? state.combo + 1
-      : 1;
+      : 1);
     state.lastActivityAt = now;
     state.lastActivityDay = dateKey;
 
-    const base = baseXp(event);
-    const comboTarget = state.combo >= 5 ? 2 : (state.combo >= 3 ? 1 : 0);
+    const base = isIncorrectQuiz ? 0 : baseXp(event);
+    const comboTarget = isIncorrectQuiz ? 0 : (state.combo >= 5 ? 2 : (state.combo >= 3 ? 1 : 0));
     const comboBonus = Math.min(comboTarget, MAX_COMBO_XP_PER_EVENT, DAILY_COMBO_BONUS_CAP - state.comboBonusAwardedToday);
     state.comboBonusAwardedToday += comboBonus;
 
@@ -159,7 +161,10 @@
       }
     }
 
-    const earnedXp = base + comboBonus + deckBonus;
+    const penaltyXp = isIncorrectQuiz
+      ? Math.min(state.totalXp, QUIZ_MISTAKE_PENALTY_XP[normalizeDifficulty(event.difficulty)])
+      : 0;
+    const earnedXp = isIncorrectQuiz ? -penaltyXp : base + comboBonus + deckBonus;
     const previousLevel = getLevel(state.totalXp).level;
     state.totalXp += earnedXp;
     const currentLevel = getLevel(state.totalXp).level;
@@ -186,6 +191,7 @@
     FLASHCARD_XP,
     QUIZ_XP,
     DAILY_DECK_BONUS,
+    QUIZ_MISTAKE_PENALTY_XP,
     DAILY_COMBO_BONUS_CAP,
     baseXp,
     createInitialState,
