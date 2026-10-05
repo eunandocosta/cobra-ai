@@ -2920,6 +2920,7 @@
       setEnabled(kind, enabled) {
         try { localStorage.setItem(this.keys[kind], String(Boolean(enabled))); } catch (error) {}
         this.render();
+        if (kind === 'sounds' && enabled) this.preload();
         if (kind === 'alerts' && !enabled) document.getElementById('gamificationRewardCard')?.remove();
       },
       render() {
@@ -2932,48 +2933,70 @@
           button.classList.toggle('primary', enabled);
         });
       },
-      play(type) {
-        if (!this.enabled('sounds')) return Promise.resolve(false);
-        const sources = {
+      sources: {
           correct: '/assets/audio/gamification/correct.wav',
           incorrect: '/assets/audio/gamification/incorrect.wav',
           levelUp: '/assets/audio/gamification/level-up.wav'
-        };
-        if (!sources[type]) return Promise.resolve(false);
+      },
+      getAudio(type) {
+        if (!this.sources[type]) return null;
+        let audio = this.audio[type];
+        if (!audio) {
+          audio = new Audio(this.sources[type]);
+          audio.preload = 'auto';
+          audio.volume = type === 'incorrect' ? 0.32 : 0.42;
+          this.audio[type] = audio;
+        }
+        return audio;
+      },
+      preload() {
+        if (!this.enabled('sounds')) return;
+        Object.keys(this.sources).forEach(type => {
+          const audio = this.getAudio(type);
+          if (audio && audio.readyState < 2) audio.load();
+        });
+      },
+      play(type) {
+        if (!this.enabled('sounds')) return Promise.resolve(false);
+        const audio = this.getAudio(type);
+        if (!audio) return Promise.resolve(false);
         try {
-          let audio = this.audio[type];
-          if (!audio) {
-            audio = new Audio(sources[type]);
-            audio.preload = 'auto';
-            audio.volume = type === 'incorrect' ? 0.32 : 0.42;
-            this.audio[type] = audio;
+          // Nunca iniciar um carregamento sob demanda no momento do feedback:
+          // isso fazia o som começar vários instantes depois da animação.
+          if (audio.readyState < 2) {
+            audio.load();
+            return Promise.resolve(false);
           }
+          audio.pause();
           audio.currentTime = 0;
-          const playbackStarted = new Promise(resolve => {
-            let settled = false;
-            const finish = started => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(fallbackTimer);
-              audio.removeEventListener('playing', onPlaying);
-              audio.removeEventListener('error', onError);
-              resolve(started);
-            };
-            const onPlaying = () => finish(true);
-            const onError = () => finish(false);
-            const fallbackTimer = setTimeout(() => finish(false), 240);
-            audio.addEventListener('playing', onPlaying, { once: true });
-            audio.addEventListener('error', onError, { once: true });
-          });
+          const startedAt = performance.now();
+          let settled = false;
+          const stopLatePlayback = () => {
+            if (settled) return;
+            settled = true;
+            audio.pause();
+            try { audio.currentTime = 0; } catch (error) {}
+          };
+          const onPlaying = () => {
+            if (performance.now() - startedAt > 180) stopLatePlayback();
+            else settled = true;
+            audio.removeEventListener('playing', onPlaying);
+          };
+          audio.addEventListener('playing', onPlaying, { once: true });
+          const latePlaybackTimer = setTimeout(stopLatePlayback, 220);
           const playback = audio.play();
-          if (playback?.catch) playback.catch(() => {});
-          return playbackStarted;
+          if (playback?.then) playback.then(() => clearTimeout(latePlaybackTimer), () => clearTimeout(latePlaybackTimer));
+          return Promise.resolve(playback).then(() => true, () => false);
         } catch (error) {
           // O feedback sonoro é opcional e não pode interromper o estudo.
           return Promise.resolve(false);
         }
       }
     };
+
+    // Baixa e decodifica os três efeitos em segundo plano antes de o estudante
+    // responder; o primeiro acerto não deve pagar o custo de rede do arquivo.
+    MedTutorGamificationPreferences.preload();
 
     function toggleGamificationPreference(kind) {
       if (!MedTutorGamificationPreferences.keys[kind]) return;
@@ -3302,16 +3325,18 @@
       showReward(award, event, previousTotalXp = this.state.totalXp - (Number(award?.earnedXp) || 0)) {
         const soundType = award?.levelUp ? 'levelUp' : (event?.outcome === 'correct' ? 'correct' : (event?.outcome === 'incorrect' ? 'incorrect' : null));
         if (!award) return;
-        // Áudio é apenas complementar: autoplay/bloqueio de rede nunca pode impedir
-        // que o feedback visual da recompensa apareça.
-        if (soundType) MedTutorGamificationPreferences.play(soundType).catch(() => false);
         if (award.levelUp) {
           document.getElementById('gamificationRewardCard')?.remove();
           showLevelUpModal(award, previousTotalXp);
+          // Dispara no mesmo ciclo visual, depois de ativar o modal.
+          if (soundType) MedTutorGamificationPreferences.play(soundType).catch(() => false);
           return;
         }
-        if (!MedTutorGamificationPreferences.enabled('alerts')) return;
-        if (!award.earnedXp) return;
+        if (!MedTutorGamificationPreferences.enabled('alerts') || !award.earnedXp) {
+          // Sons e alertas visuais são preferências independentes.
+          if (soundType) MedTutorGamificationPreferences.play(soundType).catch(() => false);
+          return;
+        }
         document.getElementById('gamificationRewardCard')?.remove();
         const card = document.createElement('div');
         card.id = 'gamificationRewardCard';
@@ -3334,6 +3359,8 @@
         card.append(icon, copy, timer);
         ensureAppNotificationStack().appendChild(card);
         animateCasinoCounter(card.querySelector('.gamification-reward-value'), 0, award.earnedXp, 850);
+        // O som começa junto da notificação já inserida, sem aguardar rede.
+        if (soundType) MedTutorGamificationPreferences.play(soundType).catch(() => false);
         clearTimeout(this.rewardTimer);
         this.rewardTimer = setTimeout(() => {
           card.classList.add('is-leaving');
