@@ -31,8 +31,8 @@ app.get('/app.min.js', (req, res) => {
   return res.sendFile(path.join(__dirname, 'web', 'app.js'));
 });
 
-// A página raiz é pública; o login usa documento próprio para sobreviver a falhas da SPA.
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'landing.html')));
+app.get('/anuncios', (req, res) => res.sendFile(path.join(__dirname, 'web', 'announcements.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'web', 'login.html')));
 app.get('/cadastro', (req, res) => res.sendFile(path.join(__dirname, 'web', 'login.html')));
 
@@ -47,6 +47,7 @@ clientRoutes.forEach(route => {
 
 app.use('/api/auth', require('./src/modules/auth/auth.routes'));
 app.use('/api/access', require('./src/modules/access/access.routes'));
+app.use('/api/announcements', require('./src/modules/announcements/announcements.routes'));
 app.use('/api/ementas', require('./src/modules/ementas/ementas.routes'));
 app.use('/api/relatorios', require('./src/modules/relatorios/relatorios.routes'));
 app.use('/api/quizzes', require('./src/modules/quizzes/quizzes.routes'));

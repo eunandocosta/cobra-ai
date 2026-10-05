@@ -182,8 +182,12 @@ service cloud.firestore {
     // 1. Perfil do Usuário
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && uidUnchanged() && isValidUserProfile(request.resource.data);
-      allow update: if (isOwner(userId) && uidNotModified()) ||
+      // `role` é um privilégio administrativo definido somente por edição
+      // confiável no Firebase Console/Admin SDK, nunca pelo próprio usuário.
+      allow create: if isOwner(userId) && uidUnchanged() && isValidUserProfile(request.resource.data) &&
+        !request.resource.data.keys().hasAny(['role']);
+      allow update: if (isOwner(userId) && uidNotModified() &&
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) ||
                        (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['challengerThumbsUp', 'challengerThumbsDown', 'challengerScore', 'challengerHistory']));
       allow delete: if isOwner(userId);
 

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110d">
+  <meta name="description" content="Acompanhe as atualizações e novidades do MedTutor Brasil.">
+  <title>Atualizações | MedTutor Brasil</title>
+  <link rel="icon" href="/icons/medtutor-icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/announcements.css?v=20261005-v1">
+  <link rel="stylesheet" href="/announcements-fixes.css?v=20261005-v1">
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script defer src="/announcements.js?v=20261005-v1"></script>
+</head>
+<body>
+  <header class="ann-header">
+    <a class="ann-brand" href="/anuncios" aria-label="MedTutor Brasil — atualizações">
+      <span class="ann-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+      <span>MedTutor <b>Brasil</b><small>Atualizações e novidades</small></span>
+    </a>
+    <nav><a href="/">Página inicial</a><a href="/login">Entrar</a></nav>
+  </header>
+  <main class="ann-main">
+    <section class="ann-intro">
+      <span class="ann-kicker">CENTRAL DE COMUNICAÇÃO</span>
+      <h1>Novidades do MedTutor</h1>
+      <p>Veja o que mudou, por que mudou e como aproveitar cada atualização.</p>
+    </section>
+    <div id="annStatus" class="ann-status" role="status" aria-live="polite">Carregando atualizações…</div>
+    <section id="annList" class="ann-list" aria-label="Atualizações publicadas"></section>
+    <section id="annAdmin" class="ann-admin" hidden>
+      <div class="admin-heading"><div><span class="ann-kicker">ÁREA ADMINISTRATIVA</span><h2>Publicar atualização</h2></div><span class="admin-badge">Acesso admin</span></div>
+      <form id="annForm">
+        <div class="ann-form-row"><label>Versão<input name="version" required maxlength="24" placeholder="v1.12" pattern="v[0-9]+\.[0-9]+(\.[0-9]+)?"></label><label>Título<input name="title" required maxlength="160" placeholder="Melhorias no cronograma"></label></div>
+        <label>Descrição detalhada<textarea name="description" required maxlength="30000" rows="10" placeholder="Descreva as mudanças. Separe tópicos por linhas em branco."></textarea></label>
+        <div class="ann-form-row"><label>Banner (URL HTTPS, opcional)<input name="bannerUrl" type="url" placeholder="https://…"></label><label>Descrição da imagem<input name="bannerAlt" maxlength="300" placeholder="Texto alternativo para acessibilidade"></label></div>
+        <p class="ann-form-hint">O banner recomendado é horizontal (proporção aproximada 3:1). A publicação fica imediatamente visível para todos.</p>
+        <div class="ann-form-actions"><button class="ann-button secondary" type="button" id="annPreviewButton">Pré-visualizar</button><button class="ann-button primary" type="submit">Publicar anúncio</button></div>
+        <p id="annAdminStatus" class="ann-status" role="status" aria-live="polite"></p>
+      </form>
+      <div id="annPreview" class="ann-preview" hidden></div>
+    </section>
+  </main>
+  <footer class="ann-footer"><a href="/">MedTutor Brasil</a><span>Comunicação clara, estudo com direção.</span></footer>
+</body>
+</html>

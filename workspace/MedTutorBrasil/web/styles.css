@@ -255,6 +255,8 @@
       justify-content: center;
       color: var(--neon);
       box-shadow: 0 0 15px var(--neon-glow);
+      text-decoration: none;
+      flex: 0 0 auto;
     }
 
     .brand-text h1 {
@@ -10258,3 +10260,13 @@
     .topbar-utility-action { width: 34px; min-width: 34px; height: 36px; }
     .topbar-utility-icon { width: 18px; height: 18px; flex-basis: 18px; }
   }
+
+  .announcement-first-access-overlay { position: fixed; inset: 0; z-index: 10050; display: grid; place-items: center; padding: 20px; background: rgba(2,8,5,.76); backdrop-filter: blur(7px); }
+  .announcement-first-access-dialog { width: min(520px,100%); padding: 26px; border: 1px solid rgba(0,230,111,.45); border-radius: 18px; background: var(--bg-card,#111a14); color: var(--text-primary,#f2f8f3); box-shadow: 0 24px 80px rgba(0,0,0,.48),0 0 35px rgba(0,230,111,.1); }
+  .announcement-first-access-version { color: var(--neon,#00e66f); font-size: 12px; font-weight: 800; }
+  .announcement-first-access-dialog h2 { margin: 8px 0 10px; font-size: 22px; }
+  .announcement-first-access-dialog p { margin: 0; color: var(--text-secondary,#91a196); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+  .announcement-first-access-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+  .announcement-first-access-actions button,.announcement-first-access-actions a { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid var(--border,rgba(197,229,207,.16)); border-radius: 9px; background: transparent; color: var(--text-primary,#f2f8f3); font: inherit; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .announcement-first-access-actions a { border-color: var(--neon,#00e66f); background: var(--neon,#00e66f); color: #06110b; }
+  @media (max-width: 520px) { .announcement-first-access-dialog { padding: 21px; } .announcement-first-access-actions { flex-direction: column-reverse; } .announcement-first-access-actions button,.announcement-first-access-actions a { width: 100%; } }

@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261005-quiz-mistake-xp-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261005-announcements-v2">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -42,9 +42,9 @@
     <!-- SIDEBAR DESKTOP / WEB / WINDOWS -->
     <aside class="sidebar" id="appSidebar">
       <div class="brand">
-        <div class="brand-logo">
+        <a class="brand-logo" href="/anuncios" aria-label="Abrir anúncios e atualizações do MedTutor" title="Anúncios e atualizações">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        </div>
+        </a>
         <div class="brand-text">
           <h1>MedTutor Brasil</h1>
           <span>Materiais de estudo</span>
@@ -3647,6 +3647,7 @@
   <script defer src="/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1"></script>
   <script defer src="/material-icons.js?v=20261004-material-symbols-v2"></script>
   <script defer src="/app.min.js?v=20261005-quiz-mistake-xp-v1"></script>
+  <script defer src="/announcement-prompt.js?v=20261005-v1"></script>
   <script>
     window.addEventListener('load', () => {
       document.getElementById('pwaBootSplash')?.classList.add('is-ready');
