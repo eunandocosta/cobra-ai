@@ -10223,11 +10223,30 @@ Respeite rigorosamente estas preferências sem que o estudante precise repeti-la
 
         // Um relatório é sempre ancorado em UM material. Não permita que um ID
         // informado caia em um arquivo homônimo: isso misturava aulas distintas.
-        const mat = (typeof chatDriveMaterials !== 'undefined')
+        let mat = (typeof chatDriveMaterials !== 'undefined')
           ? (materialId
             ? chatDriveMaterials.find(m => m.id === materialId)
             : chatDriveMaterials.find(m => m.name === materialName || m.nome === materialName || m.originalFileName === materialName))
           : null;
+
+        // A geração manual também pode começar enquanto a análise visual do
+        // upload ainda está em curso. Aguarde aqui, no ponto comum a todas as
+        // entradas de relatório, antes de consultar figuras persistidas.
+        const pendingVisualTask = window.importedMaterialVisualTasks?.[mat?.id || materialId];
+        if (pendingVisualTask && typeof pendingVisualTask.then === 'function') {
+          console.info('[Relatório MedTutor] Aguardando a conclusão das imagens do material antes de gerar.');
+          showToast('🖼️ Finalizando as imagens deste material antes do relatório...');
+          try {
+            await pendingVisualTask;
+          } catch (visualError) {
+            console.warn('[Relatório MedTutor] A etapa visual terminou com falhas; usando somente as figuras já persistidas.', visualError);
+          }
+          // O enriquecimento pode ter gravado URLs e associações no objeto do
+          // material enquanto aguardávamos; recarregue a referência atual.
+          mat = (typeof chatDriveMaterials !== 'undefined' && Array.isArray(chatDriveMaterials))
+            ? chatDriveMaterials.find(m => m.id === (materialId || mat?.id)) || mat
+            : mat;
+        }
 
         const effectiveSubject = subjectName || mat?.subject || mat?.disciplina || currentStudySubject || 'Clínica Médica';
         const effectiveTitle = mat?.name || mat?.nome || materialName || effectiveSubject;
