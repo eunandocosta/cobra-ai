@@ -1,4 +1,5 @@
-.material-symbol-font {
+.material-symbol-font,
+.material-symbols-outlined {
   display: inline-flex;
   align-items: center;
   justify-content: center;

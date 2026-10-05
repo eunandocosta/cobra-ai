@@ -1,9 +1,9 @@
-const CACHE_NAME = 'medtutor-static-v96';
+const CACHE_NAME = 'medtutor-static-v97';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/landing.html',
-  '/material-icons.css?v=20261004-material-symbols-v2',
+  '/material-icons.css?v=20261005-material-symbols-v3',
   '/material-icons.js?v=20261004-material-symbols-v2',
   '/landing.css?v=20260922-landing-v1',
   '/styles.css?v=20261003-xp-notification-layout-v7',
