@@ -338,17 +338,48 @@
     }
 
     .topbar-title {
+      min-width: 0;
+      flex: 1 1 auto;
       font-size: 16px;
       font-weight: 700;
       display: flex;
       align-items: center;
       gap: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .topbar-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex: 0 0 auto;
+      min-width: 0;
+      flex-wrap: nowrap;
+    }
+
+    .topbar-actions > button,
+    .topbar-actions > .user-profile-menu-container { flex-shrink: 0; }
+    .topbar-actions > .btn-outline-action,
+    .topbar-actions > .topbar-utility-action { white-space: nowrap; }
+    #topbarConfigButton[hidden],
+    .user-profile-dropdown .user-dropdown-item[hidden] { display: none !important; }
+
+    @media (min-width: 1281px) and (max-width: 1600px) {
+      .topbar { gap: 12px; padding-right: 16px; padding-left: 16px; }
+      .topbar-actions { gap: 6px; }
+      .topbar-utility-label { display: none; }
+      .topbar-utility-action { width: 40px; min-width: 40px; padding: 0; }
+      .topbar-actions > .btn-outline-action:not(.primary) {
+        width: 42px;
+        min-width: 42px;
+        padding: 0;
+        justify-content: center;
+      }
+      .topbar-actions > .btn-outline-action:not(.primary) > span { display: none; }
+      .topbar-actions > .btn-outline-action.primary { gap: 7px; padding-right: 12px; padding-left: 12px; }
+      .topbar-actions > .gamification-topbar { width: 124px; min-width: 124px; }
     }
 
     /* Ações globais ficam no cabeçalho, fora da área dos cartões e avisos. */

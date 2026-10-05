@@ -27,7 +27,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261005-admin-menu-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261005-settings-layout-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
 
@@ -126,11 +126,7 @@
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v4a3 3 0 0 1-3 3h-2l-3 3v-3H9a3 3 0 0 1-3-3z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
             <span>Suporte</span>
           </button>
-          <button class="btn-outline-action" onclick="toggleTheme()" title="Alternar Dia/Noite">
-            <svg class="icon" id="themeIcon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            <span id="themeLabel">Noite</span>
-          </button>
-          <button class="btn-outline-action" onclick="openConfigModal()">
+          <button class="btn-outline-action" id="topbarConfigButton" onclick="openConfigModal()" hidden>
             <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
 
@@ -158,7 +154,7 @@
                 <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <span>Editar Perfil Médico</span>
               </button>
-              <button class="user-dropdown-item" onclick="openConfigModal()">
+              <button class="user-dropdown-item" onclick="openConfigModal()" hidden>
                 <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span>Configurações & Nuvem</span>
               </button>
@@ -1607,9 +1603,12 @@
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
           <div>
             <div style="font-weight: 700; font-size: 14px;">Modo Visual</div>
-            <div style="font-size: 12px; color: var(--text-secondary);">Alternar entre Tema Noite (Preto) e Dia (Branco)</div>
+            <div style="font-size: 12px; color: var(--text-secondary);" id="themeSettingsDescription">Modo atual: Noite</div>
           </div>
-          <button class="btn-outline-action" onclick="toggleTheme()">Alternar</button>
+          <button class="btn-outline-action theme-settings-toggle" id="themeSettingsToggle" type="button" onclick="toggleTheme()" aria-pressed="false">
+            <svg class="icon" id="themeIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span id="themeSettingsLabel">Ativar modo claro</span>
+          </button>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);">
@@ -3651,7 +3650,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1"></script>
   <script defer src="/material-icons.js?v=20261004-material-symbols-v2"></script>
-  <script defer src="/app.min.js?v=20261005-admin-menu-v1"></script>
+  <script defer src="/app.min.js?v=20261005-settings-layout-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-v1"></script>
   <script>
     window.addEventListener('load', () => {

@@ -3862,23 +3862,37 @@
     }
 
     // 1. Controle de Tema (Dia / Noite)
-    let currentTheme = 'dark';
+    let currentTheme = localStorage.getItem('medtutor_theme') === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    function updateThemeSettingsControl() {
+      const isDark = currentTheme === 'dark';
+      const label = document.getElementById('themeSettingsLabel');
+      const description = document.getElementById('themeSettingsDescription');
+      const icon = document.getElementById('themeIcon');
+      const toggle = document.getElementById('themeSettingsToggle');
+      if (label) label.textContent = isDark ? 'Ativar modo claro' : 'Ativar modo escuro';
+      if (description) description.textContent = 'Modo atual: ' + (isDark ? 'Noite' : 'Dia');
+      if (toggle) toggle.setAttribute('aria-pressed', String(!isDark));
+      if (icon) icon.innerHTML = isDark
+        ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
+        : '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+    }
     function toggleTheme() {
       currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', currentTheme);
       
-      const themeLabel = document.getElementById('themeLabel');
       const themeIcon = document.getElementById('themeIcon');
 
       if (currentTheme === 'dark') {
-        themeLabel.textContent = 'Noite';
         themeIcon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
       } else {
-        themeLabel.textContent = 'Dia';
         themeIcon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
       }
+      localStorage.setItem('medtutor_theme', currentTheme);
+      updateThemeSettingsControl();
       showToast('Tema alternado para Modo ' + (currentTheme === 'dark' ? 'Noite (Preto)' : 'Dia (Branco)'));
     }
+    updateThemeSettingsControl();
 
     // 2. Navegação entre Abas
     let currentTab = 'chat';
