@@ -1,7 +1,7 @@
 (function setupMedTutorMaterialIcons() {
   'use strict';
 
-  const iconByEmoji = new Map([
+  const iconByEmoji = [...new Map([
     ['⚠️', 'warning'], ['⚡', 'bolt'], ['💡', 'lightbulb'], ['✅', 'check_circle'], ['✨', 'auto_awesome'],
     ['📄', 'description'], ['↗', 'open_in_new'], ['📖', 'menu_book'], ['📋', 'assignment'], ['⏳', 'hourglass_top'],
     ['🔬', 'biotech'], ['📚', 'library_books'], ['🗑️', 'delete'], ['⭐', 'star'], ['🩺', 'medical_services'],
@@ -24,7 +24,7 @@
     ['🏅', 'military_tech'], ['↔', 'swap_horiz'], ['🌙', 'dark_mode'], ['🩻', 'radiology'], ['🫀', 'cardiology'],
     ['📍', 'location_on'], ['📎', 'attach_file'], ['❓', 'help'], ['➡️', 'arrow_forward'], ['👁️', 'visibility'],
     ['✕', 'close'], ['→', 'arrow_forward'], ['←', 'arrow_back']
-  ].sort((a, b) => b[0].length - a[0].length));
+  ]).entries()].sort((a, b) => b[0].length - a[0].length);
 
   const iconUiSelector = [
     'button', 'a[role="button"]', '.button', '.back', '[role="tab"]', '.nav-link', '.mobile-nav-btn', '.badge', '[class*="badge"]',
