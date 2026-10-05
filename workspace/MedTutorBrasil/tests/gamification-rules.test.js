@@ -14,11 +14,18 @@ function run() {
   }
 
   const levelOne = rules.getLevel(0);
-  const levelTwo = rules.getLevel(150);
-  const levelThree = rules.getLevel(375);
-  assert.deepStrictEqual([levelOne.level, levelOne.xpToNextLevel], [1, 150]);
-  assert.deepStrictEqual([levelTwo.level, levelTwo.xpToNextLevel], [2, 225]);
-  assert.strictEqual(levelThree.level, 3);
+  const levelTwo = rules.getLevel(80);
+  const levelFifteen = rules.getLevel(1724);
+  const levelSixteen = rules.getLevel(1725);
+  const levelFortySix = rules.getLevel(7680);
+  const levelOneHundredSix = rules.getLevel(25920);
+  assert.deepStrictEqual([levelOne.level, levelOne.xpToNextLevel], [1, 80]);
+  assert.deepStrictEqual([levelTwo.level, levelTwo.xpIntoLevel, levelTwo.xpToNextLevel], [2, 0, 85]);
+  assert.deepStrictEqual([levelFifteen.level, levelFifteen.xpIntoLevel, levelFifteen.xpToNextLevel], [15, 149, 150]);
+  assert.deepStrictEqual([levelSixteen.level, levelSixteen.xpIntoLevel, levelSixteen.xpToNextLevel], [16, 0, 155]);
+  assert.deepStrictEqual([levelFortySix.level, levelFortySix.xpIntoLevel, levelFortySix.xpToNextLevel], [46, 0, 245]);
+  assert.deepStrictEqual([levelOneHundredSix.level, levelOneHundredSix.xpIntoLevel, levelOneHundredSix.xpToNextLevel], [106, 0, 365]);
+  assert.strictEqual(rules.xpRequiredForNextLevel(135), 394, 'a progressão posterior deve continuar mais lenta sem saltos');
 
   let state = rules.createInitialState();
   assert.strictEqual(state.totalStudySeconds, 0);

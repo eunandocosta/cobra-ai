@@ -92,17 +92,25 @@
     return { state, duplicate: false, deltaSeconds };
   }
 
+  function xpRequiredForNextLevel(level) {
+    const currentLevel = Math.max(1, Math.floor(Number(level) || 1));
+    if (currentLevel <= 15) return 80 + (currentLevel - 1) * 5;
+    if (currentLevel <= 45) return 155 + (currentLevel - 16) * 3;
+    if (currentLevel <= 105) return 245 + (currentLevel - 46) * 2;
+    return 365 + (currentLevel - 106);
+  }
+
   function getLevel(totalXp) {
     const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
     let level = 1;
     let xpAtLevelStart = 0;
-    let xpToNextLevel = 150;
+    let xpToNextLevel = xpRequiredForNextLevel(level);
     let remaining = xp;
     while (remaining >= xpToNextLevel) {
       remaining -= xpToNextLevel;
       xpAtLevelStart += xpToNextLevel;
       level += 1;
-      xpToNextLevel = 150 + ((level - 1) * 75);
+      xpToNextLevel = xpRequiredForNextLevel(level);
     }
     return { level, xpIntoLevel: remaining, xpToNextLevel, xpAtLevelStart, totalXp: xp };
   }
@@ -193,6 +201,7 @@
     DAILY_DECK_BONUS,
     QUIZ_MISTAKE_PENALTY_XP,
     DAILY_COMBO_BONUS_CAP,
+    xpRequiredForNextLevel,
     baseXp,
     createInitialState,
     normalizeState,
