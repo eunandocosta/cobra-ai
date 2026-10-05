@@ -10594,8 +10594,26 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         // que relatórios também exibam imagens quando o Gemini não as citar.
         reportData.html = removeInternalReportAuthoringInstructions(reportData.html);
         if (reportFigures.length) {
-          reportData.html = `${reportData.html}${this.renderMaterialFiguresHtml(reportFigures)}`;
+          // A galeria precisa ficar dentro do corpo do artigo e antes do
+          // rodapé. Anexá-la após o HTML completo deixa as figuras fora do
+          // contêiner paginado do relatório e pode fazê-las desaparecer na
+          // visualização/impressão, embora as URLs tenham sido enviadas.
+          const figureGalleryHtml = this.renderMaterialFiguresHtml(reportFigures);
+          const footerIndex = reportData.html.lastIndexOf('<footer class="academic-report-print-footer"');
+          const articleEndIndex = reportData.html.lastIndexOf('</div>');
+          const insertionIndex = footerIndex >= 0 ? footerIndex : articleEndIndex;
+          if (insertionIndex >= 0) {
+            reportData.html = `${reportData.html.slice(0, insertionIndex)}${figureGalleryHtml}\n${reportData.html.slice(insertionIndex)}`;
+          } else {
+            reportData.html = `${reportData.html}${figureGalleryHtml}`;
+          }
           reportData.markdown = `${reportData.markdown || ''}\n\n${this.renderMaterialFiguresMarkdown(reportFigures)}`;
+          console.info('[Relatório MedTutor] Figuras anexadas ao corpo do relatório', {
+            arquivo: effectiveTitle,
+            figuras: reportFigures.length,
+            htmlImages: (reportData.html.match(/<img\b/gi) || []).length,
+            markdownImages: (reportData.markdown.match(/!\[[^\]]*\]\(https?:\/\//gi) || []).length
+          });
         }
 
         if (pedagogicalData) {
