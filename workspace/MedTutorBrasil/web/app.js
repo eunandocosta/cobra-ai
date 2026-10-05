@@ -22766,6 +22766,34 @@ ${rawText}`;
       };
     }
 
+    function getMaterialContentDescription(material) {
+      if (!material || typeof material !== 'object') return '';
+      const index = material.descriptiveIndex || {};
+      const concepts = Array.isArray(index.keyConcepts) ? index.keyConcepts : [];
+      const sectionTitles = Array.isArray(index.sections)
+        ? index.sections.map(section => section?.title).filter(Boolean)
+        : [];
+      const groundedTopics = [...new Set([...concepts, ...sectionTitles]
+        .map(value => String(value).replace(/\s+/g, ' ').trim())
+        .filter(Boolean))].slice(0, 4);
+      if (groundedTopics.length) return `Conteúdo identificado: ${groundedTopics.join(' • ')}.`;
+
+      // Sem índice útil, usa uma prévia do próprio texto, nunca a justificativa
+      // genérica da fase pedagógica como se fosse descrição deste arquivo.
+      const sourceText = String(material.readingDocText || material.text || material.markdownText || '')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+        .replace(/https?:\/\/\S+/g, ' ')
+        .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+        .replace(/[>*_`|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (sourceText) {
+        const excerpt = sourceText.slice(0, 180).replace(/[\s.,;:!?-]+$/, '');
+        return `Prévia do material: ${excerpt}${sourceText.length > 180 ? '…' : '.'}`;
+      }
+      return `Material: ${String(material.name || material.originalFileName || 'sem título').trim()}.`;
+    }
+
     function calculatePedagogicalScore(material, subjectContext) {
       const profile = buildMaterialPedagogicalProfile(material, subjectContext);
       const { phaseDef, explicitClassNumber, syllabusIndex } = profile;
@@ -23786,6 +23814,7 @@ Para cada material, retorne um objeto no JSON com:
             const icon = m.pedagogicalIcon || '📄';
             const phase = m.pedagogicalPhaseName || 'Conteúdo Programático';
             const rationale = m.pedagogicalRationale || 'Etapa sequencial do roteiro de estudo';
+            const contentDescription = getMaterialContentDescription(m);
             const isQO = m.materialType === 'questions_only';
             const safeMatId = (m.id || m.name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const safeSubj = subjectName.replace(/'/g, "\\'");
@@ -23812,8 +23841,8 @@ Para cada material, retorne um objeto no JSON com:
                       onclick="event.stopPropagation(); startMaterialRename('${safeMatId}', this)"
                     >${escapeHtml(m.name)}</span>
                   </div>
-                  <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 1px;">
-                    ${escapeHtml(rationale)} ${m.sizeStr ? '• ' + m.sizeStr : ''}
+                  <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 1px;" title="${escapeHtml(rationale)}">
+                    ${escapeHtml(contentDescription)} ${m.sizeStr ? '• ' + m.sizeStr : ''}
                   </div>
                 </div>
               </div>
