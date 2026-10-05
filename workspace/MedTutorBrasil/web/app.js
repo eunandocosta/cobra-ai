@@ -19151,9 +19151,20 @@ DIRETRIZES CIRÚRGICAS:
       window.importedMaterialReportIds = [];
       window.generateReportsAfterUpload = false;
       if (reportIds.length > 0) {
-        // Não bloqueia o término da importação; os relatórios são gerados na fila,
-        // um por arquivo e sempre com seu ID e conteúdo próprios.
-        setTimeout(() => generateImportedMaterialReports(reportIds), 0);
+        // A etapa visual é iniciada sem bloquear a alocação, mas os relatórios
+        // precisam aguardar suas imagens e associações serem anexadas ao material.
+        const visualTasks = reportIds
+          .map(id => window.importedMaterialVisualTasks?.[id])
+          .filter(task => task && typeof task.then === 'function');
+        if (visualTasks.length) {
+          showToast('🖼️ Finalizando imagens dos materiais antes de gerar os relatórios...');
+        }
+        Promise.allSettled(visualTasks).then(() => {
+          reportIds.forEach(id => {
+            if (window.importedMaterialVisualTasks) delete window.importedMaterialVisualTasks[id];
+          });
+          return generateImportedMaterialReports(reportIds);
+        });
       }
     }
 
@@ -19335,10 +19346,11 @@ DIRETRIZES CIRÚRGICAS:
         sortChatDriveMaterialsInLearningOrder();
       }
       saveChatDriveMaterials();
-      // O salvamento textual não espera a extração visual: a interface permanece
-      // responsiva e as figuras originais são anexadas assim que terminarem.
+      // Mantém a interface responsiva, mas registra a tarefa para que qualquer
+      // relatório automático deste material aguarde a persistência das figuras.
       if (currentMat.file) {
-        enrichUploadedMaterialWithVisualAssociations(newMaterial, currentMat.file).catch(error => {
+        window.importedMaterialVisualTasks = window.importedMaterialVisualTasks || {};
+        window.importedMaterialVisualTasks[newMaterial.id] = enrichUploadedMaterialWithVisualAssociations(newMaterial, currentMat.file).catch(error => {
           console.warn('[Imagens do material] Falha ao anexar imagens originais:', error);
         });
       }
