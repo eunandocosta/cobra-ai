@@ -101,6 +101,10 @@ const persistenceLoader = appSource.match(/async loadAllDataFromPersistence\(\) 
 assert(persistenceLoader.includes('!materialsCacheHydrated && !hasLocalMaterialsCache'), 'cache local vazio não deve impedir a primeira leitura de materiais no Firestore');
 assert(persistenceLoader.includes('|| needsInitialMaterialsHydration'), 'a primeira hidratação deve ignorar o intervalo de 15 minutos quando não existe cópia local');
 assert(persistenceLoader.includes('getMaterialsCacheHydratedKey(uid), \'true\''), 'marcar cache hidratado somente após consulta bem-sucedida à nuvem');
+assert(persistenceLoader.includes('await Promise.all(['), 'hidratar caches IndexedDB independentes em paralelo');
+assert(persistenceLoader.includes('await yieldToBrowser()'), 'ceder tempo ao navegador ao processar coleções grandes');
+assert(persistenceLoader.includes('renderActiveTabContent()'), 'sincronização de dados deve renderizar apenas a seção ativa');
+assert(appSource.includes('function renderActiveTabContent()'), 'renderização incremental por seção deve estar disponível');
 console.log('[PASS] Primeira hidratação do cache de materiais força leitura da nuvem quando necessário');
 
 for (const fakeColleague of [
@@ -159,8 +163,8 @@ assert(sceReviewMarkup.includes('id="themeSettingsToggle"') && sceReviewMarkup.i
 assert(sceReviewMarkup.includes('class="btn-icon sce-review-close"') && sceReviewMarkup.includes('aria-label="Fechar flashcards"'), 'o modal de revisão deve ter um botão de fechar identificável e acessível');
 assert(/\.sce-review-modal \.sce-review-close[\s\S]*?width: 44px;[\s\S]*?height: 44px;/.test(fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf-8')), 'o botão de fechar do modal de revisão deve ter área de toque confortável');
 const appBundleVersion = sceReviewMarkup.match(/<script defer src="\/app\.min\.js\?v=([^\"]+)"/)?.[1] || '';
-assert(appBundleVersion === '20261005-settings-layout-v1', 'o bundle deve invalidar o cache após mudanças no app');
-assert(serviceWorkerSource.includes("medtutor-static-v105") && serviceWorkerSource.includes('/app.min.js?v=20261005-settings-layout-v1') && serviceWorkerSource.includes('/styles.css?v=20261005-announcements-admin-v1') && serviceWorkerSource.includes('/announcement-prompt.js?v=20261005-consent-prompt-v1') && serviceWorkerSource.includes('/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
+assert(appBundleVersion === '20261005-progressive-startup-v1', 'o bundle deve invalidar o cache após mudanças no app');
+assert(serviceWorkerSource.includes("medtutor-static-v106") && serviceWorkerSource.includes('/app.min.js?v=20261005-progressive-startup-v1') && serviceWorkerSource.includes('/styles.css?v=20261005-announcements-admin-v1') && serviceWorkerSource.includes('/announcement-prompt.js?v=20261005-consent-prompt-v1') && serviceWorkerSource.includes('/gamification-rules.js?v=20261005-daily-quiz-multiplier-v1') && productionMiddlewareSource.includes("path === '/service-worker.js'") && productionMiddlewareSource.includes("res.setHeader('Cache-Control', 'no-cache')"), 'o service worker deve descartar o shell antigo e ser sempre revalidado');
 const materialIconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf-8');
 const materialIconsCss = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.css'), 'utf-8');
 assert(sceReviewMarkup.includes('family=Material+Symbols+Rounded') && sceReviewMarkup.includes('icon_names=') && sceReviewMarkup.includes('/material-icons.js?v=20261004-material-symbols-v2'), 'a interface do app deve carregar ícones Material Symbols Rounded subsetados pelo Google Fonts');
@@ -215,7 +219,7 @@ assert(authMarkup.includes('__medTutorAuthBootFailure') && authMarkup.includes("
 assert(authMarkup.includes('recoverAuthStaticCache') && authMarkup.includes("registration.unregister()") && authMarkup.includes("key.indexOf('medtutor-') === 0"), 'a recuperação de sessão deve limpar somente o cache estático do MedTutor');
 assert(indexContent.includes("path.join(__dirname, 'web', 'login.html')"), 'a rota de login deve servir um documento separado da SPA');
 assert(standaloneLoginMarkup.includes("params.get('logout') === '1'") && standaloneLoginMarkup.includes('auth.signOut()'), 'o login isolado deve encerrar a sessão Firebase quando vier da recuperação');
-assert(appSource.includes("if (!item.disciplina || !Array.isArray(item.materias)) return;") && !appSource.includes("if (item.origem !== 'gemini-upload') return;"), 'ementas legadas válidas devem continuar visíveis mesmo sem metadado de origem');
+assert((appSource.includes("if (!item.disciplina || !Array.isArray(item.materias)) return;") || appSource.includes("if (!item.disciplina || !Array.isArray(item.materias)) continue;")) && !appSource.includes("if (item.origem !== 'gemini-upload') return;"), 'ementas legadas válidas devem continuar visíveis mesmo sem metadado de origem');
 assert(appSource.includes("MedTutorAuthService?.currentUser?.uid"), 'a primeira sincronização não pode usar o UID provisório antes da autenticação');
 assert(authMarkup.includes('id="semesterRenameModal"') && authMarkup.includes('id="semesterRenameProgressTrack"'), 'a revisão de renomeação deve exibir modal e barra de progresso');
 assert(appSource.includes('function readMaterialTextDirectlyFromFirestore(doc)') && appSource.includes('readMaterialTextChunks(doc.ref'), 'a renomeação deve ler o conteúdo e os chunks diretamente do Firestore');
@@ -227,7 +231,7 @@ console.log('[PASS] Recarregar preserva a rota solicitada e aguarda confirmaçã
 const chatSaveMethod = appSource.match(/async saveChatSessions\(sessionsArray\)[\s\S]*?(?=\/\/ Upload de imagem)/)?.[0] || '';
 assert(chatSaveMethod.includes('MedTutorAuthService.accessGranted === true'), 'a sincronização de chats deve aguardar a liberação do cupom');
 assert(chatSaveMethod.includes("collection('historico_chats')") && chatSaveMethod.includes('markCloudDataRevision(uid)'), 'alterações de chats devem ser salvas e sinalizadas para outros dispositivos');
-assert(appSource.includes("const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
+assert(appSource.includes("collection('historico_chats').get()") && appSource.includes('getChatsCacheHydratedKey(uid)'), 'o histórico remoto deve ser importado inclusive em instalações antigas sem cache de chats');
 assert(appSource.includes("classList.toggle('chat-view-active', tabId === 'chat')") && styleSource.includes('.view-content.chat-view-active'), 'a aba de chat deve ocupar toda a área de conteúdo disponível');
 assert(styleSource.includes('border-radius: 0 !important') && webIndexMarkup.includes('20261005-announcements-admin-v1'), 'o chat deve ser full-bleed e os estilos devem invalidar a versão anterior em cache');
 assert(styleSource.includes('chat-flow {\n    max-width: 1440px;') && webIndexMarkup.includes('20261005-announcements-admin-v1'), 'o fluxo do chat deve usar mais largura em telas grandes e invalidar o CSS anterior');

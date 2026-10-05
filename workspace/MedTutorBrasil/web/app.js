@@ -458,11 +458,7 @@
         applyRouteFromLocation({ replace: true });
         accessReturnPath = '';
         this.refreshCloudDataInBackground(user.uid);
-        if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
-        if (typeof renderDashboardView === 'function') renderDashboardView();
-        if (typeof renderCurriculumView === 'function') renderCurriculumView();
-        if (typeof renderMaterialsLibrary === 'function') renderMaterialsLibrary();
-        if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+        renderActiveTabContent();
         return true;
       },
 
@@ -2620,24 +2616,26 @@
         // 1. Tenta carregar do IndexedDB
         try {
           if (!localResetStateVerified) throw new Error('Não foi possível validar a versão remota de reset dos dados.');
-          const loadedMaterials = await MedTutorLocalDB.get('materials', uid);
+          const [loadedMaterials, loadedCurriculum, loadedQuestions, loadedChats] = await Promise.all([
+            MedTutorLocalDB.get('materials', uid),
+            MedTutorLocalDB.get('curriculum', uid),
+            MedTutorLocalDB.get('questions', uid),
+            MedTutorLocalDB.get('chats', uid)
+          ]);
           hasLocalMaterialsCache = hasLocalMaterialsCache || (Array.isArray(loadedMaterials) && loadedMaterials.length > 0);
           if (Array.isArray(loadedMaterials) && loadedMaterials.length > 0) {
             chatDriveMaterials = mergeStudyMaterialsPreservingContent(loadedMaterials);
           }
 
-          const loadedCurriculum = await MedTutorLocalDB.get('curriculum', uid);
           const sanitizedCurriculum = sanitizeSavedCurriculum(loadedCurriculum);
           if (sanitizedCurriculum.length > 0) {
             universityCurriculum = sanitizedCurriculum;
           }
 
-          const loadedQuestions = await MedTutorLocalDB.get('questions', uid);
           // Uma lista vazia também é um estado válido: ignorá-la faria cards
           // removidos reaparecerem a partir da memória da página anterior.
           if (Array.isArray(loadedQuestions)) sharedQuestionsBank = loadedQuestions;
 
-          const loadedChats = await MedTutorLocalDB.get('chats', uid);
           if (Array.isArray(loadedChats) && loadedChats.length > 0) {
             chatSessions = loadedChats;
           }
@@ -2680,11 +2678,20 @@
               console.info('[Firestore] Biblioteca local já está na revisão remota atual; leitura completa dispensada.');
             } else {
 
-            const matsSnap = await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').get();
+            // As quatro leituras independem umas das outras. Dispará-las juntas
+            // reduz a janela de sincronização sem bloquear a interação da tela.
+            const [matsSnap, currSnap, qSnap, chatsSnap] = await Promise.all([
+              firestoreDb.collection('users').doc(uid).collection('materiais_estudo').get(),
+              firestoreDb.collection('users').doc(uid).collection('grade_curricular').get(),
+              firestoreDb.collection('users').doc(uid).collection('banco_questoes').get(),
+              firestoreDb.collection('users').doc(uid).collection('historico_chats').get()
+            ]);
+
             let materialCacheHydratedSuccessfully = matsSnap.empty;
             if (!matsSnap.empty) {
               const cloudMats = [];
-              for (const doc of matsSnap.docs) {
+              for (let index = 0; index < matsSnap.docs.length; index += 1) {
+                const doc = matsSnap.docs[index];
                 const material = { ...doc.data(), id: doc.id };
                 // Não lê todos os chunks durante a abertura. Se já existir uma
                 // cópia completa no IndexedDB, ela é reutilizada; caso contrário,
@@ -2730,6 +2737,7 @@
                 // FIRESTORE É A FONTE ÚNICA E AUTORITATIVA:
                 // Nenhum dado do IndexedDB ou cache local pode sobrescrever o documento do Firestore.
                 cloudMats.push(normalized);
+                if ((index + 1) % 50 === 0) await yieldToBrowser();
               }
               if (cloudMats.length > 0) {
                 chatDriveMaterials = mergeStudyMaterialsPreservingContent(chatDriveMaterials, cloudMats);
@@ -2749,16 +2757,16 @@
               try { localStorage.setItem(this.getMaterialsCacheHydratedKey(uid), 'true'); } catch (error) {}
             }
 
-            const currSnap = await firestoreDb.collection('users').doc(uid).collection('grade_curricular').get();
             if (!currSnap.empty) {
               const periodMap = new Map();
-              currSnap.forEach(d => {
+              for (let index = 0; index < currSnap.docs.length; index += 1) {
+                const d = currSnap.docs[index];
                 const item = d.data();
                 // Ementas já existentes podem ter sido gravadas antes do campo
                 // `origem`. Elas continuam sendo dados válidos do estudante e
                 // não podem desaparecer apenas por não ter esse metadado novo.
                 // Ignora somente documentos que não têm a forma de disciplina.
-                if (!item.disciplina || !Array.isArray(item.materias)) return;
+                if (!item.disciplina || !Array.isArray(item.materias)) continue;
                 const p = item.periodo || 'Período Curricular';
                 if (!periodMap.has(p)) {
                   periodMap.set(p, {
@@ -2775,7 +2783,8 @@
                   masteryXp: item.maestria_xp || 0,
                   studiedCount: item.itensEstudados || 0
                 });
-              });
+                if ((index + 1) % 100 === 0) await yieldToBrowser();
+              }
               const cloudCurriculum = sanitizeSavedCurriculum(Array.from(periodMap.values()));
               if (cloudCurriculum.length > 0) {
                 const sortedPeriods = cloudCurriculum.sort((a, b) => {
@@ -2802,10 +2811,10 @@
               }
             }
 
-            const qSnap = await firestoreDb.collection('users').doc(uid).collection('banco_questoes').get();
             if (!qSnap.empty) {
               const cloudQ = [];
-              qSnap.forEach(d => {
+              for (let index = 0; index < qSnap.docs.length; index += 1) {
+                const d = qSnap.docs[index];
                 const q = d.data();
                 const learningFocus = q.learningFocus || q.foco_aprendizagem || '';
                 const difficultyLevel = q.difficultyLevel || q.nivel_dificuldade || (learningFocus === 'material_base'
@@ -2837,7 +2846,8 @@
                   sourceType: q.sourceType || '',
                   sourceRange: q.sourceRange || null
                 });
-              });
+                if ((index + 1) % 100 === 0) await yieldToBrowser();
+              }
               if (cloudQ.length > 0) {
                 const localById = new Map((sharedQuestionsBank || []).map(question => [question.id, question]));
                 cloudQ.forEach(question => localById.set(question.id, { ...(localById.get(question.id) || {}), ...question }));
@@ -2853,7 +2863,6 @@
 
             // O histórico também é dado multi-dispositivo: carregue-o quando a
             // revisão remota mudar e una mensagens locais ainda não sincronizadas.
-            const chatsSnap = await firestoreDb.collection('users').doc(uid).collection('historico_chats').get();
             // Marca apenas depois de uma leitura concluída. Isso faz com que
             // instalações antigas importem o histórico uma vez, mesmo se a
             // revisão legada do perfil disser que materiais já estão atuais.
@@ -2861,7 +2870,8 @@
             const localChatsById = new Map((Array.isArray(chatSessions) ? chatSessions : []).map(session => [session.id, session]));
             const remoteChatsById = new Map();
             const remoteChatRegistry = {};
-            chatsSnap.forEach(doc => {
+            for (let index = 0; index < chatsSnap.docs.length; index += 1) {
+              const doc = chatsSnap.docs[index];
               const data = doc.data() || {};
               const remoteSession = {
                 id: data.id || doc.id,
@@ -2886,7 +2896,8 @@
                 criadoEm: remoteSession.createdAt
               };
               remoteChatRegistry[remoteSession.id] = firestoreFingerprint(payload);
-            });
+              if ((index + 1) % 50 === 0) await yieldToBrowser();
+            }
 
             const mergedChats = new Map(remoteChatsById);
             localChatsById.forEach((localSession, id) => {
@@ -2938,22 +2949,11 @@
           console.info('[Firestore] Leitura completa adiada: cópia local recente disponível.');
         }
 
-        // Reaplica a última tela e matéria depois de carregar IndexedDB/Firestore.
-        if (typeof restoreStudyNavigationState === 'function') restoreStudyNavigationState();
-
-        // Atualiza a renderização de todas as telas
-        if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
-        if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
-        if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
-        if (typeof renderSceBars === 'function') renderSceBars();
-        if (typeof renderSceTimeline === 'function') renderSceTimeline();
-        if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
-        if (typeof renderChatHistorySidebar === 'function') renderChatHistorySidebar();
-        if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.populateSubjectSelects) {
-          MedTutorChallengesService.populateSubjectSelects();
-        }
-        if (typeof MedTutorClassmatesService !== 'undefined' && MedTutorClassmatesService.populateDirectPeriods) {
-          MedTutorClassmatesService.populateDirectPeriods();
+        // O estado de navegação já foi restaurado antes de mostrar a tela. A
+        // sincronização em background atualiza somente a seção que está aberta.
+        renderActiveTabContent();
+        if (currentTab === 'flashcards' || currentTab === 'quizzes') {
+          if (typeof updateSubjectFilterMenus === 'function') updateSubjectFilterMenus();
         }
         if (typeof checkMandatoryFacultyRedeclaration === 'function') {
           setTimeout(() => {
@@ -4055,6 +4055,32 @@
         setRoutePresentation('app');
       }
       if (!options.skipNavigationCache && typeof saveStudyNavigationState === 'function') saveStudyNavigationState();
+    }
+
+    // Atualiza apenas a tela visível. A hidratação da nuvem não deve renderizar
+    // todas as áreas do app em uma única tarefa longa no thread principal.
+    function renderActiveTabContent() {
+      if (currentTab === 'chat') {
+        if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
+        if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
+        if (typeof renderChatHistorySidebar === 'function') renderChatHistorySidebar();
+        if (typeof loadCurrentChatMessages === 'function') loadCurrentChatMessages();
+      } else if (currentTab === 'flashcards' || currentTab === 'quizzes') {
+        if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
+        if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+      } else if (currentTab === 'curriculum') {
+        if (typeof renderCurriculumView === 'function') renderCurriculumView();
+        if (typeof renderCurriculumGrid === 'function') renderCurriculumGrid();
+      } else if (currentTab === 'sce') {
+        if (typeof renderSceTimeline === 'function') renderSceTimeline();
+        if (typeof renderSceBars === 'function') renderSceBars();
+      } else if (currentTab === 'challenges' && typeof MedTutorChallengesService !== 'undefined') {
+        MedTutorChallengesService.initChallengesTab();
+      }
+    }
+
+    function yieldToBrowser() {
+      return new Promise(resolve => setTimeout(resolve, 0));
     }
 
     function openCurrentTabHelp() {
@@ -9234,8 +9260,10 @@ ${cleanText}
       if (validTabs.has(saved.tabId)) {
         navigateTab(saved.tabId, null, { preserveStudyContext: true, skipNavigationCache: true });
       }
-      if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
-      if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+      if (currentTab === 'flashcards' || currentTab === 'quizzes') {
+        if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
+        if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+      }
     }
 
     function escapeHtml(str) {
@@ -33367,16 +33395,12 @@ function escapeHtmlText(str) {
     }
     initChatDriveMaterials();
     initChatSessions();
-    renderSharedStudyItems();
-    renderSceBars();
-    renderSceTimeline();
-    updateSubjectFilterMenus();
-    renderCurriculumGrid();
     updateGeminiKeyBadge();
     setupMobileChatDrawer();
     loadDoubtsNotebook();
     if (typeof MedTutorClassmatesService !== 'undefined') MedTutorClassmatesService.init();
     restoreStudyNavigationState();
+    renderActiveTabContent();
 
     // Inicialização do Serviço de Autenticação e Persistência Dual-Layer (Zero Perda de F5)
     MedTutorGamification.hydrate(MedTutorAuthService?.currentUser?.uid || 'local');
@@ -33397,13 +33421,8 @@ function escapeHtmlText(str) {
       window.MedTutorLocalDB = MedTutorLocalDB;
     }
 
-    // Inicialização e pré-população imediata dos seletores de Desafios e Colegas
-    if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.populateSubjectSelects) {
-      MedTutorChallengesService.populateSubjectSelects();
-    }
-    if (typeof MedTutorClassmatesService !== 'undefined' && MedTutorClassmatesService.populateDirectPeriods) {
-      MedTutorClassmatesService.populateDirectPeriods();
-    }
+    // Selectores de Desafios/Colegas são inicializados ao abrir suas áreas,
+    // evitando trabalho fora da tela durante o F5.
     if (typeof checkMandatoryFacultyRedeclaration === 'function') {
       setTimeout(() => {
         checkMandatoryFacultyRedeclaration();
