@@ -6,6 +6,13 @@
   const FLASHCARD_XP = { easy: 8, medium: 10, hard: 12 };
   const QUIZ_XP = { easy: 2, medium: 3, hard: 4 };
   const QUIZ_MISTAKE_PENALTY_XP = { easy: 1, medium: 2, hard: 3 };
+  const DAILY_QUIZ_XP_MULTIPLIERS = [
+    { questions: 80, multiplier: 2 },
+    { questions: 40, multiplier: 1.5 },
+    { questions: 30, multiplier: 1.3 },
+    { questions: 20, multiplier: 1.2 },
+    { questions: 10, multiplier: 1.1 }
+  ];
   const OVERDUE_MULTIPLIER = 0.7;
   const DAILY_DECK_BONUS = { today: 8, overdue: 4 };
   const DAILY_COMBO_BONUS_CAP = 20;
@@ -32,6 +39,11 @@
     return 0;
   }
 
+  function getDailyQuizXpMultiplier(answeredQuestions) {
+    const count = Math.max(0, Math.floor(Number(answeredQuestions) || 0));
+    return DAILY_QUIZ_XP_MULTIPLIERS.find(tier => count >= tier.questions)?.multiplier || 1;
+  }
+
   function createInitialState() {
     return {
       version: 1,
@@ -43,6 +55,8 @@
       lastActivityDay: '',
       comboBonusDay: '',
       comboBonusAwardedToday: 0,
+      quizQuestionsDay: '',
+      quizQuestionsAnsweredToday: 0,
       recentEventIds: [],
       dailyDecks: {}
     };
@@ -59,6 +73,8 @@
       studySessionProgress: normalizeStudySessionProgress(state.studySessionProgress),
       combo: Math.max(0, Math.floor(Number(state.combo) || 0)),
       comboBonusAwardedToday: Math.max(0, Math.min(DAILY_COMBO_BONUS_CAP, Math.floor(Number(state.comboBonusAwardedToday) || 0))),
+      quizQuestionsDay: String(state.quizQuestionsDay || ''),
+      quizQuestionsAnsweredToday: Math.max(0, Math.floor(Number(state.quizQuestionsAnsweredToday) || 0)),
       recentEventIds: Array.isArray(state.recentEventIds) ? state.recentEventIds.map(String).slice(-MAX_RECENT_EVENTS) : [],
       dailyDecks: state.dailyDecks && typeof state.dailyDecks === 'object' ? state.dailyDecks : {}
     };
@@ -122,6 +138,11 @@
     if (state.recentEventIds.includes(eventId)) return { state, duplicate: true, award: null };
 
     const dateKey = String(event.dayKey || new Date(now).toISOString().slice(0, 10));
+    if (state.quizQuestionsDay !== dateKey) {
+      state.quizQuestionsDay = dateKey;
+      state.quizQuestionsAnsweredToday = 0;
+    }
+    if (event.kind === 'quiz') state.quizQuestionsAnsweredToday += 1;
     if (state.comboBonusDay !== dateKey) {
       state.comboBonusDay = dateKey;
       state.comboBonusAwardedToday = 0;
@@ -172,7 +193,10 @@
     const penaltyXp = isIncorrectQuiz
       ? Math.min(state.totalXp, QUIZ_MISTAKE_PENALTY_XP[normalizeDifficulty(event.difficulty)])
       : 0;
-    const earnedXp = isIncorrectQuiz ? -penaltyXp : base + comboBonus + deckBonus;
+    const xpMultiplier = event.kind === 'quiz' && !isIncorrectQuiz
+      ? getDailyQuizXpMultiplier(state.quizQuestionsAnsweredToday)
+      : 1;
+    const earnedXp = isIncorrectQuiz ? -penaltyXp : Math.round((base + comboBonus + deckBonus) * xpMultiplier);
     const previousLevel = getLevel(state.totalXp).level;
     state.totalXp += earnedXp;
     const currentLevel = getLevel(state.totalXp).level;
@@ -186,6 +210,8 @@
         base,
         comboBonus,
         deckBonus,
+        xpMultiplier,
+        quizQuestionsAnsweredToday: state.quizQuestionsAnsweredToday,
         earnedXp,
         combo: state.combo,
         deckCompleted,
@@ -198,11 +224,13 @@
   return {
     FLASHCARD_XP,
     QUIZ_XP,
+    DAILY_QUIZ_XP_MULTIPLIERS,
     DAILY_DECK_BONUS,
     QUIZ_MISTAKE_PENALTY_XP,
     DAILY_COMBO_BONUS_CAP,
     xpRequiredForNextLevel,
     baseXp,
+    getDailyQuizXpMultiplier,
     createInitialState,
     normalizeState,
     applyStudyTimeProgress,

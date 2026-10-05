@@ -7,6 +7,9 @@ function run() {
   assert.strictEqual(rules.baseXp({ kind: 'flashcard', difficulty: 'avancado', reviewStatus: 'overdue' }), 8);
   assert.strictEqual(rules.baseXp({ kind: 'quiz', difficulty: 'avancado' }), 4);
   assert.deepStrictEqual(rules.QUIZ_MISTAKE_PENALTY_XP, { easy: 1, medium: 2, hard: 3 });
+  for (const [count, multiplier] of [[0, 1], [9, 1], [10, 1.1], [19, 1.1], [20, 1.2], [30, 1.3], [40, 1.5], [79, 1.5], [80, 2]]) {
+    assert.strictEqual(rules.getDailyQuizXpMultiplier(count), multiplier, `multiplicador após ${count} questões`);
+  }
   for (const difficulty of ['easy', 'medium', 'hard']) {
     const flashcard = rules.baseXp({ kind: 'flashcard', difficulty, reviewStatus: 'overdue' });
     const quizMaximum = rules.baseXp({ kind: 'quiz', difficulty }) + 2;
@@ -85,6 +88,29 @@ function run() {
   assert.strictEqual(outcome.award.combo, 1);
   assert.strictEqual(outcome.award.comboBonus, 0);
   assert.strictEqual(outcome.state.comboBonusAwardedToday, 0);
+
+  state = rules.normalizeState({
+    totalXp: 100,
+    quizQuestionsDay: '2026-10-03',
+    quizQuestionsAnsweredToday: 19
+  });
+  outcome = rules.applyEvent(state, {
+    eventId: 'quiz-threshold-20', dayKey: '2026-10-03', kind: 'quiz', difficulty: 'hard', outcome: 'correct'
+  }, 2_100_000);
+  assert.strictEqual(outcome.award.quizQuestionsAnsweredToday, 20);
+  assert.strictEqual(outcome.award.xpMultiplier, 1.2);
+  assert.strictEqual(outcome.award.earnedXp, 5, '4 XP × 1,2 deve arredondar para 5 XP inteiros');
+  assert.strictEqual(Number.isInteger(outcome.award.earnedXp), true, 'XP nunca pode conter casas decimais');
+  const duplicateThreshold = rules.applyEvent(outcome.state, {
+    eventId: 'quiz-threshold-20', dayKey: '2026-10-03', kind: 'quiz', difficulty: 'hard', outcome: 'correct'
+  }, 2_101_000);
+  assert.strictEqual(duplicateThreshold.state.quizQuestionsAnsweredToday, 20, 'evento repetido não pode contar duas vezes');
+
+  const nextDayQuiz = rules.applyEvent(outcome.state, {
+    eventId: 'quiz-new-day', dayKey: '2026-10-04', kind: 'quiz', difficulty: 'hard', outcome: 'correct'
+  }, 2_102_000);
+  assert.strictEqual(nextDayQuiz.award.quizQuestionsAnsweredToday, 1, 'a contagem diária deve reiniciar no dia seguinte');
+  assert.strictEqual(nextDayQuiz.award.xpMultiplier, 1);
 
   state = rules.createInitialState();
   state.totalXp = 20;
