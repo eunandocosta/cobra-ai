@@ -37,6 +37,11 @@ const serviceWorkerSource = fs.readFileSync(path.join(__dirname, '..', 'web', 's
 const productionMiddlewareSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'shared', 'production.middleware.js'), 'utf-8');
 const announcementsClientSource = fs.readFileSync(path.join(__dirname, '..', 'web', 'announcements.js'), 'utf-8');
 const announcementsControllerSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'modules', 'announcements', 'announcements.controller.js'), 'utf-8');
+const exactMaterialCleanup = appSource.match(/async removeExactCloudMaterialDuplicates\(\)[\s\S]*?(?=\/\/ Salva os Materiais de Estudo)/)?.[0] || '';
+assert(exactMaterialCleanup.includes("{ strict: true }") && exactMaterialCleanup.includes('chunksText.length !== expectedChars'), 'a limpeza deve recusar chunks ausentes/incompletos antes de qualquer exclusão');
+assert(exactMaterialCleanup.includes('set[0].text === item.text'), 'hashes só podem agrupar candidatos; exclusão exige igualdade literal do texto integral');
+assert(exactMaterialCleanup.includes('await this.markCloudDataRevision(uid)'), 'a limpeza de materiais deve notificar a nova revisão remota para os demais dispositivos');
+assert(exactMaterialCleanup.indexOf('const plans = [];') < exactMaterialCleanup.indexOf('const removedIds = new Set();'), 'todos os documentos devem ser lidos e validados antes do início das escritas/exclusões');
 assert(webIndexMarkup.includes('id="adminPanelMenuEntry" href="/anuncios#annAdmin" hidden') && webIndexMarkup.includes('Painel de Administração'), 'o menu deve incluir o atalho administrativo oculto por padrão');
 assert(appSource.includes("fetch('/api/announcements/admin/status'") && appSource.includes('result?.isAdmin === true') && appSource.includes('entry.hidden = !isAdmin'), 'a visibilidade do atalho depende da confirmação autenticada do servidor');
 assert(announcementsControllerSource.includes("profile.get('role') !== 'admin'") && announcementsClientSource.includes('adminPanel.hidden = !isAdmin'), 'o painel permanece protegido por role estrito no servidor e oculto para não-admin');

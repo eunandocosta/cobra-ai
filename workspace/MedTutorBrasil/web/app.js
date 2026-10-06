@@ -1581,8 +1581,8 @@
         }
       },
 
-      // Só exclui registros com mesma disciplina, nome e assinatura do texto
-      // integral. Antes, une imagens e conserva o relatório mais completo.
+      // Só exclui registros com mesma disciplina, nome e texto integral. O hash
+      // serve apenas para particionar candidatos; a igualdade final é literal.
       async removeExactCloudMaterialDuplicates() {
         const uid = this.getUserId();
         if (!this.hasAuthenticatedCloudSession(uid)) {
@@ -1599,8 +1599,7 @@
         });
 
         let candidateGroups = 0;
-        let removed = 0;
-        const removedIds = new Set();
+        const plans = [];
         for (const items of groups.values()) {
           if (items.length < 2) continue;
           candidateGroups++;
@@ -1608,49 +1607,102 @@
           for (const item of items) {
             const expectedChunks = Number(item.data.conteudo_chunks) || 0;
             const rootText = String(item.data.conteudo_md || item.data.markdownText || item.data.text || '');
-            const chunksText = expectedChunks > 1 ? await this.readMaterialTextChunks(item.doc.ref, expectedChunks) : '';
-            const text = chunksText.length >= rootText.length ? chunksText : rootText;
+            let chunksText = '';
+            if (item.data.conteudo_armazenamento === 'chunks_v1') {
+              if (!expectedChunks) throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: quantidade de chunks ausente.`);
+              chunksText = await this.readMaterialTextChunks(item.doc.ref, expectedChunks, { strict: true });
+              const expectedChars = Number(item.data.conteudo_caracteres) || 0;
+              if (expectedChars && chunksText.length !== expectedChars) {
+                throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: ${chunksText.length}/${expectedChars} caracteres carregados.`);
+              }
+              if (rootText && !chunksText.startsWith(rootText)) {
+                throw new Error(`A prévia e os chunks de “${item.data.nome || item.doc.id}” divergem; nenhum material foi removido.`);
+              }
+            }
+            const text = chunksText || rootText;
+            if (!text.trim()) throw new Error(`O texto de “${item.data.nome || item.doc.id}” está vazio/incompleto; nenhum material foi removido.`);
             expanded.push({ ...item, text, signature: firestoreFingerprint(text) });
           }
-          const exactSets = new Map();
+          const hashBuckets = new Map();
           expanded.forEach(item => {
-            if (!exactSets.has(item.signature)) exactSets.set(item.signature, []);
-            exactSets.get(item.signature).push(item);
+            if (!hashBuckets.has(item.signature)) hashBuckets.set(item.signature, []);
+            hashBuckets.get(item.signature).push(item);
           });
-          for (const sameContent of exactSets.values()) {
-            if (sameContent.length < 2) continue;
-            const score = item => item.text.length
-              + (Array.isArray(item.data.figuras_clinicas) ? item.data.figuras_clinicas.length * 1000 : 0)
-              + String(item.data.relatorio_academico?.conteudo_md || '').length
-              + (item.data.relatorio_academico ? 500 : 0);
-            sameContent.sort((a, b) => score(b) - score(a));
-            const primary = sameContent[0];
-            const allImages = new Map();
-            sameContent.forEach(item => (item.data.figuras_clinicas || []).forEach(image => {
-              const url = image?.imageUrl || image?.thumbnailUrl || image?.src;
-              if (url && !allImages.has(url)) allImages.set(url, image);
-            }));
-            const bestReport = sameContent.map(item => item.data.relatorio_academico).filter(Boolean)
-              .sort((a, b) => String(b?.conteudo_md || '').length - String(a?.conteudo_md || '').length)[0] || null;
-            await primary.doc.ref.set({
-              figuras_clinicas: [...allImages.values()],
-              ...(bestReport ? { relatorio_academico: bestReport } : {}),
-              atualizadoEm: new Date().toISOString()
-            }, { merge: true });
-            for (const duplicate of sameContent.slice(1)) {
-              await this.deleteMaterialDocumentAndChunks(duplicate.doc.ref);
-              removedIds.add(duplicate.doc.id);
-              removed++;
+          for (const bucket of hashBuckets.values()) {
+            // Hash igual não basta: compara o conteúdo integral para descartar
+            // colisões e impedir exclusão de materiais diferentes.
+            const exactSets = [];
+            bucket.forEach(item => {
+              const exact = exactSets.find(set => set[0].text === item.text);
+              if (exact) exact.push(item);
+              else exactSets.push([item]);
+            });
+            for (const sameContent of exactSets) {
+              if (sameContent.length < 2) continue;
+              const score = item => item.text.length
+                + (Array.isArray(item.data.figuras_clinicas) ? item.data.figuras_clinicas.length * 1000 : 0)
+                + String(item.data.relatorio_academico?.conteudo_md || '').length
+                + (item.data.relatorio_academico ? 500 : 0);
+              sameContent.sort((a, b) => score(b) - score(a));
+              const primary = sameContent[0];
+              const allImages = new Map();
+              sameContent.forEach(item => (item.data.figuras_clinicas || []).forEach(image => {
+                const url = image?.imageUrl || image?.thumbnailUrl || image?.src;
+                if (url && !allImages.has(url)) allImages.set(url, image);
+              }));
+              const bestReport = sameContent.map(item => item.data.relatorio_academico).filter(Boolean)
+                .sort((a, b) => String(b?.conteudo_md || '').length - String(a?.conteudo_md || '').length)[0] || null;
+              plans.push({ primary, duplicates: sameContent.slice(1), images: [...allImages.values()], bestReport });
             }
           }
         }
+
+        // Toda leitura e validação acontece antes da primeira escrita. Se uma
+        // operação remota falhar no meio, registramos a revisão e refletimos
+        // localmente somente as exclusões que foram concluídas.
+        const removedIds = new Set();
+        let changedCloud = false;
+        let failure = null;
+        try {
+          for (const plan of plans) {
+            await plan.primary.doc.ref.set({
+              figuras_clinicas: plan.images,
+              ...(plan.bestReport ? { relatorio_academico: plan.bestReport } : {}),
+              atualizadoEm: new Date().toISOString()
+            }, { merge: true });
+            changedCloud = true;
+            for (const duplicate of plan.duplicates) {
+              await this.deleteMaterialDocumentAndChunks(duplicate.doc.ref);
+              changedCloud = true;
+              removedIds.add(duplicate.doc.id);
+            }
+          }
+        } catch (error) {
+          failure = error;
+        }
+
         if (removedIds.size && Array.isArray(chatDriveMaterials)) {
           chatDriveMaterials = chatDriveMaterials.filter(material => !removedIds.has(material.id));
           chatDriveMaterials = mergeStudyMaterialsPreservingContent(chatDriveMaterials);
-          await MedTutorLocalDB.set('materials', uid, chatDriveMaterials);
+          try { await MedTutorLocalDB.set('materials', uid, chatDriveMaterials); }
+          catch (cacheError) {
+            console.warn('[Firestore] A nuvem foi atualizada, mas o cache local não pôde ser atualizado:', cacheError);
+            if (!failure) failure = new Error('A nuvem foi atualizada, mas não foi possível atualizar a cópia local. Recarregue a biblioteca para sincronizar.');
+          }
         }
-        console.info('[Firestore] Auditoria de duplicatas concluída.', { candidateGroups, removed, uid });
-        return { candidateGroups, removed };
+        if (changedCloud) {
+          try { await this.markCloudDataRevision(uid); }
+          catch (revisionError) {
+            console.warn('[Firestore] Limpeza aplicada, mas a revisão remota não pôde ser atualizada:', revisionError);
+            if (!failure) failure = new Error('As alterações foram aplicadas, mas não foi possível notificar os outros dispositivos sobre a nova revisão.');
+          }
+        }
+        if (failure) {
+          if (removedIds.size) failure.message = `Limpeza parcial: ${removedIds.size} cópia(s) removida(s) antes da falha. ${failure.message || failure}`;
+          throw failure;
+        }
+        console.info('[Firestore] Auditoria de duplicatas concluída.', { candidateGroups, removed: removedIds.size, uid });
+        return { candidateGroups, removed: removedIds.size };
       },
 
       // Salva os Materiais de Estudo em users/{userId}/materiais_estudo/{materialId}
