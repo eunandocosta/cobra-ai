@@ -3627,7 +3627,9 @@
       levelUpPreviousBodyOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       levelUpReturnFocus = document.activeElement;
-      modal.classList.add('active');
+      modal.classList.remove('confetti-active');
+      void modal.offsetWidth;
+      modal.classList.add('active', 'confetti-active');
       modal.setAttribute('aria-hidden', 'false');
       animateCasinoCounter(totalXp, previousTotalXp, MedTutorGamification.state.totalXp, 1500, value => `${Math.floor(value).toLocaleString('pt-BR')} XP`);
       requestAnimationFrame(() => {
@@ -3644,7 +3646,7 @@
     function closeLevelUpModal() {
       const modal = document.getElementById('levelUpModal');
       if (!modal) return;
-      modal.classList.remove('active');
+      modal.classList.remove('active', 'confetti-active');
       modal.setAttribute('aria-hidden', 'true');
       const appRoot = document.querySelector('.app-root');
       if (appRoot) appRoot.inert = levelUpPreviousAppInert;

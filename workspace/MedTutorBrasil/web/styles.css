@@ -5988,7 +5988,17 @@
     .level-up-overlay { position: fixed; isolation: isolate; inset: 0; z-index: 100600; display: none; place-items: center; overflow-y: auto; padding: clamp(12px, 3vh, 28px); background-color: rgba(2,7,4,.92); background-image: radial-gradient(circle, rgba(81,183,117,.15) 1px, transparent 1.5px); background-size: 19px 19px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
     .level-up-overlay::before { content: ""; position: fixed; z-index: 0; inset: -14%; pointer-events: none; background: radial-gradient(ellipse at 18% 24%, rgba(0,255,115,.14), transparent 34%), radial-gradient(ellipse at 82% 72%, rgba(0,190,105,.10), transparent 38%), radial-gradient(ellipse at 58% 8%, rgba(39,125,85,.08), transparent 35%); opacity: .62; transform: translate3d(-1.5%, -1%, 0) scale(1.02); animation: levelUpAmbientDrift 16s ease-in-out infinite alternate; }
     .level-up-overlay.active { display: grid; animation: levelUpBackdropIn .24s ease-out both; }
-    .level-up-card { position: relative; z-index: 1; width: min(570px, 100%); max-height: calc(100dvh - 24px); box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; padding: clamp(21px, 4vw, 36px); overflow-y: auto; border: 1px solid #23352a; border-radius: 25px; color: var(--text-primary); background: radial-gradient(ellipse at 50% 28%, rgba(0,255,115,.08), transparent 48%), var(--bg-card); box-shadow: 0 24px 75px rgba(0,0,0,.5), 0 0 44px rgba(0,237,120,.08); text-align: center; animation: levelUpCardIn .42s cubic-bezier(.16,.8,.2,1) both; }
+    .level-up-confetti { position: fixed; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; }
+    .level-up-confetti-piece { position: absolute; top: -20px; left: var(--x); width: 7px; height: 13px; border-radius: 2px; opacity: 0; }
+    .level-up-confetti-piece:nth-child(5n + 1) { background: #ff6685; --sway: 28px; --spin: 510deg; }
+    .level-up-confetti-piece:nth-child(5n + 2) { background: #ffd166; --sway: -23px; --spin: -620deg; }
+    .level-up-confetti-piece:nth-child(5n + 3) { background: #9b8cff; --sway: 19px; --spin: 680deg; }
+    .level-up-confetti-piece:nth-child(5n + 4) { background: #54d6ff; --sway: -30px; --spin: -540deg; }
+    .level-up-confetti-piece:nth-child(5n) { background: #00ed78; --sway: 24px; --spin: 590deg; }
+    .level-up-confetti-piece:nth-child(4n) { width: 6px; height: 6px; border-radius: 50%; }
+    .level-up-confetti-piece:nth-child(7n) { width: 5px; height: 17px; border-radius: 99px; }
+    .level-up-overlay.confetti-active .level-up-confetti-piece { animation: levelUpConfettiFall 3.45s cubic-bezier(.28,.05,.68,.96) var(--delay) both; }
+    .level-up-card { position: relative; z-index: 2; width: min(570px, 100%); max-height: calc(100dvh - 24px); box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; padding: clamp(21px, 4vw, 36px); overflow-y: auto; border: 1px solid #23352a; border-radius: 25px; color: var(--text-primary); background: radial-gradient(ellipse at 50% 28%, rgba(0,255,115,.08), transparent 48%), var(--bg-card); box-shadow: 0 24px 75px rgba(0,0,0,.5), 0 0 44px rgba(0,237,120,.08); text-align: center; animation: levelUpCardIn .42s cubic-bezier(.16,.8,.2,1) both; }
     .level-up-mark { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 13px; border: 1px solid #087a41; border-radius: 15px; color: var(--neon); background: rgba(0,255,115,.1); box-shadow: 0 0 24px rgba(0,255,115,.12); }
     .level-up-mark .material-symbols-outlined { font-size: 25px; }
     .level-up-kicker { margin: 0 0 5px; color: var(--neon); font-size: 12px; font-weight: 740; letter-spacing: .02em; }
@@ -6015,6 +6025,7 @@
     .level-up-continue:focus-visible { outline: 3px solid var(--text-primary); outline-offset: 3px; }
     @keyframes levelUpBackdropIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes levelUpAmbientDrift { 0% { opacity: .48; transform: translate3d(-1.5%, -1%, 0) scale(1.02); } 50% { opacity: .78; transform: translate3d(1%, .6%, 0) scale(1.055); } 100% { opacity: .58; transform: translate3d(-.3%, 1.2%, 0) scale(1.035); } }
+    @keyframes levelUpConfettiFall { 0% { transform: translate3d(0,-12px,0) rotate(0deg); opacity: 0; } 12% { opacity: .92; } 28% { transform: translate3d(12px,28vh,0) rotate(180deg); } 52% { transform: translate3d(-12px,54vh,0) rotate(360deg); } 76% { transform: translate3d(10px,80vh,0) rotate(540deg); opacity: .82; } 100% { transform: translate3d(var(--sway),110vh,0) rotate(var(--spin)); opacity: 0; } }
     @keyframes levelUpCardIn { from { opacity: 0; transform: translateY(18px) scale(.96); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1); filter: none; } }
     @keyframes levelUpNumberReveal { from { clip-path: circle(0% at 50% 50%); opacity: .3; transform: scale(.88); } to { clip-path: circle(75% at 50% 50%); opacity: 1; transform: scale(1); } }
     @keyframes levelUpFirework { 0%,8% { transform: rotate(var(--angle)) scaleY(0); } 43%,62% { transform: rotate(var(--angle)) scaleY(1); } 100% { transform: rotate(var(--angle)) scaleY(0); } }
@@ -6023,7 +6034,7 @@
     @media (max-width: 520px) { .level-up-overlay { padding: 10px; } .level-up-card { padding: 20px 16px 17px; border-radius: 20px; } .level-up-mark { width: 43px; height: 43px; margin-bottom: 10px; } .level-up-kicker { font-size: 11px; } .level-up-heading { font-size: 19px; } .level-up-transition { margin-top: 11px; } .level-up-hero { min-height: 126px; } .level-up-hero strong { font-size: clamp(82px, 23vw, 106px); } .level-up-progress-copy, .level-up-progress-copy strong { font-size: 9.5px; } .level-up-remaining { font-size: 10.5px; margin-bottom: 12px; } .level-up-stats { gap: 7px; margin-bottom: 14px; } .level-up-stats article { min-height: 58px; padding: 8px 5px; border-radius: 11px; } .level-up-stats article strong { font-size: 15px; } .level-up-continue { min-height: 48px; padding-inline: 8px; font-size: 11.5px; } }
     @media (max-height: 560px) { .level-up-card { max-height: calc(100dvh - 16px); padding: 14px 20px; } .level-up-mark { display: none; } .level-up-transition { margin: 8px 0 0; } .level-up-hero { min-height: 82px; } .level-up-hero strong { font-size: clamp(58px, 14vh, 84px); } .level-up-stats { margin-bottom: 10px; } .level-up-continue { min-height: 42px; } }
 
-    @media (prefers-reduced-motion: reduce) { .gamification-reward-card, .gamification-reward-card *, .level-up-overlay.active, .level-up-overlay::before, .level-up-card, .level-up-hero strong, .level-up-ray, .level-up-ray::after { animation: none !important; } .level-up-continue { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { .gamification-reward-card, .gamification-reward-card *, .level-up-overlay.active, .level-up-overlay::before, .level-up-confetti-piece, .level-up-card, .level-up-hero strong, .level-up-ray, .level-up-ray::after { animation: none !important; } .level-up-confetti { display: none; } .level-up-continue { transition: none; } }
 
     .modal-head {
       display: flex;
