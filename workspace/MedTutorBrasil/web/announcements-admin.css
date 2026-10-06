@@ -49,3 +49,8 @@
 .announcement-first-access-actions button:disabled{opacity:.55;cursor:wait}
 @media(max-width:700px){.ann-user-row{grid-template-columns:1fr 1fr}.ann-user-details{grid-column:1/-1}.ann-user-row .ann-button{width:100%}.ann-summary-row,.ann-publication-row{grid-template-columns:1fr}.ann-publication-row .ann-button{width:100%}.ann-campaigns summary{align-items:flex-start}.ann-campaigns summary .ann-button{min-height:34px;padding:0 9px;font-size:10px}}
 @media(max-width:560px){.ann-title-row{grid-template-columns:1fr}.ann-admin-tabs{display:grid;grid-template-columns:1fr}.ann-admin-tabs button{text-align:left}.ann-pagination{flex-wrap:wrap}.ann-pagination .ann-button{flex:1}.ann-campaigns summary{flex-direction:column}.ann-campaigns summary .ann-button{width:100%}}
+@media(max-width:480px){.ann-admin-titlebar{align-items:flex-start}.ann-admin-title-actions{align-items:flex-end;flex-direction:column;gap:7px}.ann-return-app{min-height:36px;padding:0 10px;font-size:10px}.ann-admin-title-actions .admin-badge{font-size:9px}}
+.ann-header{position:sticky;top:0;z-index:30;backdrop-filter:blur(14px)}
+.ann-admin-titlebar{align-items:center}
+.ann-admin-title-actions{display:flex;align-items:center;gap:12px}
+.ann-return-app{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;white-space:nowrap}

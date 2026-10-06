@@ -151,7 +151,7 @@
     status.hidden = false;
     emailPreferences.hidden = !auth?.currentUser;
     if (authLink) {
-      authLink.href = auth?.currentUser ? '/' : '/login';
+      authLink.href = auth?.currentUser ? '/chat-ia' : '/login';
       authLink.textContent = auth?.currentUser ? 'Voltar ao app' : 'Entrar';
     }
     if (!auth?.currentUser) {
@@ -167,7 +167,7 @@
       list.hidden = isAdmin;
       status.hidden = isAdmin;
       if (authLink) {
-        authLink.href = auth.currentUser ? '/' : '/login';
+        authLink.href = auth.currentUser ? '/chat-ia' : '/login';
         authLink.textContent = auth.currentUser ? 'Voltar ao app' : 'Entrar';
       }
       if (isAdmin) {

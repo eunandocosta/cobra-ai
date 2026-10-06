@@ -45,6 +45,8 @@ assert.match(adminUi, /admin\/next-version/);
 assert.match(adminUi, /channels: \{ inApp: data\.has\('sendInApp'\), email:/);
 assert.match(adminUi, /admin\/summary/);
 assert.match(adminUi, /admin\/publications/);
+assert.match(adminUi, /authLink\.href = auth(?:\?\.currentUser|\.currentUser) \? '\/chat-ia' : '\/login'/);
+assert.match(adminMarkup, /ann-return-app" href="\/chat-ia"/);
 assert.match(adminMarkup, /name="kind"[\s\S]*?id="annVersionField"[\s\S]*?Título breve/);
 assert.match(adminMarkup, /Carregar mais usuários/);
 assert.match(firstAccessPrompt, /announcement-consent-yes/);

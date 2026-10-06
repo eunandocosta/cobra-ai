@@ -13,10 +13,10 @@
   <link rel="stylesheet" href="/announcements.css?v=20261005-admin-v1">
   <link rel="stylesheet" href="/announcements-fixes.css?v=20261005-v1">
   <link rel="stylesheet" href="/announcements-email.css?v=20261005-v1">
-  <link rel="stylesheet" href="/announcements-admin.css?v=20261005-admin-v2">
+  <link rel="stylesheet" href="/announcements-admin.css?v=20261005-admin-v3">
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script defer src="/announcements.js?v=20261005-admin-v3"></script>
+  <script defer src="/announcements.js?v=20261005-admin-v4"></script>
 </head>
 <body>
   <header class="ann-header">
@@ -40,7 +40,7 @@
     <div id="annStatus" class="ann-status" role="status" aria-live="polite">Carregando atualizações…</div>
     <section id="annList" class="ann-list" aria-label="Atualizações publicadas"></section>
     <section id="annAdmin" class="ann-admin" hidden>
-      <div class="admin-heading"><div><span class="ann-kicker">ÁREA ADMINISTRATIVA</span><h2>Painel administrativo</h2></div><span class="admin-badge">Acesso admin</span></div>
+      <div class="admin-heading ann-admin-titlebar"><div><span class="ann-kicker">ÁREA ADMINISTRATIVA</span><h2>Painel administrativo</h2></div><div class="ann-admin-title-actions"><span class="admin-badge">Acesso admin</span><a class="ann-button secondary ann-return-app" href="/chat-ia" title="Voltar diretamente ao aplicativo">Voltar ao app</a></div></div>
       <nav class="ann-admin-tabs" id="annAdminTabs" aria-label="Seções administrativas">
         <button type="button" data-admin-view="overview" aria-current="page">Visão geral</button><button type="button" data-admin-view="publications">Publicações</button><button type="button" data-admin-view="users">Usuários e permissões</button>
       </nav>
