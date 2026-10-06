@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtutor-static-v108';
+const CACHE_NAME = 'medtutor-static-v109';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -13,7 +13,7 @@ const APP_SHELL = [
   '/announcement-prompt.js?v=20261005-consent-prompt-v1',
   '/app.min.js?v=20261005-resource-skeleton-v1',
   '/manifest.webmanifest',
-  '/icons/medtutor-icon.svg'
+  '/icons/medtutor-icon.svg?v=20261005-ecg-v1'
 ];
 
 self.addEventListener('install', event => {

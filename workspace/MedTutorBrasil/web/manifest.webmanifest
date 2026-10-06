@@ -12,7 +12,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icons/medtutor-icon.svg",
+      "src": "/icons/medtutor-icon.svg?v=20261005-ecg-v1",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
