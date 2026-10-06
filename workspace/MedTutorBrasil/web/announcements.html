@@ -13,10 +13,10 @@
   <link rel="stylesheet" href="/announcements.css?v=20261005-admin-v1">
   <link rel="stylesheet" href="/announcements-fixes.css?v=20261005-v1">
   <link rel="stylesheet" href="/announcements-email.css?v=20261005-v1">
-  <link rel="stylesheet" href="/announcements-admin.css?v=20261005-admin-v1">
+  <link rel="stylesheet" href="/announcements-admin.css?v=20261005-admin-v2">
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script defer src="/announcements.js?v=20261005-admin-v2"></script>
+  <script defer src="/announcements.js?v=20261005-admin-v3"></script>
 </head>
 <body>
   <header class="ann-header">
@@ -27,7 +27,7 @@
     <nav><a href="/">Página inicial</a><a id="annAuthLink" href="/login">Entrar</a></nav>
   </header>
   <main class="ann-main">
-    <section class="ann-intro">
+    <section class="ann-intro" id="annPublicIntro">
       <span class="ann-kicker">CENTRAL DE COMUNICAÇÃO</span>
       <h1>Novidades do MedTutor</h1>
       <p>Veja o que mudou, por que mudou e como aproveitar cada atualização.</p>
@@ -42,33 +42,47 @@
     <section id="annAdmin" class="ann-admin" hidden>
       <div class="admin-heading"><div><span class="ann-kicker">ÁREA ADMINISTRATIVA</span><h2>Painel administrativo</h2></div><span class="admin-badge">Acesso admin</span></div>
       <nav class="ann-admin-tabs" id="annAdminTabs" aria-label="Seções administrativas">
-        <a href="#annForm">Avisos e atualizações</a><a href="#annUsers">Usuários e permissões</a><a href="#annCampaignsHeading">Envios de e-mail</a>
+        <button type="button" data-admin-view="overview" aria-current="page">Visão geral</button><button type="button" data-admin-view="publications">Publicações</button><button type="button" data-admin-view="users">Usuários e permissões</button>
       </nav>
+      <section id="annAdminOverview" class="ann-admin-view" aria-labelledby="annOverviewHeading">
+        <div class="admin-heading"><div><span class="ann-kicker">ATIVIDADE RECENTE</span><h3 id="annOverviewHeading">Últimos envios</h3><p>Resumo das três publicações mais recentes e do estado dos respectivos envios de e-mail.</p></div><button id="annRefreshSummary" class="ann-button secondary" type="button">Atualizar resumo</button></div>
+        <div id="annSummaryStatus" class="ann-status" role="status" aria-live="polite"></div>
+        <div id="annSummaryList" class="ann-summary-list"></div>
+      </section>
+      <section id="annAdminPublications" class="ann-admin-view" hidden aria-labelledby="annFormHeading">
       <section class="ann-admin-section" aria-labelledby="annFormHeading">
-      <div class="admin-heading"><div><span class="ann-kicker">PUBLICAÇÃO</span><h3 id="annFormHeading">Novo aviso ou atualização</h3></div></div>
+      <div class="admin-heading"><div><span class="ann-kicker">PUBLICAÇÃO E CAMPANHA</span><h3 id="annFormHeading">Novo aviso ou atualização</h3></div></div>
       <form id="annForm">
-        <div class="ann-form-row"><label>Tipo<select name="kind" id="annKind"><option value="update">Atualização (gera versão automática)</option><option value="notice">Aviso</option></select></label><label id="annVersionField" class="ann-version-field">Versão automática<input id="annNextVersion" type="text" value="Calculada ao publicar" readonly></label><label>Título breve<input name="title" required maxlength="160" placeholder="Melhorias no cronograma"></label></div>
+        <div class="ann-form-row ann-title-row"><label>Tipo<select name="kind" id="annKind"><option value="update">Atualização</option><option value="notice">Aviso</option></select></label><label id="annVersionField" class="ann-version-field">Versão<input id="annNextVersion" type="text" value="Calculada ao publicar" readonly></label><label>Título breve<input name="title" required maxlength="160" placeholder="Melhorias no cronograma"></label></div>
         <label>Descrição detalhada<textarea name="description" required maxlength="30000" rows="10" placeholder="Descreva as mudanças. Separe tópicos por linhas em branco."></textarea></label>
         <div class="ann-form-row"><label>Banner (URL HTTPS, opcional)<input name="bannerUrl" type="url" placeholder="https://…"></label><label>Descrição da imagem<input name="bannerAlt" maxlength="300" placeholder="Texto alternativo para acessibilidade"></label></div>
-        <fieldset class="ann-distribution"><legend>Onde publicar</legend><label><input type="checkbox" checked disabled> No painel de novidades (sempre)</label><label><input type="checkbox" name="sendEmail"> Também por e-mail para quem autorizou</label></fieldset>
+        <fieldset class="ann-distribution"><legend>Canais de envio</legend><label><input type="checkbox" name="sendInApp" checked> Publicar no blog e na entrada dos usuários</label><label><input type="checkbox" name="sendEmail"><span id="annEmailChannelLabel">Enviar também por e-mail a quem autorizou</span></label><p id="annDistributionHint" class="ann-form-hint">Blog e entrada do usuário usam a mesma publicação. A entrada mostra somente a mais recente; uma nova substitui a anterior ainda não visualizada.</p></fieldset>
         <fieldset class="ann-consent-options"><legend>Pergunta de autorização</legend><label><input type="checkbox" name="emailConsentPrompt" id="annAskConsent"> Perguntar se deseja receber novidades por e-mail</label><label class="ann-prompt-text-label">Texto da pergunta<input type="text" name="promptText" maxlength="300" value="Você deseja receber novidades e atualizações do MedTutor Brasil por e-mail?"></label><label><input type="checkbox" name="promptResponseRequired" id="annPromptRequired"> Resposta obrigatória (não permite dispensar sem escolher)</label><p class="ann-form-hint">A primeira atualização publicada após esta mudança sempre perguntará; depois, a opção pode ser escolhida por publicação. “Não” registra a recusa; dispensar uma pergunta opcional não ativa o e-mail.</p></fieldset>
         <p class="ann-form-hint">O banner recomendado é horizontal (proporção aproximada 3:1). A publicação fica imediatamente visível para todos.</p>
-        <div class="ann-form-actions"><button class="ann-button secondary" type="button" id="annPreviewButton">Pré-visualizar</button><button class="ann-button primary" type="submit">Publicar</button></div>
+        <div class="ann-form-actions"><button class="ann-button secondary" type="button" id="annPreviewButton">Pré-visualizar</button><button class="ann-button secondary" type="button" id="annCancelEdit" hidden>Cancelar edição</button><button class="ann-button primary" type="submit">Publicar</button></div>
         <p id="annAdminStatus" class="ann-status" role="status" aria-live="polite"></p>
       </form>
       <div id="annPreview" class="ann-preview" hidden></div>
       </section>
+      <section class="ann-admin-section ann-publication-history" aria-labelledby="annPublicationHistoryHeading">
+        <div class="admin-heading"><div><span class="ann-kicker">BLOG E PUBLICAÇÕES</span><h3 id="annPublicationHistoryHeading">Publicações editáveis</h3><p>Edite título, conteúdo ou banner sem criar uma campanha duplicada. E-mails já entregues não são reenviados.</p></div><button id="annRefreshPublications" class="ann-button secondary" type="button">Atualizar lista</button></div>
+        <div id="annPublicationStatus" class="ann-status" role="status" aria-live="polite"></div><div id="annPublicationList" class="ann-publication-list"></div><button id="annLoadMorePublications" class="ann-button secondary" type="button" hidden>Carregar mais publicações</button>
+      </section>
+      <details class="ann-campaigns" id="annCampaignDetails">
+        <summary><span><span class="ann-kicker">CAMPANHAS</span><strong>Histórico e estado dos envios de e-mail</strong></span><button id="annRefreshCampaigns" class="ann-button secondary" type="button">Atualizar</button></summary>
+        <p id="annCampaignConfig" class="ann-form-hint"></p><div id="annCampaignList" class="ann-campaign-list" aria-live="polite"></div>
+      </details>
+      </section>
+      <section id="annAdminUsersView" class="ann-admin-view" hidden>
       <section id="annUsers" class="ann-admin-section ann-users" aria-labelledby="annUsersHeading">
         <div class="admin-heading"><div><span class="ann-kicker">CONTAS E ACESSO</span><h3 id="annUsersHeading">Usuários do MedTutor</h3><p>Dados de autenticação e informações sensíveis não são exibidos. Aqui você pode consultar perfis e atribuir/remover o papel de administrador.</p></div><button id="annRefreshUsers" class="ann-button secondary" type="button">Atualizar lista</button></div>
-        <label class="ann-user-search">Filtrar por nome, faculdade ou período<input id="annUserSearch" type="search" autocomplete="off" placeholder="Buscar usuário"></label>
+        <label class="ann-user-search">Filtrar nesta página<input id="annUserSearch" type="search" autocomplete="off" placeholder="Buscar usuário"></label>
         <div id="annUserStatus" class="ann-status" role="status" aria-live="polite">Carregando usuários…</div>
         <div id="annUserList" class="ann-user-list"></div>
+        <div class="ann-pagination"><button id="annPreviousUsers" class="ann-button secondary" type="button" disabled>Anterior</button><span id="annUserPage" aria-live="polite">Página 1</span>
         <button id="annLoadMoreUsers" class="ann-button secondary" type="button" hidden>Carregar mais usuários</button>
+        </div>
       </section>
-      <section class="ann-campaigns" aria-labelledby="annCampaignsHeading">
-        <div class="admin-heading"><div><span class="ann-kicker">DISTRIBUIÇÃO</span><h3 id="annCampaignsHeading">Envio de e-mails</h3></div><button id="annRefreshCampaigns" class="ann-button secondary" type="button">Atualizar status</button></div>
-        <p id="annCampaignConfig" class="ann-form-hint"></p>
-        <div id="annCampaignList" class="ann-campaign-list" aria-live="polite"></div>
       </section>
     </section>
   </main>

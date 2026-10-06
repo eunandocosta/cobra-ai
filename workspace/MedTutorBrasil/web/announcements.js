@@ -35,6 +35,12 @@
   let unsubscribeMessage = '';
   let adminUsers = [];
   let nextUserPageToken = null;
+  let userPageTokens = [null];
+  let userPageIndex = 0;
+  let publicationPageToken = null;
+  let editingPublicationId = '';
+  let isAdmin = false;
+  const loadedAdminViews = new Set();
 
   function escapeText(value) {
     return String(value || '');
@@ -75,7 +81,7 @@
       heading.appendChild(date);
     }
     const title = document.createElement('h2');
-    title.textContent = item.kind === 'notice' ? `Aviso da MedTutor Brasil: ${escapeText(item.title)}` : escapeText(item.title);
+    title.textContent = escapeText(item.title);
     article.append(heading, title);
     if (item.bannerUrl) {
       const image = document.createElement('img');
@@ -125,7 +131,7 @@
       description: String(data.get('description') || '').trim(),
       bannerUrl: String(data.get('bannerUrl') || '').trim(),
       bannerAlt: String(data.get('bannerAlt') || '').trim(),
-      channels: { inApp: true, email: data.has('sendEmail') },
+      channels: { inApp: data.has('sendInApp'), email: data.has('sendEmail') },
       emailConsentPrompt: data.has('emailConsentPrompt'),
       promptResponseRequired: data.has('promptResponseRequired'),
       promptText: String(data.get('promptText') || '').trim()
@@ -139,6 +145,10 @@
   }
 
   async function setupAdmin() {
+    isAdmin = false;
+    document.getElementById('annPublicIntro').hidden = false;
+    list.hidden = false;
+    status.hidden = false;
     emailPreferences.hidden = !auth?.currentUser;
     if (authLink) {
       authLink.href = auth?.currentUser ? '/' : '/login';
@@ -150,13 +160,19 @@
     }
     try {
       const result = await request('/api/announcements/admin/status');
-      adminPanel.hidden = result.isAdmin !== true;
+      isAdmin = result.isAdmin === true;
+      adminPanel.hidden = !isAdmin;
+      document.getElementById('annPublicIntro').hidden = isAdmin;
+      emailPreferences.hidden = isAdmin || !auth?.currentUser;
+      list.hidden = isAdmin;
+      status.hidden = isAdmin;
       if (authLink) {
         authLink.href = auth.currentUser ? '/' : '/login';
         authLink.textContent = auth.currentUser ? 'Voltar ao app' : 'Entrar';
       }
-      if (result.isAdmin === true) {
-        await Promise.all([loadEmailCampaigns(), loadAdminUsers(), loadNextVersion()]);
+      if (isAdmin) {
+        showAdminView('overview');
+        await loadAdminSummary();
         if (location.hash === '#annAdmin') {
           requestAnimationFrame(() => adminPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         }
@@ -164,7 +180,7 @@
     } catch (_) {
       adminPanel.hidden = true;
     }
-    await loadEmailPreference();
+    if (!isAdmin) await loadEmailPreference();
   }
 
   async function loadEmailPreference() {
@@ -221,6 +237,105 @@
     } catch (error) {
       campaignList.textContent = error.message;
     }
+  }
+
+  function publicationTitle(item) {
+    return `${item.kind === 'notice' ? 'Aviso da MedTutor Brasil' : `Atualização ${item.version || ''}`} · ${item.title}`;
+  }
+
+  function renderSummary(items) {
+    const container = document.getElementById('annSummaryList');
+    container.replaceChildren();
+    for (const item of items || []) {
+      const row = document.createElement('article'); row.className = 'ann-summary-row';
+      const info = document.createElement('div');
+      const title = document.createElement('strong'); title.textContent = publicationTitle(item);
+      const description = document.createElement('p'); description.textContent = `${formatDate(item.publishedAt)} · ${item.channels?.inApp ? 'Blog + entrada do usuário' : 'Somente e-mail'}`;
+      const meta = document.createElement('div'); meta.className = 'ann-summary-meta';
+      const email = document.createElement('span'); email.textContent = item.channels?.email ? `${campaignLabel(item.emailStatus)} · ${item.sentCount}/${item.recipientCount} enviados` : 'E-mail não selecionado';
+      meta.appendChild(email);
+      if (item.failedCount) { const failed = document.createElement('span'); failed.textContent = `${item.failedCount} falha(s)`; meta.appendChild(failed); }
+      info.append(title, description, meta);
+      const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'ann-button secondary'; edit.textContent = 'Editar publicação'; edit.addEventListener('click', () => beginEdit(item));
+      row.append(info, edit); container.appendChild(row);
+    }
+  }
+
+  async function loadAdminSummary() {
+    const target = document.getElementById('annSummaryStatus'); target.textContent = 'Carregando os três envios mais recentes…';
+    try {
+      const result = await request('/api/announcements/admin/summary'); renderSummary(result.announcements || []);
+      target.textContent = result.announcements?.length ? '' : 'Nenhuma publicação foi feita ainda.';
+    } catch (error) { target.textContent = error.message; }
+  }
+
+  function showAdminView(view) {
+    if (!isAdmin) return;
+    const mapping = { overview: 'annAdminOverview', publications: 'annAdminPublications', users: 'annAdminUsersView' };
+    for (const [key, id] of Object.entries(mapping)) document.getElementById(id).hidden = key !== view;
+    document.querySelectorAll('#annAdminTabs [data-admin-view]').forEach(button => {
+      if (button.dataset.adminView === view) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+    });
+    if (loadedAdminViews.has(view)) return;
+    loadedAdminViews.add(view);
+    if (view === 'publications') { loadNextVersion(); loadAdminPublications(); }
+    if (view === 'users') loadAdminUsers();
+  }
+
+  function beginEdit(item) {
+    editingPublicationId = item.id;
+    form.elements.kind.value = item.kind;
+    form.elements.title.value = item.title || '';
+    form.elements.description.value = item.description || '';
+    form.elements.bannerUrl.value = item.bannerUrl || '';
+    form.elements.bannerAlt.value = item.bannerAlt || '';
+    form.elements.sendInApp.checked = item.channels?.inApp !== false;
+    form.elements.sendEmail.checked = item.channels?.email === true;
+    form.elements.emailConsentPrompt.checked = false;
+    form.elements.promptResponseRequired.checked = false;
+    form.elements.sendInApp.disabled = true;
+    form.elements.sendEmail.disabled = true;
+    kindSelect.disabled = true;
+    document.getElementById('annDistributionHint').textContent = 'Os canais e a versão ficam preservados ao editar. Alterações de texto são refletidas no blog e na entrada do usuário; e-mails já enviados não podem ser alterados.';
+    updateKindControls();
+    document.getElementById('annFormHeading').textContent = `Editar ${item.kind === 'notice' ? 'aviso' : `atualização ${item.version || ''}`}`;
+    form.querySelector('[type="submit"]').textContent = 'Salvar alterações';
+    document.getElementById('annCancelEdit').hidden = false;
+    showAdminView('publications');
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function clearEdit() {
+    editingPublicationId = '';
+    form.reset(); form.elements.kind.value = 'update'; form.elements.sendInApp.checked = true;
+    form.elements.sendInApp.disabled = false; form.elements.sendEmail.disabled = false; kindSelect.disabled = false;
+    document.getElementById('annDistributionHint').textContent = 'Blog e entrada do usuário usam a mesma publicação. A entrada mostra somente a mais recente; uma nova substitui a anterior ainda não visualizada.';
+    document.getElementById('annFormHeading').textContent = 'Novo aviso ou atualização';
+    form.querySelector('[type="submit"]').textContent = 'Publicar';
+    document.getElementById('annCancelEdit').hidden = true;
+    updatePromptControls(); updateKindControls();
+  }
+
+  async function loadAdminPublications(append = false) {
+    const container = document.getElementById('annPublicationList');
+    const target = document.getElementById('annPublicationStatus');
+    target.textContent = append ? 'Carregando…' : 'Carregando publicações…';
+    try {
+      const query = append && publicationPageToken ? `?pageToken=${encodeURIComponent(publicationPageToken)}` : '';
+      const result = await request(`/api/announcements/admin/publications${query}`);
+      if (!append) container.replaceChildren();
+      for (const item of result.announcements || []) {
+        const row = document.createElement('article'); row.className = 'ann-publication-row';
+        const info = document.createElement('div'); const title = document.createElement('strong'); title.textContent = publicationTitle(item);
+        const description = document.createElement('p'); description.textContent = `${formatDate(item.publishedAt)} · ${item.channels?.inApp ? 'Blog + entrada' : 'Somente e-mail'}${item.channels?.email ? ' · E-mail habilitado' : ''}`;
+        info.append(title, description);
+        const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'ann-button secondary'; edit.textContent = 'Editar'; edit.addEventListener('click', () => beginEdit(item));
+        row.append(info, edit); container.appendChild(row);
+      }
+      publicationPageToken = result.nextPageToken || null;
+      document.getElementById('annLoadMorePublications').hidden = !publicationPageToken;
+      target.textContent = result.announcements?.length ? '' : 'Nenhuma publicação encontrada.';
+    } catch (error) { target.textContent = error.message; }
   }
 
   async function loadNextVersion() {
@@ -285,16 +400,19 @@
     }
   }
 
-  async function loadAdminUsers(append = false) {
+  async function loadAdminUsers() {
     if (!auth?.currentUser || adminPanel.hidden) return;
-    usersStatus.textContent = append ? 'Carregando mais usuários…' : 'Carregando usuários…';
+    usersStatus.textContent = 'Carregando usuários…';
     try {
-      const query = append && nextUserPageToken ? `?pageToken=${encodeURIComponent(nextUserPageToken)}` : '';
+      const token = userPageTokens[userPageIndex];
+      const query = token ? `?pageToken=${encodeURIComponent(token)}` : '';
       const result = await request(`/api/announcements/admin/users${query}`);
-      adminUsers = append ? adminUsers.concat(result.users || []) : (result.users || []);
+      adminUsers = result.users || [];
       nextUserPageToken = result.nextPageToken || null;
       loadMoreUsersButton.hidden = !nextUserPageToken;
-      usersStatus.textContent = `${adminUsers.length} perfil(is) carregado(s). E-mails aparecem mascarados; credenciais não são consultadas.`;
+      document.getElementById('annPreviousUsers').disabled = userPageIndex === 0;
+      document.getElementById('annUserPage').textContent = `Página ${userPageIndex + 1} · até 5 usuários`;
+      usersStatus.textContent = 'E-mails mascarados; credenciais não são consultadas.';
       renderAdminUsers();
     } catch (error) {
       usersStatus.textContent = error.message;
@@ -302,9 +420,13 @@
   }
 
   function updatePromptControls() {
-    const enabled = askConsentInput.checked;
+    const enabled = askConsentInput.checked && form.elements.sendInApp.checked;
     promptRequiredInput.disabled = !enabled;
     promptTextInput.disabled = !enabled;
+    askConsentInput.disabled = !form.elements.sendInApp.checked || Boolean(editingPublicationId);
+    document.getElementById('annEmailChannelLabel').textContent = form.elements.sendInApp.checked
+      ? 'Enviar também por e-mail a quem autorizou'
+      : 'Enviar por e-mail a quem autorizou';
   }
 
   function updateKindControls() {
@@ -313,11 +435,23 @@
   }
 
   document.getElementById('annPreviewButton').addEventListener('click', () => renderPreview(collectForm()));
-  document.getElementById('annRefreshCampaigns').addEventListener('click', loadEmailCampaigns);
-  document.getElementById('annRefreshUsers').addEventListener('click', () => loadAdminUsers());
-  loadMoreUsersButton.addEventListener('click', () => loadAdminUsers(true));
+  document.getElementById('annRefreshCampaigns').addEventListener('click', event => { event.preventDefault(); loadEmailCampaigns(); });
+  document.getElementById('annRefreshUsers').addEventListener('click', () => { userPageIndex = 0; userPageTokens = [null]; loadAdminUsers(); });
+  document.getElementById('annRefreshSummary').addEventListener('click', loadAdminSummary);
+  document.getElementById('annRefreshPublications').addEventListener('click', () => { publicationPageToken = null; loadAdminPublications(); });
+  document.getElementById('annLoadMorePublications').addEventListener('click', () => loadAdminPublications(true));
+  loadMoreUsersButton.addEventListener('click', () => {
+    if (!nextUserPageToken) return;
+    userPageTokens[userPageIndex + 1] = nextUserPageToken;
+    userPageIndex += 1;
+    loadAdminUsers();
+  });
+  document.getElementById('annPreviousUsers').addEventListener('click', () => { if (userPageIndex > 0) { userPageIndex -= 1; loadAdminUsers(); } });
+  document.getElementById('annCancelEdit').addEventListener('click', clearEdit);
+  document.getElementById('annCampaignDetails').addEventListener('toggle', event => { if (event.target.open && !loadedAdminViews.has('campaigns')) { loadedAdminViews.add('campaigns'); loadEmailCampaigns(); } });
   userSearch.addEventListener('input', renderAdminUsers);
   askConsentInput.addEventListener('change', updatePromptControls);
+  form.elements.sendInApp.addEventListener('change', updatePromptControls);
   kindSelect.addEventListener('change', updateKindControls);
   updatePromptControls();
   updateKindControls();
@@ -340,9 +474,18 @@
     event.preventDefault();
     const button = form.querySelector('[type="submit"]');
     button.disabled = true;
-    adminStatus.textContent = 'Publicando atualização…';
+    adminStatus.textContent = editingPublicationId ? 'Salvando alterações…' : 'Publicando…';
     try {
-      const result = await request('/api/announcements', { method: 'POST', body: JSON.stringify(collectForm()) });
+      const payload = collectForm();
+      const result = editingPublicationId
+        ? await request(`/api/announcements/admin/${encodeURIComponent(editingPublicationId)}`, { method: 'PATCH', body: JSON.stringify(payload) })
+        : await request('/api/announcements', { method: 'POST', body: JSON.stringify(payload) });
+      if (editingPublicationId) {
+        adminStatus.textContent = 'Publicação atualizada. O blog e a entrada do usuário refletem o mesmo conteúdo; e-mails já enviados não são reenviados.';
+        clearEdit(); preview.hidden = true; publicationPageToken = null;
+        await Promise.all([loadAdminPublications(), loadAdminSummary()]);
+        return;
+      }
       const typeLabel = result.announcement?.kind === 'notice' ? 'Aviso' : `Atualização ${result.version || ''}`;
       const emailMessage = result.emailStatus === 'queued'
         ? ' O envio por e-mail aos usuários inscritos foi iniciado.'
@@ -350,14 +493,12 @@
           ? ' Para enviar e-mail, configure o provedor no servidor.'
           : '';
       adminStatus.textContent = `${typeLabel} publicado no painel.${emailMessage}${result.announcement?.emailConsentPrompt ? ' A pergunta de consentimento será exibida aos usuários.' : ''}`;
-      form.reset();
-      kindSelect.value = 'update';
-      document.getElementById('annAskConsent').checked = false;
-      updatePromptControls();
-      updateKindControls();
+      clearEdit();
       preview.hidden = true;
-      await loadAnnouncements();
-      await Promise.all([loadEmailCampaigns(), loadNextVersion()]);
+      await loadAdminSummary();
+      publicationPageToken = null;
+      if (loadedAdminViews.has('publications')) await loadAdminPublications();
+      if (document.getElementById('annCampaignDetails').open) await loadEmailCampaigns();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       adminStatus.textContent = error.message;
@@ -386,7 +527,7 @@
         auth = app.auth();
         auth.onAuthStateChanged(async () => {
           await setupAdmin();
-          await loadAnnouncements();
+          if (!isAdmin) await loadAnnouncements();
         });
       } else {
         await loadAnnouncements();
@@ -398,10 +539,8 @@
   }
 
   document.getElementById('annAdminTabs')?.addEventListener('click', event => {
-    if (event.target.matches('a[href^="#"]')) {
-      const target = document.querySelector(event.target.getAttribute('href'));
-      if (target) { event.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-    }
+    const button = event.target.closest('[data-admin-view]');
+    if (button) showAdminView(button.dataset.adminView);
   });
 
   init();

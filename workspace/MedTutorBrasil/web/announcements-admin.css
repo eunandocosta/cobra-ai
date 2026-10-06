@@ -1,9 +1,30 @@
 .ann-admin-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px;padding:0 0 16px;border-bottom:1px solid var(--line)}
-.ann-admin-tabs a{padding:9px 12px;border:1px solid var(--line);border-radius:9px;color:#dce8df;text-decoration:none;font-size:12px;font-weight:700}
-.ann-admin-tabs a:hover{border-color:var(--green);color:var(--green)}
+.ann-admin-tabs button{min-height:40px;padding:9px 14px;border:1px solid var(--line);border-radius:9px;background:#101a14;color:#dce8df;font:700 12px inherit;cursor:pointer}
+.ann-admin-tabs button:hover,.ann-admin-tabs button[aria-current=page]{border-color:var(--green);color:var(--green);background:rgba(0,230,111,.07)}
+.ann-admin-view[hidden]{display:none!important}
 .ann-admin-section{padding:18px 0;border-bottom:1px solid var(--line);scroll-margin-top:18px}
-.ann-admin-section>.admin-heading h3,.ann-campaigns .admin-heading h3{margin:5px 0 0;font-size:18px}
+.ann-admin-section>.admin-heading h3,.ann-campaigns .admin-heading h3,.ann-admin-view>.admin-heading h3{margin:5px 0 0;font-size:18px}
 .ann-admin-section>.admin-heading p{max-width:700px;margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.ann-admin-view>.admin-heading p{max-width:700px;margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.ann-title-row{grid-template-columns:minmax(180px,.9fr) minmax(130px,.55fr) minmax(240px,1.7fr)}
+.ann-title-row select{width:100%;min-height:42px;border:1px solid var(--line);border-radius:9px;padding:0 12px;background:#09120d;color:#f2f8f3;font:500 13px inherit}
+.ann-title-row #annNextVersion{font-weight:800;color:var(--green);letter-spacing:.02em}
+.ann-distribution .ann-form-hint{margin:2px 0 0 26px;max-width:760px}
+.ann-summary-list,.ann-publication-list{display:grid;gap:10px}
+.ann-summary-row,.ann-publication-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:11px;background:rgba(7,17,13,.48)}
+.ann-summary-row strong,.ann-publication-row strong{display:block;color:#edf5ef;font-size:13px;overflow-wrap:anywhere}
+.ann-summary-row p,.ann-publication-row p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+.ann-summary-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.ann-summary-meta span{padding:4px 7px;border:1px solid var(--line);border-radius:999px;color:#b7c5bb;font-size:10px;font-weight:700}
+.ann-publication-row .ann-button{white-space:nowrap}
+.ann-campaigns{margin-top:18px;border:1px solid var(--line);border-radius:11px;background:rgba(7,17,13,.4)}
+.ann-campaigns summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;cursor:pointer;list-style:none}
+.ann-campaigns summary::-webkit-details-marker{display:none}
+.ann-campaigns summary>span{display:grid;gap:4px}
+.ann-campaigns summary strong{font-size:13px;color:#eaf3ec}
+.ann-campaigns[open]>p,.ann-campaigns[open]>.ann-campaign-list{margin:0 15px 13px}
+.ann-pagination{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px}
+.ann-pagination span{color:var(--muted);font-size:12px;font-weight:700}
 .ann-distribution,.ann-consent-options{display:grid;gap:10px;margin:0;padding:14px;border:1px solid var(--line);border-radius:11px;background:rgba(7,17,13,.5)}
 .ann-distribution legend,.ann-consent-options legend{padding:0 6px;color:#dce8df;font-size:12px;font-weight:800}
 .ann-admin .ann-distribution label,.ann-admin .ann-consent-options>label{display:flex;grid-template-columns:none;align-items:center;gap:9px;font-size:12px}
@@ -26,4 +47,5 @@
 .announcement-first-access-actions .announcement-consent-yes{border-color:var(--neon,#00e66f);background:var(--neon,#00e66f);color:#06110b}
 .announcement-first-access-actions .announcement-consent-no{border-color:rgba(255,255,255,.22)}
 .announcement-first-access-actions button:disabled{opacity:.55;cursor:wait}
-@media(max-width:700px){.ann-user-row{grid-template-columns:1fr 1fr}.ann-user-details{grid-column:1/-1}.ann-user-row .ann-button{width:100%}}
+@media(max-width:700px){.ann-user-row{grid-template-columns:1fr 1fr}.ann-user-details{grid-column:1/-1}.ann-user-row .ann-button{width:100%}.ann-summary-row,.ann-publication-row{grid-template-columns:1fr}.ann-publication-row .ann-button{width:100%}.ann-campaigns summary{align-items:flex-start}.ann-campaigns summary .ann-button{min-height:34px;padding:0 9px;font-size:10px}}
+@media(max-width:560px){.ann-title-row{grid-template-columns:1fr}.ann-admin-tabs{display:grid;grid-template-columns:1fr}.ann-admin-tabs button{text-align:left}.ann-pagination{flex-wrap:wrap}.ann-pagination .ann-button{flex:1}.ann-campaigns summary{flex-direction:column}.ann-campaigns summary .ann-button{width:100%}}

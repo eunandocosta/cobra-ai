@@ -73,7 +73,7 @@ function validatePayload(body = {}) {
   if (!kind) throw Object.assign(new Error('Selecione aviso ou atualização.'), { statusCode: 400 });
   if (!title || title.length > 160) throw Object.assign(new Error('Informe um título de até 160 caracteres.'), { statusCode: 400 });
   if (!description || description.length > 30000) throw Object.assign(new Error('Informe a descrição detalhada (até 30.000 caracteres).'), { statusCode: 400 });
-  if (!channels.inApp) throw Object.assign(new Error('A publicação no painel é obrigatória; o e-mail é um canal adicional.'), { statusCode: 400 });
+  if (!channels.inApp && !channels.email) throw Object.assign(new Error('Selecione ao menos um canal de publicação.'), { statusCode: 400 });
   if (emailConsentPrompt && !channels.inApp) throw Object.assign(new Error('A pergunta de consentimento exige publicação no painel.'), { statusCode: 400 });
   if (promptText.length > 300) throw Object.assign(new Error('A pergunta deve ter até 300 caracteres.'), { statusCode: 400 });
   if (bannerUrl && (!/^https:\/\//i.test(bannerUrl) || bannerUrl.length > 2048)) {
@@ -116,8 +116,19 @@ function respondError(res, error) {
 
 async function listPublished(req, res) {
   try {
-    const snapshot = await getFirebaseFirestore().collection(ANNOUNCEMENTS_COLLECTION).where('published', '==', true).limit(100).get();
-    const announcements = snapshot.docs.map(serializeAnnouncement).filter(item => item.channels.inApp).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')));
+    const collection = getFirebaseFirestore().collection(ANNOUNCEMENTS_COLLECTION);
+    const announcements = [];
+    let cursor = null;
+    while (announcements.length < 100) {
+      let query = collection.orderBy('publishedAt', 'desc').limit(50);
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.get();
+      if (!snapshot.size) break;
+      announcements.push(...snapshot.docs.filter(doc => doc.get('published') === true).map(serializeAnnouncement).filter(item => item.channels.inApp));
+      cursor = snapshot.docs[snapshot.docs.length - 1];
+      if (snapshot.size < 50) break;
+    }
+    announcements.splice(100);
     return res.json({ announcements });
   } catch (error) { return respondError(res, error); }
 }
@@ -134,8 +145,18 @@ async function unseen(req, res) {
   try {
     const uid = await authenticatedUid(req);
     const db = getFirebaseFirestore();
-    const latest = await db.collection(ANNOUNCEMENTS_COLLECTION).where('published', '==', true).limit(100).get();
-    const newest = latest.docs.map(serializeAnnouncement).filter(item => item.channels.inApp).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')))[0];
+    const collection = db.collection(ANNOUNCEMENTS_COLLECTION);
+    let cursor = null;
+    let newest = null;
+    while (!newest) {
+      let query = collection.orderBy('publishedAt', 'desc').limit(25);
+      if (cursor) query = query.startAfter(cursor);
+      const page = await query.get();
+      if (!page.size) break;
+      newest = page.docs.map(serializeAnnouncement).find(item => item.channels.inApp) || null;
+      cursor = page.docs[page.docs.length - 1];
+      if (page.size < 25) break;
+    }
     if (!newest) return res.json({ announcement: null });
     const seen = await db.collection('users').doc(uid).collection('announcement_reads').doc(newest.id).get();
     const response = newest.emailConsentPrompt
@@ -227,6 +248,60 @@ async function listEmailCampaigns(req, res) {
   } catch (error) { return respondError(res, error); }
 }
 
+async function adminSummary(req, res) {
+  try {
+    await requireAdmin(req);
+    const db = getFirebaseFirestore();
+    const snapshot = await db.collection(ANNOUNCEMENTS_COLLECTION).orderBy('publishedAt', 'desc').limit(100).get();
+    const recent = snapshot.docs.filter(doc => doc.get('published') === true).map(serializeAnnouncement).slice(0, 3);
+    const announcements = await Promise.all(recent.map(async item => {
+      const campaign = await db.collection('announcement_email_campaigns').doc(item.id).get();
+      const campaignData = campaign.exists ? campaign.data() : null;
+      return { ...item, emailStatus: campaignData?.status || 'not_requested', recipientCount: Number(campaignData?.recipientCount) || 0, sentCount: Number(campaignData?.sentCount) || 0, failedCount: Number(campaignData?.failedCount) || 0 };
+    }));
+    return res.json({ announcements });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function listAdminPublications(req, res) {
+  try {
+    await requireAdmin(req);
+    const db = getFirebaseFirestore();
+    const collection = db.collection(ANNOUNCEMENTS_COLLECTION);
+    let query = collection.orderBy('publishedAt', 'desc');
+    const pageToken = String(req.query.pageToken || '').trim();
+    if (pageToken && pageToken.length <= 160) {
+      const cursor = await collection.doc(pageToken).get();
+      if (cursor.exists) query = query.startAfter(cursor);
+    }
+    const snapshot = await query.limit(6).get();
+    const publishedDocs = snapshot.docs.filter(doc => doc.get('published') === true);
+    const docs = publishedDocs.slice(0, 5);
+    return res.json({ announcements: docs.map(serializeAnnouncement), nextPageToken: snapshot.size > 5 ? snapshot.docs[4]?.id || null : null });
+  } catch (error) { return respondError(res, error); }
+}
+
+async function editPublication(req, res) {
+  try {
+    const adminUid = await requireAdmin(req);
+    const id = String(req.params.id || '').trim();
+    const title = String(req.body?.title || '').trim();
+    const description = String(req.body?.description || '').trim();
+    const bannerUrl = String(req.body?.bannerUrl || '').trim();
+    const bannerAlt = String(req.body?.bannerAlt || '').trim();
+    if (!id || id.length > 160) return res.status(400).json({ error: 'Identificador de publicação inválido.' });
+    if (!title || title.length > 160 || !description || description.length > 30000) return res.status(400).json({ error: 'Informe título e descrição dentro dos limites permitidos.' });
+    if (bannerUrl && (!/^https:\/\//i.test(bannerUrl) || bannerUrl.length > 2048)) return res.status(400).json({ error: 'O banner deve ser uma URL HTTPS válida ou ficar vazio.' });
+    if (bannerAlt.length > 300) return res.status(400).json({ error: 'O texto alternativo deve ter até 300 caracteres.' });
+    const db = getFirebaseFirestore();
+    const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc(id);
+    const doc = await ref.get();
+    if (!doc.exists || doc.get('published') !== true) return res.status(404).json({ error: 'Publicação não encontrada.' });
+    await ref.update({ title, description, bannerUrl, bannerAlt, editedAt: new Date(), editedBy: adminUid });
+    return res.json({ announcement: serializeAnnouncement(await ref.get()) });
+  } catch (error) { return respondError(res, error); }
+}
+
 async function listAdminUsers(req, res) {
   try {
     await requireAdmin(req);
@@ -239,9 +314,9 @@ async function listAdminUsers(req, res) {
       const cursor = await collection.doc(pageToken).get();
       if (cursor.exists) query = query.startAfter(cursor);
     }
-    const snapshot = await query.limit(200).get();
-    const users = snapshot.docs.map(serializeUser);
-    return res.json({ users, nextPageToken: snapshot.size === 200 ? snapshot.docs[snapshot.docs.length - 1].id : null });
+    const snapshot = await query.limit(6).get();
+    const page = snapshot.docs.slice(0, 5);
+    return res.json({ users: page.map(serializeUser), nextPageToken: snapshot.size > 5 ? page[page.length - 1]?.id || null : null });
   } catch (error) { return respondError(res, error); }
 }
 
@@ -275,14 +350,16 @@ async function nextVersion(req, res) {
     let current = meta.exists && Number.isInteger(meta.get('lastMajor')) && Number.isInteger(meta.get('lastMinor'))
       ? [meta.get('lastMajor'), meta.get('lastMinor')]
       : [1, -1];
+    let foundVersion = meta.exists;
     if (!meta.exists) {
-      const existing = await db.collection(ANNOUNCEMENTS_COLLECTION).get();
+      const existing = await db.collection(ANNOUNCEMENTS_COLLECTION).limit(1000).get();
       for (const doc of existing.docs) {
         const parts = versionParts(doc.get('version'));
+        if (doc.get('version') && parts[0] > 0) foundVersion = true;
         if (parts[0] > current[0] || (parts[0] === current[0] && parts[1] > current[1])) current = parts;
       }
     }
-    const next = current[1] < 0 ? current : [current[0], current[1] + 1];
+    const next = current[1] < 0 || !foundVersion ? [current[0], 0] : [current[0], current[1] + 1];
     return res.json({ version: `v${next[0]}.${next[1]}` });
   } catch (error) { return respondError(res, error); }
 }
@@ -318,14 +395,16 @@ async function publish(req, res) {
         let current = meta.exists && Number.isInteger(meta.get('lastMajor')) && Number.isInteger(meta.get('lastMinor'))
           ? [meta.get('lastMajor'), meta.get('lastMinor')]
           : [1, -1];
+        let foundVersion = meta.exists;
         if (!meta.exists) {
-          const existing = await transaction.get(db.collection(ANNOUNCEMENTS_COLLECTION));
+          const existing = await transaction.get(db.collection(ANNOUNCEMENTS_COLLECTION).limit(1000));
           for (const doc of existing.docs) {
             const parts = versionParts(doc.get('version'));
+            if (doc.get('version') && parts[0] > 0) foundVersion = true;
             if (parts[0] > current[0] || (parts[0] === current[0] && parts[1] > current[1])) current = parts;
           }
         }
-        const next = current[1] < 0 ? current : [current[0], current[1] + 1];
+        const next = current[1] < 0 || !foundVersion ? [current[0], 0] : [current[0], current[1] + 1];
         version = `v${next[0]}.${next[1]}`;
         if (!meta.exists || meta.get('firstUpdateConsentPromptPublished') !== true) askConsent = true;
         transaction.set(versionRef, { lastMajor: next[0], lastMinor: next[1], firstUpdateConsentPromptPublished: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
@@ -342,4 +421,4 @@ async function publish(req, res) {
   } catch (error) { return respondError(res, error); }
 }
 
-module.exports = { listPublished, adminStatus, unseen, answerPrompt, markRead, emailPreference, updateEmailPreference, unsubscribe, listEmailCampaigns, listAdminUsers, updateUserRole, nextVersion, retryEmailCampaign, publish, serializeUser, validatePayload, versionParts };
+module.exports = { listPublished, adminStatus, adminSummary, listAdminPublications, editPublication, unseen, answerPrompt, markRead, emailPreference, updateEmailPreference, unsubscribe, listEmailCampaigns, listAdminUsers, updateUserRole, nextVersion, retryEmailCampaign, publish, serializeUser, validatePayload, versionParts };

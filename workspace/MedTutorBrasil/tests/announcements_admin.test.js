@@ -15,8 +15,8 @@ const update = validatePayload({
 assert.equal(update.kind, 'update');
 assert.equal(update.channels.email, true);
 assert.equal(update.emailConsentPrompt, true);
-assert.throws(() => validatePayload({ kind: 'notice', title: 'Aviso', description: 'Texto', channels: { inApp: false, email: true } }), /painel é obrigatória/);
-assert.throws(() => validatePayload({ kind: 'update', title: 'Sem canal', description: 'Texto', channels: { inApp: false, email: false } }), /painel é obrigatória/);
+assert.equal(validatePayload({ kind: 'notice', title: 'Aviso', description: 'Texto', channels: { inApp: false, email: true } }).channels.email, true);
+assert.throws(() => validatePayload({ kind: 'update', title: 'Sem canal', description: 'Texto', channels: { inApp: false, email: false } }), /ao menos um canal/);
 
 const user = serializeUser({ id: 'uid-123', data: () => ({ nome: 'Pessoa Teste', email: 'pessoa@example.com', role: 'admin', faculdade: 'Universo', periodo_atual: '2º Período', senha: 'não deve sair', token: 'secreto' }) });
 assert.equal(user.role, 'admin');
@@ -38,10 +38,15 @@ const firstAccessPrompt = fs.readFileSync(require.resolve('../web/announcement-p
 const routes = fs.readFileSync(require.resolve('../src/modules/announcements/announcements.routes.js'), 'utf8');
 assert.match(adminMarkup, /name="kind"[\s\S]*?Atualização[\s\S]*?Aviso/);
 assert.match(adminMarkup, /name="sendEmail"/);
+assert.match(adminMarkup, /name="sendInApp"/);
 assert.match(adminMarkup, /name="emailConsentPrompt"[\s\S]*?name="promptResponseRequired"/);
 assert.match(adminUi, /admin\/users/);
 assert.match(adminUi, /admin\/next-version/);
-assert.match(adminUi, /channels: \{ inApp: true, email:/);
+assert.match(adminUi, /channels: \{ inApp: data\.has\('sendInApp'\), email:/);
+assert.match(adminUi, /admin\/summary/);
+assert.match(adminUi, /admin\/publications/);
+assert.match(adminMarkup, /name="kind"[\s\S]*?id="annVersionField"[\s\S]*?Título breve/);
+assert.match(adminMarkup, /Carregar mais usuários/);
 assert.match(firstAccessPrompt, /announcement-consent-yes/);
 assert.match(firstAccessPrompt, /promptResponseRequired !== true/);
 assert.match(routes, /controller\.listAdminUsers/);
