@@ -310,7 +310,10 @@
           console.error('[MedTutor Auth] Tempo limite ao restaurar ou validar a sessão Firebase.');
           setRoutePresentation('resolving');
           this.setAuthScreenState('error');
-        }, 12000);
+        // A restauração do Auth pode ser seguida por obtenção do token e
+        // validação de acesso no servidor. 12 s causavam falsos erros em redes
+        // lentas mesmo quando a sessão ainda estava progredindo.
+        }, 35000);
       },
 
       async retryAuthSessionResolution() {

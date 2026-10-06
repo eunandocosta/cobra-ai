@@ -18,15 +18,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded&icon_names=account_balance,add,analytics,arrow_back,arrow_forward,assignment,attach_file,auto_awesome,balance,biotech,bolt,cached,calendar_month,campaign,cancel,cardiology,casino,celebration,chat,chat_bubble,check_circle,chevron_right,child_care,circle,cleaning_services,close,cloud,cloud_sync,content_copy,dark_mode,delete,description,difference,edit,edit_note,emergency,emoji_events,event,expand_more,explore,favorite,flag,folder,folder_copy,folder_open,genetics,gps_fixed,groups,help,hourglass_top,image,info,inventory_2,key,library_books,lightbulb,link,local_fire_department,local_hospital,location_on,lock,logout,mail,mark_email_unread,medical_services,medication,menu,menu_book,military_tech,monitoring,move_to_inbox,notifications,open_in_new,outbox,payments,person,photo_camera,print,progress_activity,psychology,public,pulmonology,push_pin,quiz,radiology,refresh,rocket_launch,save,school,science,search,settings,shield,skip_next,smart_toy,south_east,sports_martial_arts,square,star,style,support_agent,swap_horiz,sync,thumb_down,thumb_up,timer,touch_app,upload_file,visibility,warning,waving_hand&display=block" rel="stylesheet">
   <link rel="stylesheet" href="/material-icons.css?v=20261005-material-symbols-v3">
   <!-- PDF.js da Mozilla para descompressão e extração de texto fiel de arquivos PDF da Ementa -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- Firebase SDK v10 (Compat) para persistência em nuvem, Firestore, Storage e Auth -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link rel="stylesheet" href="/styles.css?v=20261005-chat-gemini-picker-v1">
 </head>
 <body class="route-resolving" data-route="resolving">
@@ -2984,7 +2984,7 @@
       <strong id="authSessionErrorTitle">Não foi possível verificar sua sessão</strong>
       <p id="authSessionErrorDetail">A confirmação do Firebase demorou mais que o esperado.</p>
       <div class="auth-session-error-actions">
-        <a class="btn-primary" href="/login?logout=1&amp;from=session-recovery">Tentar novamente</a>
+        <button class="btn-primary" type="button" onclick="window.location.reload()">Tentar novamente</button>
         <a class="btn-secondary" href="/login?logout=1&amp;from=session-recovery">Ir para login</a>
       </div>
     </section>
@@ -3117,7 +3117,7 @@
       screen.classList.remove('auth-state-resolving');
       screen.classList.add('active', 'auth-state-error');
       screen.setAttribute('aria-busy', 'false');
-    }, 15000);
+    }, 45000);
   </script>
 
   <div id="paymentScreenContainer" class="auth-screen-overlay payment-screen-overlay" aria-live="polite" aria-hidden="true">
