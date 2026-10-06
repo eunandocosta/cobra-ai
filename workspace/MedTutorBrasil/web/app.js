@@ -1149,6 +1149,9 @@
         name: effectiveName,
         nome: effectiveName,
         originalFileName: m.originalFileName || effectiveName,
+        sourceFileHash: String(m.sourceFileHash || m.source_file_sha256 || ''),
+        sourceFileHashes: [...new Set([...(Array.isArray(m.sourceFileHashes) ? m.sourceFileHashes : Array.isArray(m.source_file_sha256_aliases) ? m.source_file_sha256_aliases : []), m.sourceFileHash, m.source_file_sha256].filter(value => /^[a-f0-9]{64}$/i.test(String(value || ''))).map(value => String(value).toLowerCase()))],
+        contentHash: String(m.contentHash || m.content_sha256 || ''),
         subject: effectiveSubject,
         disciplina: effectiveSubject,
         topic: effectiveTopic,
@@ -1225,6 +1228,23 @@
       return `${text.length}:${(hash >>> 0).toString(36)}`;
     }
 
+    async function sha256Hex(value) {
+      if (!globalThis.crypto?.subtle || typeof TextEncoder === 'undefined') {
+        throw new Error('SHA-256 não está disponível neste navegador; use a conexão HTTPS atualizada.');
+      }
+      const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function sha256FileHex(file) {
+      if (!file || typeof file.arrayBuffer !== 'function') return '';
+      // Evita reservar um segundo buffer muito grande no navegador; o hash do
+      // conteúdo extraído ainda identifica documentos grandes com segurança.
+      if (Number(file.size) > 64 * 1024 * 1024) return '';
+      return sha256Hex(await file.arrayBuffer());
+    }
+
     function getFirestoreSyncRegistry(uid, scope) {
       try { return JSON.parse(localStorage.getItem(`medtutor_firestore_sync_${scope}_${uid}`) || '{}') || {}; } catch (error) { return {}; }
     }
@@ -1277,6 +1297,9 @@
         id: docId,
         nome: String(material.name || material.title || 'Aula Médica').slice(0, 250),
         originalFileName: String(material.originalFileName || '').slice(0, 250),
+        source_file_sha256: /^[a-f0-9]{64}$/i.test(material.sourceFileHash || material.source_file_sha256 || '') ? String(material.sourceFileHash || material.source_file_sha256).toLowerCase() : '',
+        source_file_sha256_aliases: [...new Set([...(Array.isArray(material.sourceFileHashes) ? material.sourceFileHashes : Array.isArray(material.source_file_sha256_aliases) ? material.source_file_sha256_aliases : []), material.sourceFileHash, material.source_file_sha256].filter(value => /^[a-f0-9]{64}$/i.test(String(value || ''))).map(value => String(value).toLowerCase()))].slice(0, 20),
+        content_sha256: /^[a-f0-9]{64}$/i.test(material.contentHash || material.content_sha256 || '') ? String(material.contentHash || material.content_sha256).toLowerCase() : '',
         disciplina: String(material.subject || '').slice(0, 200),
         materia: String(material.topic || material.name || '').slice(0, 200),
         doenca: String(material.disease || '').slice(0, 200),
@@ -1581,8 +1604,8 @@
         }
       },
 
-      // Só exclui registros com mesma disciplina, nome e texto integral. O hash
-      // serve apenas para particionar candidatos; a igualdade final é literal.
+      // Identifica a origem por SHA-256 do arquivo nos uploads novos e migra os
+      // materiais antigos com SHA-256 do texto integral salvo no Firestore.
       async removeExactCloudMaterialDuplicates() {
         const uid = this.getUserId();
         if (!this.hasAuthenticatedCloudSession(uid)) {
@@ -1593,44 +1616,88 @@
         const groups = new Map();
         snapshot.docs.forEach(doc => {
           const data = { ...doc.data(), id: doc.id };
-          const key = getMaterialMergeKey(data);
+          const normalizeSubject = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          const key = normalizeSubject(data.disciplina || data.subject) || `__sem_disciplina__:${doc.id}`;
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key).push({ doc, data });
         });
 
         let candidateGroups = 0;
         const plans = [];
-        for (const items of groups.values()) {
-          if (items.length < 2) continue;
-          candidateGroups++;
-          const expanded = [];
-          for (const item of items) {
-            const expectedChunks = Number(item.data.conteudo_chunks) || 0;
-            const rootText = String(item.data.conteudo_md || item.data.markdownText || item.data.text || '');
-            let chunksText = '';
-            if (item.data.conteudo_armazenamento === 'chunks_v1') {
-              if (!expectedChunks) throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: quantidade de chunks ausente.`);
-              chunksText = await this.readMaterialTextChunks(item.doc.ref, expectedChunks, { strict: true });
-              const expectedChars = Number(item.data.conteudo_caracteres) || 0;
-              if (expectedChars && chunksText.length !== expectedChars) {
-                throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: ${chunksText.length}/${expectedChars} caracteres carregados.`);
-              }
-              if (rootText && !chunksText.startsWith(rootText)) {
-                throw new Error(`A prévia e os chunks de “${item.data.nome || item.doc.id}” divergem; nenhum material foi removido.`);
-              }
+        const hashUpdates = [];
+        let sameSourceDifferentContent = 0;
+        const readCompleteText = async item => {
+          const expectedChunks = Number(item.data.conteudo_chunks) || 0;
+          const rootText = String(item.data.conteudo_md || item.data.markdownText || item.data.text || '');
+          let chunksText = '';
+          if (item.data.conteudo_armazenamento === 'chunks_v1') {
+            if (!expectedChunks) throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: quantidade de chunks ausente.`);
+            chunksText = await this.readMaterialTextChunks(item.doc.ref, expectedChunks, { strict: true });
+            const expectedChars = Number(item.data.conteudo_caracteres) || 0;
+            if (expectedChars && chunksText.length !== expectedChars) {
+              throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: ${chunksText.length}/${expectedChars} caracteres carregados.`);
             }
-            const text = chunksText || rootText;
-            if (!text.trim()) throw new Error(`O texto de “${item.data.nome || item.doc.id}” está vazio/incompleto; nenhum material foi removido.`);
-            expanded.push({ ...item, text, signature: firestoreFingerprint(text) });
+            if (rootText && !chunksText.startsWith(rootText)) {
+              throw new Error(`A prévia e os chunks de “${item.data.nome || item.doc.id}” divergem; nenhum material foi removido.`);
+            }
           }
+          const text = chunksText || rootText;
+          if (!text.trim()) throw new Error(`O texto de “${item.data.nome || item.doc.id}” está vazio/incompleto; nenhum material foi removido.`);
+          const declaredChars = Number(item.data.conteudo_caracteres) || 0;
+          if (declaredChars && text.length < declaredChars) {
+            throw new Error(`Não foi possível comprovar o texto integral de “${item.data.nome || item.doc.id}”: ${text.length}/${declaredChars} caracteres carregados.`);
+          }
+          return text;
+        };
+        for (const items of groups.values()) {
+          if (items.length > 1) candidateGroups++;
+          const expanded = items.map(item => ({
+            ...item,
+            text: null,
+            contentHash: /^[a-f0-9]{64}$/i.test(item.data.content_sha256 || '') ? String(item.data.content_sha256).toLowerCase() : '',
+            sourceHash: /^[a-f0-9]{64}$/i.test(item.data.source_file_sha256 || '') ? String(item.data.source_file_sha256).toLowerCase() : '',
+            sourceHashes: [...new Set([...(Array.isArray(item.data.source_file_sha256_aliases) ? item.data.source_file_sha256_aliases : []), item.data.source_file_sha256].filter(value => /^[a-f0-9]{64}$/i.test(String(value || ''))).map(value => String(value).toLowerCase()))]
+          }));
+
+          // Hash binário repetido prova que o arquivo enviado é o mesmo, mas
+          // não basta para excluir: conteúdo textual diferente é preservado.
+          const sourceGroups = new Map();
+          expanded.forEach(item => {
+            item.sourceHashes.forEach(sourceHash => {
+              if (!sourceGroups.has(sourceHash)) sourceGroups.set(sourceHash, []);
+              if (!sourceGroups.get(sourceHash).includes(item)) sourceGroups.get(sourceHash).push(item);
+            });
+          });
+          for (const sourceItems of sourceGroups.values()) {
+            if (sourceItems.length < 2) continue;
+            for (const item of sourceItems) {
+              item.text = await readCompleteText(item);
+              item.contentHash = await sha256Hex(item.text);
+            }
+            if (new Set(sourceItems.map(item => item.contentHash)).size > 1) sameSourceDifferentContent++;
+          }
+
+          for (const item of items) {
+            const expandedItem = expanded.find(candidate => candidate.doc.id === item.doc.id);
+            if (!expandedItem.contentHash || !expandedItem.text) {
+              expandedItem.text = await readCompleteText(expandedItem);
+              expandedItem.contentHash = await sha256Hex(expandedItem.text);
+            }
+            if (expandedItem.data.content_sha256 !== expandedItem.contentHash) {
+              hashUpdates.push({ item: expandedItem, contentHash: expandedItem.contentHash });
+            }
+          }
+
           const hashBuckets = new Map();
           expanded.forEach(item => {
-            if (!hashBuckets.has(item.signature)) hashBuckets.set(item.signature, []);
-            hashBuckets.get(item.signature).push(item);
+            if (!hashBuckets.has(item.contentHash)) hashBuckets.set(item.contentHash, []);
+            hashBuckets.get(item.contentHash).push(item);
           });
           for (const bucket of hashBuckets.values()) {
-            // Hash igual não basta: compara o conteúdo integral para descartar
-            // colisões e impedir exclusão de materiais diferentes.
+            if (bucket.length < 2) continue;
+            for (const item of bucket) if (!item.text) item.text = await readCompleteText(item);
+            // Mesmo SHA-256 é confirmação forte; a comparação literal elimina
+            // também a possibilidade teórica de colisão do hash.
             const exactSets = [];
             bucket.forEach(item => {
               const exact = exactSets.find(set => set[0].text === item.text);
@@ -1652,7 +1719,8 @@
               }));
               const bestReport = sameContent.map(item => item.data.relatorio_academico).filter(Boolean)
                 .sort((a, b) => String(b?.conteudo_md || '').length - String(a?.conteudo_md || '').length)[0] || null;
-              plans.push({ primary, duplicates: sameContent.slice(1), images: [...allImages.values()], bestReport });
+              const sourceHashes = [...new Set(sameContent.flatMap(item => item.sourceHashes))].slice(0, 20);
+              plans.push({ primary, duplicates: sameContent.slice(1), images: [...allImages.values()], bestReport, sourceHashes });
             }
           }
         }
@@ -1664,9 +1732,16 @@
         let changedCloud = false;
         let failure = null;
         try {
+          for (const update of hashUpdates) {
+            await update.item.doc.ref.set({ content_sha256: update.contentHash }, { merge: true });
+            changedCloud = true;
+          }
           for (const plan of plans) {
             await plan.primary.doc.ref.set({
               figuras_clinicas: plan.images,
+              content_sha256: plan.primary.contentHash,
+              source_file_sha256: plan.primary.sourceHash || plan.sourceHashes[0] || '',
+              source_file_sha256_aliases: plan.sourceHashes,
               ...(plan.bestReport ? { relatorio_academico: plan.bestReport } : {}),
               atualizadoEm: new Date().toISOString()
             }, { merge: true });
@@ -1701,14 +1776,27 @@
           if (removedIds.size) failure.message = `Limpeza parcial: ${removedIds.size} cópia(s) removida(s) antes da falha. ${failure.message || failure}`;
           throw failure;
         }
-        console.info('[Firestore] Auditoria de duplicatas concluída.', { candidateGroups, removed: removedIds.size, uid });
-        return { candidateGroups, removed: removedIds.size };
+        console.info('[Firestore] Auditoria de duplicatas concluída.', { candidateGroups, backfilled: hashUpdates.length, sameSourceDifferentContent, removed: removedIds.size, uid });
+        return { candidateGroups, backfilled: hashUpdates.length, sameSourceDifferentContent, removed: removedIds.size };
       },
 
       // Salva os Materiais de Estudo em users/{userId}/materiais_estudo/{materialId}
       async saveAllMaterials(materialsArray) {
         if (!Array.isArray(materialsArray)) return;
         const uid = this.getUserId();
+
+        // Calcula a assinatura criptográfica uma única vez, usando o texto
+        // integral que será persistido nos chunks. Materiais legados recebem
+        // o marcador quando forem sincronizados novamente.
+        for (const material of materialsArray) {
+          if (!material || typeof material !== 'object') continue;
+          const content = String(material.markdownText || material.conteudo_md || material.text || '');
+          if (!/^[a-f0-9]{64}$/i.test(material.contentHash || material.content_sha256 || '') && content) {
+            try { material.contentHash = await sha256Hex(content); }
+            catch (hashError) { console.warn('[Firestore] Não foi possível calcular o hash do conteúdo; o material será salvo sem o marcador.', hashError); }
+          }
+          if (material.source_file_sha256 && !material.sourceFileHash) material.sourceFileHash = material.source_file_sha256;
+        }
 
         if (this.hasAuthenticatedCloudSession(uid)) {
           try {
@@ -1746,6 +1834,8 @@
             const markdown = String(mat.markdownText || mat.conteudo_md || mat.text || '');
             const fingerprint = firestoreFingerprint({
               markdown,
+              contentHash: mat.contentHash || mat.content_sha256 || '',
+              sourceFileHash: mat.sourceFileHash || mat.source_file_sha256 || '',
               name: mat.name || mat.nome || '',
               subject: mat.subject || mat.disciplina || '',
               topic: mat.topic || mat.materia || '',
@@ -17618,7 +17708,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         showToast('⚠️ Entre novamente na conta Firebase antes de auditar materiais na nuvem.');
         return;
       }
-      const confirmed = confirm('Auditar e remover somente cópias exatamente idênticas?\n\nA comparação considera disciplina, nome e conteúdo integral. Arquivos com o mesmo nome, mas texto diferente, serão preservados. Imagens e o relatório mais completo serão mantidos na cópia principal.');
+      const confirmed = confirm('Auditar e remover cópias com conteúdo integral idêntico?\n\nA identificação usa SHA-256 do texto integral, sem depender do nome do arquivo. Os materiais antigos receberão esse marcador durante a auditoria. Novos uploads também guardam o hash do arquivo original. Mesmo arquivo com conteúdo salvo diferente será preservado. Imagens e o relatório mais completo serão mantidos.');
       if (!confirmed) return;
       showToast('🔎 Auditando cópias idênticas na nuvem...');
       try {
@@ -17626,9 +17716,10 @@ Retorne EXCLUSIVAMENTE um JSON:
         renderCurriculumGrid();
         if (typeof renderSlideSelectors === 'function') renderSlideSelectors();
         if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
+        const details = `${result.backfilled || 0} material(is) antigo(s) receberam marcador de conteúdo.${result.sameSourceDifferentContent ? ` ${result.sameSourceDifferentContent} grupo(s) do mesmo arquivo com texto diferente foram preservados.` : ''}`;
         showToast(result.removed > 0
-          ? `✅ ${result.removed} cópia(s) idêntica(s) removida(s); conteúdos diferentes foram preservados.`
-          : '✅ Auditoria concluída: não há cópias exatamente idênticas para remover.');
+          ? `✅ ${result.removed} cópia(s) idêntica(s) removida(s). ${details}`
+          : `✅ Auditoria concluída: nenhuma cópia integral idêntica para remover. ${details}`);
       } catch (error) {
         console.error('[Firestore] Falha na auditoria de duplicatas:', error);
         showToast(`⚠️ Não foi possível concluir a auditoria: ${error.message || 'erro de sincronização'}`);
@@ -19683,6 +19774,7 @@ DIRETRIZES CIRÚRGICAS:
         id: 'upload-mat-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
         name: finalTitle,
         originalFileName: currentMat.fileName,
+        sourceFileHash: String(currentMat.sourceFileHash || ''),
         sizeStr: currentMat.sizeStr || `${optimization.compressionStats.compressedSizeKB} KB`,
         type: (currentMat.fileName && currentMat.fileName.includes('.ppt')) ? 'slide' : 'doc',
         selected: true,
@@ -20053,11 +20145,15 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
           }
 
           const sizeMB = f.sizeMB || (f.size ? f.size / (1024 * 1024) : 1);
+          let sourceFileHash = '';
+          try { sourceFileHash = await sha256FileHex(f); }
+          catch (hashError) { console.warn(`[Upload MedTutor] Hash do arquivo original indisponível para "${f.name}":`, hashError); }
           queue.push({
             fileName: f.name,
             text: combinedText,
             sizeStr: f.sizeStr || `${sizeMB >= 1 ? sizeMB.toFixed(1) + ' MB' : Math.round(sizeMB * 1024) + ' KB'}`,
             file: f,
+            sourceFileHash,
             visualAssociationAuthorized,
             extractedImageCount
           });
