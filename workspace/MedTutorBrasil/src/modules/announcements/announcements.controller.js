@@ -48,6 +48,7 @@ function serializeAnnouncement(doc) {
     bannerUrl: data.bannerUrl ? String(data.bannerUrl) : '',
     bannerAlt: data.bannerAlt ? String(data.bannerAlt) : '',
     channels: { inApp: data.channels?.inApp !== false, email: data.channels?.email === true },
+    showProductHighlights: data.showProductHighlights === true,
     emailConsentPrompt: data.emailConsentPrompt === true,
     promptResponseRequired: data.promptResponseRequired === true,
     promptText: String(data.promptText || ''),
@@ -67,6 +68,7 @@ function validatePayload(body = {}) {
   const bannerUrl = String(body.bannerUrl || '').trim();
   const bannerAlt = String(body.bannerAlt || '').trim();
   const channels = { inApp: body.channels?.inApp === true, email: body.channels?.email === true };
+  const showProductHighlights = body.showProductHighlights === true;
   const emailConsentPrompt = body.emailConsentPrompt === true;
   const promptResponseRequired = body.promptResponseRequired === true;
   const promptText = String(body.promptText || '').trim();
@@ -75,12 +77,13 @@ function validatePayload(body = {}) {
   if (!description || description.length > 30000) throw Object.assign(new Error('Informe a descrição detalhada (até 30.000 caracteres).'), { statusCode: 400 });
   if (!channels.inApp && !channels.email) throw Object.assign(new Error('Selecione ao menos um canal de publicação.'), { statusCode: 400 });
   if (emailConsentPrompt && !channels.inApp) throw Object.assign(new Error('A pergunta de consentimento exige publicação no painel.'), { statusCode: 400 });
+  if (showProductHighlights && !channels.email) throw Object.assign(new Error('Os destaques do produto só podem ser enviados por e-mail.'), { statusCode: 400 });
   if (promptText.length > 300) throw Object.assign(new Error('A pergunta deve ter até 300 caracteres.'), { statusCode: 400 });
   if (bannerUrl && (!/^https:\/\//i.test(bannerUrl) || bannerUrl.length > 2048)) {
     throw Object.assign(new Error('O banner deve ser uma URL HTTPS válida ou ficar vazio.'), { statusCode: 400 });
   }
   if (bannerAlt.length > 300) throw Object.assign(new Error('O texto alternativo do banner deve ter até 300 caracteres.'), { statusCode: 400 });
-  return { kind, title, description, bannerUrl, bannerAlt, channels, emailConsentPrompt, promptResponseRequired, promptText };
+  return { kind, title, description, bannerUrl, bannerAlt, channels, showProductHighlights, emailConsentPrompt, promptResponseRequired, promptText };
 }
 
 function maskEmail(value) {
@@ -297,7 +300,8 @@ async function editPublication(req, res) {
     const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc(id);
     const doc = await ref.get();
     if (!doc.exists || doc.get('published') !== true) return res.status(404).json({ error: 'Publicação não encontrada.' });
-    await ref.update({ title, description, bannerUrl, bannerAlt, editedAt: new Date(), editedBy: adminUid });
+    const showProductHighlights = doc.get('channels.email') === true && req.body?.showProductHighlights === true;
+    await ref.update({ title, description, bannerUrl, bannerAlt, showProductHighlights, editedAt: new Date(), editedBy: adminUid });
     return res.json({ announcement: serializeAnnouncement(await ref.get()) });
   } catch (error) { return respondError(res, error); }
 }

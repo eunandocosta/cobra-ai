@@ -132,6 +132,7 @@
       bannerUrl: String(data.get('bannerUrl') || '').trim(),
       bannerAlt: String(data.get('bannerAlt') || '').trim(),
       channels: { inApp: data.has('sendInApp'), email: data.has('sendEmail') },
+      showProductHighlights: data.has('showProductHighlights'),
       emailConsentPrompt: data.has('emailConsentPrompt'),
       promptResponseRequired: data.has('promptResponseRequired'),
       promptText: String(data.get('promptText') || '').trim()
@@ -291,6 +292,8 @@
     form.elements.bannerAlt.value = item.bannerAlt || '';
     form.elements.sendInApp.checked = item.channels?.inApp !== false;
     form.elements.sendEmail.checked = item.channels?.email === true;
+    form.elements.showProductHighlights.checked = item.showProductHighlights === true;
+    form.elements.showProductHighlights.disabled = item.channels?.email !== true;
     form.elements.emailConsentPrompt.checked = false;
     form.elements.promptResponseRequired.checked = false;
     form.elements.sendInApp.disabled = true;
@@ -309,6 +312,7 @@
     editingPublicationId = '';
     form.reset(); form.elements.kind.value = 'update'; form.elements.sendInApp.checked = true;
     form.elements.sendInApp.disabled = false; form.elements.sendEmail.disabled = false; kindSelect.disabled = false;
+    form.elements.showProductHighlights.disabled = false;
     document.getElementById('annDistributionHint').textContent = 'Blog e entrada do usuário usam a mesma publicação. A entrada mostra somente a mais recente; uma nova substitui a anterior ainda não visualizada.';
     document.getElementById('annFormHeading').textContent = 'Novo aviso ou atualização';
     form.querySelector('[type="submit"]').textContent = 'Publicar';
