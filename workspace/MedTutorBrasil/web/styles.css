@@ -6326,6 +6326,7 @@
     .auth-session-mark {
       width: 56px;
       height: 56px;
+      position: relative;
       display: grid;
       place-items: center;
       border: 1px solid var(--border-accent);
@@ -6338,6 +6339,13 @@
     .auth-session-mark .icon {
       width: 28px;
       height: 28px;
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+      vertical-align: initial;
     }
 
     .auth-screen-overlay.auth-state-resolving .auth-card {
