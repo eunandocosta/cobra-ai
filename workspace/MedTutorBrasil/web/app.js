@@ -4015,6 +4015,48 @@
       }
     };
 
+    function createTabLoadingSkeleton(tabId) {
+      const layouts = {
+        chat: '<div class="tab-skeleton-head"><i class="tab-skeleton-block square"></i><i class="tab-skeleton-block short"></i><i class="tab-skeleton-block medium"></i></div><div class="tab-skeleton-chat"><i class="tab-skeleton-block bubble right"></i><i class="tab-skeleton-block bubble left"></i><i class="tab-skeleton-block bubble right compact"></i></div><i class="tab-skeleton-block composer"></i>',
+        flashcards: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><div class="tab-skeleton-grid two"><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i></div><i class="tab-skeleton-block study-card"></i><i class="tab-skeleton-block line wide"></i><i class="tab-skeleton-block composer"></i>',
+        quizzes: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><i class="tab-skeleton-block study-card"></i><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i>',
+        curriculum: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><div class="tab-skeleton-grid three"><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i></div><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i>',
+        sce: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><div class="tab-skeleton-grid two"><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i></div><i class="tab-skeleton-block panel tall"></i><i class="tab-skeleton-block panel"></i>',
+        challenges: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><i class="tab-skeleton-block composer"></i><i class="tab-skeleton-block panel tall"></i><i class="tab-skeleton-block panel"></i>'
+      };
+      const skeleton = document.createElement('div');
+      skeleton.className = `tab-loading-skeleton tab-loading-skeleton-${tabId}`;
+      skeleton.setAttribute('role', 'status');
+      skeleton.setAttribute('aria-label', `Carregando ${viewTitles[tabId] || 'conteúdo'}`);
+      skeleton.innerHTML = layouts[tabId] || layouts.chat;
+      return skeleton;
+    }
+
+    function renderTabWithLoadingState(tabId, targetTab, render) {
+      const skeleton = createTabLoadingSkeleton(tabId);
+      targetTab.querySelector('.tab-loading-skeleton')?.remove();
+      targetTab.classList.add('is-loading');
+      targetTab.appendChild(skeleton);
+      const startedAt = performance.now();
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (currentTab !== tabId || !skeleton.isConnected) {
+          skeleton.remove();
+          targetTab.classList.remove('is-loading');
+          return;
+        }
+        try {
+          render();
+        } catch (error) {
+          console.error(`[MedTutor UI] Falha ao abrir a seção ${tabId}:`, error);
+        }
+        const remaining = Math.max(260 - (performance.now() - startedAt), 0);
+        setTimeout(() => {
+          if (skeleton.isConnected) skeleton.remove();
+          targetTab.classList.remove('is-loading');
+        }, remaining);
+      }));
+    }
+
     function navigateTab(tabId, btn, options = {}) {
       if (MedTutorAuthService?.currentUser && MedTutorAuthService.accessGranted !== true) {
         setRoutePresentation('login');
@@ -4023,6 +4065,7 @@
       }
       const targetTab = document.getElementById('tab-' + tabId);
       if (!targetTab) return;
+      const tabChanged = currentTab !== tabId;
       currentTab = tabId;
       MedTutorStudyTimeTracker.onViewChanged(tabId);
       document.querySelector('.view-content')?.classList.toggle('chat-view-active', tabId === 'chat');
@@ -4036,23 +4079,27 @@
       if (btn) btn.classList.add('active');
       document.querySelectorAll(`.nav-link[onclick*="${tabId}"], .mobile-nav-btn[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
 
-      if (tabId === 'sce') {
-        renderSceTimeline();
-        renderSceBars();
-      }
-      if (tabId === 'challenges' && typeof MedTutorChallengesService !== 'undefined') {
-        MedTutorChallengesService.initChallengesTab();
-      }
-      if (tabId === 'flashcards' && typeof renderSharedStudyItems === 'function') {
-        // A sessão começa pelo que vence primeiro; sem pendências, libera os inéditos de hoje.
-        const queueCounts = !options.preserveStudyContext && typeof getSrsQueueCounts === 'function' ? getSrsQueueCounts(getFilteredQuestions()) : null;
-        if (queueCounts) {
-          srsQueueFilter = queueCounts.due > 0 ? 'due'
-            : (queueCounts.new > 0 ? 'new' : (queueCounts.tomorrow > 0 ? 'tomorrow' : 'upcoming'));
-          currentCardIndex = 0;
+      const renderTabContent = () => {
+        if (tabId === 'sce') {
+          renderSceTimeline();
+          renderSceBars();
+        } else if (tabId === 'challenges' && typeof MedTutorChallengesService !== 'undefined') {
+          MedTutorChallengesService.initChallengesTab();
+        } else if (tabId === 'flashcards' && typeof renderSharedStudyItems === 'function') {
+          // A sessão começa pelo que vence primeiro; sem pendências, libera os inéditos de hoje.
+          const queueCounts = !options.preserveStudyContext && typeof getSrsQueueCounts === 'function' ? getSrsQueueCounts(getFilteredQuestions()) : null;
+          if (queueCounts) {
+            srsQueueFilter = queueCounts.due > 0 ? 'due'
+              : (queueCounts.new > 0 ? 'new' : (queueCounts.tomorrow > 0 ? 'tomorrow' : 'upcoming'));
+            currentCardIndex = 0;
+          }
+          renderSharedStudyItems();
+        } else {
+          renderActiveTabContent();
         }
-        renderSharedStudyItems();
-      }
+      };
+      if (tabChanged && !options.skipLoadingSkeleton) renderTabWithLoadingState(tabId, targetTab, renderTabContent);
+      else renderTabContent();
       if (!options.skipRoute && APP_ROUTE_BY_TAB[tabId]) {
         setAppRoute(APP_ROUTE_BY_TAB[tabId]);
         setRoutePresentation('app');
@@ -27238,7 +27285,7 @@ Para cada material, retorne um objeto no JSON com:
       const loadingBubble = document.createElement('div');
       loadingBubble.className = 'chat-bubble tutor chat-response-loading';
       loadingBubble.setAttribute('aria-live', 'polite');
-      loadingBubble.innerHTML = `<div class="tutor-header"><span class="sparkle-icon">✦</span><span>MedTutor AI</span></div><div style="display:flex;align-items:center;gap:9px;padding:8px 2px;color:var(--text-secondary);font-size:13px;"><span class="loader-spinner" style="width:18px;height:18px;border-width:2px;flex:0 0 auto;"></span><span>Elaborando uma resposta fundamentada…</span></div>`;
+      loadingBubble.innerHTML = `<div class="tutor-header"><span class="sparkle-icon">✦</span><span>MedTutor AI</span></div><div class="chat-response-skeleton" role="status" aria-label="Elaborando uma resposta fundamentada"><i></i><i></i><i></i></div><span class="chat-response-loading-label">Elaborando uma resposta fundamentada…</span>`;
       flow.appendChild(loadingBubble);
       flow.scrollTop = flow.scrollHeight;
 

@@ -535,6 +535,140 @@
       height: 100%;
     }
 
+    .tab-section.is-loading {
+      position: relative;
+      min-height: min(680px, 72vh);
+      isolation: isolate;
+    }
+
+    .tab-section.is-loading > :not(.tab-loading-skeleton) {
+      visibility: hidden !important;
+    }
+
+    .tab-loading-skeleton {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 100%;
+      min-height: 100%;
+      padding: clamp(8px, 1.4vw, 20px);
+      overflow: hidden;
+      pointer-events: none;
+      animation: tab-skeleton-enter .18s ease-out both;
+    }
+
+    .tab-skeleton-head,
+    .tab-skeleton-grid {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .tab-skeleton-head { align-items: center; min-height: 38px; }
+    .tab-skeleton-grid > .tab-skeleton-block { flex: 1 1 0; }
+    .tab-skeleton-grid.three { flex-wrap: wrap; }
+
+    .tab-skeleton-block {
+      position: relative;
+      display: block;
+      flex: 0 0 auto;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      background: var(--surface-2);
+      background: color-mix(in srgb, var(--surface-2) 78%, var(--bg-card));
+    }
+
+    .tab-skeleton-block::after {
+      position: absolute;
+      inset: 0;
+      content: '';
+      transform: translateX(-115%);
+      background: linear-gradient(105deg, transparent 25%, rgba(255,255,255,.09) 45%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.08) 55%, transparent 75%);
+      animation: tab-skeleton-shimmer 1.35s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    .tab-skeleton-block.short { width: clamp(70px, 14%, 150px); height: 28px; }
+    .tab-skeleton-block.medium { width: clamp(150px, 34%, 340px); height: 30px; }
+    .tab-skeleton-block.square { width: 36px; height: 36px; border-radius: 50%; }
+    .tab-skeleton-block.line { width: 42%; height: 13px; border: 0; border-radius: 7px; }
+    .tab-skeleton-block.line.wide { width: 72%; }
+    .tab-skeleton-block.composer { width: 100%; height: 58px; border-radius: 22px; }
+    .tab-skeleton-block.panel { min-height: 120px; border-radius: 16px; }
+    .tab-skeleton-block.panel.tall { min-height: 250px; }
+    .tab-skeleton-block.study-card { width: min(100%, 820px); min-height: 320px; align-self: center; border-radius: 24px; }
+    .tab-skeleton-chat { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: center; gap: 22px; min-height: 260px; padding: 12px 2%; }
+    .tab-skeleton-block.bubble { width: min(72%, 660px); min-height: 76px; border-radius: 22px; }
+    .tab-skeleton-block.bubble.right { align-self: flex-end; }
+    .tab-skeleton-block.bubble.left { align-self: flex-start; }
+    .tab-skeleton-block.bubble.compact { width: min(52%, 470px); min-height: 52px; }
+
+    @keyframes tab-skeleton-shimmer {
+      0% { transform: translateX(-115%); }
+      100% { transform: translateX(115%); }
+    }
+
+    @keyframes tab-skeleton-enter {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .chat-response-skeleton {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: min(100%, 720px);
+      padding: 10px 0 4px;
+    }
+
+    .chat-response-skeleton i {
+      position: relative;
+      display: block;
+      height: 13px;
+      max-width: 100%;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .chat-response-skeleton i:nth-child(1) { width: 94%; }
+    .chat-response-skeleton i:nth-child(2) { width: 78%; }
+    .chat-response-skeleton i:nth-child(3) { width: 56%; }
+
+    .chat-response-skeleton i::after {
+      position: absolute;
+      inset: 0;
+      content: '';
+      transform: translateX(-115%);
+      background: linear-gradient(105deg, transparent 25%, rgba(255,255,255,.1) 45%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.08) 55%, transparent 75%);
+      animation: tab-skeleton-shimmer 1.35s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    .chat-response-loading-label {
+      display: block;
+      margin-top: 4px;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .tab-section.is-loading { min-height: 58vh; }
+      .tab-loading-skeleton { gap: 12px; padding: 10px 4px; }
+      .tab-skeleton-grid { flex-direction: column; }
+      .tab-skeleton-grid > .tab-skeleton-block { min-height: 82px; }
+      .tab-skeleton-grid.three { flex-direction: row; }
+      .tab-skeleton-grid.three > .tab-skeleton-block { min-width: calc(50% - 6px); min-height: 96px; }
+      .tab-skeleton-block.study-card { min-height: 260px; }
+      .tab-skeleton-block.panel.tall { min-height: 180px; }
+      .tab-skeleton-block.bubble { width: 86%; }
+    }
+
     /* O SCE contém blocos verticais próprios e deve rolar junto com a página. */
     #tab-sce.tab-section.active {
       height: auto;
