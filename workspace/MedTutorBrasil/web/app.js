@@ -8513,7 +8513,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         pergunta: candidate.question,
         gabarito: candidate.correctLetter,
         resposta: candidate.correctAnswer,
-        evidência: candidate.sourceEvidence
+        evidência_modelo: candidate.modelEvidence,
+        trecho_recuperado_da_fonte: candidate.retrievedSourcePassage || candidate.sourceEvidence,
+        métricas_de_ancoragem: candidate.groundingMetrics
       })));
       candidates.forEach(candidate => {
         console.info(`Candidata ${candidate.candidate}: alternativas e detalhes`, candidate);

@@ -128,7 +128,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     });
     assert.strictEqual(groundedBatch.length, 1, 'Questão de outro assunto deve ser rejeitada, mesmo se o modelo disser que veio da fonte');
     assert.match(groundedBatch[0].question, /paramentação/i);
-    assert.strictEqual(groundedBatch[0].sourceEvidence, 'Gorro primeiro; máscara e óculos; avental estéril; luvas estéreis.');
+    assert.strictEqual(groundedBatch[0].sourceEvidence, 'Paramentação cirúrgica: gorro primeiro, cobrindo todo o cabelo; máscara e óculos; avental estéril; luvas estéreis por último.');
     console.log('  [PASS] Questão fora do tema é rejeitada individualmente por falta de evidência alinhada ao texto-base');
 
     const trochlearEvidence = 'O nervo troclear é o único nervo craniano que emerge dorsalmente do tronco encefálico.';
@@ -147,6 +147,25 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(paraphrasedGroundedQuestion.length, 1, 'Paráfrase didática ancorada por evidência literal não deve ser rejeitada por diferença lexical');
     assert.strictEqual(paraphrasedGroundedQuestion.generationDiagnostics.candidates[0].status, 'accepted');
     console.log('  [PASS] Paráfrase com resposta e evidência ancoradas no material passa pela validação lexical tolerante');
+
+    const brainstemSource = 'O tronco encefálico é formado por mesencéfalo, ponte e bulbo, que conectam o diencéfalo à medula espinal.';
+    mockQuestions = [
+      {
+        ...makeQuestion('Quais são as três principais divisões macroscópicas do tronco encefálico?', 0, 'nova_a_partir_da_fonte', 'Mesencéfalo, ponte e bulbo'),
+        evidencia_fonte: 'As três partes anatômicas listadas no slide.'
+      }
+    ];
+    const paraphrasedModelEvidence = await quizzesService.generateQuestions({
+      materialText: brainstemSource,
+      materialName: 'Neuroanatomia do tronco encefálico',
+      quantidade: 1,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(paraphrasedModelEvidence.length, 1, 'Citação parafraseada do modelo não deve invalidar resposta sustentada pelo texto');
+    assert.strictEqual(paraphrasedModelEvidence[0].sourceEvidence, brainstemSource, 'A saída deve citar trecho literal recuperado do próprio material');
+    assert.match(paraphrasedModelEvidence.generationDiagnostics.candidates[0].modelEvidence, /slide/i);
+    assert.strictEqual(paraphrasedModelEvidence.generationDiagnostics.candidates[0].status, 'accepted');
+    console.log('  [PASS] Evidência parafraseada pelo modelo é substituída por citação literal recuperada do material');
 
     const kahootChromeMaterial = 'Kahoot — plataforma de quiz interativo. Zona restrita: acesso exclusivo da equipe paramentada. A paramentação cirúrgica segue esta ordem: gorro, máscara e óculos, avental estéril e luvas estéreis.';
     mockQuestions = [
@@ -231,12 +250,12 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(emptyValidationError.statusCode, 422);
     assert.strictEqual(emptyValidationError.code, 'QUIZ-EMPTY-VALIDATION');
     assert.strictEqual(emptyValidationError.diagnostics.rejected.insufficient_evidence, 1);
-    assert.strictEqual(emptyValidationError.diagnostics.rejected.evidence_reasons.evidence_not_in_source, 1);
+    assert.strictEqual(emptyValidationError.diagnostics.rejected.evidence_reasons.answer_not_grounded_in_source, 1);
     assert.strictEqual(emptyValidationError.diagnostics.candidates[0].status, 'rejected');
     assert.match(emptyValidationError.diagnostics.candidates[0].question, /estrutura conduz/);
     assert.strictEqual(emptyValidationError.diagnostics.candidates[0].correctAnswer, 'Trato corticoespinhal');
     assert.deepStrictEqual(emptyValidationError.diagnostics.candidates[0].rejectionReasons, [
-      'evidence:evidence_not_in_source',
+      'evidence:answer_not_grounded_in_source',
       'evidence:question_answer_weakly_linked_to_source'
     ]);
     assert.strictEqual(emptyValidationError.diagnostics.acceptedCount, 0);

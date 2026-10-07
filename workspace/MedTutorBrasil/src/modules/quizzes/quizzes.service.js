@@ -15,41 +15,100 @@ function normalizedSourceTokens(value) {
   return new Set(String(value || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .map(token => token.length > 4 && token.endsWith('s') ? token.slice(0, -1) : token)
     .filter(token => token.length >= 4 && !['qual', 'quais', 'como', 'esse', 'essa', 'isso', 'este', 'esta', 'para', 'pela', 'pelo', 'com', 'uma', 'seu', 'sua', 'sobre', 'entre', 'cada', 'deve', 'podem', 'quando', 'onde', 'porque', 'qualquer', 'mais', 'menos', 'apenas', 'tambem', 'cada'].includes(token)));
 }
 
-function isQuestionGroundedInMaterial(question, answer, evidence, materialText) {
-  const sourceTokens = normalizedSourceTokens(materialText);
-  const evidenceTokens = normalizedSourceTokens(evidence);
-  const relevantTokens = normalizedSourceTokens(`${question || ''} ${answer || ''}`);
-  const relevantEvidenceTokens = [...relevantTokens].filter(token => evidenceTokens.has(token));
-  const relevantSourceTokens = [...relevantTokens].filter(token => sourceTokens.has(token));
-  const evidenceMatches = [...evidenceTokens].filter(token => sourceTokens.has(token)).length;
-  const evidenceCoverage = evidenceTokens.size ? evidenceMatches / evidenceTokens.size : 0;
-  const relevantSourceCoverage = relevantTokens.size ? relevantSourceTokens.length / relevantTokens.size : 0;
-  const relevantEvidenceCoverage = relevantTokens.size ? relevantEvidenceTokens.length / relevantTokens.size : 0;
+function splitGroundingSegments(materialText) {
+  const paragraphs = String(materialText || '').replace(/\r/g, '').split(/\n{2,}/)
+    .map(text => text.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const segments = [];
+  paragraphs.forEach(paragraph => {
+    if (paragraph.length <= 1000) {
+      segments.push(paragraph);
+      return;
+    }
+    // Long OCR blocks often contain several independent slide bullets. Scan
+    // overlapping windows so evidence can be recovered without trusting the
+    // model's description of where it saw the fact.
+    const step = 650;
+    for (let start = 0; start < paragraph.length; start += step) {
+      const segment = paragraph.slice(start, start + 1000).trim();
+      if (segment) segments.push(segment);
+      if (start + 1000 >= paragraph.length) break;
+    }
+  });
+  // OCR commonly puts the concept, its label, and its definition on adjacent
+  // lines. Join neighboring lines as a bounded local passage, not the whole file.
+  const lines = String(materialText || '').replace(/\r/g, '').split('\n')
+    .map(text => text.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  for (let index = 0; index < lines.length; index++) {
+    const segment = lines.slice(index, index + 3).join(' ').slice(0, 1000);
+    if (segment) segments.push(segment);
+  }
+  return [...new Set(segments)];
+}
 
-  // Exija evidência textual realmente presente no material, mas não cobre
-  // similaridade lexical alta do enunciado inteiro: paráfrases legítimas
-  // frequentemente usam vocabulário diferente do trecho-fonte.
+function buildGroundingIndex(materialText) {
+  const segments = splitGroundingSegments(materialText).map(text => ({ text, tokens: normalizedSourceTokens(text) }));
+  return { segments, sourceTokens: normalizedSourceTokens(materialText) };
+}
+
+function isQuestionGroundedInMaterial(question, answer, evidence, groundingIndex) {
+  const answerTokens = normalizedSourceTokens(answer);
+  const questionTokens = normalizedSourceTokens(question);
+  const relevantTokens = new Set([...answerTokens, ...questionTokens]);
+  const segments = groundingIndex.segments;
+  const sourceTokens = groundingIndex.sourceTokens;
+  const evidenceTokens = normalizedSourceTokens(evidence);
+  const evidenceInSourceCoverage = evidenceTokens.size
+    ? [...evidenceTokens].filter(token => sourceTokens.has(token)).length / evidenceTokens.size
+    : 0;
+
+  let best = { segment: '', answerMatches: [], questionMatches: [], answerCoverage: 0 };
+  for (const segment of segments) {
+    const tokens = segment.tokens;
+    const answerMatches = [...answerTokens].filter(token => tokens.has(token));
+    const questionMatches = [...questionTokens].filter(token => tokens.has(token));
+    const answerCoverage = answerTokens.size ? answerMatches.length / answerTokens.size : 0;
+    const score = answerCoverage * 10 + Math.min(questionMatches.length, 4) / 10;
+    const bestScore = best.answerCoverage * 10 + Math.min(best.questionMatches.length, 4) / 10;
+    if (score > bestScore) best = { segment: segment.text, answerMatches, questionMatches, answerCoverage };
+  }
+
+  // A model-generated evidence field may be a true paraphrase (“as partes no
+  // slide”) rather than a verbatim quote. Ground the answer independently in a
+  // short passage from the authoritative source and return that passage as the
+  // auditable citation. Require answer-specific overlap plus a question anchor;
+  // topic similarity alone can never validate an unsupported answer.
+  const minimumAnswerMatches = answerTokens.size <= 1 ? 1 : 2;
+  const minimumAnswerCoverage = answerTokens.size <= 2 ? 0.5 : 0.4;
+  const valid = answerTokens.size > 0
+    && best.answerMatches.length >= minimumAnswerMatches
+    && best.answerCoverage >= minimumAnswerCoverage
+    && best.questionMatches.length >= 1;
   const reasons = [];
-  if (evidenceTokens.size < 3) reasons.push('evidence_too_short');
-  if (relevantTokens.size < 2) reasons.push('question_or_answer_too_generic');
-  if (evidenceCoverage < 0.72) reasons.push('evidence_not_in_source');
-  if (relevantSourceTokens.length < 2 || relevantSourceCoverage < 0.12) reasons.push('question_answer_weakly_linked_to_source');
-  if (relevantEvidenceTokens.length < 1 || relevantEvidenceCoverage < 0.08) reasons.push('question_answer_weakly_linked_to_evidence');
+  if (answerTokens.size === 0 || relevantTokens.size < 2) reasons.push('question_or_answer_too_generic');
+  if (!valid) {
+    if (best.answerMatches.length < minimumAnswerMatches || best.answerCoverage < minimumAnswerCoverage) {
+      reasons.push('answer_not_grounded_in_source');
+    }
+    if (best.questionMatches.length < 1) reasons.push('question_answer_weakly_linked_to_source');
+  }
 
   return {
-    valid: reasons.length === 0,
+    valid,
     reasons,
+    evidence: valid ? best.segment : '',
     metrics: {
       evidenceTokenCount: evidenceTokens.size,
-      evidenceCoverage: Number(evidenceCoverage.toFixed(3)),
+      modelEvidenceSourceCoverage: Number(evidenceInSourceCoverage.toFixed(3)),
       relevantTokenCount: relevantTokens.size,
-      relevantSourceMatches: relevantSourceTokens.length,
-      relevantSourceCoverage: Number(relevantSourceCoverage.toFixed(3)),
-      relevantEvidenceMatches: relevantEvidenceTokens.length,
-      relevantEvidenceCoverage: Number(relevantEvidenceCoverage.toFixed(3))
+      answerTokenCount: answerTokens.size,
+      answerSourceMatches: best.answerMatches.length,
+      answerSourceCoverage: Number(best.answerCoverage.toFixed(3)),
+      questionSourceMatches: best.questionMatches.length,
+      retrievedEvidenceLength: best.segment.length
     }
   };
 }
@@ -957,11 +1016,9 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           platform_or_interface: 0,
           insufficient_evidence: 0,
           evidence_reasons: {
-            evidence_too_short: 0,
             question_or_answer_too_generic: 0,
-            evidence_not_in_source: 0,
-            question_answer_weakly_linked_to_source: 0,
-            question_answer_weakly_linked_to_evidence: 0
+            answer_not_grounded_in_source: 0,
+            question_answer_weakly_linked_to_source: 0
           },
           invalid_or_incomplete_stem: 0,
           duplicate_question_or_answer: 0,
@@ -977,12 +1034,14 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           alternatives,
           correctLetter: String(question?.gabarito || '').toUpperCase(),
           correctAnswer: String(question?.texto_resposta_correta || alternatives[correctIndex] || ''),
-          sourceEvidence: String(question?.evidencia_fonte || ''),
+          modelEvidence: String(question?.evidencia_fonte || ''),
+          sourceEvidence: '',
           section: String(question?.secao_origem || ''),
           status: 'validating',
           rejectionReasons: []
         };
       });
+      const materialGroundingIndex = buildGroundingIndex(materialText);
       const markCandidateRejected = (index, reason) => {
         const candidate = candidateAudit[index];
         if (!candidate) return;
@@ -1025,8 +1084,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           return null;
         }
         const grounding = !canReuseSource
-          ? isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialText)
+          ? isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialGroundingIndex)
           : { valid: true, reasons: [], metrics: {} };
+        if (!canReuseSource && candidateAudit[questionIndex]) {
+          candidateAudit[questionIndex].retrievedSourcePassage = grounding.evidence || '';
+          candidateAudit[questionIndex].groundingMetrics = grounding.metrics;
+        }
         if (!grounding.valid) {
           validationDiagnostics.rejected.insufficient_evidence++;
           grounding.reasons.forEach(reason => markCandidateRejected(questionIndex, `evidence:${reason}`));
@@ -1041,6 +1104,9 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
             metrics: grounding.metrics
           });
           return null;
+        }
+        if (!canReuseSource && candidateAudit[questionIndex]) {
+          candidateAudit[questionIndex].sourceEvidence = grounding.evidence;
         }
 
         return {
@@ -1204,7 +1270,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           topic: cleanTopic,
           disease: cleanDisease,
           sectionOrigin: rawSection || cleanTopic,
-          sourceEvidence: String(q.evidencia_fonte || '').trim(),
+          sourceEvidence: String(candidateAudit[q.__auditIndex]?.sourceEvidence || q.evidencia_fonte || '').trim(),
           flashcardTitle,
           flashcard: {
             title: flashcardTitle,
