@@ -275,6 +275,29 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert(networkQuestions.generationDiagnostics.candidates[0].rejectionReasons.includes('unresolved_question_context'));
     console.log('  [PASS] Comparação "rede e não pirâmide" exige contexto explícito do SUS no próprio enunciado');
 
+    const universalAccessSource = 'Após a Constituição Federal de 1988, o SUS assegura acesso universal à saúde para toda a população brasileira.';
+    mockQuestions = [
+      {
+        ...makeQuestion('Ela pode procurar o sistema público de saúde?', 0, 'nova_a_partir_da_fonte', 'Sim, o SUS assegura acesso universal à saúde para toda a população brasileira'),
+        evidencia_fonte: universalAccessSource
+      },
+      {
+        ...makeQuestion('Após a Constituição Federal de 1988, toda pessoa no Brasil pode procurar o SUS pelo princípio do acesso universal à saúde?', 0, 'nova_a_partir_da_fonte', 'Sim, o SUS assegura acesso universal à saúde para toda a população brasileira'),
+        evidencia_fonte: universalAccessSource
+      }
+    ];
+    const accessQuestions = await quizzesService.generateQuestions({
+      materialText: universalAccessSource,
+      materialName: 'Acesso ao SUS pós-1988',
+      quantidade: 2,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(accessQuestions.length, 1, 'Pronome sem antecedente deve ser rejeitado, sem eliminar a pergunta que nomeia população e período');
+    assert.match(accessQuestions[0].question, /toda pessoa no Brasil/);
+    assert.strictEqual(accessQuestions.generationDiagnostics.rejected.invalid_or_incomplete_stem, 1);
+    assert(accessQuestions.generationDiagnostics.candidates[0].rejectionReasons.includes('unresolved_question_context'));
+    console.log('  [PASS] Pronome "ela" sem referente é rejeitado; pergunta contextualizada sobre acesso universal permanece');
+
     mockQuestions = [
       {
         ...makeQuestion('Qual estrutura conduz o impulso nervoso até o córtex cerebral?', 0, 'nova_a_partir_da_fonte', 'Trato corticoespinhal'),
