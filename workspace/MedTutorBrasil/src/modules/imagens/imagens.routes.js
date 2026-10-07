@@ -7,6 +7,7 @@ const imagensController = require('./imagens.controller');
 router.post('/buscar', withAccess((req, res) => imagensController.search(req, res)));
 router.post('/curar', withAccess((req, res) => imagensController.curate(req, res)));
 router.post('/analisar-associacao-visual', withAccess((req, res) => imagensController.analyzeVisualAssociation(req, res)));
+router.post('/analisar-associacao-visual-lote', withAccess((req, res) => imagensController.analyzeVisualAssociationBatch(req, res)));
 router.post('/analisar-mapeamento-material', withAccess((req, res) => imagensController.analyzeMaterialMapping(req, res)));
 
 module.exports = router;

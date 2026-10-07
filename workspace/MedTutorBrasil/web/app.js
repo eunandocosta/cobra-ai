@@ -1291,7 +1291,11 @@
         clinicalLabel: image?.clinicalLabel || '',
         visualAssociation: image?.visualAssociation || '',
         visibleStructures: Array.isArray(image?.visibleStructures) ? image.visibleStructures.slice(0, 20) : [],
-        studyQuestion: image?.studyQuestion || ''
+        studyQuestion: image?.studyQuestion || '',
+        transcription: image?.transcription || '',
+        visualAnalysisCaution: image?.visualAnalysisCaution || '',
+        visualAnalysisModel: image?.visualAnalysisModel || '',
+        visualAnalysisCompleted: Boolean(image?.visualAnalysisCompleted)
       }));
       return {
         id: docId,
@@ -2471,6 +2475,63 @@
           } catch (err) {
             console.warn('[Firestore] Erro ao atualizar material no Firestore:', err);
           }
+        }
+      },
+
+      async saveMaterialVisualAssociations(materialId, associations, sourceImages = []) {
+        if (!materialId || !Array.isArray(associations) || !associations.length) return false;
+        const uid = this.getUserId();
+        const material = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(item => item.id === materialId);
+        const existing = [sourceImages, material?.clinicalImages, material?.figuras_clinicas]
+          .filter(Array.isArray).sort((left, right) => right.length - left.length)[0] || [];
+        const images = existing.map(image => ({ ...image }));
+        associations.forEach(association => {
+          const index = Number(association.sourceImageIndex);
+          if (!Number.isInteger(index) || index < 0 || index >= images.length || !association.analyzed) return;
+          images[index] = {
+            ...images[index],
+            title: association.title || images[index].title || '',
+            visualAssociation: association.association || '',
+            visibleStructures: Array.isArray(association.visibleStructures) ? association.visibleStructures : [],
+            studyQuestion: association.studyQuestion || '',
+            transcription: association.transcription || '',
+            visualAnalysisCaution: association.caution || '',
+            visualAnalysisModel: association.model || '',
+            visualAnalysisCompleted: true
+          };
+        });
+        if (material) {
+          material.clinicalImages = images;
+          material.figuras_clinicas = images;
+          try { await MedTutorLocalDB.set('materials', uid, chatDriveMaterials); } catch (error) {
+            console.warn('[Firestore Visual] Não foi possível atualizar o cache local das figuras:', error);
+          }
+        }
+        if (!this.hasAuthenticatedCloudSession(uid)) return Boolean(material);
+        const safeImages = images.map(image => ({
+          title: String(image?.title || '').slice(0, 180),
+          source: String(image?.source || '').slice(0, 500),
+          imageUrl: /^https?:\/\//.test(image?.imageUrl || '') ? image.imageUrl : '',
+          thumbnailUrl: /^https?:\/\//.test(image?.thumbnailUrl || '') ? image.thumbnailUrl : '',
+          page: Number(image?.page) || null,
+          clinicalLabel: String(image?.clinicalLabel || '').slice(0, 500),
+          visualAssociation: String(image?.visualAssociation || '').slice(0, 1600),
+          visibleStructures: Array.isArray(image?.visibleStructures) ? image.visibleStructures.slice(0, 12).map(value => String(value).slice(0, 160)) : [],
+          studyQuestion: String(image?.studyQuestion || '').slice(0, 600),
+          transcription: String(image?.transcription || '').slice(0, 3000),
+          visualAnalysisCaution: String(image?.visualAnalysisCaution || '').slice(0, 500),
+          visualAnalysisModel: String(image?.visualAnalysisModel || '').slice(0, 80),
+          visualAnalysisCompleted: Boolean(image?.visualAnalysisCompleted)
+        }));
+        try {
+          await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').doc(materialId)
+            .set({ figuras_clinicas: safeImages, atualizadoEm: new Date().toISOString() }, { merge: true });
+          await this.markCloudDataRevision(uid);
+          console.info('[Firestore Visual] Análise visual vinculada ao material:', { materialId, paginasAnalisadas: associations.length });
+          return true;
+        } catch (error) {
+          console.error('[Firestore Visual] Falha ao persistir associações visuais:', { materialId, error: error?.message || String(error) });
+          throw error;
         }
       },
 
@@ -6321,6 +6382,142 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const encoded = canvas.toDataURL('image/jpeg', 0.72);
       return { mimeType: 'image/jpeg', data: encoded.split(',')[1] || '' };
+    }
+
+    function materialHasVisualAnalysis(image) {
+      return Boolean(image?.visualAnalysisCompleted || String(image?.transcription || '').trim() || String(image?.visualAssociation || '').trim()
+        || (Array.isArray(image?.visibleStructures) && image.visibleStructures.length));
+    }
+
+    function isImageOnlyStudyMaterial(text, images) {
+      if (!Array.isArray(images) || images.length === 0) return false;
+      const readable = String(text || '')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+        .replace(/^\s*\*?Figura\s+\d+[^\n]*$/gim, ' ')
+        .replace(/^\s*Material de estudo sem texto extra[ií]vel selecion[aá]vel\.?\s*$/gim, ' ')
+        .replace(/^\s*##?\s*(?:Figuras do Material Original|Imagens extra[ií]das do material)\s*$/gim, ' ')
+        .replace(/https?:\/\/\S+/g, ' ')
+        .replace(/[*#_`|()[\]{}>-]/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+      return readable.length < 180;
+    }
+
+    function buildSavedVisualEvidence(images) {
+      const analyzed = (Array.isArray(images) ? images : []).filter(materialHasVisualAnalysis);
+      if (!analyzed.length) return '';
+      return `\n\n# Evidências visuais analisadas do material original\nAs transcrições e descrições abaixo foram extraídas das imagens do próprio documento. Use somente o que estiver explícito nesta seção ou no texto-base; não complete trechos ilegíveis com conhecimento externo.\n\n${analyzed.map((image, index) => {
+        const page = Number(image.page) || index + 1;
+        return `## Página/imagem ${page}${image.title ? ` — ${image.title}` : ''}\n${image.transcription ? `Transcrição legível: ${image.transcription}\n` : ''}${Array.isArray(image.visibleStructures) && image.visibleStructures.length ? `Elementos visíveis: ${image.visibleStructures.join('; ')}\n` : ''}${image.visualAssociation ? `Descrição visual: ${image.visualAssociation}\n` : ''}${image.visualAnalysisCaution ? `Limitação: ${image.visualAnalysisCaution}\n` : ''}`.trim();
+      }).join('\n\n')}`;
+    }
+
+    async function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Não foi possível ler a imagem armazenada.'));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function analyzeSavedMaterialImagesForQuiz() {
+      const context = pendingValidatedStudyContext;
+      if (!context || context.actionType === 'report' || !Array.isArray(context.visualImages) || !context.visualImages.length) return;
+      if (context.visualAnalysisRunning) return;
+      const button = document.getElementById('btnAnalyzeSavedVisuals');
+      const alertEl = document.getElementById('validateModalQualityAlert');
+      context.visualAnalysisRunning = true;
+      if (button) { button.disabled = true; button.textContent = '⏳ Analisando páginas…'; }
+      const pending = context.visualImages.map((image, index) => ({ image, index }))
+        .filter(item => !materialHasVisualAnalysis(item.image));
+      let completed = context.visualImages.length - pending.length;
+      try {
+        for (let offset = 0; offset < pending.length; offset += 4) {
+          const batch = pending.slice(offset, offset + 4);
+          const status = document.getElementById('savedVisualAnalysisStatus');
+          if (status) status.textContent = `Analisando páginas ${completed + 1}–${completed + batch.length} de ${context.visualImages.length}…`;
+          if (button) button.textContent = `⏳ Analisando ${completed}/${context.visualImages.length}`;
+          const payloadImages = [];
+          for (const item of batch) {
+            const imageUrl = String(item.image?.imageUrl || item.image?.thumbnailUrl || item.image?.src || '');
+            if (!/^https?:\/\//i.test(imageUrl)) throw new Error(`A página ${item.image?.page || item.index + 1} não possui uma URL de imagem válida.`);
+            const response = await fetch(imageUrl, { mode: 'cors', credentials: 'omit' });
+            if (!response.ok) throw new Error(`Não foi possível carregar a página ${item.image?.page || item.index + 1} do armazenamento (HTTP ${response.status}).`);
+            const blob = await response.blob();
+            const image = await makeVisionSafeImage(await blobToDataUrl(blob));
+            payloadImages.push({ image, page: Number(item.image?.page) || item.index + 1, sourceImageIndex: item.index });
+          }
+          const response = await fetch('/api/imagens/analisar-associacao-visual-lote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: payloadImages, fileName: context.displayName || context.materialName, subject: context.subjectName })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !Array.isArray(result.associations)) {
+            throw new Error(result.details || result.error || `A análise visual falhou (HTTP ${response.status}).`);
+          }
+          if (typeof AppExpenseTracker !== 'undefined') {
+            AppExpenseTracker.recordAction({
+              actionName: `Análise visual de quiz: ${context.displayName || context.materialName} (${batch.length} páginas)`,
+              model: result.model || 'gemini-3.5-flash',
+              inputTokens: Number(result.usage?.inputTokens) || 0,
+              outputTokens: Number(result.usage?.outputTokens) || 0,
+              cachedTokens: Number(result.usage?.cachedTokens) || 0
+            });
+          }
+          if (result.associations.some(association => !association.analyzed)) {
+            throw new Error('O modelo não devolveu uma análise para todas as imagens do lote; nenhuma geração será liberada com leitura parcial.');
+          }
+          const analyzed = result.associations.map((association, index) => ({
+            ...association,
+            sourceImageIndex: payloadImages[index].sourceImageIndex,
+            model: result.model
+          }));
+          const updatedVisualImages = context.visualImages.map(image => ({ ...image }));
+          analyzed.forEach(association => {
+            updatedVisualImages[association.sourceImageIndex] = {
+              ...updatedVisualImages[association.sourceImageIndex],
+              title: association.title,
+              visualAssociation: association.association,
+              visibleStructures: association.visibleStructures,
+              studyQuestion: association.studyQuestion,
+              transcription: association.transcription,
+              visualAnalysisCaution: association.caution,
+              visualAnalysisModel: association.model,
+              visualAnalysisCompleted: true
+            };
+          });
+          const saved = await MedTutorFirebaseService.saveMaterialVisualAssociations(context.docId || context.firestoreMaterialId, analyzed, updatedVisualImages);
+          if (!saved) throw new Error('Não foi possível salvar a análise visual no material. Verifique a sessão do Firebase e tente novamente.');
+          context.visualImages = updatedVisualImages;
+          completed += batch.length;
+        }
+        context.visualEvidence = buildSavedVisualEvidence(context.visualImages);
+        context.visualAnalysisComplete = true;
+        const generateButton = document.getElementById('btnExecuteValidatedGeneration');
+        if (generateButton && MedTutorAuthService.accessGranted === true) generateButton.disabled = false;
+        if (alertEl) {
+          const status = document.getElementById('savedVisualAnalysisStatus');
+          if (status) status.textContent = `✅ ${context.visualImages.length} páginas analisadas; transcrições e descrições serão evidências do quiz.`;
+        }
+        if (button) { button.remove(); }
+        console.info('[MedTutor Quiz Visual] Análise completa das imagens do material:', {
+          code: 'QUIZ-VISUAL-EVIDENCE-READY', materialId: context.firestoreMaterialId,
+          pages: context.visualImages.length, evidenceChars: context.visualEvidence.length
+        });
+        showToast(`✅ ${context.visualImages.length} páginas visuais analisadas e vinculadas ao material.`);
+      } catch (error) {
+        console.error('[MedTutor Quiz Visual] Falha ao analisar imagens do material:', {
+          code: 'QUIZ-VISUAL-ANALYSIS-FAILED', materialId: context.firestoreMaterialId,
+          completed, total: context.visualImages.length, message: error?.message || String(error)
+        });
+        const status = document.getElementById('savedVisualAnalysisStatus');
+        if (status) status.textContent = `⚠️ Análise interrompida em ${completed}/${context.visualImages.length} páginas. ${error?.message || ''}`;
+        if (button) { button.disabled = false; button.textContent = `🖼️ Tentar novamente (${completed}/${context.visualImages.length})`; }
+        showToast(`⚠️ Não foi possível analisar todas as páginas: ${error?.message || 'erro visual'}`);
+      } finally {
+        context.visualAnalysisRunning = false;
+      }
     }
 
     // Executada somente com consentimento no checkbox de importação. Cada imagem
@@ -15012,7 +15209,12 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         displayName: config?.displayName || targetMat,
         docId: '',
         originalFirestoreText: '',
-        currentText: ''
+        currentText: '',
+        visualImages: [],
+        visualEvidence: '',
+        imageOnly: false,
+        visualAnalysisComplete: false,
+        visualAnalysisRunning: false
       };
 
       const modal = document.getElementById('modalValidateMaterialText');
@@ -15099,6 +15301,22 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       pendingValidatedStudyContext.docId = result?.docId || '';
       pendingValidatedStudyContext.originalFirestoreText = text;
       pendingValidatedStudyContext.currentText = text;
+      const persistedImages = Array.isArray(result?.data?.figuras_clinicas) ? result.data.figuras_clinicas
+        : Array.isArray(result?.data?.clinicalImages) ? result.data.clinicalImages
+          : Array.isArray(selectedMaterial?.clinicalImages) ? selectedMaterial.clinicalImages
+            : Array.isArray(selectedMaterial?.figuras_clinicas) ? selectedMaterial.figuras_clinicas : [];
+      const allVisualImages = [...persistedImages, ...extractPersistedImagesFromMarkdown(text)];
+      const deduplicatedVisualImages = [...new Map(allVisualImages.map((image, index) => {
+        const url = String(image?.imageUrl || image?.thumbnailUrl || image?.src || '');
+        return [url || `image-${index}`, image];
+      })).values()];
+      pendingValidatedStudyContext.visualImages = deduplicatedVisualImages.filter(image =>
+        /^https?:\/\//i.test(String(image?.imageUrl || image?.thumbnailUrl || image?.src || ''))
+      ).map(image => ({ ...image }));
+      pendingValidatedStudyContext.imageOnly = isImageOnlyStudyMaterial(text, pendingValidatedStudyContext.visualImages);
+      pendingValidatedStudyContext.visualAnalysisComplete = pendingValidatedStudyContext.visualImages.length > 0
+        && pendingValidatedStudyContext.visualImages.every(materialHasVisualAnalysis);
+      pendingValidatedStudyContext.visualEvidence = buildSavedVisualEvidence(pendingValidatedStudyContext.visualImages);
 
       // 3. Atualiza UI com o texto recuperado
       if (textareaEl) {
@@ -15112,11 +15330,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         };
       }
       const requiresFirebaseAuth = result?.source === 'auth_required';
+      const requiresVisualAnalysis = !isReportValidation && pendingValidatedStudyContext.imageOnly && !pendingValidatedStudyContext.visualAnalysisComplete;
       if (btnExec) {
-        btnExec.disabled = requiresFirebaseAuth;
+        btnExec.disabled = requiresFirebaseAuth || requiresVisualAnalysis;
         btnExec.innerHTML = requiresFirebaseAuth
           ? '<span>🔐</span> Entre no Firebase para continuar'
-          : (isReportValidation ? '<span>📄</span> Validar & Emitir Relatório' : `<span>🚀</span> Validar & Gerar ${qCount} Questões`);
+          : requiresVisualAnalysis
+            ? '<span>🖼️</span> Analise as imagens antes de gerar'
+            : isReportValidation
+              ? '<span>📄</span> Validar & Emitir Relatório'
+              : `<span>🚀</span> Validar & Gerar ${qCount} Questões`;
       }
 
       updateValidationModalStats(text);
@@ -15126,6 +15349,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           alertEl.style.background = 'rgba(255, 59, 48, 0.1)';
           alertEl.style.borderColor = 'rgba(255, 59, 48, 0.4)';
           alertEl.innerHTML = '🔐 <strong>Sessão Firebase necessária:</strong> entre com a conta Google que possui seus materiais. O app não usará uma síntese local como substituta do texto do Firestore.';
+        } else if (pendingValidatedStudyContext.imageOnly) {
+          alertEl.style.background = 'rgba(255, 170, 0, 0.1)';
+          alertEl.style.borderColor = 'rgba(255, 170, 0, 0.4)';
+          alertEl.innerHTML = `🖼️ <strong>Texto selecionável ausente ou insuficiente:</strong> Foram encontradas ${pendingValidatedStudyContext.visualImages.length} imagens; a validação das questões só será liberada depois de analisá-las.`;
         } else if (text.length >= 300) {
           alertEl.style.background = 'rgba(0, 255, 102, 0.08)';
           alertEl.style.borderColor = 'rgba(0, 255, 102, 0.3)';
@@ -15138,6 +15365,20 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           alertEl.style.background = 'rgba(255, 59, 48, 0.1)';
           alertEl.style.borderColor = 'rgba(255, 59, 48, 0.4)';
           alertEl.innerHTML = `⚠️ <strong>Nenhum texto encontrado no Firestore para esta aula:</strong> Cole ou digite o texto da aula no campo abaixo para prosseguir com a geração.`;
+        }
+        if (config?.actionType !== 'report' && pendingValidatedStudyContext.visualImages.length) {
+          const missingVisuals = pendingValidatedStudyContext.visualImages.filter(image => !materialHasVisualAnalysis(image)).length;
+          if (pendingValidatedStudyContext.imageOnly && missingVisuals) {
+            alertEl.insertAdjacentHTML('beforeend', `<div style="margin-top:8px"><strong>🖼️ Este material contém ${pendingValidatedStudyContext.visualImages.length} imagens e quase nenhum texto extraível.</strong> Para evitar que o quiz seja bloqueado ou invente respostas, analise as imagens do próprio documento. O conteúdo visual será enviado ao Gemini e salvo junto às figuras do material.</div>`);
+          } else if (missingVisuals) {
+            alertEl.insertAdjacentHTML('beforeend', '<div style="margin-top:8px">Este material também contém imagens ainda não analisadas. Você pode incluí-las como evidência visual.</div>');
+          }
+          if (missingVisuals) {
+            alertEl.insertAdjacentHTML('beforeend', `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn-outline-action" id="btnAnalyzeSavedVisuals" style="padding:8px 12px">🖼️ Analisar ${pendingValidatedStudyContext.visualImages.length} imagens</button><span id="savedVisualAnalysisStatus" role="status" style="color:var(--text-secondary)"></span></div>`);
+            document.getElementById('btnAnalyzeSavedVisuals')?.addEventListener('click', analyzeSavedMaterialImagesForQuiz);
+          } else if (pendingValidatedStudyContext.visualEvidence) {
+            alertEl.insertAdjacentHTML('beforeend', '<div id="savedVisualAnalysisStatus" role="status" style="margin-top:8px;color:var(--neon)">✅ Evidências visuais deste material já estão analisadas e serão usadas na geração.</div>');
+          }
         }
       }
     }
@@ -15172,7 +15413,17 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const validatedText = (textareaEl ? textareaEl.value : '').trim();
 
       const actionType = pendingValidatedStudyContext.actionType || 'study';
-      if (validatedText.length < (actionType === 'report' ? 500 : 30)) {
+      const visualEvidence = actionType === 'report' ? '' : (pendingValidatedStudyContext.visualEvidence || '');
+      if (actionType !== 'report' && pendingValidatedStudyContext.imageOnly && !pendingValidatedStudyContext.visualAnalysisComplete) {
+        showToast('🖼️ Este material é composto principalmente por imagens. Analise todas as páginas antes de gerar o quiz.');
+        return;
+      }
+      if (actionType !== 'report' && pendingValidatedStudyContext.imageOnly && !visualEvidence.trim()) {
+        showToast('⚠️ As imagens foram analisadas, mas não há texto legível suficiente para fundamentar questões. Revise o OCR ou envie o material em melhor resolução.');
+        return;
+      }
+      const generationText = [validatedText, visualEvidence].filter(Boolean).join('\n\n');
+      if (generationText.length < (actionType === 'report' ? 500 : 30)) {
         showToast(actionType === 'report'
           ? '⚠️ O relatório exige ao menos 500 caracteres do conteúdo clínico original.'
           : '⚠️ O texto precisa de pelo menos 30 caracteres para que a IA possa formular perguntas clínicas.');
@@ -15198,9 +15449,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       // Executa a geração com o texto estritamente validado
       if (materialName) {
-        await generateUnifiedStudyForMaterial(materialName, subjectName, count, config, validatedText);
+        await generateUnifiedStudyForMaterial(materialName, subjectName, count, config, generationText);
       } else {
-        await generateUnifiedStudyForSubject(subjectName, count, config, validatedText);
+        await generateUnifiedStudyForSubject(subjectName, count, config, generationText);
       }
     }
     window.executeValidatedGeneration = executeValidatedGeneration;

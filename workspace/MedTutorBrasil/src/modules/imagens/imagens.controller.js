@@ -56,6 +56,25 @@ class ImagensController {
     }
   }
 
+  async analyzeVisualAssociationBatch(req, res) {
+    try {
+      const { images, fileName, subject } = req.body || {};
+      if (!Array.isArray(images) || images.length < 1 || images.length > 4) {
+        return res.status(400).json({ error: 'Envie de 1 a 4 páginas por lote de análise visual.' });
+      }
+      const totalBytes = images.reduce((sum, item) => sum + Math.ceil(String(item?.image?.data || '').length * 0.75), 0);
+      if (totalBytes > 7_000_000) {
+        return res.status(413).json({ error: 'O lote de imagens excede o limite seguro de envio.' });
+      }
+      const result = await imagensService.analyzeVisualAssociationBatch({ images, fileName, subject });
+      console.info('✅ [Gemini Visual] Lote analisado:', { arquivo: String(fileName || '').slice(0, 180), paginas: images.length, modelo: result.model });
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('❌ [ImagensController] Erro no lote de associação visual:', err);
+      return res.status(500).json({ error: 'Erro ao interpretar lote visual do material', details: err.message });
+    }
+  }
+
   async analyzeMaterialMapping(req, res) {
     try {
       const { text, fileName, subject } = req.body || {};

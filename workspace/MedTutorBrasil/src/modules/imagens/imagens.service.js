@@ -81,6 +81,69 @@ Retorne JSON puro com: isVisualStudyMaterial (boolean), title (string curto), vi
     };
   }
 
+  async analyzeVisualAssociationBatch({ images, fileName = 'Material visual', subject = 'Medicina' }) {
+    if (!Array.isArray(images) || images.length < 1 || images.length > 4) {
+      throw new Error('Envie de 1 a 4 páginas por lote de análise visual.');
+    }
+    const genAI = getGenAI();
+    if (!genAI) throw new Error('GEMINI_API_KEY não configurada no servidor.');
+    const parts = [];
+    const pageMetadata = [];
+    for (let index = 0; index < images.length; index++) {
+      const item = images[index] || {};
+      const mimeType = String(item.image?.mimeType || 'image/jpeg').toLowerCase();
+      const data = String(item.image?.data || '').replace(/^data:[^;]+;base64,/, '');
+      if (!/^image\/(?:jpeg|jpg|png|webp)$/i.test(mimeType) || !data || data.length > 1_700_000) {
+        throw new Error(`A imagem ${index + 1} do lote é inválida ou excede o limite de análise.`);
+      }
+      const page = Number(item.page) || index + 1;
+      pageMetadata.push({ index: index + 1, page });
+      parts.push({ text: `PÁGINA ${index + 1} (página original ${page}):` });
+      parts.push({ inlineData: { mimeType, data } });
+    }
+
+    const modelOptions = {
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 6000 }
+    };
+    const prompt = `Você é um docente de anatomia e educação médica. Analise cada imagem anexada, na ordem indicada. O arquivo/disciplina são apenas contexto; a fonte factual exclusiva é o que estiver legível ou claramente representado nas próprias imagens.
+Arquivo: ${String(fileName).slice(0, 180)} | Disciplina: ${String(subject).slice(0, 180)}
+
+Para CADA página, devolva um objeto, sem omitir páginas. Se houver questão de prova/quiz, transcreva fielmente enunciado, alternativas e gabarito/indicação de resposta quando estiverem visíveis. Também transcreva rótulos legíveis e descreva somente estruturas e relações visíveis com segurança. Não complete lacunas com conhecimento externo. Se uma parte estiver ilegível, marque isso em caution e não a reconstrua. Se a imagem não tiver conteúdo educacional útil, marque isVisualStudyMaterial=false. Não invente numeração, rótulos ou relações anatômicas.
+Retorne JSON puro neste formato: {"items":[{"index":1,"page":1,"isVisualStudyMaterial":true,"title":"...","transcription":"Texto legível da página, incluindo perguntas e alternativas, sem inferências.","visibleStructures":["..."],"association":"Descrição factual concisa, apoiada no que está visível.","caution":"Incerteza, se houver.","studyQuestion":"Pergunta aberta respondível apenas pela página."}]}.
+Índices de entrada: ${JSON.stringify(pageMetadata)}`;
+    const generated = await generateContentWithFallback(genAI, modelOptions, [{ text: prompt }, ...parts], IMAGE_FLASH_MODELS, (model, payload) => runWithAiLimit(() => model.generateContent(payload)));
+    const visionResponse = generated.result.response;
+    const raw = visionResponse.text().replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { throw new Error('O Gemini retornou um lote visual em formato inválido.'); }
+    const byIndex = new Map((Array.isArray(parsed.items) ? parsed.items : []).map(item => [Number(item.index), item]));
+    const associations = pageMetadata.map(meta => {
+      const item = byIndex.get(meta.index);
+      if (!item) return { ...meta, analyzed: false, isVisualStudyMaterial: false, title: `Página ${meta.page}`, visibleStructures: [], association: '', caution: 'A página não recebeu análise válida.', studyQuestion: '' };
+      return {
+        ...meta,
+        analyzed: true,
+        isVisualStudyMaterial: Boolean(item.isVisualStudyMaterial),
+        title: String(item.title || `Página ${meta.page}`).slice(0, 180),
+        transcription: String(item.transcription || '').slice(0, 3000),
+        visibleStructures: Array.isArray(item.visibleStructures) ? item.visibleStructures.map(value => String(value).slice(0, 180)).slice(0, 8) : [],
+        association: String(item.association || '').slice(0, 1600),
+        caution: String(item.caution || '').slice(0, 500),
+        studyQuestion: String(item.studyQuestion || '').slice(0, 600)
+      };
+    });
+    const usage = visionResponse.usageMetadata || {};
+    return {
+      model: generated.modelName,
+      usage: {
+        inputTokens: Number(usage.promptTokenCount) || 0,
+        outputTokens: Number(usage.candidatesTokenCount) || 0,
+        cachedTokens: Number(usage.cachedContentTokenCount) || 0
+      },
+      associations
+    };
+  }
+
   async analyzeMaterialMapping({ text, fileName = 'Material', subject = '' }) {
     const genAI = getGenAI();
     if (!genAI) throw new Error('GEMINI_API_KEY não configurada no servidor.');
