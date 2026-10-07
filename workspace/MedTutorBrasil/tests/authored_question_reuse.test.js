@@ -192,6 +192,30 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     ].sort(), 'Alternativas autorais devem ser preservadas, não substituídas por perguntas sobre a interface');
     assert.strictEqual(kahootQuizPage[0].correctAnswerText, 'Gorro, máscara e óculos, avental estéril e luvas estéreis');
     console.log('  [PASS] Página Kahoot mantém enunciado, alternativas e gabarito da questão autoral');
+
+    mockQuestions = [
+      {
+        ...makeQuestion('Qual estrutura conduz o impulso nervoso até o córtex cerebral?', 0, 'nova_a_partir_da_fonte', 'Trato corticoespinhal'),
+        evidencia_fonte: 'O trato corticoespinhal conduz o impulso nervoso até o córtex cerebral.'
+      }
+    ];
+    let emptyValidationError;
+    try {
+      await quizzesService.generateQuestions({
+        materialText: 'A paramentação cirúrgica segue a ordem: gorro, máscara e óculos, avental estéril e luvas estéreis.',
+        materialName: 'Paramentação cirúrgica',
+        quantidade: 1,
+        difficulty: 'balanced'
+      });
+    } catch (error) {
+      emptyValidationError = error;
+    }
+    assert(emptyValidationError, 'Lote sem questões válidas deve expor erro diagnóstico em vez de resposta vazia silenciosa');
+    assert.strictEqual(emptyValidationError.statusCode, 422);
+    assert.strictEqual(emptyValidationError.code, 'QUIZ-EMPTY-VALIDATION');
+    assert.strictEqual(emptyValidationError.diagnostics.rejected.insufficient_evidence, 1);
+    assert.strictEqual(emptyValidationError.diagnostics.acceptedCount, 0);
+    console.log('  [PASS] Lote vazio retorna código e contagem da etapa de validação que rejeitou a questão');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;

@@ -926,6 +926,19 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       const questoes = JSON.parse(responseText);
       const pendingByIndex = new Map(authoredQuestionsMissingFromDeck.map(source => [source.index, source.question]));
       const usedSourceIndexes = new Set();
+      const validationDiagnostics = {
+        code: 'QUIZ-EMPTY-VALIDATION',
+        phase: 'post_generation_validation',
+        model: quizModel,
+        generatedCount: Array.isArray(questoes) ? questoes.length : 0,
+        rejected: {
+          platform_or_interface: 0,
+          insufficient_evidence: 0,
+          invalid_or_incomplete_stem: 0,
+          duplicate_question_or_answer: 0,
+          invalid_alternatives: 0
+        }
+      };
       const questoesNormalizadas = (Array.isArray(questoes) ? questoes : []).map(question => {
         const declaredSourceIndex = Number(question?.indice_questao_fonte);
         const responseStem = buildReusedQuestionStem(question?.pergunta || '');
@@ -953,6 +966,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           || question.alternativas?.[{ A: 0, B: 1, C: 2, D: 3 }[question.gabarito]]
           || '';
         if (!canReuseSource && isPlatformOrGenerationMetaQuestion(safeStem)) {
+          validationDiagnostics.rejected.platform_or_interface++;
           console.warn('⚠️ [Quiz Engine] Questão descartada: pergunta sobre plataforma/interface não é conteúdo didático do material.', {
             materialId: String(payload.materialId || ''),
             textFingerprint: materialFingerprint
@@ -961,6 +975,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         }
         if (!canReuseSource
           && !isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialText)) {
+          validationDiagnostics.rejected.insufficient_evidence++;
           console.warn('⚠️ [Quiz Engine] Questão descartada: evidência insuficiente ou incompatível com o texto-base.', {
             materialId: String(payload.materialId || ''),
             textFingerprint: materialFingerprint,
@@ -986,6 +1001,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       }).filter(question => {
         if (!question) return false;
         if (!question.pergunta) {
+          validationDiagnostics.rejected.invalid_or_incomplete_stem++;
           console.warn('⚠️ [Quiz Engine] Questão descartada individualmente: não foi possível deixá-la autocontida após validar o contexto e os localizadores visuais.');
           return false;
         }
@@ -994,9 +1010,13 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         // A extração já identificou esse texto como pergunta; validamos sua
         // origem e tamanho, mas não reescrevemos o estilo original do professor.
         if (question.origem_pergunta === 'reaproveitada_da_fonte') {
-          return isAuthoredQuestionCandidate(question.pergunta) && isSharedQuestionStemValid(question.pergunta);
+          const valid = isAuthoredQuestionCandidate(question.pergunta) && isSharedQuestionStemValid(question.pergunta);
+          if (!valid) validationDiagnostics.rejected.invalid_or_incomplete_stem++;
+          return valid;
         }
-        return isSharedQuestionStemValid(question.pergunta);
+        const valid = isSharedQuestionStemValid(question.pergunta);
+        if (!valid) validationDiagnostics.rejected.invalid_or_incomplete_stem++;
+        return valid;
       });
       const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
       const getCorrectAnswer = question => {
@@ -1015,12 +1035,20 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const repeatsPreviousAnswer = previousQuestionAnswers.some(previous =>
           areQuestionsTooSimilar(current, previous.question, currentAnswer, previous.answer)
         );
-        return !repeatsInBatch && !repeatsPreviousAnswer;
+        const unique = !repeatsInBatch && !repeatsPreviousAnswer;
+        if (!unique) validationDiagnostics.rejected.duplicate_question_or_answer++;
+        return unique;
       });
 
       if (questoesUnicas.length === 0) {
-        console.warn('⚠️ [Quiz Engine] Nenhuma questão válida e não redundante restou após a validação; itens problemáticos foram descartados individualmente.');
-        return [];
+        validationDiagnostics.acceptedCount = 0;
+        console.error('❌ [Quiz Engine] Lote vazio após validação.', validationDiagnostics);
+        const validationError = new Error('A IA respondeu, mas nenhuma questão passou pela validação de conteúdo, formato e redundância.');
+        validationError.statusCode = 422;
+        validationError.code = validationDiagnostics.code;
+        validationError.retryable = false;
+        validationError.diagnostics = validationDiagnostics;
+        throw validationError;
       }
 
       if (authoredSourceQuestions.length && !questoesUnicas.some(question => question.origem_pergunta === 'inspirada_na_fonte')) {
@@ -1031,6 +1059,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const correctIdx = letterToIndex[q.gabarito] ?? 0;
         const cleanAlternatives = Array.isArray(q.alternativas) ? q.alternativas : [];
         if (cleanAlternatives.length !== 4 || cleanAlternatives.some(option => !String(option || '').trim()) || correctIdx > 3) {
+          validationDiagnostics.rejected.invalid_alternatives++;
           return null;
         }
         const correctAnswer = q.texto_resposta_correta || cleanAlternatives[correctIdx] || '';
@@ -1129,9 +1158,18 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       }
 
       if (formatadas.length === 0) {
-        console.warn('⚠️ [Quiz Engine] Todas as questões deste lote foram inválidas; nenhuma foi salva.');
-        return [];
+        validationDiagnostics.acceptedCount = 0;
+        console.error('❌ [Quiz Engine] Nenhuma questão possuía alternativas válidas.', validationDiagnostics);
+        const validationError = new Error('A IA gerou questões, mas todas falharam na validação das quatro alternativas.');
+        validationError.statusCode = 422;
+        validationError.code = 'QUIZ-INVALID-OPTIONS';
+        validationError.retryable = false;
+        validationError.diagnostics = { ...validationDiagnostics, code: validationError.code };
+        throw validationError;
       }
+      validationDiagnostics.acceptedCount = formatadas.length;
+      validationDiagnostics.code = 'QUIZ-VALIDATION-SUMMARY';
+      console.info('ℹ️ [Quiz Engine] Resultado da validação do lote:', validationDiagnostics);
       if (authoredSourceQuestions.length && !formatadas.some(question => question.sourceQuestionOrigin === 'inspirada_na_fonte')) {
         console.warn('⚠️ [Quiz Engine] Questão inspirada ausente/inválida; as demais questões válidas serão mantidas.');
       }

@@ -40,7 +40,15 @@ class QuizzesController {
       return res.json(data);
     } catch (err) {
       console.error("❌ Erro capturado no QuizzesController:", err);
-      return res.status(500).json({ error: 'Erro ao gerar questões', details: err.message });
+      const status = Number.isInteger(err.statusCode) && err.statusCode >= 400 && err.statusCode < 500
+        ? err.statusCode : 500;
+      return res.status(status).json({
+        error: status === 422 ? 'As questões geradas não passaram pela validação.' : 'Erro ao gerar questões',
+        code: err.code || 'QUIZ-GENERATION-FAILED',
+        details: err.message,
+        retryable: err.retryable !== false,
+        diagnostics: err.diagnostics || undefined
+      });
     }
   }
 

@@ -8808,6 +8808,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     async function generateQuestionsViaBackend(materialText, metadata, config = {}, count = 1) {
+      window.__MEDTUTOR_QUIZ_LAST_ERROR__ = null;
       const acceptedStudyItems = config.acceptedStudyItems || [];
       const previousQuestions = acceptedStudyItems.map(item => item.question || item.pergunta || '').filter(Boolean).slice(-30);
       const previousQuestionAnswers = acceptedStudyItems.map(item => ({
@@ -8862,16 +8863,38 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !Array.isArray(data)) {
-          logQuizGenerationDebug('backend_generation_failed', { status: response.status, details: data?.details || data?.error || 'Resposta inválida' });
+          const failure = {
+            code: data?.code || (response.status === 422 ? 'QUIZ-BACKEND-VALIDATION-FAILED' : 'QUIZ-BACKEND-REQUEST-FAILED'),
+            status: response.status,
+            details: data?.details || data?.error || 'Resposta inválida',
+            retryable: data?.retryable !== false,
+            diagnostics: data?.diagnostics || null
+          };
+          window.__MEDTUTOR_QUIZ_LAST_ERROR__ = failure;
+          logQuizGenerationDebug('backend_generation_failed', failure);
           return null;
         }
+        const rejectionCounts = {
+          missing_or_fragmented_stem: 0,
+          invalid_question_stem: 0,
+          authored_question_missing_source: 0
+        };
         const items = data.map(item => {
           const sharedStem = removeUnsupportedVisualLocator(sanitizeSharedQuestionStem(item.question || item.pergunta || ''));
           const isAuthoredReuse = item.sourceQuestionOrigin === 'reaproveitada_da_fonte'
             || item.origem_pergunta === 'reaproveitada_da_fonte';
           if (isAuthoredReuse) {
-            if (!sharedStem || sharedStem.length < 18 || String(item.sourceQuestionText || '').trim().length < 18) return null;
-          } else if (!sharedStem || !isSharedQuestionStemValid(sharedStem)) return null;
+            if (!sharedStem || sharedStem.length < 18 || String(item.sourceQuestionText || '').trim().length < 18) {
+              rejectionCounts.authored_question_missing_source++;
+              return null;
+            }
+          } else if (!sharedStem) {
+            rejectionCounts.missing_or_fragmented_stem++;
+            return null;
+          } else if (!isSharedQuestionStemValid(sharedStem)) {
+            rejectionCounts.invalid_question_stem++;
+            return null;
+          }
           const itemDiff = ['iniciante', 'intermediario', 'avancado'].includes(item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             ? (item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)
             : 'iniciante';
@@ -8921,10 +8944,27 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
             evidence: { ...(item.evidence || {}), subject: metadata.subjectName || '', materialExcerpt: materialText.slice(0, 2400) }
           };
         }).filter(Boolean);
-        logQuizGenerationDebug('backend_generation_accepted', { model: items[0]?.generatorModel || 'backend-gemini', accepted: items.length, requestedDifficulty, imagesRequested: items.filter(item => item.requer_imagem).length, sourceOrigins: items.map(item => item.sourceQuestionOrigin || 'nova_a_partir_da_fonte') });
+        if (!items.length) {
+          window.__MEDTUTOR_QUIZ_LAST_ERROR__ = {
+            code: 'QUIZ-CLIENT-ALL-ITEMS-REJECTED',
+            status: response.status,
+            received: data.length,
+            rejectionCounts
+          };
+        }
+        logQuizGenerationDebug('backend_generation_accepted', {
+          model: items[0]?.generatorModel || data[0]?.generatorModel || 'backend-gemini',
+          received: data.length,
+          accepted: items.length,
+          rejected: rejectionCounts,
+          requestedDifficulty,
+          imagesRequested: items.filter(item => item.requer_imagem).length,
+          sourceOrigins: items.map(item => item.sourceQuestionOrigin || 'nova_a_partir_da_fonte')
+        });
         return items;
       } catch (error) {
-        logQuizGenerationDebug('backend_generation_exception', { message: error.message });
+        window.__MEDTUTOR_QUIZ_LAST_ERROR__ = { code: 'QUIZ-CLIENT-NETWORK-OR-PARSE-ERROR', message: error.message };
+        logQuizGenerationDebug('backend_generation_exception', { code: 'QUIZ-CLIENT-NETWORK-OR-PARSE-ERROR', message: error.message });
         return null;
       }
     }
@@ -9268,12 +9308,15 @@ ${cleanText}
           if (!Array.isArray(generated) || generated.length === 0) {
             consecutiveEmptyBatches++;
             logQuizGenerationDebug('generation_batch_empty', {
+              code: window.__MEDTUTOR_QUIZ_LAST_ERROR__?.code || 'QUIZ-BATCH-EMPTY-UNKNOWN',
+              backendError: window.__MEDTUTOR_QUIZ_LAST_ERROR__ || null,
               requestedItems: needed,
               acceptedItems: accepted.length,
               totalRequested: total,
-              consecutiveEmptyBatches
+              consecutiveEmptyBatches,
+              retryable: window.__MEDTUTOR_QUIZ_LAST_ERROR__?.retryable !== false
             });
-            if (consecutiveEmptyBatches >= 2) break;
+            if (window.__MEDTUTOR_QUIZ_LAST_ERROR__?.retryable === false || consecutiveEmptyBatches >= 2) break;
             continue;
           }
           const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
@@ -9296,8 +9339,10 @@ ${cleanText}
         }
 
         logQuizGenerationDebug('study_generation_finished', {
+          code: accepted.length ? 'QUIZ-GENERATION-PARTIAL' : (window.__MEDTUTOR_QUIZ_LAST_ERROR__?.code || 'QUIZ-GENERATION-EMPTY-UNKNOWN'),
           requestedItems: total,
           acceptedItems: accepted.length,
+          backendError: window.__MEDTUTOR_QUIZ_LAST_ERROR__ || null,
           generationMode: config.generationMode || 'sections',
           stoppedForNoUniqueContent: accepted.length < total
         });
@@ -9311,8 +9356,19 @@ ${cleanText}
     function generateLocalMedCopilotQuestions(materialName, subjectName, count, config = {}, slideText = '') {
       // O gerador heurístico usava títulos de arquivos e moldes genéricos, produzindo
       // conteúdo plausível porém não ancorado. Qualidade tem precedência sobre quantidade.
-      console.warn('[Estudo] Fallback heurístico desativado: gere somente após planejamento e validação do material.');
-      logQuizGenerationDebug('local_fallback_blocked', { materialName, subjectName, requestedItems: count });
+      console.warn('[Estudo] Fallback heurístico desativado para evitar questões sem evidência verificável.', {
+        code: 'QUIZ-LOCAL-FALLBACK-DISABLED',
+        cause: window.__MEDTUTOR_QUIZ_LAST_ERROR__?.code || 'QUIZ-NO-VALIDATED-PLAN',
+        backendError: window.__MEDTUTOR_QUIZ_LAST_ERROR__ || null
+      });
+      logQuizGenerationDebug('local_fallback_blocked', {
+        code: 'QUIZ-LOCAL-FALLBACK-DISABLED',
+        cause: window.__MEDTUTOR_QUIZ_LAST_ERROR__?.code || 'QUIZ-NO-VALIDATED-PLAN',
+        backendError: window.__MEDTUTOR_QUIZ_LAST_ERROR__ || null,
+        materialName,
+        subjectName,
+        requestedItems: count
+      });
       return [];
     }
 
