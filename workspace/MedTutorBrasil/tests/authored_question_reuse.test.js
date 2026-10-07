@@ -229,6 +229,29 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(kahootQuizPage[0].correctAnswerText, 'Gorro, máscara e óculos, avental estéril e luvas estéreis');
     console.log('  [PASS] Página Kahoot mantém enunciado, alternativas e gabarito da questão autoral');
 
+    const healthFinancingSource = 'No modelo de financiamento da saúde descrito para 1978, o atendimento era custeado pela população por meio de impostos.';
+    mockQuestions = [
+      {
+        ...makeQuestion('Quem provavelmente financiará seu atendimento?', 0, 'nova_a_partir_da_fonte', 'A população, por meio de impostos'),
+        evidencia_fonte: healthFinancingSource
+      },
+      {
+        ...makeQuestion('No modelo de financiamento da saúde descrito para 1978, quem custeava o atendimento?', 0, 'nova_a_partir_da_fonte', 'A população, por meio de impostos'),
+        evidencia_fonte: healthFinancingSource
+      }
+    ];
+    const contextualQuestions = await quizzesService.generateQuestions({
+      materialText: healthFinancingSource,
+      materialName: 'Financiamento da Saúde em 1978',
+      quantidade: 2,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(contextualQuestions.length, 1, 'Pergunta que depende de contexto implícito deve ser descartada sem perder a contextualizada');
+    assert.match(contextualQuestions[0].question, /1978/);
+    assert.strictEqual(contextualQuestions.generationDiagnostics.rejected.invalid_or_incomplete_stem, 1);
+    assert(contextualQuestions.generationDiagnostics.candidates[0].rejectionReasons.includes('unresolved_question_context'));
+    console.log('  [PASS] Pergunta vaga sobre "seu atendimento" é descartada; versão com período e modelo explícitos é mantida');
+
     mockQuestions = [
       {
         ...makeQuestion('Qual estrutura conduz o impulso nervoso até o córtex cerebral?', 0, 'nova_a_partir_da_fonte', 'Trato corticoespinhal'),

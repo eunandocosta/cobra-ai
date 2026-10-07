@@ -9002,6 +9002,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return true;
     }
 
+    function hasUnresolvedQuestionContext(stem) {
+      return /\b(?:seu|sua|seus|suas)\s+(?:atendimento|tratamento|cuidado|diagn[oó]stico|conduta|quadro|situa[cç][aã]o|doen[cç]a|sa[uú]de)\b/i.test(String(stem || ''));
+    }
+
     function removeUnsupportedVisualLocator(stem) {
       const locator = /\b(?:figura|fig\.?|imagem|prancha|tabela|quadro|diagrama|esquema|slide|p[aá]gina)\s*(?:(?:n[º°o.]?\s*)?\d+|abaixo|acima|anterior|seguinte|a seguir|anexa?|do material)\b/i;
       const prepositionalLocator = /\b(?:n[oa]|em|conforme|segundo)\s+(?:a|o)?\s*(?:figura|fig\.?|imagem|prancha|diagrama|esquema|slide|p[aá]gina)\b/i;
@@ -9112,6 +9116,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const rejectionCounts = {
           missing_or_fragmented_stem: 0,
           invalid_question_stem: 0,
+          unresolved_question_context: 0,
           authored_question_missing_source: 0,
           authored_question_metadata_missing_but_server_validated: 0
         };
@@ -9131,8 +9136,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           } else if (!sharedStem) {
             rejectionCounts.missing_or_fragmented_stem++;
             return null;
-          } else if (!isSharedQuestionStemValid(sharedStem)) {
-            rejectionCounts.invalid_question_stem++;
+          } else if (!isSharedQuestionStemValid(sharedStem) || hasUnresolvedQuestionContext(sharedStem)) {
+            if (hasUnresolvedQuestionContext(sharedStem)) rejectionCounts.unresolved_question_context++;
+            else rejectionCounts.invalid_question_stem++;
             return null;
           }
           const itemDiff = ['iniciante', 'intermediario', 'avancado'].includes(item.difficultyLevel || item.nivel_dificuldade || item.cognitiveLevel)

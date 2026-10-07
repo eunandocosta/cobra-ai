@@ -351,6 +351,13 @@ function isSharedQuestionStemValid(stem) {
   return true;
 }
 
+// O título do card e as perguntas anteriores não acompanham o flashcard em
+// todos os contextos. Evite enunciados que falam diretamente com o aluno e
+// deixam implícito de quem é o atendimento/tratamento perguntado.
+function hasUnresolvedQuestionContext(stem) {
+  return /\b(?:seu|sua|seus|suas)\s+(?:atendimento|tratamento|cuidado|diagn[oó]stico|conduta|quadro|situa[cç][aã]o|doen[cç]a|sa[uú]de)\b/i.test(String(stem || ''));
+}
+
 function buildSafeFlashcardTitle(title, correctAnswer) {
   const candidate = String(title || '').replace(/\s+/g, ' ').trim();
   const normalize = value => String(value || '').normalize('NFD')
@@ -660,6 +667,7 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E GERAÇÃO POR SEÇÕES:
 7. Comece pelo entendimento direto do conteúdo. Use situação clínica somente se ela estiver descrita na fonte e o nível solicitado for avançado; mesmo nesse caso, mantenha uma única decisão conceitual simples.
 8. Não use rótulos editoriais como "caso 1" ou "caso clínico X" sem contexto. Quando uma questão da fonte referir-se a um caso numerado, encontre os dados clínicos correspondentes no material e incorpore-os ao enunciado, sem citar a numeração. Não apague a questão apenas para retirar o rótulo; se não houver contexto suficiente, omita só essa questão e preserve as demais válidas.
 9. O aluno não tem acesso ao documento; o enunciado deve ser 100% autocontido no contexto médico/biológico real. Cada pergunta precisa ser uma frase interrogativa completa, iniciar com letra maiúscula e terminar com "?". Não devolva fragmentos de frases, continuações entre parênteses, reticências ou trechos iniciados por conjunções/preposições; se não conseguir reconstruir o enunciado completo com a fonte, omita somente essa questão.
+9a. CONTEXTO EXPLÍCITO: cada enunciado deve nomear o sistema, população, período, doença ou situação que delimita a pergunta. Não dependa do título do card, do documento, de perguntas anteriores ou de conhecimento implícito. Não se dirija ao aluno com expressões como "seu atendimento" ou "seu tratamento"; formule a pergunta sobre o paciente, população ou modelo específico descrito na fonte. Se esse contexto não estiver disponível, omita a questão.
 10. COMPATIBILIDADE QUIZ + FLASHCARD: escreva cada pergunta como questão aberta e respondível sem ver alternativas. É proibido usar 'assinale a alternativa', 'marque a opção', 'de acordo com os opções' ou qualquer referência a alternativas/opções. As quatro alternativas pertencem exclusivamente ao campo alternativas e jamais aparecem em pergunta.
 10a. NÃO CITE FIGURAS, IMAGENS, TABELAS, QUADROS, DIAGRAMAS, SLIDES OU PÁGINAS NO ENUNCIADO. O estudante não tem necessariamente acesso ao recurso visual citado, e o sistema não vincula com segurança cada questão à figura exata. Transforme a pergunta para cobrar somente o conceito textual explícito; se ela depender essencialmente de um recurso visual não descrito no texto, omita apenas essa questão.
 11. ALTA QUALIDADE DOS DISTRATORES MÉDICOS:
@@ -1105,6 +1113,11 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           });
           return null;
         }
+        if (!canReuseSource && hasUnresolvedQuestionContext(safeStem)) {
+          validationDiagnostics.rejected.invalid_or_incomplete_stem++;
+          markCandidateRejected(questionIndex, 'unresolved_question_context');
+          return null;
+        }
         if (!canReuseSource && candidateAudit[questionIndex]) {
           candidateAudit[questionIndex].sourceEvidence = grounding.evidence;
         }
@@ -1144,10 +1157,12 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           }
           return valid;
         }
-        const valid = isSharedQuestionStemValid(question.pergunta);
+        const valid = isSharedQuestionStemValid(question.pergunta) && !hasUnresolvedQuestionContext(question.pergunta);
         if (!valid) {
           validationDiagnostics.rejected.invalid_or_incomplete_stem++;
-          markCandidateRejected(question.__auditIndex, 'invalid_or_incomplete_stem');
+          markCandidateRejected(question.__auditIndex, hasUnresolvedQuestionContext(question.pergunta)
+            ? 'unresolved_question_context'
+            : 'invalid_or_incomplete_stem');
         }
         return valid;
       });
