@@ -37,7 +37,10 @@ class QuizzesController {
       }
       payload.materialText = materialText;
       const data = await quizzesService.generateQuestions(payload);
-      return res.json(data);
+      const responseData = data.map((item, index) => index === 0 && data.generationDiagnostics
+        ? { ...item, __quizGenerationDiagnostics: data.generationDiagnostics }
+        : item);
+      return res.json(responseData);
     } catch (err) {
       console.error("❌ Erro capturado no QuizzesController:", err);
       const status = Number.isInteger(err.statusCode) && err.statusCode >= 400 && err.statusCode < 500

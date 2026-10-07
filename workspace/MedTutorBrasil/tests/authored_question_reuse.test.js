@@ -145,6 +145,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
       difficulty: 'balanced'
     });
     assert.strictEqual(paraphrasedGroundedQuestion.length, 1, 'Paráfrase didática ancorada por evidência literal não deve ser rejeitada por diferença lexical');
+    assert.strictEqual(paraphrasedGroundedQuestion.generationDiagnostics.candidates[0].status, 'accepted');
     console.log('  [PASS] Paráfrase com resposta e evidência ancoradas no material passa pela validação lexical tolerante');
 
     const kahootChromeMaterial = 'Kahoot — plataforma de quiz interativo. Zona restrita: acesso exclusivo da equipe paramentada. A paramentação cirúrgica segue esta ordem: gorro, máscara e óculos, avental estéril e luvas estéreis.';
@@ -231,6 +232,13 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(emptyValidationError.code, 'QUIZ-EMPTY-VALIDATION');
     assert.strictEqual(emptyValidationError.diagnostics.rejected.insufficient_evidence, 1);
     assert.strictEqual(emptyValidationError.diagnostics.rejected.evidence_reasons.evidence_not_in_source, 1);
+    assert.strictEqual(emptyValidationError.diagnostics.candidates[0].status, 'rejected');
+    assert.match(emptyValidationError.diagnostics.candidates[0].question, /estrutura conduz/);
+    assert.strictEqual(emptyValidationError.diagnostics.candidates[0].correctAnswer, 'Trato corticoespinhal');
+    assert.deepStrictEqual(emptyValidationError.diagnostics.candidates[0].rejectionReasons, [
+      'evidence:evidence_not_in_source',
+      'evidence:question_answer_weakly_linked_to_source'
+    ]);
     assert.strictEqual(emptyValidationError.diagnostics.acceptedCount, 0);
     console.log('  [PASS] Lote vazio retorna código e contagem da etapa de validação que rejeitou a questão');
   } finally {

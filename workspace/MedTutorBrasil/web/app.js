@@ -8503,6 +8503,24 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       console.info('[MedTutor Quiz]', entry);
     }
 
+    function logQuizCandidateAudit(candidates) {
+      if (!Array.isArray(candidates) || !candidates.length) return;
+      console.groupCollapsed(`[MedTutor Quiz] Auditoria das ${candidates.length} questões candidatas`);
+      console.table(candidates.map(candidate => ({
+        candidata: candidate.candidate,
+        resultado: candidate.status,
+        motivos: (candidate.rejectionReasons || []).join(', ') || '—',
+        pergunta: candidate.question,
+        gabarito: candidate.correctLetter,
+        resposta: candidate.correctAnswer,
+        evidência: candidate.sourceEvidence
+      })));
+      candidates.forEach(candidate => {
+        console.info(`Candidata ${candidate.candidate}: alternativas e detalhes`, candidate);
+      });
+      console.groupEnd();
+    }
+
     function hasUsableStudyContent(text) {
       const normalized = normalizeStudyComparisonText(text);
       // Nome de arquivo, índice ou cabeçalho isolado nunca é base suficiente para uma questão confiável.
@@ -8872,14 +8890,25 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           };
           window.__MEDTUTOR_QUIZ_LAST_ERROR__ = failure;
           logQuizGenerationDebug('backend_generation_failed', failure);
+          logQuizCandidateAudit(failure.diagnostics?.candidates);
           return null;
+        }
+        const generationDiagnostics = data[0]?.__quizGenerationDiagnostics || null;
+        if (generationDiagnostics?.candidates) {
+          logQuizGenerationDebug('generated_candidate_audit', {
+            generated: generationDiagnostics.generatedCount,
+            accepted: generationDiagnostics.acceptedCount,
+            rejected: generationDiagnostics.rejected,
+            candidates: generationDiagnostics.candidates
+          });
+          logQuizCandidateAudit(generationDiagnostics.candidates);
         }
         const rejectionCounts = {
           missing_or_fragmented_stem: 0,
           invalid_question_stem: 0,
           authored_question_missing_source: 0
         };
-        const items = data.map(item => {
+        const items = data.map(({ __quizGenerationDiagnostics, ...item }) => {
           const sharedStem = removeUnsupportedVisualLocator(sanitizeSharedQuestionStem(item.question || item.pergunta || ''));
           const isAuthoredReuse = item.sourceQuestionOrigin === 'reaproveitada_da_fonte'
             || item.origem_pergunta === 'reaproveitada_da_fonte';
