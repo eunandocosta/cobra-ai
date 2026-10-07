@@ -9093,6 +9093,13 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           return null;
         }
         const generationDiagnostics = data[0]?.__quizGenerationDiagnostics || null;
+        // Em deploys graduais, o frontend novo pode falar com um backend que já
+        // valida e marca a questão autoral como reaproveitada, mas ainda não
+        // devolve sourceQuestionText. Nesse caso, o diagnóstico do próprio
+        // servidor é a autoridade; não descarte novamente o item por metadado.
+        const backendValidatedWholeBatch = Number.isInteger(Number(generationDiagnostics?.acceptedCount))
+          && Number(generationDiagnostics.acceptedCount) === data.length
+          && data.length > 0;
         if (generationDiagnostics?.candidates) {
           logQuizGenerationDebug('generated_candidate_audit', {
             generated: generationDiagnostics.generatedCount,
@@ -9105,16 +9112,21 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const rejectionCounts = {
           missing_or_fragmented_stem: 0,
           invalid_question_stem: 0,
-          authored_question_missing_source: 0
+          authored_question_missing_source: 0,
+          authored_question_metadata_missing_but_server_validated: 0
         };
         const items = data.map(({ __quizGenerationDiagnostics, ...item }) => {
           const sharedStem = removeUnsupportedVisualLocator(sanitizeSharedQuestionStem(item.question || item.pergunta || ''));
           const isAuthoredReuse = item.sourceQuestionOrigin === 'reaproveitada_da_fonte'
             || item.origem_pergunta === 'reaproveitada_da_fonte';
           if (isAuthoredReuse) {
-            if (!sharedStem || sharedStem.length < 18 || String(item.sourceQuestionText || '').trim().length < 18) {
+            const hasSourceText = String(item.sourceQuestionText || '').trim().length >= 18;
+            if (!sharedStem || sharedStem.length < 18 || (!hasSourceText && !backendValidatedWholeBatch)) {
               rejectionCounts.authored_question_missing_source++;
               return null;
+            }
+            if (!hasSourceText && backendValidatedWholeBatch) {
+              rejectionCounts.authored_question_metadata_missing_but_server_validated++;
             }
           } else if (!sharedStem) {
             rejectionCounts.missing_or_fragmented_stem++;
