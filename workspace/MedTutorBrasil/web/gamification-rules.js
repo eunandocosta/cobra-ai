@@ -110,10 +110,7 @@
 
   function xpRequiredForNextLevel(level) {
     const currentLevel = Math.max(1, Math.floor(Number(level) || 1));
-    if (currentLevel <= 15) return 80 + (currentLevel - 1) * 5;
-    if (currentLevel <= 45) return 155 + (currentLevel - 16) * 3;
-    if (currentLevel <= 105) return 245 + (currentLevel - 46) * 2;
-    return 365 + (currentLevel - 106);
+    return 80 + (currentLevel - 1) * 5;
   }
 
   function getLevel(totalXp) {

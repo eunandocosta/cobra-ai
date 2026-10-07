@@ -9265,7 +9265,17 @@ ${cleanText}
             acceptedStudyItems: [...existingItems, ...accepted]
           }, needed);
 
-          if (!Array.isArray(generated) || generated.length === 0) break;
+          if (!Array.isArray(generated) || generated.length === 0) {
+            consecutiveEmptyBatches++;
+            logQuizGenerationDebug('generation_batch_empty', {
+              requestedItems: needed,
+              acceptedItems: accepted.length,
+              totalRequested: total,
+              consecutiveEmptyBatches
+            });
+            if (consecutiveEmptyBatches >= 2) break;
+            continue;
+          }
           const unique = filterUniqueStudyItems(generated, [...existingItems, ...accepted]);
           if (unique.length === 0) {
             consecutiveEmptyBatches++;
@@ -17280,7 +17290,12 @@ Retorne EXCLUSIVAMENTE um JSON:
       renderSceBars();
       updateSubjectFilterMenus();
 
-      showToast(`⚡ ${generated.length} pares de estudo (Quiz & Flashcard) gerados com sucesso para "${materialName}"!`);
+      if (generated.length < qCount) {
+        showToast(`⚠️ Foram gerados ${generated.length} de ${qCount} itens para "${materialName}". Questões sem apoio suficiente foram descartadas; tente completar o lote novamente.`);
+        logQuizGenerationDebug('study_generation_saved_partial', { requestedItems: qCount, savedItems: generated.length, materialName, subjectName: targetSubj });
+      } else {
+        showToast(`⚡ ${generated.length} pares de estudo (Quiz & Flashcard) gerados com sucesso para "${materialName}"!`);
+      }
       setStudyGenerationProgress({ done: true });
     }
 
@@ -17371,6 +17386,10 @@ Retorne EXCLUSIVAMENTE um JSON:
         setStudyGenerationProgress({ done: true });
         showToast('⚠️ Nenhum item novo passou pela validação de conteúdo e redundância.');
         return;
+      }
+
+      if (totalCreated < qCount) {
+        logQuizGenerationDebug('study_generation_saved_partial', { requestedItems: qCount, savedItems: totalCreated, subjectName: targetSubj });
       }
 
       // Acrescenta ao deck já existente da disciplina; as questões anteriores e

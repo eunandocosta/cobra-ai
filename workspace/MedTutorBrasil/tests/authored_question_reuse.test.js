@@ -130,6 +130,68 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.match(groundedBatch[0].question, /paramentação/i);
     assert.strictEqual(groundedBatch[0].sourceEvidence, 'Gorro primeiro; máscara e óculos; avental estéril; luvas estéreis.');
     console.log('  [PASS] Questão fora do tema é rejeitada individualmente por falta de evidência alinhada ao texto-base');
+
+    const kahootChromeMaterial = 'Kahoot — plataforma de quiz interativo. Zona restrita: acesso exclusivo da equipe paramentada. A paramentação cirúrgica segue esta ordem: gorro, máscara e óculos, avental estéril e luvas estéreis.';
+    mockQuestions = [
+      {
+        ...makeQuestion('Qual foi a plataforma utilizada para gerar o quiz interativo?', 0, 'nova_a_partir_da_fonte', 'Kahoot'),
+        evidencia_fonte: 'Kahoot — plataforma de quiz interativo.'
+      },
+      {
+        ...makeQuestion('Qual é a sequência correta dos itens de paramentação cirúrgica?', 0, 'nova_a_partir_da_fonte', 'Gorro, máscara e óculos, avental estéril e luvas estéreis'),
+        evidencia_fonte: 'A paramentação cirúrgica segue esta ordem: gorro, máscara e óculos, avental estéril e luvas estéreis.'
+      }
+    ];
+    const kahootFiltered = await quizzesService.generateQuestions({
+      materialText: kahootChromeMaterial,
+      materialName: 'Quiz de biossegurança',
+      materialId: 'material-kahoot-biosseguranca',
+      targetSubject: 'Clínica Médica',
+      quantidade: 2,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(kahootFiltered.length, 1, 'Metadados Kahoot não devem virar questão, mesmo se aparecerem no texto extraído');
+    assert.match(kahootFiltered[0].question, /paramentação cirúrgica/i);
+    console.log('  [PASS] Marca/descrição do Kahoot não vira questão; conteúdo do quiz continua aproveitável');
+
+    const authoredMetaQuestion = 'Qual plataforma foi usada para gerar o quiz interativo?';
+    mockQuestions = [
+      makeQuestion(authoredMetaQuestion, 1, 'reaproveitada_da_fonte', 'Kahoot')
+    ];
+    const sourceQuizQuestion = await quizzesService.generateQuestions({
+      materialText: `Questão 1: ${authoredMetaQuestion}\nA) Kahoot\nB) Moodle\nC) Canvas\nD) Google Forms`,
+      quantidade: 1,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(sourceQuizQuestion.length, 1, 'Pergunta realmente presente no quiz autoral deve ser preservada integralmente');
+    assert.strictEqual(sourceQuizQuestion[0].sourceQuestionOrigin, 'reaproveitada_da_fonte');
+    console.log('  [PASS] Questão autoral real é preservada; filtro se aplica apenas a conteúdo inventado a partir da interface');
+
+    const kahootQuestionText = [
+      'Questão 1: Qual é a ordem correta da paramentação cirúrgica?',
+      'A) Gorro, máscara e óculos, avental estéril e luvas estéreis',
+      'B) Máscara, gorro, luvas estéreis e avental',
+      'C) Luvas, avental, gorro e máscara',
+      'D) Avental, gorro, máscara e luvas',
+      'Gabarito: A'
+    ].join('\n');
+    mockQuestions = [
+      makeQuestion('Qual é a ordem correta da paramentação cirúrgica?', 1, 'reaproveitada_da_fonte', 'Gorro, máscara e óculos, avental estéril e luvas estéreis')
+    ];
+    const kahootQuizPage = await quizzesService.generateQuestions({
+      materialText: `Kahoot • Questão 1 de 10\n${kahootQuestionText}`,
+      quantidade: 1,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(kahootQuizPage.length, 1, 'Página de quiz deve ser reconhecida como fonte didática');
+    assert.deepStrictEqual([...kahootQuizPage[0].quizOptions].sort(), [
+      'Gorro, máscara e óculos, avental estéril e luvas estéreis',
+      'Máscara, gorro, luvas estéreis e avental',
+      'Luvas, avental, gorro e máscara',
+      'Avental, gorro, máscara e luvas'
+    ].sort(), 'Alternativas autorais devem ser preservadas, não substituídas por perguntas sobre a interface');
+    assert.strictEqual(kahootQuizPage[0].correctAnswerText, 'Gorro, máscara e óculos, avental estéril e luvas estéreis');
+    console.log('  [PASS] Página Kahoot mantém enunciado, alternativas e gabarito da questão autoral');
   } finally {
     GoogleGenerativeAI.prototype.getGenerativeModel = originalGetModel;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalApiKey;

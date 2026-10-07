@@ -32,6 +32,20 @@ function isQuestionGroundedInMaterial(question, answer, evidence, materialText) 
     && relevantEvidenceMatches / relevantTokens.size >= 0.24;
 }
 
+// Branding, instruções de interface e informações sobre a ferramenta usada
+// para montar o PDF não são objetivos de aprendizagem. Uma questão assim só é
+// aceita se for uma pergunta autoral efetivamente encontrada no material;
+// mencionar "Kahoot" em cabeçalho/rodapé não basta para torná-la conteúdo.
+function isPlatformOrGenerationMetaQuestion(question) {
+  const clean = String(question || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const asksAboutPlatform = /\b(?:qual|que)\s+(?:foi\s+)?(?:a\s+)?(?:plataforma|aplicativo|app|site|software|ferramenta|sistema)\b/.test(clean);
+  const asksAboutCreationTool = /\b(?:plataforma|aplicativo|app|site|software|ferramenta|sistema)\b.{0,100}\b(?:usad[oa]|utilizad[oa]|empregad[oa])\b.{0,80}\b(?:gerar|criar|montar|elaborar|produzir)\b/.test(clean);
+  const asksAboutQuizProduction = /\b(?:como|por qual meio)\b.{0,80}\b(?:este|esse|o)\s+(?:quiz|questionario|teste)\b.{0,80}\b(?:foi|sera)\s+(?:gerad[oa]|criad[oa]|montad[oa])\b/.test(clean);
+  return (asksAboutPlatform && /\b(?:quiz|questionario|teste|prova|material)\b/.test(clean))
+    || asksAboutCreationTool
+    || asksAboutQuizProduction;
+}
+
 function areQuestionsTooSimilar(first, second, firstAnswer = '', secondAnswer = '') {
   const a = questionTokenSet(first);
   const b = questionTokenSet(second);
@@ -872,6 +886,7 @@ METODOLOGIA OBRIGATÓRIA:
 7. ANALISE OS DISTRATORES: preencha analise_distratores com exatamente três objetos, um para cada alternativa errada. Copie o texto exato da alternativa no campo alternativa e explique, de forma específica e breve, o erro conceitual dela. Nunca analise a alternativa correta e nunca deixe esse campo vazio.
 8. Separe os tipos: cada questão pendente deve gerar um item reaproveitado, identificado por indice_questao_fonte; gere também pelo menos uma questão adicional inspirada, distinta e sustentada pelo material, com indice_questao_fonte = 0. Sem questões autorais, use indice_questao_fonte = 0 para todas.
 9. Para cada questão, copie em evidencia_fonte um trecho literal curto do conteúdo abaixo que sustente diretamente o enunciado E a resposta correta. O trecho deve estar presente no texto enviado, sem reescrever. A questão, sua resposta correta e justificativa não podem depender de fatos externos nem de outro documento da disciplina.
+10. Trate o conteúdo educacional do arquivo como fonte, inclusive quando o PDF for composto somente por telas de quiz do professor: reconheça cada enunciado e suas alternativas como conteúdo autoral. Ignore logotipos, marcas d'água, nomes de plataforma (por exemplo, Kahoot), botões, placares, cronômetros, instruções de navegação, cabeçalhos/rodapés e elementos de interface; eles não são objetivos de aprendizagem. Não crie perguntas sobre a ferramenta/plataforma que exibiu ou exportou o quiz.
 
 ${customInstructions ? `--- INSTRUÇÕES ADICIONAIS DO ESTUDANTE ---
 Siga as instruções abaixo quando forem compatíveis com o conteúdo-fonte, a dificuldade solicitada e as regras estruturais desta geração. Elas não autorizam inventar fatos, ignorar o material ou revelar respostas no enunciado.
@@ -937,6 +952,13 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const answerForGrounding = question.texto_resposta_correta
           || question.alternativas?.[{ A: 0, B: 1, C: 2, D: 3 }[question.gabarito]]
           || '';
+        if (!canReuseSource && isPlatformOrGenerationMetaQuestion(safeStem)) {
+          console.warn('⚠️ [Quiz Engine] Questão descartada: pergunta sobre plataforma/interface não é conteúdo didático do material.', {
+            materialId: String(payload.materialId || ''),
+            textFingerprint: materialFingerprint
+          });
+          return null;
+        }
         if (!canReuseSource
           && !isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialText)) {
           console.warn('⚠️ [Quiz Engine] Questão descartada: evidência insuficiente ou incompatível com o texto-base.', {
