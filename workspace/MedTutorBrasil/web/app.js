@@ -9003,7 +9003,11 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     function hasUnresolvedQuestionContext(stem) {
-      return /\b(?:seu|sua|seus|suas)\s+(?:atendimento|tratamento|cuidado|diagn[oó]stico|conduta|quadro|situa[cç][aã]o|doen[cç]a|sa[uú]de)\b/i.test(String(stem || ''));
+      const clean = String(stem || '');
+      const addressesStudent = /\b(?:seu|sua|seus|suas)\s+(?:atendimento|tratamento|cuidado|diagn[oó]stico|conduta|quadro|situa[cç][aã]o|doen[cç]a|sa[uú]de)\b/i.test(clean);
+      const whyContrast = /\bpor que\b[\s\S]{0,100}\be n[aã]o\b[\s\S]{1,80}\?/i.test(clean);
+      const domainAnchor = /\b(?:SUS|sa[uú]de|sistema|modelo|organiza[cç][aã]o|aten[cç][aã]o|assist[eê]ncia|servi[cç]o|pol[ií]tica|paciente|doen[cç]a|mecanismo|estrutura|anatomia|fisiologia|tratamento|diagn[oó]stico|conduta|cirurgia|f[aá]rmaco|medicamento|terapia)\b/i.test(clean);
+      return addressesStudent || (whyContrast && !domainAnchor);
     }
 
     function removeUnsupportedVisualLocator(stem) {

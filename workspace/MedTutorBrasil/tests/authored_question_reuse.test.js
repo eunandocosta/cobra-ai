@@ -252,6 +252,29 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert(contextualQuestions.generationDiagnostics.candidates[0].rejectionReasons.includes('unresolved_question_context'));
     console.log('  [PASS] Pergunta vaga sobre "seu atendimento" é descartada; versão com período e modelo explícitos é mantida');
 
+    const networkModelSource = 'No SUS, a organização dos serviços de saúde articula diferentes níveis de atenção em uma rede regionalizada e hierarquizada.';
+    mockQuestions = [
+      {
+        ...makeQuestion('Por que rede e não pirâmide?', 0, 'nova_a_partir_da_fonte', 'Porque articula diferentes níveis de atenção em uma rede regionalizada e hierarquizada'),
+        evidencia_fonte: networkModelSource
+      },
+      {
+        ...makeQuestion('Por que a organização da atenção à saúde no SUS funciona em rede, e não como uma pirâmide?', 0, 'nova_a_partir_da_fonte', 'Porque articula diferentes níveis de atenção em uma rede regionalizada e hierarquizada'),
+        evidencia_fonte: networkModelSource
+      }
+    ];
+    const networkQuestions = await quizzesService.generateQuestions({
+      materialText: networkModelSource,
+      materialName: 'Rede versus pirâmide no SUS',
+      quantidade: 2,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(networkQuestions.length, 1, 'Comparação sem domínio explícito deve ser rejeitada, sem eliminar a questão contextualizada');
+    assert.match(networkQuestions[0].question, /SUS/);
+    assert.strictEqual(networkQuestions.generationDiagnostics.rejected.invalid_or_incomplete_stem, 1);
+    assert(networkQuestions.generationDiagnostics.candidates[0].rejectionReasons.includes('unresolved_question_context'));
+    console.log('  [PASS] Comparação "rede e não pirâmide" exige contexto explícito do SUS no próprio enunciado');
+
     mockQuestions = [
       {
         ...makeQuestion('Qual estrutura conduz o impulso nervoso até o córtex cerebral?', 0, 'nova_a_partir_da_fonte', 'Trato corticoespinhal'),
