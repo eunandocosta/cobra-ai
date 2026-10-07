@@ -10528,3 +10528,11 @@
   .announcement-first-access-actions button,.announcement-first-access-actions a { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid var(--border,rgba(197,229,207,.16)); border-radius: 9px; background: transparent; color: var(--text-primary,#f2f8f3); font: inherit; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
   .announcement-first-access-actions a { border-color: var(--neon,#00e66f); background: var(--neon,#00e66f); color: #06110b; }
   @media (max-width: 520px) { .announcement-first-access-dialog { padding: 21px; } .announcement-first-access-actions { flex-direction: column-reverse; } .announcement-first-access-actions button,.announcement-first-access-actions a { width: 100%; } }
+
+  @media (max-width: 700px) {
+    #modalChallengePlayer { padding: 0 9px !important; }
+    #modalChallengePlayer .challenge-player-modal { width: 100%; max-width: 680px; min-width: 0; max-height: min(88dvh, 760px); padding: 14px !important; }
+    #modalChallengePlayer .challenge-player-meta { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; }
+    #modalChallengePlayer #challengePlayerCounter { min-width: 0; }
+    #modalChallengePlayer #challengePlayerSubject { display: inline-block; max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+  }
