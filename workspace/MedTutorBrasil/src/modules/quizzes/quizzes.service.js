@@ -22,14 +22,36 @@ function isQuestionGroundedInMaterial(question, answer, evidence, materialText) 
   const sourceTokens = normalizedSourceTokens(materialText);
   const evidenceTokens = normalizedSourceTokens(evidence);
   const relevantTokens = normalizedSourceTokens(`${question || ''} ${answer || ''}`);
-  if (evidenceTokens.size < 3 || relevantTokens.size < 3) return false;
-
+  const relevantEvidenceTokens = [...relevantTokens].filter(token => evidenceTokens.has(token));
+  const relevantSourceTokens = [...relevantTokens].filter(token => sourceTokens.has(token));
   const evidenceMatches = [...evidenceTokens].filter(token => sourceTokens.has(token)).length;
-  const relevantMatches = [...relevantTokens].filter(token => sourceTokens.has(token)).length;
-  const relevantEvidenceMatches = [...relevantTokens].filter(token => evidenceTokens.has(token)).length;
-  return evidenceMatches / evidenceTokens.size >= 0.72
-    && relevantMatches / relevantTokens.size >= 0.28
-    && relevantEvidenceMatches / relevantTokens.size >= 0.24;
+  const evidenceCoverage = evidenceTokens.size ? evidenceMatches / evidenceTokens.size : 0;
+  const relevantSourceCoverage = relevantTokens.size ? relevantSourceTokens.length / relevantTokens.size : 0;
+  const relevantEvidenceCoverage = relevantTokens.size ? relevantEvidenceTokens.length / relevantTokens.size : 0;
+
+  // Exija evidência textual realmente presente no material, mas não cobre
+  // similaridade lexical alta do enunciado inteiro: paráfrases legítimas
+  // frequentemente usam vocabulário diferente do trecho-fonte.
+  const reasons = [];
+  if (evidenceTokens.size < 3) reasons.push('evidence_too_short');
+  if (relevantTokens.size < 2) reasons.push('question_or_answer_too_generic');
+  if (evidenceCoverage < 0.72) reasons.push('evidence_not_in_source');
+  if (relevantSourceTokens.length < 2 || relevantSourceCoverage < 0.12) reasons.push('question_answer_weakly_linked_to_source');
+  if (relevantEvidenceTokens.length < 1 || relevantEvidenceCoverage < 0.08) reasons.push('question_answer_weakly_linked_to_evidence');
+
+  return {
+    valid: reasons.length === 0,
+    reasons,
+    metrics: {
+      evidenceTokenCount: evidenceTokens.size,
+      evidenceCoverage: Number(evidenceCoverage.toFixed(3)),
+      relevantTokenCount: relevantTokens.size,
+      relevantSourceMatches: relevantSourceTokens.length,
+      relevantSourceCoverage: Number(relevantSourceCoverage.toFixed(3)),
+      relevantEvidenceMatches: relevantEvidenceTokens.length,
+      relevantEvidenceCoverage: Number(relevantEvidenceCoverage.toFixed(3))
+    }
+  };
 }
 
 // Branding, instruções de interface e informações sobre a ferramenta usada
@@ -934,6 +956,13 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         rejected: {
           platform_or_interface: 0,
           insufficient_evidence: 0,
+          evidence_reasons: {
+            evidence_too_short: 0,
+            question_or_answer_too_generic: 0,
+            evidence_not_in_source: 0,
+            question_answer_weakly_linked_to_source: 0,
+            question_answer_weakly_linked_to_evidence: 0
+          },
           invalid_or_incomplete_stem: 0,
           duplicate_question_or_answer: 0,
           invalid_alternatives: 0
@@ -973,13 +1002,20 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
           });
           return null;
         }
-        if (!canReuseSource
-          && !isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialText)) {
+        const grounding = !canReuseSource
+          ? isQuestionGroundedInMaterial(question.pergunta, answerForGrounding, question.evidencia_fonte, materialText)
+          : { valid: true, reasons: [], metrics: {} };
+        if (!grounding.valid) {
           validationDiagnostics.rejected.insufficient_evidence++;
+          grounding.reasons.forEach(reason => {
+            validationDiagnostics.rejected.evidence_reasons[reason]++;
+          });
           console.warn('⚠️ [Quiz Engine] Questão descartada: evidência insuficiente ou incompatível com o texto-base.', {
             materialId: String(payload.materialId || ''),
             textFingerprint: materialFingerprint,
-            section: String(question.secao_origem || '').slice(0, 120)
+            section: String(question.secao_origem || '').slice(0, 120),
+            reasons: grounding.reasons,
+            metrics: grounding.metrics
           });
           return null;
         }

@@ -131,6 +131,22 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(groundedBatch[0].sourceEvidence, 'Gorro primeiro; máscara e óculos; avental estéril; luvas estéreis.');
     console.log('  [PASS] Questão fora do tema é rejeitada individualmente por falta de evidência alinhada ao texto-base');
 
+    const trochlearEvidence = 'O nervo troclear é o único nervo craniano que emerge dorsalmente do tronco encefálico.';
+    mockQuestions = [
+      {
+        ...makeQuestion('Qual nervo craniano é singular por sair pela face posterior do tronco encefálico?', 0, 'nova_a_partir_da_fonte', 'Nervo troclear'),
+        evidencia_fonte: trochlearEvidence
+      }
+    ];
+    const paraphrasedGroundedQuestion = await quizzesService.generateQuestions({
+      materialText: trochlearEvidence,
+      materialName: 'Neuroanatomia do tronco encefálico',
+      quantidade: 1,
+      difficulty: 'balanced'
+    });
+    assert.strictEqual(paraphrasedGroundedQuestion.length, 1, 'Paráfrase didática ancorada por evidência literal não deve ser rejeitada por diferença lexical');
+    console.log('  [PASS] Paráfrase com resposta e evidência ancoradas no material passa pela validação lexical tolerante');
+
     const kahootChromeMaterial = 'Kahoot — plataforma de quiz interativo. Zona restrita: acesso exclusivo da equipe paramentada. A paramentação cirúrgica segue esta ordem: gorro, máscara e óculos, avental estéril e luvas estéreis.';
     mockQuestions = [
       {
@@ -214,6 +230,7 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     assert.strictEqual(emptyValidationError.statusCode, 422);
     assert.strictEqual(emptyValidationError.code, 'QUIZ-EMPTY-VALIDATION');
     assert.strictEqual(emptyValidationError.diagnostics.rejected.insufficient_evidence, 1);
+    assert.strictEqual(emptyValidationError.diagnostics.rejected.evidence_reasons.evidence_not_in_source, 1);
     assert.strictEqual(emptyValidationError.diagnostics.acceptedCount, 0);
     console.log('  [PASS] Lote vazio retorna código e contagem da etapa de validação que rejeitou a questão');
   } finally {
