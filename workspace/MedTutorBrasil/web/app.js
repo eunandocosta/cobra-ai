@@ -17709,11 +17709,17 @@ Retorne EXCLUSIVAMENTE um JSON:
     if (typeof window !== 'undefined') {
       window.quizPrintState = quizPrintState;
       window.openQuizPrintModal = openQuizPrintModal;
+      window.__realOpenQuizPrintModal = openQuizPrintModal;
       window.closeQuizPrintModal = closeQuizPrintModal;
+      window.__realCloseQuizPrintModal = closeQuizPrintModal;
       window.handleQuizPrintBackdrop = handleQuizPrintBackdrop;
+      window.__realHandleQuizPrintBackdrop = handleQuizPrintBackdrop;
       window.selectQuizPrintFormat = selectQuizPrintFormat;
+      window.__realSelectQuizPrintFormat = selectQuizPrintFormat;
       window.setQuizPrintLinesCount = setQuizPrintLinesCount;
+      window.__realSetQuizPrintLinesCount = setQuizPrintLinesCount;
       window.executeQuizPrint = executeQuizPrint;
+      window.__realExecuteQuizPrint = executeQuizPrint;
       window.getActiveQuizPrintQuestions = getActiveQuizPrintQuestions;
     }
 

@@ -29,6 +29,59 @@
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link rel="stylesheet" href="/styles.css?v=20261006-duel-mobile-meta-v1">
+  <script>
+    // Disponibilidade imediata das funções do modal de impressão de quiz
+    function openQuizPrintModal() {
+      if (typeof window.__realOpenQuizPrintModal === 'function') {
+        return window.__realOpenQuizPrintModal();
+      }
+      const modal = document.getElementById('quizPrintModal');
+      if (modal) modal.classList.add('active');
+    }
+    function closeQuizPrintModal() {
+      if (typeof window.__realCloseQuizPrintModal === 'function') {
+        return window.__realCloseQuizPrintModal();
+      }
+      const modal = document.getElementById('quizPrintModal');
+      if (modal) modal.classList.remove('active');
+    }
+    function handleQuizPrintBackdrop(event) {
+      if (typeof window.__realHandleQuizPrintBackdrop === 'function') {
+        return window.__realHandleQuizPrintBackdrop(event);
+      }
+      if (event && event.target && event.target.id === 'quizPrintModal') {
+        closeQuizPrintModal();
+      }
+    }
+    function selectQuizPrintFormat(fmt) {
+      if (typeof window.__realSelectQuizPrintFormat === 'function') {
+        return window.__realSelectQuizPrintFormat(fmt);
+      }
+      const cardM = document.getElementById('quizPrintFormatMultiple');
+      const cardD = document.getElementById('quizPrintFormatDiscursive');
+      const optsD = document.getElementById('quizPrintDiscursiveOptions');
+      if (cardM && cardD) {
+        cardM.classList.toggle('active', fmt === 'multiple');
+        cardD.classList.toggle('active', fmt === 'discursive');
+      }
+      if (optsD) optsD.style.display = fmt === 'discursive' ? 'block' : 'none';
+    }
+    function setQuizPrintLinesCount(cnt) {
+      if (typeof window.__realSetQuizPrintLinesCount === 'function') {
+        return window.__realSetQuizPrintLinesCount(cnt);
+      }
+      const num = Math.max(5, Number(cnt) || 5);
+      document.querySelectorAll('.quiz-print-lines-selector .btn-line-option').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.getAttribute('data-lines')) === num);
+      });
+    }
+    function executeQuizPrint() {
+      if (typeof window.__realExecuteQuizPrint === 'function') {
+        return window.__realExecuteQuizPrint();
+      }
+      window.print();
+    }
+  </script>
 </head>
 <body class="route-resolving" data-route="resolving">
 
