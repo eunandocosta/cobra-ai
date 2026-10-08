@@ -16929,7 +16929,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       list.forEach(item => {
         const userChoice = quizExamState.userChoices[item.id];
-        const isCorrect = userChoice === item.correctIndex;
+        const isCorrect = userChoice === resolveQuizCorrectIndex(item);
         if (typeof userChoice === 'number') answeredItems.push({ item, outcome: isCorrect ? 'correct' : 'incorrect' });
         if (isCorrect) correctCount++;
 
@@ -17056,6 +17056,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
         const areaClass = item.area || 'clinica';
         const areaLabel = item.areaLabel || 'Clínica Médica';
+        const correctIndex = resolveQuizCorrectIndex(item);
 
         const styleLabel = item.examStyle === 'enare' ? 'ENARE / FGV' : (item.examStyle === 'enamed' ? 'ENAMED / MEC' : 'Taxonomia Bloom');
         const diffLabel = getFlashcardDifficultyLabel(item);
@@ -17133,16 +17134,16 @@ Retorne EXCLUSIVAMENTE um JSON:
             ${(item.quizOptions || []).map((opt, optIdx) => {
               let optClass = 'quiz-opt';
               if (isRevealed) {
-                if (optIdx === item.correctIndex) {
+                if (optIdx === correctIndex) {
                   optClass += ' correct';
-                } else if (optIdx === currentChoice && currentChoice !== item.correctIndex) {
+                } else if (optIdx === currentChoice && currentChoice !== correctIndex) {
                   optClass += ' incorrect';
                 }
               } else if (quizStudyMode === 'exam' && examChoice === optIdx) {
                 optClass += ' selected-exam-choice';
               }
               return `
-                <div class="${optClass}" id="opt_${item.id}_${optIdx}" onclick="answerQuizOption(this, ${optIdx === item.correctIndex}, '${item.id}', ${optIdx})">
+                <div class="${optClass}" id="opt_${item.id}_${optIdx}" onclick="answerQuizOption(this, ${optIdx === correctIndex}, '${item.id}', ${optIdx})">
                   <span style="font-weight: 700; width: 22px; flex-shrink: 0;">${String.fromCharCode(65 + optIdx)})</span>
                   <span style="flex: 1;">${formatStudyRichText(opt)}</span>
                 </div>
@@ -17156,7 +17157,7 @@ Retorne EXCLUSIVAMENTE um JSON:
 
         // Se estiver em modo revelado e com escolha feita, monta o feedback imediatamente
         if (isRevealed && hasChoice) {
-          renderQuizFeedbackHtml(item, currentChoice === item.correctIndex, currentChoice);
+          renderQuizFeedbackHtml(item, currentChoice === correctIndex, currentChoice);
         }
       });
     }
@@ -17164,6 +17165,8 @@ Retorne EXCLUSIVAMENTE um JSON:
     function answerQuizOption(el, isCorrect, qId, optIdx) {
       const item = sharedQuestionsBank.find(q => q.id === qId);
       if (!item) return;
+      const correctIndex = resolveQuizCorrectIndex(item);
+      isCorrect = optIdx === correctIndex;
 
       // No modo Simulado (antes de finalizar), apenas seleciona a opção sem revelar gabarito
       if (quizStudyMode === 'exam' && !quizExamState.finished) {
@@ -17196,7 +17199,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       item.quizOptions.forEach((_, idx) => {
         const optEl = document.getElementById(`opt_${qId}_${idx}`);
         if (!optEl) return;
-        if (idx === item.correctIndex) {
+        if (idx === correctIndex) {
           optEl.classList.add('correct');
         } else if (idx === optIdx && !isCorrect) {
           optEl.classList.add('incorrect');
@@ -17223,6 +17226,26 @@ Retorne EXCLUSIVAMENTE um JSON:
       }
     }
 
+    function resolveQuizCorrectIndex(item) {
+      const options = Array.isArray(item?.quizOptions) ? item.quizOptions : (Array.isArray(item?.alternativas) ? item.alternativas : []);
+      const explicitIndex = [item?.correctIndex, item?.correct_index, item?.correctAnswerIndex, item?.indice_resposta_correta]
+        .find(value => Number.isInteger(value) && value >= 0 && value < options.length);
+      if (Number.isInteger(explicitIndex)) return explicitIndex;
+
+      const rawAnswerKey = item?.gabarito || item?.correctLetter || item?.resposta_correta_letra || '';
+      const answerKey = String(typeof rawAnswerKey === 'object' ? (rawAnswerKey.letra || rawAnswerKey.letter || '') : rawAnswerKey).trim().toUpperCase();
+      const letterMatch = answerKey.match(/^(?:(?:GABARITO|ALTERNATIVA|LETRA)\s*[:=-]?\s*)?([A-D])(?:[).:\s]*)$/);
+      if (letterMatch) return letterMatch[1].charCodeAt(0) - 65;
+      const answerText = item?.correctAnswerText || item?.resposta_correta || item?.answer || item?.reference_answer;
+      if (answerText && options.length) {
+        const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^[a-d][).:\s-]+/, '').replace(/[^a-z0-9]/g, '');
+        const normalizedAnswer = normalize(answerText);
+        const matchingIndex = options.findIndex(option => normalize(option) === normalizedAnswer);
+        if (matchingIndex >= 0) return matchingIndex;
+      }
+      return -1;
+    }
+
     function renderQuizFeedbackHtml(item, isCorrect, optIdx) {
       const feedbackBanner = document.getElementById(`quizFeedback_${item.id}`);
       if (!feedbackBanner) return;
@@ -17232,20 +17255,20 @@ Retorne EXCLUSIVAMENTE um JSON:
         distractorAnalysis: item.distractorAnalysis || {},
         pearl: 'A identificação semiológica precoce e a adesão aos protocolos oficiais de saúde norteiam a conduta resolutiva no SUS e ENARE.'
       };
+      const correctReason = tripartite.correctReason || item.explanation || item.justificativa || item.answer || 'Justificativa não disponível para esta questão.';
 
-      const correctLetter = String.fromCharCode(65 + item.correctIndex);
+      const correctIndex = resolveQuizCorrectIndex(item);
+      const correctLetter = correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : '';
       const savedDistractorAnalysis = tripartite.distractorAnalysis || item.distractorAnalysis || {};
-      const distractorEntries = Object.entries(savedDistractorAnalysis)
-        .filter(([dIdx, dText]) => parseInt(dIdx, 10) !== item.correctIndex && String(dText || '').trim());
-      // Decks gerados antes da análise obrigatória não podem renderizar uma
-      // caixa vazia. Eles recebem uma explicação honesta baseada no gabarito,
-      // enquanto os novos cards trazem a análise específica do Gemini.
-      const visibleDistractorEntries = distractorEntries.length
-        ? distractorEntries
-        : (Array.isArray(item.quizOptions) ? item.quizOptions : []).map((option, index) => [String(index), index === item.correctIndex
-          ? ''
-          : `Esta alternativa não corresponde ao conceito cobrado. A resposta correta é: ${item.correctAnswerText || item.answer || item.reference_answer || item.explanation || 'consulte a justificativa acima.'}`])
-          .filter(([, text]) => text);
+      const distractorEntries = Object.entries(savedDistractorAnalysis).map(([key, text]) => {
+        const letterIndex = /^[A-D]$/i.test(key) ? key.toUpperCase().charCodeAt(0) - 65 : Number.parseInt(key, 10);
+        return [letterIndex, typeof text === 'string' ? text : (text?.explanation || text?.explicacao || '')];
+      }).filter(([index, text]) => {
+        const normalizedText = String(text || '').trim();
+        return Number.isInteger(index) && index >= 0 && index < 4 && index !== correctIndex && normalizedText
+          && !/esta alternativa não corresponde|a resposta correta é|a justificativa correta é/i.test(normalizedText);
+      });
+      const visibleDistractorEntries = [...new Map(distractorEntries.map(([index, text]) => [index, text])).entries()];
 
       const topic = item.topic || item.disease || item.subject || 'Medicina';
       const subject = item.subject || '';
@@ -17277,7 +17300,7 @@ Retorne EXCLUSIVAMENTE um JSON:
               ${isCorrect ? '✅ Resposta Correta!' : '❌ Resposta Incorreta'}
             </span>
             <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-surface); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border);">
-              Gabarito Oficial: Letra ${correctLetter}
+              ${correctLetter ? `Gabarito Oficial: Letra ${correctLetter}` : 'Gabarito oficial indisponível'}
             </span>
           </div>
 
@@ -17290,23 +17313,22 @@ Retorne EXCLUSIVAMENTE um JSON:
 
           <!-- 1. Por que a certa é a certa -->
           <div class="commentary-correct">
-            <div class="commentary-title">🟢 Por que a Letra ${correctLetter} é a correta (Diretriz Oficial):</div>
-            <div style="color: var(--text-primary);">${(typeof formatInlineMd === 'function') ? formatInlineMd(tripartite.correctReason) : tripartite.correctReason}</div>
+            <div class="commentary-title">🟢 ${correctLetter ? `Por que a Letra ${correctLetter} é a correta` : 'Justificativa da resposta correta'}:</div>
+            <div style="color: var(--text-primary);">${(typeof formatInlineMd === 'function') ? formatInlineMd(correctReason) : correctReason}</div>
           </div>
 
           <!-- 2. Por que cada distrator está errado -->
-          <div class="commentary-distractors">
-            <div class="commentary-title">🔴 Análise Detalhada dos Distratores:</div>
+          ${visibleDistractorEntries.length ? `<div class="commentary-distractors">
+            <div class="commentary-title">🔴 Análise dos Distratores:</div>
             ${visibleDistractorEntries.map(([dIdx, dText]) => {
-              if (parseInt(dIdx, 10) === item.correctIndex) return '';
-              const distLetter = String.fromCharCode(65 + parseInt(dIdx));
+              const distLetter = String.fromCharCode(65 + dIdx);
               return `
                 <div class="distractor-analysis-item">
                   <span style="color: var(--danger); font-weight: 700;">Letra ${distLetter}:</span> ${(typeof formatInlineMd === 'function') ? formatInlineMd(dText) : dText}
                 </div>
               `;
             }).join('')}
-          </div>
+          </div>` : (isCorrect ? '' : '<div class="commentary-distractors"><div class="commentary-title">🔴 Análise dos Distratores</div><p>Não há justificativas específicas disponíveis para as alternativas desta questão.</p></div>')}
 
           <!-- 3. Pérola Clínica ("Take-home message") -->
           <div class="commentary-pearl">

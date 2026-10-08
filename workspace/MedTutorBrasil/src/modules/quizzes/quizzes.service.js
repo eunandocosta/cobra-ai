@@ -1227,8 +1227,8 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         const rawDistractorAnalysis = {};
         cleanAlternatives.forEach((alternative, optionIndex) => {
           if (optionIndex === correctIdx) return;
-          rawDistractorAnalysis[optionIndex] = analysisByAlternative.get(String(alternative).trim())
-            || `Esta alternativa não corresponde ao conceito exigido. A justificativa correta é: ${String(q.justificativa || correctAnswer).trim()}`;
+          const specificAnalysis = analysisByAlternative.get(String(alternative).trim());
+          if (specificAnalysis) rawDistractorAnalysis[optionIndex] = specificAnalysis;
         });
         const flashcardTitle = buildSafeFlashcardTitle(q.titulo_flashcard, correctAnswer);
         // A etiqueta segue o plano solicitado, e não uma classificação livre
@@ -1241,8 +1241,7 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
         shuffledOptions.forEach((alternative, optionIndex) => {
           if (optionIndex === newCorrectIndex) return;
           const originalIndex = cleanAlternatives.indexOf(alternative);
-          remappedDistractorAnalysis[optionIndex] = rawDistractorAnalysis[originalIndex]
-            || `Esta alternativa não corresponde ao conceito exigido. A justificativa correta é: ${String(q.justificativa || correctAnswer).trim()}`;
+          if (rawDistractorAnalysis[originalIndex]) remappedDistractorAnalysis[optionIndex] = rawDistractorAnalysis[originalIndex];
         });
         const rawSection = q.secao_origem || '';
         const cleanTopic = sanitizeTopicName(rawSection, payload.targetSubject || payload.materialName || 'Clínica Médica');

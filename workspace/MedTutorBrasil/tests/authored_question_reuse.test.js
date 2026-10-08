@@ -62,6 +62,21 @@ const quizzesService = require('../src/modules/quizzes/quizzes.service');
     console.log('  [PASS] Referência a caso é substituída pelos achados correspondentes da fonte');
     console.log('  [PASS] Questão inspirada permanece adicional');
 
+    const answerWithoutDistractorAnalysis = 'TRIF ativa IRF3 e IRF7 por meio da sinalização do TLR3.';
+    mockQuestions = [{
+      ...makeQuestion('Qual adaptador do TLR3 participa da ativação de IRF3 e IRF7?', 0, 'nova_a_partir_da_fonte', answerWithoutDistractorAnalysis),
+      analise_distratores: [],
+      evidencia_fonte: answerWithoutDistractorAnalysis
+    }];
+    const questionWithoutDistractorAnalysis = await quizzesService.generateQuestions({
+      materialText: answerWithoutDistractorAnalysis,
+      quantidade: 1,
+      difficulty: 'balanced'
+    });
+    assert(questionWithoutDistractorAnalysis.length === 1, 'Questão válida sem análise de distratores deve continuar sendo gerada');
+    assert.deepStrictEqual(questionWithoutDistractorAnalysis[0].tripartite.distractorAnalysis, {}, 'Não inventa justificativas genéricas para distratores ausentes');
+    console.log('  [PASS] Análise ausente não vira justificativa genérica repetida nos distratores');
+
     mockQuestions = [
       { ...makeQuestion('Qual glândula produz secreção holócrina, conforme a Figura 2?', 0, 'inspirada_na_fonte', 'Glândula sebácea'), evidencia_fonte: 'As glândulas sebáceas produzem secreção holócrina.' },
       makeQuestion('Qual estrutura está indicada na Figura 2?', 0, 'inspirada_na_fonte', 'Estrutura visual')
