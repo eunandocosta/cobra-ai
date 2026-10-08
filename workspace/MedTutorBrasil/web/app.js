@@ -17397,6 +17397,326 @@ Retorne EXCLUSIVAMENTE um JSON:
       }
     }
 
+    /* =========================================================
+     * IMPRESSÃO DE QUIZZES (MÚLTIPLA ESCOLHA & DISCURSIVO COM LINHAS)
+     * ========================================================= */
+    let quizPrintState = {
+      format: 'multiple', // 'multiple' | 'discursive'
+      discursiveLines: 5,  // Pelo menos 5 linhas
+      includeHeader: true,
+      includeKey: true
+    };
+
+    function getActiveQuizPrintQuestions() {
+      let list = (typeof getFilteredQuestions === 'function' ? getFilteredQuestions() : []).filter(item => !item.flashcardOnly);
+      if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
+        list = list.filter(q => q.isStarred);
+      }
+      return list;
+    }
+
+    function openQuizPrintModal() {
+      const modal = document.getElementById('quizPrintModal');
+      if (!modal) return;
+      const questions = getActiveQuizPrintQuestions();
+
+      const subjectLabel = document.getElementById('quizPrintSubjectLabel');
+      const countBadge = document.getElementById('quizPrintCountBadge');
+      if (subjectLabel) {
+        const materialName = (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') ? ` • ${currentQuizSlideFilter}` : '';
+        subjectLabel.textContent = `${currentStudySubject || 'Medicina Geral'}${materialName}`;
+      }
+      if (countBadge) {
+        countBadge.textContent = `${questions.length} ${questions.length === 1 ? 'questão' : 'questões'}`;
+      }
+
+      selectQuizPrintFormat(quizPrintState.format || 'multiple');
+      setQuizPrintLinesCount(quizPrintState.discursiveLines || 5);
+
+      const headerCheck = document.getElementById('quizPrintIncludeHeader');
+      if (headerCheck) headerCheck.checked = quizPrintState.includeHeader;
+      const keyCheck = document.getElementById('quizPrintIncludeKey');
+      if (keyCheck) keyCheck.checked = quizPrintState.includeKey;
+
+      modal.classList.add('active');
+    }
+
+    function closeQuizPrintModal() {
+      const modal = document.getElementById('quizPrintModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function handleQuizPrintBackdrop(event) {
+      if (event.target && event.target.id === 'quizPrintModal') {
+        closeQuizPrintModal();
+      }
+    }
+
+    function selectQuizPrintFormat(format) {
+      quizPrintState.format = format === 'discursive' ? 'discursive' : 'multiple';
+      const cardMultiple = document.getElementById('quizPrintFormatMultiple');
+      const cardDiscursive = document.getElementById('quizPrintFormatDiscursive');
+      const discursiveOptions = document.getElementById('quizPrintDiscursiveOptions');
+
+      if (cardMultiple && cardDiscursive) {
+        cardMultiple.classList.toggle('active', quizPrintState.format === 'multiple');
+        cardDiscursive.classList.toggle('active', quizPrintState.format === 'discursive');
+      }
+      if (discursiveOptions) {
+        discursiveOptions.style.display = quizPrintState.format === 'discursive' ? 'block' : 'none';
+      }
+    }
+
+    function setQuizPrintLinesCount(count) {
+      const num = Math.max(5, Number(count) || 5);
+      quizPrintState.discursiveLines = num;
+      const buttons = document.querySelectorAll('.quiz-print-lines-selector .btn-line-option');
+      buttons.forEach(btn => {
+        btn.classList.toggle('active', Number(btn.getAttribute('data-lines')) === num);
+      });
+    }
+
+    function executeQuizPrint() {
+      const questions = getActiveQuizPrintQuestions();
+      if (!questions || questions.length === 0) {
+        if (typeof showToast === 'function') {
+          showToast('⚠️ Nenhuma pergunta encontrada para os filtros ativos da matéria/aula.');
+        }
+        return;
+      }
+
+      const headerCheck = document.getElementById('quizPrintIncludeHeader');
+      const keyCheck = document.getElementById('quizPrintIncludeKey');
+      quizPrintState.includeHeader = headerCheck ? headerCheck.checked : true;
+      quizPrintState.includeKey = keyCheck ? keyCheck.checked : true;
+
+      const printArea = document.getElementById('quizPrintArea');
+      if (!printArea) {
+        if (typeof showToast === 'function') showToast('❌ Área de impressão não encontrada no documento.');
+        return;
+      }
+
+      const isDiscursive = quizPrintState.format === 'discursive';
+      const linesCount = Math.max(5, quizPrintState.discursiveLines || 5);
+      const subject = currentStudySubject || 'Medicina Geral';
+      const slideTitle = (currentQuizSlideFilter && currentQuizSlideFilter !== 'all') ? currentQuizSlideFilter : 'Ementa Geral / Banco da Disciplina';
+      const studentName = (typeof currentUser !== 'undefined' && currentUser?.name) ? currentUser.name : 'Estudante de Medicina';
+      const currentDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+      let html = '<div class="quiz-print-sheet">';
+
+      if (quizPrintState.includeHeader) {
+        html += `
+          <div class="quiz-print-header">
+            <div class="quiz-print-header-institution">Faculdade de Medicina • MedTutor Brasil</div>
+            <div class="quiz-print-header-subtitle">SISTEMA INTELIGENTE DE FORMAÇÃO MÉDICA E AVALIAÇÃO FORMATIVA</div>
+            <h1 class="quiz-print-header-title">${isDiscursive ? 'Caderno de Questões Discursivas' : 'Avaliação Formativa & Simulado Clínico'}</h1>
+            <div class="quiz-print-header-subject">Eixo Curricular: ${escapeHtml(subject)} • Conteúdo: ${escapeHtml(slideTitle)}</div>
+
+            <table class="quiz-print-header-meta-table">
+              <tr>
+                <td style="width: 55%; border-right: 1pt solid #cbd5e1 !important;">
+                  <div><strong>Acadêmico(a):</strong> __________________________________________________</div>
+                  <div style="margin-top: 4pt;"><strong>Data:</strong> ${currentDate} &nbsp;&nbsp;&nbsp;&nbsp; <strong>Turma/Período:</strong> ______________</div>
+                </td>
+                <td style="width: 45%; padding-left: 10pt !important;">
+                  <div><strong>Matrícula:</strong> ____________________</div>
+                  <div style="margin-top: 4pt;"><strong>Nota / Desempenho:</strong> ______ / 10,0</div>
+                </td>
+              </tr>
+            </table>
+
+            <div class="quiz-print-instructions">
+              <strong>INSTRUÇÕES DE PREENCHIMENTO:</strong>
+              ${isDiscursive
+                ? 'Responda manuscrito às questões respeitando o limite das linhas pautadas oficiais. Redija com letra legível e utilize caneta esferográfica azul ou preta.'
+                : 'Assinale com caneta esferográfica a alternativa correspondente preenchendo o círculo ◯. Cada questão possui apenas uma alternativa correta.'
+              }
+              ${quizPrintState.includeKey ? ' O gabarito oficial comentado encontra-se ao final deste caderno para autocorreção.' : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      html += '<div class="quiz-print-questions-list">';
+      questions.forEach((item, index) => {
+        const qNum = String(index + 1).padStart(2, '0');
+        const areaLabel = item.areaLabel || (item.area === 'clinica' ? 'Clínica Médica' : (item.area || 'Clínica Médica'));
+        const styleLabel = item.examStyle === 'enare' ? 'ENARE / FGV' : (item.examStyle === 'enamed' ? 'ENAMED' : 'Avaliação Médica');
+        const diffLabel = (typeof getFlashcardDifficultyLabel === 'function') ? getFlashcardDifficultyLabel(item) : 'Intermediário';
+
+        html += `
+          <div class="quiz-print-question-card">
+            <div class="quiz-print-q-topbar">
+              <span class="quiz-print-q-number">QUESTÃO ${qNum}</span>
+              <span>${escapeHtml(areaLabel)} • ${styleLabel} • Nível ${diffLabel}</span>
+            </div>
+        `;
+
+        if (item.vignette) {
+          html += `
+            <div class="quiz-print-vignette">
+              <strong>Caso Clínico:</strong> ${(typeof formatStudyRichText === 'function') ? formatStudyRichText(item.vignette) : escapeHtml(item.vignette)}
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="quiz-print-prompt">
+            ${(typeof formatStudyRichText === 'function') ? formatStudyRichText(item.question) : escapeHtml(item.question)}
+          </div>
+        `;
+
+        const supportImage = (typeof getStudySupportImage === 'function') ? getStudySupportImage(item) : null;
+        if (supportImage && supportImage.imageUrl) {
+          html += `
+            <div style="text-align: center; margin: 8pt 0;">
+              <img src="${supportImage.imageUrl}" alt="Figura da Questão" style="max-width: 260px; max-height: 180px; object-fit: contain; border: 1pt solid #cbd5e1; border-radius: 4pt;">
+              ${supportImage.title ? `<div style="font-size: 7.5pt; color: #64748b; margin-top: 2pt;">${escapeHtml(supportImage.title)}</div>` : ''}
+            </div>
+          `;
+        }
+
+        if (isDiscursive) {
+          html += `
+            <div class="quiz-print-discursive-wrapper">
+              <div class="quiz-print-discursive-label">RESPOSTA DISCURSIVA:</div>
+              <div class="quiz-print-discursive-lines">
+          `;
+          for (let l = 1; l <= linesCount; l++) {
+            html += `
+              <div class="quiz-print-discursive-line">
+                <span class="quiz-print-discursive-line-num">${l}.</span>
+                <span class="quiz-print-discursive-line-rule"></span>
+              </div>
+            `;
+          }
+          html += `
+              </div>
+            </div>
+          `;
+        } else {
+          const options = Array.isArray(item.quizOptions) ? item.quizOptions : (Array.isArray(item.alternativas) ? item.alternativas : []);
+          html += '<div class="quiz-print-options">';
+          options.forEach((opt, optIdx) => {
+            const letter = String.fromCharCode(65 + optIdx);
+            html += `
+              <div class="quiz-print-option-row">
+                <span class="quiz-print-option-circle">${letter}</span>
+                <div class="quiz-print-option-text">
+                  <strong>${letter})</strong> ${(typeof formatStudyRichText === 'function') ? formatStudyRichText(opt) : escapeHtml(opt)}
+                </div>
+              </div>
+            `;
+          });
+          html += '</div>';
+        }
+
+        html += '</div>';
+      });
+      html += '</div>';
+
+      if (quizPrintState.includeKey) {
+        html += `
+          <div class="quiz-print-key-section">
+            <div class="quiz-print-key-header">
+              <div style="font-size: 9pt; font-weight: 700; color: #059669; letter-spacing: 1px; text-transform: uppercase;">GABARITO OFICIAL & RESOLUÇÃO COMENTADA</div>
+              <h2 style="font-size: 13pt; font-weight: 800; color: #0f172a; margin: 4pt 0 2pt 0; text-transform: uppercase;">Caderno de Respostas e Critérios de Correção</h2>
+              <div style="font-size: 8.5pt; color: #475569;">Disciplina: ${escapeHtml(subject)} • Total de Questões: ${questions.length}</div>
+            </div>
+        `;
+
+        if (!isDiscursive) {
+          html += `
+            <div style="margin-bottom: 14pt; page-break-inside: avoid; break-inside: avoid;">
+              <strong style="font-size: 8.5pt; color: #1e293b; display: block; margin-bottom: 4pt;">TABELA DE CONFERÊNCIA RÁPIDA:</strong>
+              <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 8pt; border: 1pt solid #cbd5e1;">
+                <tr style="background: #f1f5f9; font-weight: 700;">
+          `;
+          questions.forEach((_, i) => {
+            html += `<th style="border: 1pt solid #cbd5e1; padding: 3pt 4pt;">Q${i + 1}</th>`;
+          });
+          html += '</tr><tr>';
+          questions.forEach(q => {
+            const cIdx = (typeof resolveQuizCorrectIndex === 'function') ? resolveQuizCorrectIndex(q) : -1;
+            const letter = cIdx >= 0 ? String.fromCharCode(65 + cIdx) : '-';
+            html += `<td style="border: 1pt solid #cbd5e1; padding: 4pt; font-weight: 800; color: #059669;">${letter}</td>`;
+          });
+          html += '</tr></table></div>';
+        }
+
+        questions.forEach((item, index) => {
+          const qNum = String(index + 1).padStart(2, '0');
+          const correctIndex = (typeof resolveQuizCorrectIndex === 'function') ? resolveQuizCorrectIndex(item) : -1;
+          const correctLetter = correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : '';
+          const correctReason = item.explanation || item.justificativa || item.answer || (item.tripartite && item.tripartite.correctReason) || 'Conduta fundamentada nos protocolos clínicos e diretrizes vigentes.';
+          const pearl = (item.tripartite && item.tripartite.pearl) || 'Atenção aos sinais semiológicos de alarme e diagnóstico diferencial.';
+
+          html += `
+            <div class="quiz-print-key-item">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3pt;">
+                <strong style="color: #0f172a; font-size: 9pt;">Questão ${qNum}: ${isDiscursive ? 'Padrão de Resposta Esperado' : `Alternativa Correta [ Letra ${correctLetter} ]`}</strong>
+                <span style="font-size: 7.5pt; color: #64748b;">${escapeHtml(item.disease || item.subject || 'Clínica Médica')}</span>
+              </div>
+              <div style="font-size: 8.5pt; color: #1e293b; margin-bottom: 3pt;">
+                <strong>${isDiscursive ? 'Conduta e Critérios:' : 'Justificativa:'}</strong> ${(typeof formatStudyRichText === 'function') ? formatStudyRichText(correctReason) : escapeHtml(correctReason)}
+              </div>
+              ${pearl ? `
+                <div style="font-size: 8pt; color: #047857; font-style: italic; background: #ecfdf5; padding: 3pt 6pt; border-radius: 3pt;">
+                  💡 <strong>Pérola de Plantão:</strong> ${escapeHtml(pearl)}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        });
+
+        html += '</div>';
+      }
+
+      html += `
+        <div style="margin-top: 20pt; padding-top: 8pt; border-top: 0.5pt solid #cbd5e1; font-size: 7.5pt; color: #64748b; display: flex; justify-content: space-between; page-break-inside: avoid; break-inside: avoid;">
+          <span>MedTutor Brasil • Caderno de Questões e Avaliação Formativa</span>
+          <span>Formato: ${isDiscursive ? `Discursivo (${linesCount} linhas)` : 'Múltipla Escolha'} • Impresso em ${currentDate}</span>
+        </div>
+      `;
+
+      html += '</div>';
+
+      printArea.innerHTML = html;
+      closeQuizPrintModal();
+      document.body.classList.add('printing-quiz');
+
+      if (typeof showToast === 'function') {
+        showToast('🖨️ Abrindo diálogo de impressão / PDF...');
+      }
+
+      const cleanupPrint = () => {
+        document.body.classList.remove('printing-quiz');
+        if (printArea) {
+          printArea.innerHTML = '';
+        }
+        window.removeEventListener('afterprint', cleanupPrint);
+      };
+
+      window.addEventListener('afterprint', cleanupPrint, { once: true });
+
+      setTimeout(() => {
+        window.print();
+        setTimeout(cleanupPrint, 3000);
+      }, 300);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.quizPrintState = quizPrintState;
+      window.openQuizPrintModal = openQuizPrintModal;
+      window.closeQuizPrintModal = closeQuizPrintModal;
+      window.handleQuizPrintBackdrop = handleQuizPrintBackdrop;
+      window.selectQuizPrintFormat = selectQuizPrintFormat;
+      window.setQuizPrintLinesCount = setQuizPrintLinesCount;
+      window.executeQuizPrint = executeQuizPrint;
+      window.getActiveQuizPrintQuestions = getActiveQuizPrintQuestions;
+    }
+
     function getStudySupportImage(item) {
       return item?.medicalImage || item?.image || (Array.isArray(item?.medicalImages) ? item.medicalImages[0] : null);
     }

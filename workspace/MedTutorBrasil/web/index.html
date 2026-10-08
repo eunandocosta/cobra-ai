@@ -629,6 +629,11 @@
                   🎲 Banco Global
                 </button>
 
+                <!-- IMPRIMIR QUIZ (PROVA / CADERNO) -->
+                <button class="btn-outline-action" id="qzPrintQuizBtn" onclick="openQuizPrintModal()" title="Imprimir este quiz (Múltipla Escolha com alternativas ou Discursivo com linhas pautadas)" style="font-weight: 700;">
+                  🖨️ Imprimir Quiz
+                </button>
+
                 <!-- SUPER QUESTÕES (★) -->
                 <button class="btn-outline-action" id="qzSuperQuestionsBtn" onclick="toggleSuperQuestionsFilter('qz')" title="Filtrar apenas questões com estrela (★) desta disciplina">
                   ⭐ Super Questões (<span id="qzSuperCount">0</span>)
@@ -649,6 +654,9 @@
                     ⋮ Opções ▾
                   </button>
                   <div class="dropdown-menu-list" id="qzStudyMoreMenu" style="right: 0; left: auto; min-width: 230px;">
+                    <div class="dropdown-item" onclick="openQuizPrintModal()">
+                      🖨️ Imprimir Quiz (Prova/Lista)
+                    </div>
                     <div class="dropdown-item" onclick="startGlobalSubjectQuiz()">
                       🎲 Banco Global da Matéria
                     </div>
@@ -712,14 +720,20 @@
               </div>
             </div>
 
-            <!-- CONTROLES DO MODO SIMULADO (CRONÔMETRO + FINALIZAR) -->
-            <div id="quizExamControls" style="display: none; align-items: center; gap: 10px;">
-              <span id="quizExamTimer" style="font-size: 12.5px; font-weight: 700; color: var(--neon); background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.3); padding: 4px 10px; border-radius: 6px;">
-                ⏱️ 00:00
-              </span>
-              <button class="btn-outline-action primary" onclick="finishExamMode()" style="font-weight: 700; font-size: 11.5px; padding: 5px 12px;">
-                🏁 Finalizar & Corrigir Prova
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn-outline-action" id="btnQuizModeBarPrint" onclick="openQuizPrintModal()" title="Imprimir este quiz em folha A4 (Múltipla Escolha ou Discursivo)" style="font-size: 11.5px; padding: 4px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                🖨️ Imprimir
               </button>
+
+              <!-- CONTROLES DO MODO SIMULADO (CRONÔMETRO + FINALIZAR) -->
+              <div id="quizExamControls" style="display: none; align-items: center; gap: 10px;">
+                <span id="quizExamTimer" style="font-size: 12.5px; font-weight: 700; color: var(--neon); background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.3); padding: 4px 10px; border-radius: 6px;">
+                  ⏱️ 00:00
+                </span>
+                <button class="btn-outline-action primary" onclick="finishExamMode()" style="font-weight: 700; font-size: 11.5px; padding: 5px 12px;">
+                  🏁 Finalizar & Corrigir Prova
+                </button>
+              </div>
             </div>
           </div>
 
@@ -3603,6 +3617,109 @@
       </div>
     </div>
   </div>
+
+  <!-- =========================================================
+       MODAL DE IMPRESSÃO DE QUIZZES (MÚLTIPLA ESCOLHA vs DISCURSIVO COM LINHAS)
+       ========================================================= -->
+  <div class="modal-overlay quiz-print-overlay" id="quizPrintModal" onclick="handleQuizPrintBackdrop(event)" aria-modal="true" role="dialog" aria-labelledby="quizPrintModalTitle" aria-hidden="true">
+    <div class="modal-window quiz-print-window" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="quiz-print-icon-badge" aria-hidden="true">🖨️</div>
+          <div>
+            <h2 id="quizPrintModalTitle" style="margin: 0; font-size: 17px; font-weight: 700;">Imprimir Quiz / Avaliação Formativa</h2>
+            <small style="color: var(--text-secondary); display: block; margin-top: 2px;">
+              <span id="quizPrintSubjectLabel">Clínica Médica</span> • <span id="quizPrintCountBadge" style="color: var(--neon); font-weight: 700;">0 questões</span>
+            </small>
+          </div>
+        </div>
+        <button class="btn-close-modal" type="button" aria-label="Fechar" onclick="closeQuizPrintModal()">✕</button>
+      </div>
+
+      <div class="quiz-print-body" style="display: flex; flex-direction: column; gap: 16px; padding: 16px 0 6px 0;">
+        <!-- Seletor do Formato de Impressão -->
+        <div>
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">
+            Escolha o Formato da Prova / Lista de Exercícios:
+          </label>
+          <div class="quiz-print-formats-grid">
+            <!-- Card Múltipla Escolha -->
+            <div class="quiz-print-format-card active" id="quizPrintFormatMultiple" onclick="selectQuizPrintFormat('multiple')" role="button" tabindex="0">
+              <div class="format-card-header">
+                <span class="format-radio-indicator"></span>
+                <span class="format-icon">📝</span>
+                <strong class="format-title">Múltipla Escolha</strong>
+              </div>
+              <p class="format-desc">
+                Imprime os enunciados com as alternativas (A, B, C, D) e campos para marcação de gabarito. Ideal para treino de prova objetiva e simulados.
+              </p>
+              <div class="format-badge">Alternativas A, B, C, D</div>
+            </div>
+
+            <!-- Card Discursiva -->
+            <div class="quiz-print-format-card" id="quizPrintFormatDiscursive" onclick="selectQuizPrintFormat('discursive')" role="button" tabindex="0">
+              <div class="format-card-header">
+                <span class="format-radio-indicator"></span>
+                <span class="format-icon">✍️</span>
+                <strong class="format-title">Formato Discursivo</strong>
+              </div>
+              <p class="format-desc">
+                Imprime o caso clínico e a pergunta com <strong>linhas pautadas oficiais</strong> logo abaixo para resposta dissertativa manuscrita.
+              </p>
+              <div class="format-badge" style="color: #00ff66; border-color: rgba(0, 255, 102, 0.3); background: rgba(0, 255, 102, 0.08);">Linhas Pautadas (mín. 5 linhas)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opções Específicas do Formato Discursivo (Linhas por Questão) -->
+        <div id="quizPrintDiscursiveOptions" style="display: none; background: rgba(0, 229, 255, 0.04); border: 1px solid rgba(0, 229, 255, 0.18); border-radius: 12px; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+            <label style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+              <span>📏</span> Linhas pautadas por questão:
+            </label>
+            <span style="font-size: 11px; color: var(--text-muted);">Espaçamento adequado para caligrafia (~32px)</span>
+          </div>
+
+          <div class="quiz-print-lines-selector" style="display: flex; gap: 10px;">
+            <button type="button" class="btn-line-option active" data-lines="5" onclick="setQuizPrintLinesCount(5)">
+              <strong>5 Linhas</strong> <small>(Padrão Prova)</small>
+            </button>
+            <button type="button" class="btn-line-option" data-lines="7" onclick="setQuizPrintLinesCount(7)">
+              <strong>7 Linhas</strong> <small>(Ampla)</small>
+            </button>
+            <button type="button" class="btn-line-option" data-lines="10" onclick="setQuizPrintLinesCount(10)">
+              <strong>10 Linhas</strong> <small>(Aprofundada)</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Opções Complementares (Gabarito, Cabeçalho) -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; color: var(--text-primary);">
+            <input type="checkbox" id="quizPrintIncludeHeader" checked style="accent-color: var(--neon); width: 16px; height: 16px;">
+            <span><strong>Incluir cabeçalho oficial de avaliação</strong> (Nome do aluno, data, turma e nota)</span>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; color: var(--text-primary);">
+            <input type="checkbox" id="quizPrintIncludeKey" checked style="accent-color: var(--neon); width: 16px; height: 16px;">
+            <span><strong>Incluir gabarito e comentários ao final</strong> (em folha separada para autocorreção)</span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap;">
+        <button class="btn-outline-action" type="button" onclick="closeQuizPrintModal()">
+          Cancelar
+        </button>
+        <button class="btn-outline-action primary" type="button" id="btnExecuteQuizPrint" onclick="executeQuizPrint()" style="font-weight: 700; padding: 8px 22px; font-size: 13px;">
+          🖨️ Imprimir / Salvar em PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTAINER DE IMPRESSÃO ISOLADO DO QUIZ (OCULTO NA TELA, VISÍVEL NO PRINT) -->
+  <div id="quizPrintArea" class="quiz-print-area" aria-hidden="true"></div>
 
   <div class="modal-overlay gamification-modal-overlay" id="gamificationModal" onclick="handleGamificationBackdrop(event)" aria-modal="true" role="dialog" aria-labelledby="gamificationModalTitle" aria-hidden="true">
     <section class="modal-window gamification-modal-window" onclick="event.stopPropagation()">
