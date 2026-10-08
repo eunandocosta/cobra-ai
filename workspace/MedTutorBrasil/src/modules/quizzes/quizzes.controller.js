@@ -37,7 +37,8 @@ class QuizzesController {
       }
       payload.materialText = materialText;
       const data = await quizzesService.generateQuestions(payload);
-      const responseData = data.map((item, index) => index === 0 && data.generationDiagnostics
+      const items = Array.isArray(data) ? data : (Array.isArray(data?.questions) ? data.questions : []);
+      const responseData = items.map((item, index) => index === 0 && data?.generationDiagnostics
         ? { ...item, __quizGenerationDiagnostics: data.generationDiagnostics }
         : item);
       return res.json(responseData);

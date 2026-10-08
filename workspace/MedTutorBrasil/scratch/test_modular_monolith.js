@@ -431,8 +431,9 @@ server.listen(TEST_PORT, async () => {
       materialText: 'O tronco encefálico é formado por mesencéfalo, ponte e bulbo, contendo vias ascendentes, descendentes e núcleos de nervos cranianos.'
     });
     assert.strictEqual(quiz.statusCode, 200);
-    assert.strictEqual(quiz.body.questions.length, 3);
-    console.log(`[PASS] POST /api/quizzes/gerar -> 200 OK (${quiz.body.questions.length} questões com distratores)`);
+    const questionsCount = Array.isArray(quiz.body) ? quiz.body.length : (quiz.body?.questions?.length || 0);
+    assert.strictEqual(questionsCount, 3);
+    console.log(`[PASS] POST /api/quizzes/gerar -> 200 OK (${questionsCount} questões com distratores)`);
 
     const retiredFlashcardsEndpoint = await makeRequest('GET', '/api/quizzes/flashcards/neurologia');
     assert.strictEqual(retiredFlashcardsEndpoint.statusCode, 410);
