@@ -6880,32 +6880,32 @@
     .gamification-modal-page[hidden] { display: none !important; }
     .gamification-modal-page:not([hidden]) { animation: gamificationPageEnter .24s ease both; }
     @keyframes gamificationPageEnter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    .gamification-profile-heading { display: flex; align-items: center; gap: 16px; min-width: 0; }
-    .gamification-profile-avatar { --frame-main: var(--neon); --frame-light: #b2ffd2; --frame-deep: #07552d; position: relative; width: 96px; height: 96px; flex: 0 0 96px; display: grid; place-items: center; border-radius: 50%; isolation: isolate; }
+    .gamification-profile-heading { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; padding: 12px 0 2px; text-align: center; }
+    .gamification-profile-avatar { --frame-main: var(--neon); --frame-light: #b2ffd2; --frame-deep: #07552d; position: relative; width: 184px; height: 184px; flex: 0 0 184px; display: grid; place-items: center; border-radius: 50%; isolation: isolate; }
     .gamification-profile-avatar .profile-frame-svg { position: absolute; inset: -18%; z-index: 0; width: 136%; height: 136%; overflow: visible; pointer-events: none; }
-    .gamification-profile-avatar .profile-frame-initials { position: relative; z-index: 1; width: 62px; height: 62px; display: grid; place-items: center; border: 2px solid color-mix(in srgb,var(--frame-main),transparent 25%); border-radius: 50%; color: var(--neon); background: var(--bg-card); font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
+    .gamification-profile-avatar .profile-frame-initials { position: relative; z-index: 1; width: 112px; height: 112px; display: grid; place-items: center; border: 2px solid color-mix(in srgb,var(--frame-main),transparent 25%); border-radius: 50%; color: var(--neon); background: var(--bg-card); font-size: 40px; font-weight: 800; letter-spacing: -.04em; }
     .gamification-profile-avatar[data-frame="neon"] { filter: drop-shadow(0 0 12px color-mix(in srgb,var(--frame-main),transparent 50%)); }
     .gamification-profile-avatar[data-frame="neon"]::after { content:""; position:absolute; inset:-8%; z-index:-1; border:1px solid color-mix(in srgb,var(--frame-main),transparent 72%); border-radius:50%; animation: gamificationNeonPulse 2.8s ease-in-out infinite; }
     @keyframes gamificationNeonPulse { 50% { opacity:.42; transform:scale(1.08); } }
-    .gamification-profile-copy { display: grid; min-width: 0; gap: 3px; }
+    .gamification-profile-copy { display: grid; justify-items: center; min-width: 0; gap: 3px; }
     .gamification-profile-copy strong { font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
     .gamification-profile-copy span,.gamification-profile-copy small { color: var(--text-secondary); }
     .gamification-profile-copy small { color: var(--neon); font-size: 12px; font-weight: 700; }
-    .gamification-profile-level-row { display: grid; grid-template-columns: minmax(170px,.8fr) minmax(0,1.5fr); gap: 14px; align-items: stretch; }
-    .gamification-level-launch { display:flex; align-items:center; gap:10px; min-width:0; padding:13px; border:1px solid var(--border-accent); border-radius:15px; color:var(--text-primary); background:linear-gradient(125deg,var(--neon-subtle),var(--bg-surface)); text-align:left; font:inherit; transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+    .gamification-profile-level-row { display: grid; grid-template-columns: minmax(0,1fr); gap: 9px; align-items: stretch; max-width: 560px; width: 100%; margin: 0 auto; }
+    .gamification-level-launch { display:flex; align-items:center; justify-content:center; gap:8px; min-width:0; padding:7px 12px; border:1px solid var(--border); border-radius:12px; color:var(--text-secondary); background:var(--bg-surface); text-align:center; font:inherit; transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease, color .2s ease; }
     .gamification-level-launch:hover { transform:translateY(-2px); border-color:var(--neon); box-shadow:0 8px 24px rgba(0,255,115,.12); }
     .gamification-level-launch > span:nth-child(2) { display:grid; gap:3px; min-width:0; }
-    .gamification-level-launch strong { color:var(--neon); font-size:18px; white-space:nowrap; }
-    .gamification-level-launch small { color:var(--text-secondary); font-size:11px; }
-    .gamification-level-launch-icon { color:var(--neon); font-size:26px; }
-    .gamification-level-launch-arrow { margin-left:auto; color:var(--neon); font-size:19px; }
-    .gamification-profile-xp { display:grid; align-content:center; gap:7px; min-width:0; padding:13px 15px; border:1px solid var(--border); border-radius:15px; background:var(--bg-surface); }
-    .gamification-profile-xp > span { font-weight:750; }
-    .gamification-profile-xp > small { color:var(--text-secondary); }
-    .gamification-profile-study-time { display:flex; align-items:center; gap:8px; padding:12px 14px; border:1px solid var(--border); border-radius:13px; color:var(--text-secondary); background:var(--bg-surface); }
+    .gamification-level-launch strong { color:var(--neon); font-size:15px; white-space:nowrap; }
+    .gamification-level-launch small { color:var(--text-muted); font-size:10px; }
+    .gamification-level-launch-icon { color:var(--neon); font-size:19px; }
+    .gamification-level-launch-arrow { color:var(--neon); font-size:16px; }
+    .gamification-profile-xp { display:grid; align-content:center; gap:6px; min-width:0; padding:4px 2px; text-align:center; }
+    .gamification-profile-xp > span { color:var(--text-secondary); font-size:12px; font-weight:650; }
+    .gamification-profile-xp > small { color:var(--text-muted); font-size:11px; }
+    .gamification-profile-study-time { display:flex; align-items:center; justify-content:center; gap:8px; padding:9px 12px; border-top:1px solid var(--border); color:var(--text-secondary); background:transparent; }
     .gamification-profile-study-time .material-symbols-outlined { color:var(--neon); }
-    .gamification-profile-study-time strong { margin-left:auto; color:var(--text-primary); font-size:17px; white-space:nowrap; }
-    .gamification-frame-carousel { display:flex; align-items:center; justify-content:center; gap:10px; min-height:38px; color:var(--text-secondary); font-size:12px; font-weight:700; }
+    .gamification-profile-study-time strong { color:var(--text-primary); font-size:15px; white-space:nowrap; }
+    .gamification-frame-carousel { display:flex; align-items:center; justify-content:center; gap:10px; min-height:34px; color:var(--text-secondary); font-size:12px; font-weight:700; }
     .gamification-frame-carousel[hidden] { display:none; }
     .gamification-frame-arrow { width:34px; height:34px; display:grid; place-items:center; border:1px solid var(--border); border-radius:50%; color:var(--neon); background:var(--bg-surface); font-size:24px; line-height:1; transition:background .2s ease, transform .2s ease; }
     .gamification-frame-arrow:hover { transform:scale(1.06); background:var(--neon-subtle); }
@@ -7008,7 +7008,9 @@
     @media (max-width: 600px) {
       .gamification-modal-window { width: min(100%, 520px); max-height: calc(100dvh - 20px); padding: 17px; gap: 13px; }
       .gamification-profile-level-row { grid-template-columns: 1fr; gap: 9px; }
-      .gamification-profile-avatar { width: 82px; height: 82px; flex-basis: 82px; }
+      .gamification-profile-heading { padding-top: 5px; }
+      .gamification-profile-avatar { width: 156px; height: 156px; flex-basis: 156px; }
+      .gamification-profile-avatar .profile-frame-initials { width: 96px; height: 96px; font-size: 34px; }
       .gamification-profile-copy strong { font-size: 17px; }
       .gamification-frame-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
       .gamification-frame-option { min-height: 116px; }
