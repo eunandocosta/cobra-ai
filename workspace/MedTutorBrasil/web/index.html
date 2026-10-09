@@ -96,12 +96,12 @@
     <!-- SIDEBAR DESKTOP / WEB / WINDOWS -->
     <aside class="sidebar" id="appSidebar">
       <div class="brand">
-        <a class="brand-logo" href="/anuncios" aria-label="Abrir anúncios e atualizações do MedTutor" title="Anúncios e atualizações">
+        <a class="brand-logo" href="#home" onclick="navigateTab('home'); return false;" aria-label="Ir para a tela inicial do MedTutor" title="Início • O que quer fazer hoje?">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </a>
-        <div class="brand-text">
+        <div class="brand-text" onclick="navigateTab('home')" style="cursor: pointer;" title="Ir para a tela inicial">
           <h1>MedTutor Brasil</h1>
-          <span>Materiais de estudo</span>
+          <span>Estudo Ativo & Medicina</span>
         </div>
         <button class="sidebar-collapse-btn" type="button" onclick="toggleAppSidebar()" aria-label="Recolher menu lateral" aria-expanded="true" title="Recolher menu lateral">
           <svg class="icon sidebar-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="toggle-line toggle-line-top" d="M4 6h16"/><path class="toggle-line toggle-line-middle" d="M4 12h16"/><path class="toggle-line toggle-line-bottom" d="M4 18h16"/></svg>
@@ -109,18 +109,17 @@
       </div>
 
       <nav class="nav-list">
-        <button class="nav-link active" onclick="navigateTab('chat', this)" title="Chat Científico" aria-label="Chat Científico">
+        <!-- Chat Científico inativo / suspenso -->
+        <button class="nav-link" id="navLinkChat" onclick="navigateTab('chat', this)" title="Chat Científico" aria-label="Chat Científico" style="display: none;">
           <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           Chat Científico
         </button>
-        <button class="nav-link" onclick="navigateTab('flashcards', this)" title="Flashcards" aria-label="Flashcards">
-          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
-          Flashcards
+        <!-- Estudo Ativo unificado (Flashcards + Quizzes) -->
+        <button class="nav-link" id="navLinkStudy" onclick="navigateTab('study', this)" title="Estudo Ativo (Flashcards & Quizzes)" aria-label="Estudo Ativo">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Estudo Ativo
         </button>
-        <button class="nav-link" onclick="navigateTab('quizzes', this)" title="Quizzes & Casos" aria-label="Quizzes & Casos">
-          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Quizzes & Casos
-        </button>
+        <button class="nav-link" id="navLinkQuizzesCompat" onclick="navigateTab('quizzes', this)" title="Quizzes & Casos" aria-label="Quizzes & Casos" style="display: none;"></button>
         <button class="nav-link" onclick="navigateTab('curriculum', this)" title="Matérias Curriculares" aria-label="Matérias Curriculares">
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           Matérias Curriculares
@@ -152,8 +151,11 @@
       
       <!-- Topbar -->
       <header class="topbar">
+        <button class="topbar-home-brand-btn" type="button" onclick="navigateTab('home')" title="Início • O que você quer fazer hoje?" aria-label="Início do MedTutor">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </button>
         <div class="topbar-title" id="currentViewTitle">
-          Chat Científico & Revisão
+          Início • O que você quer fazer hoje?
         </div>
         <div class="topbar-actions">
           <button class="gamification-topbar" id="gamificationTopbar" type="button" onclick="openGamificationModal()" title="Ver nível, XP e critérios de pontuação" aria-label="Progresso de gamificação">
@@ -232,10 +234,223 @@
       </header>
 
       <!-- ÁREA DE CONTEÚDO DAS ABAS -->
-      <div class="view-content chat-view-active">
+      <div class="view-content">
 
-        <!-- 1. ABA CHAT (PADRÃO CHATGPT & GOOGLE GEMINI - TÁBUA EM BRANCO) -->
-        <section id="tab-chat" class="tab-section active">
+        <!-- 0. ABA INICIAL: O QUE VOCÊ QUER FAZER HOJE? (HUB & ONBOARDING) -->
+        <section id="tab-home" class="tab-section active">
+          <div class="home-hub-wrapper">
+
+            <!-- HERO DE BOAS-VINDAS & ACOLHIMENTO -->
+            <div class="home-hero-card">
+              <div class="home-hero-badge-row">
+                <span class="home-greeting-chip">
+                  <span class="home-pulse-dot"></span>
+                  <span id="homeGreetingTime">Bom dia</span>, futuro(a) médico(a)
+                </span>
+                <span class="home-period-chip" id="homeUserPeriodChip">Ciclo Básico</span>
+              </div>
+
+              <h1 class="home-hero-title">
+                Olá, <span id="homeGreetingName">Dr(a). Estudante</span> 👋
+              </h1>
+              <p class="home-hero-subtitle">
+                O que você quer praticar hoje no MedTutor? Escolha um objetivo abaixo ou continue suas revisões programadas.
+              </p>
+
+              <!-- MÉTRICAS RÁPIDAS DO DIA -->
+              <div class="home-quick-metrics-grid">
+                <div class="home-metric-card" onclick="navigateTab('flashcards')" title="Ir para revisões de hoje">
+                  <div class="home-metric-icon due">🟠</div>
+                  <div class="home-metric-info">
+                    <span class="home-metric-label">Revisões de Hoje</span>
+                    <strong class="home-metric-val" id="homeMetricDueCount">0 cards</strong>
+                  </div>
+                </div>
+
+                <div class="home-metric-card" onclick="openGamificationModal()" title="Ver nível e XP">
+                  <div class="home-metric-icon xp">⚡</div>
+                  <div class="home-metric-info">
+                    <span class="home-metric-label">Nível & Progresso</span>
+                    <strong class="home-metric-val" id="homeMetricLevel">Nível 1 (0 XP)</strong>
+                  </div>
+                </div>
+
+                <div class="home-metric-card" title="Tempo ativo de estudo acumulado hoje">
+                  <div class="home-metric-icon time">⏱️</div>
+                  <div class="home-metric-info">
+                    <span class="home-metric-label">Tempo Hoje</span>
+                    <strong class="home-metric-val" id="homeMetricTime">0 min</strong>
+                  </div>
+                </div>
+
+                <div class="home-metric-card" onclick="navigateTab('curriculum')" title="Ver disciplinas cadastradas">
+                  <div class="home-metric-icon subs">📚</div>
+                  <div class="home-metric-info">
+                    <span class="home-metric-label">Aulas & Grade</span>
+                    <strong class="home-metric-val" id="homeMetricSubjects">Disciplinas</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- JORNADA DE PRIMEIRO ACESSO / ONBOARDING AMIGÁVEL -->
+            <div class="home-onboarding-panel" id="homeOnboardingPanel">
+              <div class="home-onboarding-header">
+                <div class="home-onboarding-title-group">
+                  <span class="home-onboarding-kicker">🚀 Guia Rápido de Primeiro Acesso</span>
+                  <h2 class="home-onboarding-heading">Como dominar qualquer matéria em 3 passos com o MedTutor</h2>
+                </div>
+                <button type="button" class="btn-outline-action home-onboarding-close-btn" onclick="toggleHomeOnboarding(false)" title="Dispensar guia de introdução">
+                  ✕ Entendi
+                </button>
+              </div>
+
+              <div class="home-steps-grid">
+                <!-- Passo 1 -->
+                <div class="home-step-item" onclick="openGeneralUploadModal()">
+                  <div class="home-step-badge">1</div>
+                  <div class="home-step-body">
+                    <h3>Suba suas Aulas</h3>
+                    <p>Envie slides em PDF, apostilas ou anotações da faculdade. A IA divide tudo por temas e matérias.</p>
+                    <span class="home-step-action-link">📤 Fazer Upload de Aula ›</span>
+                  </div>
+                </div>
+
+                <!-- Passo 2 -->
+                <div class="home-step-item" onclick="navigateTab('flashcards')">
+                  <div class="home-step-badge">2</div>
+                  <div class="home-step-body">
+                    <h3>Pratique no Estudo Ativo</h3>
+                    <p>Alterne facilmente entre Flashcards para memorização e Quizzes clínicos com gabaritos detalhados.</p>
+                    <span class="home-step-action-link">🎯 Ir para Estudo Ativo ›</span>
+                  </div>
+                </div>
+
+                <!-- Passo 3 -->
+                <div class="home-step-item" onclick="navigateTab('sce')">
+                  <div class="home-step-badge">3</div>
+                  <div class="home-step-body">
+                    <h3>Fixe com o SCE (Waze)</h3>
+                    <p>A repetição espaçada agenda suas revisões nos momentos exatos para reter o conteúdo até a prova.</p>
+                    <span class="home-step-action-link">📈 Abrir Waze de Estudos ›</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARDS DE AÇÃO RÁPIDA: O QUE VOCÊ QUER FAZER HOJE? -->
+            <div class="home-actions-section">
+              <div class="home-section-title-row">
+                <h2 class="home-section-title">Escolha seu objetivo de estudo</h2>
+                <span class="home-section-badge">Atalhos principais</span>
+              </div>
+
+              <div class="home-action-cards-grid">
+                
+                <!-- Card 1: Estudo Ativo -->
+                <div class="home-hub-card featured" onclick="navigateTab('flashcards')">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">🎯</span>
+                    <span class="home-hub-card-tag">Recomendado</span>
+                  </div>
+                  <h3 class="home-hub-card-title">Estudo Ativo</h3>
+                  <p class="home-hub-card-desc">
+                    Revisão focada de Flashcards e Quizzes clínicos com respostas comentadas da sua faculdade.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Iniciar Estudo Ativo ➔</span>
+                  </div>
+                </div>
+
+                <!-- Card 2: Upload de Material -->
+                <div class="home-hub-card" onclick="openGeneralUploadModal()">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">📤</span>
+                    <span class="home-hub-card-tag">Conteúdo</span>
+                  </div>
+                  <h3 class="home-hub-card-title">Adicionar Aulas</h3>
+                  <p class="home-hub-card-desc">
+                    Envie slides em PDF, resumos ou fotos de apostilas para gerar questões e cartões sob medida com IA.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Enviar Arquivos ➔</span>
+                  </div>
+                </div>
+
+                <!-- Card 3: Grade Curricular -->
+                <div class="home-hub-card" onclick="navigateTab('curriculum')">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">📚</span>
+                    <span class="home-hub-card-tag">Grade</span>
+                  </div>
+                  <h3 class="home-hub-card-title">Grade Curricular</h3>
+                  <p class="home-hub-card-desc">
+                    Navegue pelas disciplinas do seu semestre, veja as matérias e organize suas ementas médicas.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Ver Disciplinas ➔</span>
+                  </div>
+                </div>
+
+                <!-- Card 4: SCE & Waze -->
+                <div class="home-hub-card" onclick="navigateTab('sce')">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">📈</span>
+                    <span class="home-hub-card-tag">Retenção</span>
+                  </div>
+                  <h3 class="home-hub-card-title">SCE & Waze de Estudos</h3>
+                  <p class="home-hub-card-desc">
+                    Seu cronograma inteligente de repetições espaçadas, linha do tempo diária e métricas de retenção.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Abrir Cronograma ➔</span>
+                  </div>
+                </div>
+
+                <!-- Card 5: Desafios Clínicos -->
+                <div class="home-hub-card" onclick="navigateTab('challenges')">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">⚔️</span>
+                    <span class="home-hub-card-tag">PvP & Ranking</span>
+                  </div>
+                  <h3 class="home-hub-card-title">Desafios Clínicos</h3>
+                  <p class="home-hub-card-desc">
+                    Duelos cronometrados contra colegas de faculdade ou contra o Residente Virtual IA.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Entrar na Arena ➔</span>
+                  </div>
+                </div>
+
+                <!-- Card 6: Imprimir Provas -->
+                <div class="home-hub-card" onclick="openQuizPrintModal()">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">🖨️</span>
+                    <span class="home-hub-card-tag">Papel & PDF</span>
+                  </div>
+                  <h3 class="home-hub-card-title">Imprimir Provas & Cadernos</h3>
+                  <p class="home-hub-card-desc">
+                    Gere provas impressas de múltipla escolha com gabarito ou cadernos discursivos com linhas pautadas.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Gerar Impressão ➔</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- AVISO DISCRETO: COMO VOLTAR A ESTA TELA -->
+            <div class="home-footer-hint">
+              <span class="hint-icon">💡</span>
+              <span>Dica: Para voltar a esta tela inicial a qualquer momento, clique no logotipo do <strong>MedTutor</strong> no canto superior da tela.</span>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 1. ABA CHAT (MÓDULO SUSPENSO / EM MANUTENÇÃO) -->
+        <section id="tab-chat" class="tab-section">
           <div class="chat-container-split">
             
             <!-- SIDEBAR DE HISTÓRICO DE CHATS (ESTILO CHATGPT / GEMINI) -->
@@ -385,6 +600,21 @@
           
           <!-- BARRA UNIFICADA DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (PERÍODO > DISCIPLINA > SLIDE) -->
           <div class="unified-study-control-card">
+
+            <!-- SELETOR DE MODALIDADE DO ESTUDO ATIVO: FLASHCARDS ⇄ QUIZZES -->
+            <div class="study-submode-selector-wrap">
+              <div class="study-submode-segmented-control" role="tablist" aria-label="Modalidade de Estudo Ativo">
+                <button type="button" class="study-submode-pill-btn active" id="btnStudySubmodeFc" onclick="setStudyActiveSubmode('flashcards')" role="tab" aria-selected="true" title="Modo Flashcards com repetição espaçada">
+                  <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
+                  <span>🗂️ Flashcards (SRS)</span>
+                </button>
+                <button type="button" class="study-submode-pill-btn" id="btnStudySubmodeQz" onclick="setStudyActiveSubmode('quizzes')" role="tab" aria-selected="false" title="Modo Quizzes e Casos Clínicos com gabarito comentado">
+                  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <span>📝 Quizzes & Casos Clínicos</span>
+                </button>
+              </div>
+            </div>
+
             <!-- NAVEGAÇÃO HIERÁRQUICA DROPDOWNS -->
             <div class="study-nav-hierarchy">
               <div class="study-nav-field">
@@ -631,6 +861,21 @@
         <section id="tab-quizzes" class="tab-section">
           <!-- BARRA UNIFICADA DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (PERÍODO > DISCIPLINA > SLIDE) -->
           <div class="unified-study-control-card">
+
+            <!-- SELETOR DE MODALIDADE DO ESTUDO ATIVO: FLASHCARDS ⇄ QUIZZES -->
+            <div class="study-submode-selector-wrap">
+              <div class="study-submode-segmented-control" role="tablist" aria-label="Modalidade de Estudo Ativo">
+                <button type="button" class="study-submode-pill-btn" id="btnStudySubmodeFcQzView" onclick="setStudyActiveSubmode('flashcards')" role="tab" aria-selected="false" title="Modo Flashcards com repetição espaçada">
+                  <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
+                  <span>🗂️ Flashcards (SRS)</span>
+                </button>
+                <button type="button" class="study-submode-pill-btn active" id="btnStudySubmodeQzQzView" onclick="setStudyActiveSubmode('quizzes')" role="tab" aria-selected="true" title="Modo Quizzes e Casos Clínicos com gabarito comentado">
+                  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <span>📝 Quizzes & Casos Clínicos</span>
+                </button>
+              </div>
+            </div>
+
             <!-- NAVEGAÇÃO HIERÁRQUICA DROPDOWNS -->
             <div class="study-nav-hierarchy">
               <div class="study-nav-field">
@@ -1197,29 +1442,29 @@
 
       <!-- MOBILE BOTTOM NAV (iOS & ANDROID) -->
       <nav class="mobile-bottom-nav">
-        <button class="mobile-nav-btn active" onclick="navigateTab('chat', this)">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span>Chat</span>
+        <button class="mobile-nav-btn active" onclick="navigateTab('home', this)" title="Início">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Início</span>
         </button>
-        <button class="mobile-nav-btn" onclick="navigateTab('flashcards', this)">
-          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
-          <span>Cards</span>
+        <button class="mobile-nav-btn" onclick="navigateTab('study', this)" title="Estudo Ativo">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <span>Estudo</span>
         </button>
-        <button class="mobile-nav-btn" onclick="navigateTab('quizzes', this)">
-          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
-          <span>Quizzes</span>
-        </button>
-        <button class="mobile-nav-btn" onclick="navigateTab('curriculum', this)">
+        <button class="mobile-nav-btn" onclick="navigateTab('curriculum', this)" title="Matérias">
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span>Matérias</span>
         </button>
-        <button class="mobile-nav-btn" onclick="navigateTab('sce', this)">
+        <button class="mobile-nav-btn" onclick="navigateTab('sce', this)" title="SCE">
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
           <span>SCE</span>
         </button>
-        <button class="mobile-nav-btn" onclick="navigateTab('challenges', this)">
+        <button class="mobile-nav-btn" onclick="navigateTab('challenges', this)" title="Desafios">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5l-6 6"/><path d="M8 8l-4-4"/><path d="M5 3L3 5"/></svg>
           <span>Desafios</span>
+        </button>
+        <button class="mobile-nav-btn" onclick="openGeneralUploadModal()" title="Upload">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="17" x2="12" y2="15"/></svg>
+          <span>Upload</span>
         </button>
       </nav>
 

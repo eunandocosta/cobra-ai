@@ -938,6 +938,9 @@
         if (btnSyllabus) {
           btnSyllabus.style.display = isUniverso ? 'none' : 'inline-flex';
         }
+        if (typeof renderHomeView === 'function') {
+          renderHomeView();
+        }
         this.refreshAdminMenuVisibility();
       },
 
@@ -4103,8 +4106,10 @@
     updateThemeSettingsControl();
 
     // 2. Navegação entre Abas
-    let currentTab = 'chat';
+    let currentTab = 'home';
     const APP_ROUTE_BY_TAB = {
+      home: '/inicio',
+      study: '/flashcards',
       chat: '/chat-ia',
       flashcards: '/flashcards',
       quizzes: '/quizzes',
@@ -4113,6 +4118,8 @@
       challenges: '/desafios'
     };
     const APP_TAB_BY_ROUTE = Object.fromEntries(Object.entries(APP_ROUTE_BY_TAB).map(([tab, route]) => [route, tab]));
+    APP_TAB_BY_ROUTE['/'] = 'home';
+    APP_TAB_BY_ROUTE['/inicio'] = 'home';
     let pendingRoutePath = (typeof window !== 'undefined' && window.location.pathname) || '/login';
 
     function setRoutePresentation(routeName) {
@@ -4124,7 +4131,7 @@
     }
 
     function setAppRoute(path, { replace = false } = {}) {
-      const normalized = path && path.startsWith('/') ? path : '/chat-ia';
+      const normalized = path && path.startsWith('/') ? path : '/inicio';
       if (typeof window !== 'undefined' && window.location.pathname !== normalized) {
         const method = replace ? 'replaceState' : 'pushState';
         window.history[method]({ medtutorRoute: normalized }, '', normalized);
@@ -4149,8 +4156,9 @@
       const savedTab = (() => {
         try { return JSON.parse(localStorage.getItem(STUDY_NAVIGATION_STORAGE_KEY) || 'null')?.tabId; } catch (e) { return null; }
       })();
-      const tabId = requestedTab || (!forceDefault && APP_TAB_BY_ROUTE[pendingRoutePath]) || (isAuthRoute ? 'chat' : savedTab) || 'chat';
-      const route = APP_ROUTE_BY_TAB[tabId] || APP_ROUTE_BY_TAB.chat;
+      const safeSavedTab = savedTab === 'chat' ? 'home' : savedTab;
+      const tabId = requestedTab || (!forceDefault && APP_TAB_BY_ROUTE[pendingRoutePath]) || (isAuthRoute ? 'home' : safeSavedTab) || 'home';
+      const route = APP_ROUTE_BY_TAB[tabId] || APP_ROUTE_BY_TAB.home;
       setAppRoute(route, { replace });
       setRoutePresentation('app');
       navigateTab(tabId, null, { preserveStudyContext: true, skipNavigationCache: true, skipRoute: true });
@@ -4185,6 +4193,8 @@
     }
 
     const viewTitles = {
+      home: 'Início • O que você quer fazer hoje?',
+      study: 'Estudo Ativo (Flashcards & Quizzes)',
       chat: 'Chat Científico & Revisão',
       flashcards: 'Flashcards de Repetição Espaçada',
       quizzes: 'Quizzes & Casos Clínicos',
@@ -4194,6 +4204,10 @@
     };
 
     const tabHelpDescriptions = {
+      home: {
+        title: 'Central de Aprendizado & Boas-Vindas',
+        text: 'Escolha o objetivo do seu dia de estudos, envie novas aulas da sua faculdade, revise pendências e acompanhe sua evolução.'
+      },
       chat: {
         title: 'Chat Científico & Materiais do Drive',
         text: 'Tire dúvidas clínicas com o tutor socrático ou anexe arquivos do Google Drive da sua turma para solicitar a produção de materiais didáticos completos para leitura (com tabelas semiológicas, diferenciais clínicos e pérolas de prova).'
@@ -4222,6 +4236,7 @@
 
     function createTabLoadingSkeleton(tabId) {
       const layouts = {
+        home: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><div class="tab-skeleton-grid three"><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i></div><div class="tab-skeleton-grid two"><i class="tab-skeleton-block panel tall"></i><i class="tab-skeleton-block panel tall"></i></div>',
         chat: '<div class="tab-skeleton-head"><i class="tab-skeleton-block square"></i><i class="tab-skeleton-block short"></i><i class="tab-skeleton-block medium"></i></div><div class="tab-skeleton-chat"><i class="tab-skeleton-block bubble right"></i><i class="tab-skeleton-block bubble left"></i><i class="tab-skeleton-block bubble right compact"></i></div><i class="tab-skeleton-block composer"></i>',
         flashcards: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><div class="tab-skeleton-grid two"><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i></div><i class="tab-skeleton-block study-card"></i><i class="tab-skeleton-block line wide"></i><i class="tab-skeleton-block composer"></i>',
         quizzes: '<div class="tab-skeleton-head"><i class="tab-skeleton-block medium"></i><i class="tab-skeleton-block short"></i></div><i class="tab-skeleton-block study-card"></i><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i><i class="tab-skeleton-block panel"></i>',
@@ -4262,11 +4277,110 @@
       }));
     }
 
+    let currentStudySubmode = (() => {
+      try { return localStorage.getItem('medtutor_study_submode_v1') || 'flashcards'; } catch (e) { return 'flashcards'; }
+    })();
+
+    function setStudyActiveSubmode(mode) {
+      currentStudySubmode = mode === 'quizzes' ? 'quizzes' : 'flashcards';
+      try { localStorage.setItem('medtutor_study_submode_v1', currentStudySubmode); } catch (e) {}
+      syncStudySubmodeSwitcherUI(currentStudySubmode);
+      navigateTab(currentStudySubmode, null, { preserveStudyContext: true });
+    }
+    window.setStudyActiveSubmode = setStudyActiveSubmode;
+
+    function syncStudySubmodeSwitcherUI(mode) {
+      const isQz = mode === 'quizzes';
+      ['btnStudySubmodeFc', 'btnStudySubmodeFcQzView'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.toggle('active', !isQz);
+          el.setAttribute('aria-selected', !isQz ? 'true' : 'false');
+        }
+      });
+      ['btnStudySubmodeQz', 'btnStudySubmodeQzQzView'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.toggle('active', isQz);
+          el.setAttribute('aria-selected', isQz ? 'true' : 'false');
+        }
+      });
+      const navStudy = document.getElementById('navLinkStudy');
+      if (navStudy) navStudy.classList.add('active');
+    }
+    window.syncStudySubmodeSwitcherUI = syncStudySubmodeSwitcherUI;
+
+    function toggleHomeOnboarding(show) {
+      const panel = document.getElementById('homeOnboardingPanel');
+      if (!panel) return;
+      if (show === false) {
+        panel.style.display = 'none';
+        try { localStorage.setItem('medtutor_home_onboarding_dismissed', 'true'); } catch (e) {}
+      } else {
+        panel.style.display = 'block';
+        try { localStorage.removeItem('medtutor_home_onboarding_dismissed'); } catch (e) {}
+      }
+    }
+    window.toggleHomeOnboarding = toggleHomeOnboarding;
+
+    function renderHomeView() {
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? 'Bom dia' : (hour < 18 ? 'Boa tarde' : 'Boa noite');
+      const greetingTimeEl = document.getElementById('homeGreetingTime');
+      if (greetingTimeEl) greetingTimeEl.textContent = greeting;
+
+      const name = (MedTutorAuthService?.userProfile?.nome) || (MedTutorAuthService?.currentUser?.displayName) || 'Estudante';
+      const nameEl = document.getElementById('homeGreetingName');
+      if (nameEl) nameEl.textContent = 'Dr(a). ' + name;
+
+      const period = (MedTutorAuthService?.userProfile?.periodo_atual) || 'Ciclo Básico';
+      const periodChip = document.getElementById('homeUserPeriodChip');
+      if (periodChip) periodChip.textContent = period;
+
+      const questions = (typeof getFilteredQuestions === 'function') ? getFilteredQuestions() : (sharedQuestionsBank || []);
+      const queueCounts = (typeof getSrsQueueCounts === 'function') ? getSrsQueueCounts(questions) : null;
+      const dueCount = queueCounts ? queueCounts.due : 0;
+      const dueEl = document.getElementById('homeMetricDueCount');
+      if (dueEl) dueEl.textContent = `${dueCount} ${dueCount === 1 ? 'card' : 'cards'}`;
+
+      const lvlLabel = document.getElementById('gamificationLevelLabel')?.textContent || 'Nível 1';
+      const xpLabel = document.getElementById('gamificationXpLabel')?.textContent || '0 XP';
+      const lvlEl = document.getElementById('homeMetricLevel');
+      if (lvlEl) lvlEl.textContent = `${lvlLabel} (${xpLabel})`;
+
+      const seconds = (typeof MedTutorStudyTimeTracker !== 'undefined' && MedTutorStudyTimeTracker.getTodaySeconds)
+        ? MedTutorStudyTimeTracker.getTodaySeconds()
+        : 0;
+      const mins = Math.round(seconds / 60);
+      const timeEl = document.getElementById('homeMetricTime');
+      if (timeEl) timeEl.textContent = mins > 0 ? `${mins} min` : 'Comece agora';
+
+      const materialsCount = Array.isArray(chatDriveMaterials) ? chatDriveMaterials.length : 0;
+      const subEl = document.getElementById('homeMetricSubjects');
+      if (subEl) subEl.textContent = materialsCount > 0 ? `${materialsCount} ${materialsCount === 1 ? 'aula salva' : 'aulas salvas'}` : 'Adicionar aulas';
+
+      const isDismissed = (() => {
+        try { return localStorage.getItem('medtutor_home_onboarding_dismissed') === 'true'; } catch (e) { return false; }
+      })();
+      const panel = document.getElementById('homeOnboardingPanel');
+      if (panel) {
+        if (materialsCount === 0 || !isDismissed) {
+          panel.style.display = 'block';
+        } else {
+          panel.style.display = 'none';
+        }
+      }
+    }
+    window.renderHomeView = renderHomeView;
+
     function navigateTab(tabId, btn, options = {}) {
       if (MedTutorAuthService?.currentUser && MedTutorAuthService.accessGranted !== true) {
         setRoutePresentation('login');
         MedTutorAuthService.setAuthScreenState(MedTutorAuthService.accessGranted === false ? 'access' : 'checking');
         return;
+      }
+      if (tabId === 'study') {
+        tabId = currentStudySubmode || 'flashcards';
       }
       const targetTab = document.getElementById('tab-' + tabId);
       if (!targetTab) return;
@@ -4284,8 +4398,20 @@
       if (btn) btn.classList.add('active');
       document.querySelectorAll(`.nav-link[onclick*="${tabId}"], .mobile-nav-btn[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
 
+      if (['flashcards', 'quizzes'].includes(tabId)) {
+        document.getElementById('navLinkStudy')?.classList.add('active');
+        document.querySelectorAll('.mobile-nav-btn[onclick*="study"]').forEach(el => el.classList.add('active'));
+        currentStudySubmode = tabId;
+        if (typeof syncStudySubmodeSwitcherUI === 'function') syncStudySubmodeSwitcherUI(tabId);
+      }
+      if (tabId === 'home') {
+        document.querySelectorAll('.mobile-nav-btn[onclick*="home"]').forEach(el => el.classList.add('active'));
+      }
+
       const renderTabContent = () => {
-        if (tabId === 'sce') {
+        if (tabId === 'home') {
+          renderHomeView();
+        } else if (tabId === 'sce') {
           renderSceTimeline();
           renderSceBars();
         } else if (tabId === 'challenges' && typeof MedTutorChallengesService !== 'undefined') {
@@ -4315,7 +4441,9 @@
     // Atualiza apenas a tela visível. A hidratação da nuvem não deve renderizar
     // todas as áreas do app em uma única tarefa longa no thread principal.
     function renderActiveTabContent() {
-      if (currentTab === 'chat') {
+      if (currentTab === 'home') {
+        renderHomeView();
+      } else if (currentTab === 'chat') {
         if (typeof renderChatSubjectTags === 'function') renderChatSubjectTags();
         if (typeof renderChatDriveVerticalList === 'function') renderChatDriveVerticalList();
         if (typeof renderChatHistorySidebar === 'function') renderChatHistorySidebar();
