@@ -292,10 +292,10 @@
     .app-root.sidebar-collapsed .nav-link .icon,
     .app-root.sidebar-collapsed .sidebar-settings-btn .icon,
     .app-root.sidebar-collapsed .sidebar-support-btn .icon {
-      width: 24px;
-      height: 24px;
-      font-size: 24px;
-      flex: 0 0 24px;
+      width: 28px;
+      height: 28px;
+      font-size: 28px;
+      flex: 0 0 28px;
     }
 
     .app-root.sidebar-collapsed .sidebar-settings-btn,
@@ -751,10 +751,10 @@
     .sidebar .nav-link > .icon,
     .sidebar .sidebar-settings-btn > .icon,
     .sidebar .sidebar-support-btn > .icon {
-      width: 24px;
-      height: 24px;
-      flex: 0 0 24px;
-      font-size: 24px;
+      width: 28px;
+      height: 28px;
+      flex: 0 0 28px;
+      font-size: 28px;
       line-height: 1;
     }
 
