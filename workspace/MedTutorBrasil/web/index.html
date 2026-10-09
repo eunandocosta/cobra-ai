@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261009-sidebar-icons-larger-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261009-profile-frames-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -4090,30 +4090,50 @@
 
   <div class="modal-overlay gamification-modal-overlay" id="gamificationModal" onclick="handleGamificationBackdrop(event)" aria-modal="true" role="dialog" aria-labelledby="gamificationModalTitle" aria-hidden="true">
     <section class="modal-window gamification-modal-window" onclick="event.stopPropagation()">
-      <header class="modal-head">
-        <div>
-          <h2 id="gamificationModalTitle" style="margin:0">Seu progresso de estudo</h2>
-          <small style="color:var(--text-secondary)">Pontos reconhecem a prática; maestria continua baseada no desempenho e na repetição espaçada.</small>
-        </div>
+      <header class="modal-head gamification-modal-header">
+        <div><h2 id="gamificationModalTitle" style="margin:0">Perfil do estudante</h2><small style="color:var(--text-secondary)">Sua jornada, conquistas e itens desbloqueados.</small></div>
         <button class="btn-close-modal" type="button" onclick="closeGamificationModal()" aria-label="Fechar">✕</button>
       </header>
-      <div class="gamification-modal-level">
-        <div class="gamification-level-mark" aria-hidden="true">✦</div>
-        <div class="gamification-level-details">
-          <strong id="gamificationModalLevel">Nível 1</strong>
-          <span id="gamificationModalXp">0 XP total</span>
-          <div class="gamification-progress-track"><span class="gamification-progress-fill" id="gamificationModalProgressFill"></span></div>
-          <small id="gamificationModalNextLevel">150 XP para o próximo nível</small>
-          <small class="gamification-study-time">Tempo ativo registrado: <strong id="gamificationModalStudyTime">0 min</strong></small>
+      <div class="gamification-modal-tabs" role="tablist" aria-label="Perfil e coleção">
+        <button class="gamification-modal-tab active" id="gamificationProfileTab" type="button" role="tab" aria-selected="true" aria-controls="gamificationProfileView" onclick="setGamificationModalView('profile')">Perfil</button>
+        <button class="gamification-modal-tab" id="gamificationCollectionTab" type="button" role="tab" aria-selected="false" aria-controls="gamificationCollectionView" onclick="setGamificationModalView('collection')">Coleção</button>
+      </div>
+      <section class="gamification-modal-page active" id="gamificationProfileView" role="tabpanel" aria-labelledby="gamificationProfileTab">
+        <div class="gamification-profile-heading">
+          <div class="gamification-profile-avatar" id="gamificationProfileAvatar" aria-label="Avatar com moldura selecionada"><span id="gamificationProfileInitials">--</span></div>
+          <div class="gamification-profile-copy"><strong id="gamificationProfileName">Estudante</strong><span id="gamificationProfileCourse">Medicina</span><small id="gamificationEquippedFrame">Sem moldura equipada</small></div>
         </div>
-      </div>
-      <div class="gamification-rules-grid">
-        <article><h3>Flashcards</h3><p>No dia: fácil <b>8 XP</b> · intermediário <b>10 XP</b> · difícil <b>12 XP</b>.</p><p>Atrasados: <b>6 / 7 / 8 XP</b>, respectivamente. Cartões estudados antes da data recebem o valor-base, sem bônus de deck.</p></article>
-        <article><h3>Quiz</h3><p>Fácil <b>2 XP</b> · Intermediário <b>3 XP</b> · Difícil <b>4 XP</b></p><p>Errar não remove XP. Cada questão pontua no máximo uma vez por dia.</p></article>
-        <article><h3>Deck completo</h3><p>Concluir os flashcards previstos da disciplina: <b>+8 XP</b> no dia ou <b>+4 XP</b> se atrasados.</p><p>Bônus único por disciplina, fila e dia.</p></article>
-        <article><h3>Combo de estudo</h3><p>Ações de estudo em até 30 minutos: <b>+1 XP</b> a partir da 3ª e <b>+2 XP</b> a partir da 5ª.</p><p>Bônus de combo limitado a 20 XP por dia.</p></article>
-      </div>
-      <p class="gamification-level-note">O primeiro nível exige 80 XP; a meta de cada nível seguinte aumenta 5 XP em relação ao anterior. XP mede prática, não substitui maestria nem retenção. O tempo considera atividade nas áreas de estudo com a página visível e interação recente; pode ser menor que o tempo real de leitura passiva.</p>
+        <div class="gamification-profile-level-row">
+          <button class="gamification-level-launch" id="gamificationProfileLevelButton" type="button" onclick="showGamificationLevelInfo()" aria-label="Abrir explicação da progressão de nível">
+            <span class="gamification-level-launch-icon material-symbols-outlined" aria-hidden="true">military_tech</span>
+            <span><strong id="gamificationProfileLevel">Nível 1</strong><small>Toque para ver sua progressão</small></span>
+            <span class="material-symbols-outlined gamification-level-launch-arrow" aria-hidden="true">arrow_forward</span>
+          </button>
+          <div class="gamification-profile-xp"><span id="gamificationProfileXp">0 XP total</span><div class="gamification-progress-track" role="progressbar" id="gamificationProfileProgressTrack" aria-label="Progresso de XP para o próximo nível" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="gamification-progress-fill" id="gamificationProfileProgressFill"></span></div><small id="gamificationProfileNextLevel">0 XP para o próximo nível</small></div>
+        </div>
+        <div class="gamification-profile-study-time"><span class="material-symbols-outlined" aria-hidden="true">timer</span><span>Tempo ativo de estudo</span><strong id="gamificationProfileStudyTime">0 min</strong></div>
+        <div class="gamification-frame-carousel" id="gamificationFrameCarousel" hidden>
+          <button class="gamification-frame-arrow" type="button" onclick="cycleGamificationFrame(-1)" aria-label="Moldura anterior">‹</button><span id="gamificationFrameCarouselLabel">Louro acadêmico · 1º período</span><button class="gamification-frame-arrow" type="button" onclick="cycleGamificationFrame(1)" aria-label="Próxima moldura">›</button>
+        </div>
+      </section>
+      <section class="gamification-modal-page" id="gamificationCollectionView" role="tabpanel" aria-labelledby="gamificationCollectionTab" hidden>
+        <div class="gamification-collection-heading"><h3>Coleção de molduras</h3><p>Desbloqueie molduras estudando e escolha qual usar no seu perfil.</p></div>
+        <div class="gamification-frame-grid" id="gamificationFrameGrid" aria-label="Molduras disponíveis"></div>
+      </section>
+      <section class="gamification-modal-page gamification-level-info" id="gamificationLevelInfoView" hidden aria-label="Regras de progressão">
+        <button class="gamification-back-button" type="button" onclick="showGamificationProfile()"><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span> Voltar ao perfil</button>
+        <div class="gamification-modal-level">
+          <div class="gamification-level-mark" aria-hidden="true">✦</div>
+          <div class="gamification-level-details"><strong id="gamificationModalLevel">Nível 1</strong><span id="gamificationModalXp">0 XP total</span><div class="gamification-progress-track"><span class="gamification-progress-fill" id="gamificationModalProgressFill"></span></div><small id="gamificationModalNextLevel">150 XP para o próximo nível</small><small class="gamification-study-time">Tempo ativo registrado: <strong id="gamificationModalStudyTime">0 min</strong></small></div>
+        </div>
+        <div class="gamification-rules-grid">
+          <article><h3>Flashcards</h3><p>No dia: fácil <b>8 XP</b> · intermediário <b>10 XP</b> · difícil <b>12 XP</b>.</p><p>Atrasados: <b>6 / 7 / 8 XP</b>, respectivamente. Cartões estudados antes da data recebem o valor-base, sem bônus de deck.</p></article>
+          <article><h3>Quiz</h3><p>Fácil <b>2 XP</b> · Intermediário <b>3 XP</b> · Difícil <b>4 XP</b></p><p>Errar não remove XP. Cada questão pontua no máximo uma vez por dia.</p></article>
+          <article><h3>Deck completo</h3><p>Concluir os flashcards previstos da disciplina: <b>+8 XP</b> no dia ou <b>+4 XP</b> se atrasados.</p><p>Bônus único por disciplina, fila e dia.</p></article>
+          <article><h3>Combo de estudo</h3><p>Ações de estudo em até 30 minutos: <b>+1 XP</b> a partir da 3ª e <b>+2 XP</b> a partir da 5ª.</p><p>Bônus de combo limitado a 20 XP por dia.</p></article>
+        </div>
+        <p class="gamification-level-note">O primeiro nível exige 80 XP; a meta de cada nível seguinte aumenta 5 XP em relação ao anterior. XP mede prática, não substitui maestria nem retenção. O tempo considera atividade nas áreas de estudo com a página visível e interação recente; pode ser menor que o tempo real de leitura passiva.</p>
+      </section>
     </section>
   </div>
 
@@ -4151,7 +4171,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/material-icons.js?v=20261009-compact-sidebar-tooltips-v1"></script>
-  <script defer src="/app.min.js?v=20261009-sidebar-study-dropdown-v1"></script>
+  <script defer src="/app.min.js?v=20261009-profile-frames-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

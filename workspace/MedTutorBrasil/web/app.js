@@ -3593,6 +3593,7 @@
         if (timeTotal) timeTotal.textContent = `${this.state.totalXp.toLocaleString('pt-BR')} XP`;
         if (timeRemaining) timeRemaining.textContent = `${(level.xpToNextLevel - level.xpIntoLevel).toLocaleString('pt-BR')} XP`;
         if (timeStudy) timeStudy.textContent = formatGamificationStudyTime(this.state.totalStudySeconds);
+        renderGamificationProfile();
       },
 
       showReward(award, event, previousTotalXp = this.state.totalXp - (Number(award?.earnedXp) || 0)) {
@@ -3741,10 +3742,304 @@
       }
     });
 
+    const gamificationLaurelFrames = [
+      { period: 1, colors: ['#59402c','#9a7044','#d2ae76'], title: 'Madeira clara' },
+      { period: 2, colors: ['#68472d','#b17a48','#e3bc7b'], title: 'Madeira polida' },
+      { period: 3, colors: ['#5c4935','#bd8950','#f0c777'], title: 'Bronze inicial' },
+      { period: 4, colors: ['#4d603b','#9f9b56','#f0d681'], title: 'Bronze dourado' },
+      { period: 5, colors: ['#236644','#42a36a','#f3dc7c'], title: 'Louro esmeralda' },
+      { period: 6, colors: ['#176b49','#57c487','#ffe48b'], title: 'Liga nobre' },
+      { period: 7, colors: ['#176c52','#62d4a1','#eaffc4'], title: 'Esmeralda lapidada' },
+      { period: 8, colors: ['#176a68','#64c9bd','#e6fff7'], title: 'Cristal verde' },
+      { period: 9, colors: ['#1c677a','#72ccdd','#e8fcff'], title: 'Cristal celeste' },
+      { period: 10, colors: ['#315d91','#81bdf1','#effaff'], title: 'Safira luminosa' },
+      { period: 11, colors: ['#536fa8','#b2d4fc','#ffffff'], title: 'Diamante lapidado' },
+      { period: 12, colors: ['#80a9ca','#e1f5ff','#ffffff'], title: 'Diamante brilhante' }
+    ];
+    const gamificationNeonFrame = { id: 'neon', title: 'Pulso Neon', colors: ['#00f477','#b2ffd2','#07552d'] };
+    let gamificationEquippedFrame = null;
+    let gamificationFrameCarouselIds = [];
+    let gamificationFrameCarouselIndex = 0;
+    let gamificationFrameCountsCache = null;
+    let gamificationNeonEligibilitySeen = null;
+
+    function gamificationFrameId(period) { return `laurel-${period}`; }
+    function gamificationUserId() {
+      return MedTutorAuthService?.currentUser?.uid || MedTutorGamification?.uid || 'local';
+    }
+    function readEquippedGamificationFrame() {
+      const profileValue = String(MedTutorAuthService?.userProfile?.moldura_perfil || '');
+      if (profileValue) return profileValue;
+      try { return localStorage.getItem(`medtutor_profile_frame_v1_${gamificationUserId()}`) || ''; } catch (error) { return ''; }
+    }
+    function getGamificationProfileInfo() {
+      const profile = MedTutorAuthService?.userProfile || {};
+      const name = String(profile.nome || MedTutorAuthService?.currentUser?.displayName || 'Estudante').trim();
+      const names = name.split(/\s+/).filter(Boolean);
+      const initials = names.length > 1 ? `${names[0][0]}${names[names.length - 1][0]}` : (names[0] || 'MD').slice(0, 2);
+      const course = [profile.faculdade, profile.periodo_atual].filter(Boolean).join(' · ') || 'Medicina';
+      return { profile, name, initials: initials.toUpperCase(), course };
+    }
+    function getGamificationFrameCounts() {
+      const counts = Array(12).fill(0);
+      const seen = new Set();
+      const curriculum = typeof getOfficialCurriculumDisciplineList === 'function' ? getOfficialCurriculumDisciplineList() : [];
+      const numberFromLabel = value => {
+        const label = String(value || '');
+        if (!/(per[ií]odo|semestre|fase|termo|etapa)/i.test(label)) return 0;
+        const number = Number(label.match(/(?:^|\D)(1[0-2]|[1-9])(?:\D|$)/)?.[1] || 0);
+        return number >= 1 && number <= 12 ? number : 0;
+      };
+      (Array.isArray(sharedQuestionsBank) ? sharedQuestionsBank : []).forEach(question => {
+        if (!question || !question.id || seen.has(String(question.id))) return;
+        const stats = question.quizStats || {};
+        const answered = Number(stats.attempts) > 0 || stats.answered === true || (stats.lastStatus && stats.lastStatus !== 'unanswered');
+        if (!answered) return;
+        seen.add(String(question.id));
+        let period = numberFromLabel(question.period || question.periodo || question.semester || question.fullPeriod);
+        if (!period) period = numberFromLabel(question.subject || question.disciplina);
+        if (!period && (question.subject || question.disciplina)) {
+          const subject = question.subject || question.disciplina;
+          const match = curriculum.find(item => typeof isSameCurriculumSubject === 'function'
+            ? isSameCurriculumSubject(item.name, subject)
+            : String(item.name).trim().toLowerCase() === String(subject).trim().toLowerCase());
+          period = numberFromLabel(match?.period || match?.fullPeriod);
+        }
+        if (period) counts[period - 1] += 1;
+      });
+      return counts;
+    }
+    function gamificationFrameRequirement(frameId, counts, studySeconds) {
+      if (frameId === 'neon') return {
+        unlocked: Number(studySeconds) >= 3600,
+        requirement: 'Acumule 1 hora de prática ativa nas áreas de estudo. O tempo é registrado com a página visível e interação recente.'
+      };
+      const period = Number(String(frameId).match(/^laurel-(\d{1,2})$/)?.[1] || 0);
+      if (!period || period > 12) return { unlocked: false, requirement: 'Esta moldura ainda não está disponível.' };
+      const missingPeriod = counts.findIndex((count, index) => index < period && count < 50) + 1;
+      return {
+        unlocked: missingPeriod === 0,
+        requirement: missingPeriod
+          ? `Responda 50 questões em cada período, em ordem. Primeiro conclua 50 do ${missingPeriod}º período; há ${counts[missingPeriod - 1]} de 50.`
+          : `Responda pelo menos 50 questões únicas em cada período do 1º ao ${period}º. A sequência é obrigatória.`
+      };
+    }
+    function buildGamificationFrameSvg(frameId) {
+      const isNeon = frameId === 'neon';
+      if (isNeon) return '<svg class="profile-frame-svg" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="64" fill="none" stroke="var(--frame-main)" stroke-width="3"/><circle cx="80" cy="80" r="71" fill="none" stroke="var(--frame-main)" stroke-width="1.5" opacity=".35"/><path d="M80 8v15m0 114v15M8 80h15m114 0h15M28 28l11 11m82 82 11 11m0-104-11 11m-82 82-11 11" fill="none" stroke="var(--frame-light)" stroke-width="3" stroke-linecap="round"/><circle cx="80" cy="15" r="4" fill="var(--frame-light)"/><circle cx="145" cy="80" r="4" fill="var(--frame-light)"/><circle cx="80" cy="145" r="4" fill="var(--frame-light)"/><circle cx="15" cy="80" r="4" fill="var(--frame-light)"/></svg>';
+      const leaves = Array.from({ length: 7 }, (_, index) => {
+        const y = 119 - index * 15;
+        const x = 35 + Math.round(Math.sin(index / 6 * Math.PI) * 13);
+        return `<path d="M${x} ${y} C${x - 15} ${y - 1} ${x - 19} ${y - 11} ${x - 17} ${y - 18} C${x - 5} ${y - 16} ${x + 2} ${y - 8} ${x} ${y}Z"/><path d="M${160 - x} ${y} C${175 - x} ${y - 1} ${179 - x} ${y - 11} ${177 - x} ${y - 18} C${165 - x} ${y - 16} ${158 - x} ${y - 8} ${160 - x} ${y}Z"/>`;
+      }).join('');
+      const period = Number(frameId.replace('laurel-', '')) || 1;
+      const topAdornment = period >= 9
+        ? '<path d="m80 5 2.4 5.7 6.1.5-4.6 4 1.4 5.9-5.3-3.1-5.3 3.1 1.4-5.9-4.6-4 6.1-.5z" fill="var(--frame-light)"/><path d="M49 18 80 8l31 10" fill="none" stroke="var(--frame-light)" stroke-width="1.2" opacity=".75"/>'
+        : '';
+      return `<svg class="profile-frame-svg" viewBox="0 0 160 160" aria-hidden="true"><path d="M34 128C14 102 19 53 48 22M126 128c20-26 15-75-14-106" fill="none" stroke="var(--frame-main)" stroke-width="3" stroke-linecap="round"/><g fill="var(--frame-deep)" stroke="var(--frame-light)" stroke-width="1.4" stroke-linejoin="round">${leaves}</g><path d="M44 136c9 6 21 9 36 9s27-3 36-9" fill="none" stroke="var(--frame-main)" stroke-width="2.2" stroke-linecap="round"/>${topAdornment}</svg>`;
+    }
+    function frameOptionMarkup(frameId, colors, initials, compact = false) {
+      const avatarClass = compact ? 'frame-option-avatar' : 'gamification-profile-avatar';
+      return `<div class="${avatarClass}" data-frame="${frameId}" style="--frame-main:${colors[0]};--frame-light:${colors[1]};--frame-deep:${colors[2]}">${buildGamificationFrameSvg(frameId)}<span class="profile-frame-initials">${initials}</span></div>`;
+    }
+    function applyGamificationAvatarFrame(avatar, frameId, colors, initials) {
+      if (!avatar) return;
+      const id = frameId || 'none';
+      const renderKey = `${id}:${initials}`;
+      avatar.dataset.frame = id;
+      avatar.style.setProperty('--frame-main', colors[0]);
+      avatar.style.setProperty('--frame-light', colors[1]);
+      avatar.style.setProperty('--frame-deep', colors[2]);
+      if (avatar.dataset.renderKey === renderKey) return;
+      avatar.dataset.renderKey = renderKey;
+      avatar.innerHTML = `${frameId ? buildGamificationFrameSvg(frameId) : ''}<span class="profile-frame-initials">${initials}</span>`;
+    }
+    function getGamificationFrameDefinitions() {
+      return [
+        ...gamificationLaurelFrames.map(item => ({ id: gamificationFrameId(item.period), type: 'laurel', period: item.period, title: `Louro acadêmico · ${item.period}º período`, colors: item.colors })),
+        { id: 'neon', type: 'neon', title: 'Pulso Neon', colors: gamificationNeonFrame.colors }
+      ];
+    }
+    function renderGamificationProfile() {
+      const profileView = document.getElementById('gamificationProfileView');
+      if (!profileView) return;
+      const { name, initials, course } = getGamificationProfileInfo();
+      const nameEl = document.getElementById('gamificationProfileName');
+      const courseEl = document.getElementById('gamificationProfileCourse');
+      const initialsEl = document.getElementById('gamificationProfileInitials');
+      if (nameEl) nameEl.textContent = name;
+      if (courseEl) courseEl.textContent = course;
+      if (initialsEl) initialsEl.textContent = initials;
+      const equipped = readEquippedGamificationFrame();
+      const counts = gamificationFrameCountsCache || (gamificationFrameCountsCache = getGamificationFrameCounts());
+      const candidateFrame = getGamificationFrameDefinitions().find(item => item.id === equipped);
+      const frame = candidateFrame && gamificationFrameRequirement(candidateFrame.id, counts, MedTutorGamification.state.totalStudySeconds).unlocked
+        ? candidateFrame
+        : null;
+      gamificationEquippedFrame = frame?.id || null;
+      const avatar = document.getElementById('gamificationProfileAvatar');
+      const colors = frame?.colors || ['var(--neon)','#b2ffd2','#07552d'];
+      applyGamificationAvatarFrame(avatar, frame?.id || '', colors, initials);
+      const frameLabel = document.getElementById('gamificationEquippedFrame');
+      if (frameLabel) frameLabel.textContent = frame?.title || 'Escolha uma moldura na coleção';
+      const level = MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp);
+      const levelEl = document.getElementById('gamificationProfileLevel');
+      if (levelEl) levelEl.textContent = `Nível ${level.level}`;
+      const xpEl = document.getElementById('gamificationProfileXp');
+      if (xpEl) xpEl.textContent = `${MedTutorGamification.state.totalXp.toLocaleString('pt-BR')} XP total`;
+      const fill = document.getElementById('gamificationProfileProgressFill');
+      const pct = Math.max(0, Math.min(100, level.xpIntoLevel / level.xpToNextLevel * 100));
+      if (fill) fill.style.width = `${pct}%`;
+      const track = document.getElementById('gamificationProfileProgressTrack');
+      if (track) track.setAttribute('aria-valuenow', String(Math.round(pct)));
+      const next = document.getElementById('gamificationProfileNextLevel');
+      if (next) next.textContent = `${(level.xpToNextLevel - level.xpIntoLevel).toLocaleString('pt-BR')} XP para o próximo nível`;
+      const time = document.getElementById('gamificationProfileStudyTime');
+      if (time) time.textContent = formatGamificationStudyTime(MedTutorGamification.state.totalStudySeconds);
+      const neonUnlocked = MedTutorGamification.state.totalStudySeconds >= 3600;
+      if (gamificationNeonEligibilitySeen === false && neonUnlocked && document.getElementById('gamificationModal')?.classList.contains('active')) {
+        if (!document.getElementById('gamificationCollectionView')?.hidden) renderGamificationCollection();
+        gamificationNeonEligibilitySeen = true;
+      } else if (gamificationNeonEligibilitySeen === null) {
+        gamificationNeonEligibilitySeen = neonUnlocked;
+      }
+      renderGamificationFrameCarousel(initials);
+    }
+    function renderGamificationFrameCarousel(initials = getGamificationProfileInfo().initials) {
+      const container = document.getElementById('gamificationFrameCarousel');
+      if (!container) return;
+      const counts = gamificationFrameCountsCache || (gamificationFrameCountsCache = getGamificationFrameCounts());
+      const equippedLaurel = String(gamificationEquippedFrame || '').startsWith('laurel-');
+      if (!equippedLaurel) { container.hidden = true; return; }
+      const defs = gamificationFrameDefinitionsForCarousel(counts);
+      if (defs.length < 2) { container.hidden = true; return; }
+      container.hidden = false;
+      gamificationFrameCarouselIds = defs.map(item => item.id);
+      let index = gamificationFrameCarouselIds.indexOf(gamificationEquippedFrame);
+      if (index < 0) index = Math.min(gamificationFrameCarouselIndex, defs.length - 1);
+      gamificationFrameCarouselIndex = index;
+      const current = defs[index];
+      const label = document.getElementById('gamificationFrameCarouselLabel');
+      const avatar = document.getElementById('gamificationProfileAvatar');
+      if (label) label.textContent = current.title;
+      applyGamificationAvatarFrame(avatar, current.id, current.colors, initials);
+    }
+    function gamificationFrameDefinitionsForCarousel(counts = gamificationFrameCountsCache || getGamificationFrameCounts()) {
+      return gamificationLaurelFrames
+        .map(item => ({ id: gamificationFrameId(item.period), type: 'laurel', period: item.period, title: `Louro acadêmico · ${item.period}º período`, colors: item.colors }))
+        .filter(item => gamificationFrameRequirement(item.id, counts, MedTutorGamification.state.totalStudySeconds).unlocked);
+    }
+    function cycleGamificationFrame(direction) {
+      if (!gamificationFrameCarouselIds.length) return;
+      gamificationFrameCarouselIndex = (gamificationFrameCarouselIndex + direction + gamificationFrameCarouselIds.length) % gamificationFrameCarouselIds.length;
+      const selectedId = gamificationFrameCarouselIds[gamificationFrameCarouselIndex];
+      const counts = gamificationFrameCountsCache || getGamificationFrameCounts();
+      const frame = gamificationFrameDefinitionsForCarousel(counts).find(item => item.id === selectedId);
+      if (frame) selectGamificationFrame(frame);
+    }
+    async function selectGamificationFrame(frame) {
+      const counts = getGamificationFrameCounts();
+      if (!gamificationFrameRequirement(frame.id, counts, MedTutorGamification.state.totalStudySeconds).unlocked) return;
+      gamificationEquippedFrame = frame.id;
+      gamificationFrameCarouselIndex = Math.max(0, gamificationFrameCarouselIds.indexOf(frame.id));
+      try { localStorage.setItem(`medtutor_profile_frame_v1_${gamificationUserId()}`, frame.id); } catch (error) {}
+      const profile = MedTutorAuthService?.userProfile;
+      if (profile && MedTutorAuthService?.currentUser?.uid) {
+        profile.moldura_perfil = frame.id;
+        MedTutorAuthService.userProfile = profile;
+        await MedTutorFirebaseService.saveUserProfile({ ...profile, moldura_perfil: frame.id });
+      }
+      renderGamificationProfile();
+      renderGamificationCollection();
+    }
+    let gamificationTooltipTimer = null;
+    function renderGamificationCollection() {
+      const grid = document.getElementById('gamificationFrameGrid');
+      if (!grid) return;
+      const { initials } = getGamificationProfileInfo();
+      const counts = gamificationFrameCountsCache || (gamificationFrameCountsCache = getGamificationFrameCounts());
+      const definitions = getGamificationFrameDefinitions();
+      const equipped = readEquippedGamificationFrame();
+      grid.innerHTML = definitions.map(frame => {
+        const state = gamificationFrameRequirement(frame.id, counts, MedTutorGamification.state.totalStudySeconds);
+        const label = state.unlocked ? frame.title : 'Bloqueado';
+        const selected = state.unlocked && equipped === frame.id;
+        const accessible = state.unlocked ? `Selecionar moldura ${frame.title}${selected ? ', equipada' : ''}` : `Moldura bloqueada. ${state.requirement}`;
+        return `<button type="button" class="gamification-frame-option${selected ? ' is-selected' : ''}" data-frame-id="${frame.id}" aria-label="${accessible}" aria-disabled="${state.unlocked ? 'false' : 'true'}" aria-pressed="${selected ? 'true' : 'false'}">${frameOptionMarkup(frame.id, frame.colors, initials, true)}<span class="${state.unlocked ? 'frame-option-name' : 'frame-option-lock'}">${label}</span><span class="gamification-frame-tooltip" role="tooltip">${state.requirement}</span></button>`;
+      }).join('');
+      grid.querySelectorAll('.gamification-frame-option').forEach(button => {
+        const showLater = () => {
+          clearTimeout(gamificationTooltipTimer);
+          gamificationTooltipTimer = setTimeout(() => button.classList.add('tooltip-visible'), 1500);
+        };
+        const hide = () => { clearTimeout(gamificationTooltipTimer); button.classList.remove('tooltip-visible'); };
+        button.addEventListener('pointerenter', showLater);
+        button.addEventListener('pointerleave', hide);
+        button.addEventListener('focus', showLater);
+        button.addEventListener('blur', hide);
+        button.addEventListener('click', () => {
+          hide();
+          const frame = definitions.find(item => item.id === button.dataset.frameId);
+          if (!frame) return;
+          if (button.getAttribute('aria-disabled') === 'true') {
+            button.classList.add('tooltip-visible');
+            setTimeout(() => button.classList.remove('tooltip-visible'), 3000);
+            return;
+          }
+          selectGamificationFrame(frame);
+        });
+      });
+    }
+    function setGamificationModalView(view) {
+      const profile = document.getElementById('gamificationProfileView');
+      const collection = document.getElementById('gamificationCollectionView');
+      const info = document.getElementById('gamificationLevelInfoView');
+      const profileTab = document.getElementById('gamificationProfileTab');
+      const collectionTab = document.getElementById('gamificationCollectionTab');
+      const showCollection = view === 'collection';
+      if (profile) profile.hidden = showCollection;
+      if (collection) collection.hidden = !showCollection;
+      if (info) info.hidden = true;
+      profileTab?.classList.toggle('active', !showCollection);
+      collectionTab?.classList.toggle('active', showCollection);
+      profileTab?.setAttribute('aria-selected', String(!showCollection));
+      collectionTab?.setAttribute('aria-selected', String(showCollection));
+      if (showCollection) {
+        gamificationFrameCountsCache = getGamificationFrameCounts();
+        gamificationNeonEligibilitySeen = MedTutorGamification.state.totalStudySeconds >= 3600;
+        renderGamificationCollection();
+      }
+    }
+    function showGamificationLevelInfo() {
+      const profile = document.getElementById('gamificationProfileView');
+      const collection = document.getElementById('gamificationCollectionView');
+      const info = document.getElementById('gamificationLevelInfoView');
+      if (profile) profile.hidden = true;
+      if (collection) collection.hidden = true;
+      if (info) info.hidden = false;
+      document.getElementById('gamificationProfileTab')?.classList.add('active');
+      document.getElementById('gamificationProfileTab')?.setAttribute('aria-selected', 'true');
+      document.getElementById('gamificationCollectionTab')?.classList.remove('active');
+      document.getElementById('gamificationCollectionTab')?.setAttribute('aria-selected', 'false');
+    }
+    function showGamificationProfile() { setGamificationModalView('profile'); }
+
+    function refreshGamificationFramesAfterQuiz() {
+      gamificationFrameCountsCache = null;
+      const modal = document.getElementById('gamificationModal');
+      if (!modal?.classList.contains('active')) return;
+      gamificationFrameCountsCache = getGamificationFrameCounts();
+      if (!document.getElementById('gamificationCollectionView')?.hidden) renderGamificationCollection();
+      else renderGamificationProfile();
+    }
+
     function openGamificationModal() {
       const modal = document.getElementById('gamificationModal');
       if (!modal) return;
       MedTutorGamification.render();
+      gamificationFrameCountsCache = getGamificationFrameCounts();
+      gamificationNeonEligibilitySeen = MedTutorGamification.state.totalStudySeconds >= 3600;
+      setGamificationModalView('profile');
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
     }
@@ -3822,6 +4117,10 @@
 
     window.openGamificationModal = openGamificationModal;
     window.closeGamificationModal = closeGamificationModal;
+    window.setGamificationModalView = setGamificationModalView;
+    window.showGamificationLevelInfo = showGamificationLevelInfo;
+    window.showGamificationProfile = showGamificationProfile;
+    window.cycleGamificationFrame = cycleGamificationFrame;
     window.handleGamificationBackdrop = handleGamificationBackdrop;
     window.addEventListener('online', () => MedTutorGamification.syncPending());
 
@@ -17465,6 +17764,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       renderSceBars();
 
       if (answeredItems.length) {
+        refreshGamificationFramesAfterQuiz();
         Promise.all(answeredItems.map(({ item, outcome }) => awardQuizGamification(item, { quiet: true, outcome }))).then(results => {
           const earned = results.reduce((total, result) => total + (result?.award?.earnedXp || 0), 0);
           if (earned !== 0) {
@@ -17764,6 +18064,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       item.quizStats.lastChoice = optIdx;
       item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
       saveSharedQuestionsBank();
+      refreshGamificationFramesAfterQuiz();
       renderSceBars();
       awardQuizGamification(item, { outcome: isCorrect ? 'correct' : 'incorrect' });
 
