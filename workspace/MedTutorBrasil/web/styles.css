@@ -338,7 +338,7 @@
     }
 
     .sidebar-dropdown-group.open .sidebar-submenu {
-      max-height: 140px;
+      max-height: 200px;
       opacity: 1;
       margin-top: 4px;
       margin-bottom: 4px;
@@ -347,8 +347,9 @@
     .sidebar-submenu-item {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
+      gap: 11px;
+      min-height: 44px;
+      padding: 6px 10px;
       border-radius: 10px;
       background: transparent;
       border: 1px solid transparent;
@@ -359,6 +360,7 @@
       text-align: left;
       transition: all 0.18s ease;
       width: 100%;
+      line-height: 1.25;
     }
 
     .sidebar-submenu-item:hover {
@@ -373,17 +375,36 @@
     }
 
     .sidebar-submenu-item .icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      width: 28px;
+      height: 28px;
+      flex: 0 0 28px;
+      border-radius: 8px;
+      color: var(--neon);
+      background: var(--neon-subtle);
       flex-shrink: 0;
     }
 
     .sidebar-submenu-item .submenu-item-text {
       flex: 1;
+      min-width: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    /* Mantém os ícones no eixo dos botões, inclusive quando o texto quebra. */
+    button > .icon,
+    button > .material-symbol-font,
+    a[role="button"] > .icon,
+    a[role="button"] > .material-symbol-font {
+      align-self: center;
+      flex-shrink: 0;
+      line-height: 1;
+      vertical-align: middle;
     }
 
     /* Submenu em modo colapsado (flyout flutuante) */
@@ -396,7 +417,7 @@
       position: absolute;
       left: calc(100% + 12px);
       top: 0;
-      width: 200px;
+      width: 220px;
       max-height: none;
       background: var(--bg-card);
       border: 1px solid var(--border-accent);
