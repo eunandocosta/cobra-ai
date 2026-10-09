@@ -12,5 +12,8 @@ router.post('/responder', withAccess((req, res) => quizzesController.submit(req,
 router.get('/flashcards/:subjectId', withAccess((req, res) => quizzesController.getFlashcards(req, res)));
 router.post('/flashcards/revisar', withAccess((req, res) => quizzesController.reviewFlashcard(req, res)));
 router.post('/flashcards/corrigir', withAccess((req, res) => quizzesController.evaluateFlashcard(req, res)));
+router.get('/curadoria', (req, res) => quizzesController.listCuratedQuestions(req, res));
+router.put('/curadoria', (req, res) => quizzesController.saveCuratedQuestion(req, res));
+router.delete('/curadoria/:questionId', (req, res) => quizzesController.deleteCuratedQuestion(req, res));
 
 module.exports = router;

@@ -279,6 +279,12 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow create, update: if isAuthenticated();
       }
+
+      // A curadoria só é acessada pelo endpoint autenticado, que confere a
+      // faculdade no perfil confiável; publicações verificam Partner/Admin.
+      match /disciplinas/{disciplineId}/questoes_curadas/{questionId} {
+        allow read, write: if false;
+      }
     }
 
     // 8. Banco Comunitário de Questões da Instituição por Disciplina

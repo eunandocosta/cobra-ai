@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261009-study-submenu-icons-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261009-institutional-curation-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -713,6 +713,16 @@
                   ⚡ Gerar Estudo
                 </button>
 
+                <div class="curated-study-menu-wrap">
+                  <button class="btn-outline-action curated-study-toolbar-btn" id="fcCurationFilterBtn" onclick="toggleCuratedStudyMenu(event)" title="Abrir questões priorizadas para esta disciplina" style="display: none;">
+                    <span class="material-symbol-font icon" aria-hidden="true">library_books</span> Questões da Curadoria <span id="fcCuratedStudyCount" class="curated-study-count">0</span>
+                  </button>
+                  <div class="curated-study-menu" role="menu" aria-label="Tipo de conteúdo da curadoria" hidden>
+                    <button type="button" class="curated-study-menu-item" role="menuitem" data-curated-content-type="flashcards" onclick="openCuratedStudyContent('flashcards')" hidden><span class="material-symbol-font icon" aria-hidden="true">style</span><span>Flashcards</span><small data-curated-content-count>0</small></button>
+                    <button type="button" class="curated-study-menu-item" role="menuitem" data-curated-content-type="quizzes" onclick="openCuratedStudyContent('quizzes')" hidden><span class="material-symbol-font icon" aria-hidden="true">quiz</span><span>Quiz</span><small data-curated-content-count>0</small></button>
+                  </div>
+                </div>
+
                 <button class="btn-outline-action" id="fcUploadMaterialBtn" onclick="openImportStudyMaterialModal('flashcards')" title="Fazer upload de apostila ou material didático para transformar em Flashcards e Quizzes com IA" style="font-weight: 700; border-color: rgba(0, 229, 255, 0.45); color: var(--neon);">
                   📤 Upload de Material
                 </button>
@@ -804,7 +814,6 @@
                  <button id="srsQueue-due" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('due')" aria-pressed="false">Revisão de Hoje: 0</button>
                  <button id="srsQueue-tomorrow" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('tomorrow')" aria-pressed="false">Revisão de amanhã: 0</button>
                  <button id="srsQueue-upcoming" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('upcoming')" aria-pressed="false">Revisão dos próximos dias: 0</button>
-                 <button id="srsQueue-curated" class="btn-outline-action curation-filter-btn" style="font-size: 10.5px; padding: 4px 8px;" onclick="setStudyCurationFilter('flashcards')" aria-pressed="false" title="Filtrar perguntas da Curadoria da Instituição">🏛️ Curadoria: <span id="fcCurationBadge">0</span></button>
                </div>
              </div>
              <div id="learningGapPanel" class="learning-gap-panel" aria-live="polite"></div>
@@ -965,9 +974,15 @@
                   ⚡ Gerar Estudo
                 </button>
 
-                <button class="btn-outline-action curation-action-btn" id="qzCurationFilterBtn" onclick="toggleCurationFilter('quizzes')" title="Filtrar perguntas selecionadas pela Curadoria da instituição">
-                  🏛️ Perguntas da Curadoria (<span id="qzCurationCount">0</span>)
-                </button>
+                <div class="curated-study-menu-wrap">
+                  <button class="btn-outline-action curated-study-toolbar-btn" id="qzCurationFilterBtn" onclick="toggleCuratedStudyMenu(event)" title="Abrir questões priorizadas para esta disciplina" style="display: none;">
+                    <span class="material-symbol-font icon" aria-hidden="true">library_books</span> Questões da Curadoria <span id="qzCurationCount" class="curated-study-count">0</span>
+                  </button>
+                  <div class="curated-study-menu" role="menu" aria-label="Tipo de conteúdo da curadoria" hidden>
+                    <button type="button" class="curated-study-menu-item" role="menuitem" data-curated-content-type="flashcards" onclick="openCuratedStudyContent('flashcards')" hidden><span class="material-symbol-font icon" aria-hidden="true">style</span><span>Flashcards</span><small data-curated-content-count>0</small></button>
+                    <button type="button" class="curated-study-menu-item" role="menuitem" data-curated-content-type="quizzes" onclick="openCuratedStudyContent('quizzes')" hidden><span class="material-symbol-font icon" aria-hidden="true">quiz</span><span>Quiz</span><small data-curated-content-count>0</small></button>
+                  </div>
+                </div>
 
                 <button class="btn-outline-action" id="qzUploadMaterialBtn" onclick="openImportStudyMaterialModal('quizzes')" title="Fazer upload de apostila ou material didático para transformar em Quizzes e Flashcards com IA" style="font-weight: 700; border-color: rgba(0, 229, 255, 0.45); color: var(--neon);">
                   📤 Upload de Material
@@ -4135,7 +4150,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/material-icons.js?v=20261009-compact-sidebar-tooltips-v1"></script>
-  <script defer src="/app.min.js?v=20261007-quiz-visual-evidence-v1"></script>
+  <script defer src="/app.min.js?v=20261009-institutional-curation-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

@@ -4348,6 +4348,9 @@
         group.classList.remove('open');
         document.getElementById('navLinkStudy')?.setAttribute('aria-expanded', 'false');
       }
+      if (!event.target.closest('.curated-study-menu-wrap')) {
+        document.querySelectorAll('.curated-study-menu').forEach(menu => { menu.hidden = true; });
+      }
     });
 
     function isCuratorUser() {
@@ -4355,6 +4358,166 @@
       return role === 'partner' || role === 'admin';
     }
     window.isCuratorUser = isCuratorUser;
+
+    var institutionCuratedStudyQuestions = [];
+    var institutionCuratedStudyScope = '';
+    var institutionCuratedStudyLoadingScope = '';
+
+    function getCuratedQuestionTypes(item) {
+      const contentTypes = item?.contentTypes || {};
+      const options = item?.quizOptions || item?.options || item?.alternativas || [];
+      const hasFlashcardType = Object.prototype.hasOwnProperty.call(contentTypes, 'flashcards');
+      const hasQuizType = Object.prototype.hasOwnProperty.call(contentTypes, 'quizzes');
+      return {
+        flashcards: hasFlashcardType
+          ? contentTypes.flashcards === true
+          : Boolean(item?.answer || item?.referenceAnswer || item?.back || item?.flashcard?.back),
+        quizzes: hasQuizType
+          ? contentTypes.quizzes === true
+          : item?.flashcardOnly !== true && Array.isArray(options) && options.length >= 2
+      };
+    }
+
+    function isInstitutionCuratedQuestion(questionId) {
+      return institutionCuratedStudyQuestions.some(question => String(question.id) === String(questionId));
+    }
+
+    function updateCuratedStudyToolbar() {
+      const types = institutionCuratedStudyQuestions.reduce((totals, item) => {
+        const available = getCuratedQuestionTypes(item);
+        if (available.flashcards) totals.flashcards++;
+        if (available.quizzes) totals.quizzes++;
+        return totals;
+      }, { flashcards: 0, quizzes: 0 });
+      const controls = [
+        { button: 'fcCurationFilterBtn', count: 'fcCuratedStudyCount', type: 'flashcards' },
+        { button: 'qzCurationFilterBtn', count: 'qzCurationCount', type: 'quizzes' }
+      ];
+      controls.forEach(({ button, count, type }) => {
+        const buttonEl = document.getElementById(button);
+        const countEl = document.getElementById(count);
+        const available = types[type] > 0;
+        if (buttonEl) buttonEl.style.display = available ? 'inline-flex' : 'none';
+        if (buttonEl) buttonEl.classList.toggle('active', type === 'flashcards' ? isStudyCurationFilterActive : isQuizCurationFilterActive);
+        if (countEl) countEl.textContent = String(types[type]);
+      });
+      document.querySelectorAll('[data-curated-content-type]').forEach(option => {
+        const type = option.getAttribute('data-curated-content-type');
+        const available = types[type] > 0;
+        option.hidden = !available;
+        if (available) option.querySelector('[data-curated-content-count]')?.replaceChildren(document.createTextNode(String(types[type])));
+      });
+    }
+
+    async function loadInstitutionCuratedQuestions(subjectName = currentStudySubject, force = false) {
+      const profile = MedTutorAuthService?.userProfile || {};
+      const institution = String(profile.faculdade || '').trim();
+      const discipline = resolveCanonicalCurriculumSubjectName(subjectName);
+      const scope = institution && discipline ? `${institution.toLocaleLowerCase()}::${getDisciplineQuestionBankId(discipline)}` : '';
+      if (!scope) {
+        institutionCuratedStudyQuestions = [];
+        institutionCuratedStudyScope = '';
+        updateCuratedStudyToolbar();
+        return;
+      }
+      if (!force && (scope === institutionCuratedStudyScope || scope === institutionCuratedStudyLoadingScope)) return;
+      institutionCuratedStudyQuestions = [];
+      institutionCuratedStudyLoadingScope = scope;
+      updateCuratedStudyToolbar();
+      try {
+        const response = await fetch(`/api/quizzes/curadoria?disciplina=${encodeURIComponent(discipline)}`);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        if (institutionCuratedStudyLoadingScope !== scope) return;
+        institutionCuratedStudyQuestions = Array.isArray(result.questions)
+          ? result.questions.map(question => ({ ...question, curated: true, curatedInstitution: result.institution || institution }))
+          : [];
+        institutionCuratedStudyScope = scope;
+      } catch (error) {
+        if (institutionCuratedStudyLoadingScope === scope) {
+          institutionCuratedStudyScope = scope;
+          institutionCuratedStudyQuestions = [];
+        }
+        console.warn('[Curadoria] Não foi possível carregar o banco desta disciplina:', error);
+      } finally {
+        if (institutionCuratedStudyLoadingScope === scope) institutionCuratedStudyLoadingScope = '';
+        updateCuratedStudyToolbar();
+        if (scope === institutionCuratedStudyScope && isSameCurriculumSubject(currentStudySubject, discipline)) {
+          if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+          if (typeof renderQuizzesList === 'function') renderQuizzesList();
+        }
+      }
+    }
+
+    function toggleCuratedStudyMenu(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const wrapper = event?.currentTarget?.closest('.curated-study-menu-wrap');
+      const menu = wrapper?.querySelector('.curated-study-menu');
+      if (!menu) return;
+      const willOpen = menu.hidden;
+      document.querySelectorAll('.curated-study-menu').forEach(item => { item.hidden = true; });
+      menu.hidden = !willOpen;
+      if (willOpen) loadInstitutionCuratedQuestions(currentStudySubject);
+    }
+    window.toggleCuratedStudyMenu = toggleCuratedStudyMenu;
+
+    function openCuratedStudyContent(type) {
+      document.querySelectorAll('.curated-study-menu').forEach(item => { item.hidden = true; });
+      if (type === 'flashcards') {
+        toggleCurationFilter('quizzes', false);
+        if (currentTab !== 'flashcards') navigateTab('flashcards');
+        setStudyCurationFilter('flashcards', true);
+      } else if (type === 'quizzes') {
+        setStudyCurationFilter('flashcards', false);
+        if (currentTab !== 'quizzes') navigateTab('quizzes');
+        toggleCurationFilter('quizzes', true);
+      }
+    }
+    window.openCuratedStudyContent = openCuratedStudyContent;
+
+    async function toggleInstitutionCuratedQuestion(item, type) {
+      if (!isCuratorUser()) {
+        showToast('A Curadoria está disponível somente para Partner e Administradores.');
+        return;
+      }
+      const questionId = String(item?.id || '');
+      const isAlreadyCurated = isInstitutionCuratedQuestion(questionId);
+      const discipline = resolveCanonicalCurriculumSubjectName(item?.subject || item?.disciplina || currentStudySubject);
+      if (!questionId || !discipline) return;
+      const button = type === 'quizzes'
+        ? Array.from(document.querySelectorAll('.curation-rocket-btn')).find(element => element.dataset.questionId === questionId)
+        : document.getElementById('fcCurateToggleBtn');
+      if (button) button.disabled = true;
+      try {
+        let response;
+        if (isAlreadyCurated) {
+          response = await fetch(`/api/quizzes/curadoria/${encodeURIComponent(questionId)}?disciplina=${encodeURIComponent(discipline)}`, { method: 'DELETE' });
+        } else {
+          response = await fetch('/api/quizzes/curadoria', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ discipline, question: { ...item, __curationType: type } })
+          });
+        }
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        institutionCuratedStudyQuestions = isAlreadyCurated
+          ? institutionCuratedStudyQuestions.filter(question => question.id !== questionId)
+          : [...institutionCuratedStudyQuestions.filter(question => question.id !== questionId), { ...result.question, curated: true }];
+        showToast(isAlreadyCurated ? 'Questão removida da Curadoria da Instituição.' : 'Questão enviada à Curadoria da sua instituição.');
+        updateCuratedStudyToolbar();
+        if (type === 'quizzes') renderQuizzesList();
+        else renderSharedStudyItems();
+      } catch (error) {
+        console.error('[Curadoria] Não foi possível atualizar a questão:', error);
+        showToast(error.message || 'Não foi possível atualizar a questão na curadoria.');
+      } finally {
+        if (button) button.disabled = false;
+      }
+    }
 
     function setUserRole(role) {
       if (!MedTutorAuthService) return;
@@ -4392,11 +4555,12 @@
     }
     window.setStudyCurationFilter = setStudyCurationFilter;
 
-    function toggleCurationFilter(type) {
-      isQuizCurationFilterActive = !isQuizCurationFilterActive;
+    function toggleCurationFilter(type, forceState) {
+      isQuizCurationFilterActive = typeof forceState === 'boolean' ? forceState : !isQuizCurationFilterActive;
       const btn = document.getElementById('qzCurationFilterBtn');
       if (btn) btn.classList.toggle('active', isQuizCurationFilterActive);
-      if (typeof renderQuizzesList === 'function') renderQuizzesList();
+      if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+      else if (typeof renderQuizzesList === 'function') renderQuizzesList();
     }
     window.toggleCurationFilter = toggleCurationFilter;
 
@@ -4407,38 +4571,15 @@
       if (!list.length || currentCardIndex >= list.length) return;
       const item = list[currentCardIndex];
       if (!item) return;
-      item.curated = !item.curated;
-      if (item.curated) {
-        item.curatedBy = MedTutorAuthService?.userProfile?.nome || 'Partner Curador';
-        item.curatedInstitution = MedTutorAuthService?.userProfile?.faculdade || 'Instituição';
-        item.curatedAt = new Date().toISOString();
-        showToast('🏛️ Flashcard salvo na Curadoria da Instituição!');
-      } else {
-        showToast('Flashcard removido da Curadoria.');
-      }
-      saveSharedQuestionsBank();
-      if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+      toggleInstitutionCuratedQuestion(item, 'flashcards');
     }
     window.toggleCurrentCardCuration = toggleCurrentCardCuration;
 
     function toggleCurateQuestion(questionId, view) {
-      const item = sharedQuestionsBank.find(q => q.id === questionId);
+      const item = sharedQuestionsBank.find(q => q.id === questionId)
+        || institutionCuratedStudyQuestions.find(q => q.id === questionId);
       if (!item) return;
-      item.curated = !item.curated;
-      if (item.curated) {
-        item.curatedBy = MedTutorAuthService?.userProfile?.nome || 'Partner Curador';
-        item.curatedInstitution = MedTutorAuthService?.userProfile?.faculdade || 'Instituição';
-        item.curatedAt = new Date().toISOString();
-        showToast('🏛️ Questão adicionada à Curadoria da Instituição!');
-      } else {
-        showToast('Questão removida da Curadoria.');
-      }
-      saveSharedQuestionsBank();
-      if (view === 'quizzes' && typeof renderQuizzesList === 'function') {
-        renderQuizzesList();
-      } else if (typeof renderSharedStudyItems === 'function') {
-        renderSharedStudyItems();
-      }
+      toggleInstitutionCuratedQuestion(item, view === 'quizzes' ? 'quizzes' : 'flashcards');
     }
     window.toggleCurateQuestion = toggleCurateQuestion;
 
@@ -10030,6 +10171,11 @@ ${cleanText}
       currentDiseaseFilter = 'all';
       currentQuizSlideFilter = 'all';
       currentCardIndex = 0;
+      isStudyCurationFilterActive = false;
+      isQuizCurationFilterActive = false;
+      srsQueueFilter = 'new';
+      institutionCuratedStudyQuestions = [];
+      institutionCuratedStudyScope = '';
       updateSubjectFilterMenus();
       renderSharedStudyItems();
       saveStudyNavigationState();
@@ -15954,6 +16100,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     function renderSharedStudyItems() {
       ensureCurrentSubjectValid();
+      loadInstitutionCuratedQuestions(currentStudySubject);
 
       const currentStatus = subjectGenerationStatus[currentStudySubject] || { status: 'ready', materialsCount: 0, questionsCount: 0 };
       // Usa a mesma resolução de disciplina da tela Matérias Curriculares.
@@ -15964,7 +16111,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         : [];
       const matCount = resolvedMaterials.length || currentStatus.materialsCount || 0;
       const qCount = sharedQuestionsBank.filter(q => isSameCurriculumSubject(q.subject || q.disciplina, currentStudySubject)).length;
-      const isPending = currentStatus.status === 'pending' || (matCount > 0 && qCount === 0);
+      const curatedCount = institutionCuratedStudyQuestions.length;
+      const isPending = !curatedCount && (currentStatus.status === 'pending' || (matCount > 0 && qCount === 0));
 
       // 1. Atualiza os seletores hierárquicos e badges
       renderSlideSelectors();
@@ -16009,18 +16157,25 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       // 4. Questões filtradas da matéria ativa
       const filtered = getFilteredQuestions();
-      const hasItems = filtered.length > 0;
+      const hasFlashcardItems = srsQueueFilter === 'curated'
+        ? institutionCuratedStudyQuestions.some(item => getCuratedQuestionTypes(item).flashcards)
+        : filtered.length > 0;
+      const hasQuizItems = isQuizCurationFilterActive
+        ? institutionCuratedStudyQuestions.some(item => getCuratedQuestionTypes(item).quizzes)
+        : filtered.some(item => !item.flashcardOnly);
 
-      if (fcEmpty) fcEmpty.style.display = hasItems ? 'none' : 'flex';
-      if (fcDeck) fcDeck.style.display = hasItems ? 'block' : 'none';
+      if (fcEmpty) fcEmpty.style.display = hasFlashcardItems ? 'none' : 'flex';
+      if (fcDeck) fcDeck.style.display = hasFlashcardItems ? 'block' : 'none';
 
-      if (qzEmpty) qzEmpty.style.display = hasItems ? 'none' : 'flex';
-      if (qzDeck) qzDeck.style.display = hasItems ? 'flex' : 'none';
-      if (qzModeBar) qzModeBar.style.display = hasItems ? 'flex' : 'none';
+      if (qzEmpty) qzEmpty.style.display = hasQuizItems ? 'none' : 'flex';
+      if (qzDeck) qzDeck.style.display = hasQuizItems ? 'flex' : 'none';
+      if (qzModeBar) qzModeBar.style.display = hasQuizItems ? 'flex' : 'none';
 
-      if (hasItems) {
+      if (hasFlashcardItems) {
         if (currentCardIndex >= filtered.length) currentCardIndex = 0;
         updateCardDisplay(filtered);
+      }
+      if (hasQuizItems || isQuizCurationFilterActive) {
         renderQuizzesList(filtered);
       }
     }
@@ -16093,15 +16248,15 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       (baseList || []).forEach(item => {
         const key = getFlashcardQueueKey(item);
         if (counts[key] !== undefined) counts[key]++;
-        if (item.curated) counts.curated++;
       });
+      counts.curated = institutionCuratedStudyQuestions.filter(item => getCuratedQuestionTypes(item).flashcards).length;
       return counts;
     }
 
     function getSrsFilteredList(baseList) {
       const list = baseList || getFilteredQuestions();
       const selected = srsQueueFilter === 'curated'
-        ? list.filter(item => Boolean(item.curated))
+        ? institutionCuratedStudyQuestions.filter(item => getCuratedQuestionTypes(item).flashcards)
         : (srsQueueFilter === 'all' ? list : list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter));
       return selected.slice().sort((a, b) => {
         const aDate = a.srs?.dueDate || a.srs?.newScheduledDate || a.createdAt || '';
@@ -16374,18 +16529,23 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const fcAccessBadge = document.getElementById('fcAccessBadge');
       const fcCuratedBadge = document.getElementById('fcCuratedBadge');
       const fcCurateToggleBtn = document.getElementById('fcCurateToggleBtn');
+      const isInstitutionCurated = isInstitutionCuratedQuestion(item.id);
       if (fcAccessBadge) {
-        fcAccessBadge.style.display = item.curated ? 'none' : 'inline-flex';
+        fcAccessBadge.style.display = isInstitutionCurated ? 'none' : 'inline-flex';
       }
       if (fcCuratedBadge) {
-        fcCuratedBadge.style.display = item.curated ? 'inline-flex' : 'none';
-        fcCuratedBadge.textContent = item.curatedInstitution ? `🏛️ Curadoria (${item.curatedInstitution})` : '🏛️ Curadoria';
+        fcCuratedBadge.style.display = isInstitutionCurated ? 'inline-flex' : 'none';
+        const institutionName = institutionCuratedStudyQuestions.find(question => String(question.id) === String(item.id))?.curatedInstitution;
+        fcCuratedBadge.textContent = institutionName ? `🏛️ Curadoria (${institutionName})` : '🏛️ Curadoria';
       }
       if (fcCurateToggleBtn) {
         const canCurate = typeof isCuratorUser === 'function' && isCuratorUser();
         fcCurateToggleBtn.style.display = canCurate ? 'inline-flex' : 'none';
-        fcCurateToggleBtn.classList.toggle('curated', Boolean(item.curated));
-        fcCurateToggleBtn.textContent = item.curated ? '🏛️ Salvo na Curadoria' : '🏛️ Salvar na Curadoria';
+        fcCurateToggleBtn.classList.toggle('curated', isInstitutionCurated);
+        fcCurateToggleBtn.dataset.questionId = String(item.id || '');
+        fcCurateToggleBtn.title = isInstitutionCurated ? 'Remover esta questão da Curadoria da Instituição' : 'Enviar esta questão para a Curadoria da Instituição';
+        fcCurateToggleBtn.setAttribute('aria-label', fcCurateToggleBtn.title);
+        fcCurateToggleBtn.innerHTML = '<span class="material-symbol-font" aria-hidden="true">rocket_launch</span>';
       }
 
       // Detecção de Redundância Local (>50% de similaridade) a Custo Zero (Algoritmo Leve)
@@ -17382,17 +17542,15 @@ Retorne EXCLUSIVAMENTE um JSON:
     function renderQuizzesList(filteredList) {
       const quizDeck = document.getElementById('quizDeck');
       if (!quizDeck) return;
+      loadInstitutionCuratedQuestions(currentStudySubject);
       quizDeck.innerHTML = '';
-      let list = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
+      const ordinaryList = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
+      const curatedList = institutionCuratedStudyQuestions.filter(item => getCuratedQuestionTypes(item).quizzes);
+      let list = isQuizCurationFilterActive ? curatedList.slice() : ordinaryList;
 
-      const baseList = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
-      const curatedCount = baseList.filter(q => q.curated).length;
+      const curatedCount = curatedList.length;
       const qzCurationCountEl = document.getElementById('qzCurationCount');
       if (qzCurationCountEl) qzCurationCountEl.textContent = String(curatedCount);
-
-      if (typeof isQuizCurationFilterActive !== 'undefined' && isQuizCurationFilterActive) {
-        list = list.filter(q => q.curated);
-      }
 
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
@@ -17443,6 +17601,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         const areaClass = item.area || 'clinica';
         const areaLabel = item.areaLabel || 'Clínica Médica';
         const correctIndex = resolveQuizCorrectIndex(item);
+        const isCuratedForInstitution = isInstitutionCuratedQuestion(item.id);
 
         const styleLabel = item.examStyle === 'enare' ? 'ENARE / FGV' : (item.examStyle === 'enamed' ? 'ENAMED / MEC' : 'Taxonomia Bloom');
         const diffLabel = getFlashcardDifficultyLabel(item);
@@ -17460,9 +17619,9 @@ Retorne EXCLUSIVAMENTE um JSON:
           <div class="quiz-card-topbar">
             <div class="quiz-card-metadata">
               <span class="area-badge area-${areaClass}">${areaLabel}</span>
-              ${item.curated ? `
+              ${isCuratedForInstitution ? `
                 <span class="resource-badge-tag partner" title="Questão Curada da Instituição">
-                  🏛️ Curadoria ${item.curatedInstitution ? `• ${escapeHtml(item.curatedInstitution)}` : ''}
+                  🏛️ Curadoria ${institutionCuratedStudyQuestions.find(question => String(question.id) === String(item.id))?.curatedInstitution ? `• ${escapeHtml(institutionCuratedStudyQuestions.find(question => String(question.id) === String(item.id)).curatedInstitution)}` : ''}
                 </span>
               ` : `
                 <span class="resource-badge-tag public" title="Recurso com acesso para Público Geral">
@@ -17499,8 +17658,8 @@ Retorne EXCLUSIVAMENTE um JSON:
             </div>
             <div class="quiz-card-actions">
               ${(typeof isCuratorUser === 'function' && isCuratorUser()) ? `
-                <button class="btn-outline-action btn-curate-inline ${item.curated ? 'curated' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleCurateQuestion('${item.id}', 'quizzes')" title="${item.curated ? 'Remover da Curadoria da Instituição' : 'Salvar esta questão na Curadoria da Instituição'}">
-                  ${item.curated ? '🏛️ Curada' : '🏛️ Curar'}
+                <button type="button" class="btn-curate-inline curation-rocket-btn ${isCuratedForInstitution ? 'curated' : ''}" data-question-id="${escapeHtml(item.id)}" onclick="toggleCurateQuestion('${escapeHtml(item.id)}', 'quizzes')" title="${isCuratedForInstitution ? 'Remover da Curadoria da Instituição' : 'Enviar para a Curadoria da Instituição'}" aria-label="${isCuratedForInstitution ? 'Remover da Curadoria da Instituição' : 'Enviar para a Curadoria da Instituição'}">
+                  <span class="material-symbol-font" aria-hidden="true">rocket_launch</span>
                 </button>
               ` : ''}
               <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px;" onclick="openQuestionDiscussionById('${item.id}')" title="Perguntar ao tutor sobre esta questão">
