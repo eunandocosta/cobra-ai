@@ -748,6 +748,11 @@
       border-color: var(--border-accent);
     }
 
+    /* Nível de acesso é interno; não ocupa espaço nem aparece na navegação. */
+    .sidebar .resource-badge-tag {
+      display: none !important;
+    }
+
     .nav-link-text,
     .nav-link .resource-badge-tag,
     .nav-dropdown-chevron {
@@ -758,7 +763,12 @@
       transition: opacity 0.2s ease, max-width 0.38s cubic-bezier(0.22, 1, 0.36, 1), width 0.38s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear;
     }
 
-    .nav-link-text { max-width: 190px; }
+    .nav-link-text {
+      min-width: 0;
+      max-width: 190px;
+      flex: 1 1 auto;
+      text-overflow: ellipsis;
+    }
     .nav-link .resource-badge-tag { max-width: 180px; }
     .nav-dropdown-chevron { max-width: 24px; }
 
