@@ -207,6 +207,7 @@
       padding-left: 12px;
       padding-right: 12px;
       align-items: center;
+      overflow: visible;
     }
 
     .app-root.sidebar-collapsed .brand {
@@ -232,12 +233,44 @@
     .app-root.sidebar-collapsed .sidebar-footer { width: 100%; }
 
     .app-root.sidebar-collapsed .nav-link {
+      position: relative;
       justify-content: center;
       width: 50px;
       height: 48px;
       padding: 0;
       gap: 0;
       font-size: 0;
+    }
+
+    .app-root.sidebar-collapsed .nav-link[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      z-index: 30;
+      left: calc(100% + 10px);
+      top: 50%;
+      width: max-content;
+      max-width: min(240px, calc(100vw - 100px));
+      padding: 8px 11px;
+      border: 1px solid var(--border-accent);
+      border-radius: 10px;
+      background: var(--bg-elevated);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .32);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.35;
+      text-align: left;
+      white-space: normal;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(4px, -50%);
+      transition: opacity .16s ease, transform .16s ease;
+    }
+
+    .app-root.sidebar-collapsed .nav-link[data-tooltip]:hover::after,
+    .app-root.sidebar-collapsed .nav-link[data-tooltip]:focus-visible::after {
+      opacity: 1;
+      transform: translate(0, -50%);
     }
 
     .app-root.sidebar-collapsed .nav-link-text,
@@ -606,6 +639,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    /* O título da seção é texto; ícones acidentais vindos de conteúdo legado
+       não devem competir visualmente com a marca nem deslocar o cabeçalho. */
+    #currentViewTitle > .material-symbol-font,
+    #currentViewTitle > svg,
+    #currentViewTitle > .icon { display: none !important; }
 
     .topbar-actions {
       display: flex;

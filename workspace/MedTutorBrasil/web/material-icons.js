@@ -162,6 +162,13 @@
       const label = String(element.getAttribute('aria-label') || element.getAttribute('title') || fallbackLabel || element.id || element.className?.baseVal || element.className || '')
         .replace(/\b(auto_awesome|expand_more|chevron_right|support_agent|add|close|help|menu|settings)\b/g, ' ')
         .replace(/[+✦?☰×✕]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (element.classList.contains('nav-link')) {
+        // Em ícones recolhidos, o title nativo do browser vira um balão grande
+        // e inconsistente. O label curto é mostrado pelo tooltip visual do app.
+        element.dataset.tooltip = String(element.getAttribute('aria-label') || fallbackLabel || label).replace(/\s+/g, ' ').trim();
+        element.removeAttribute('title');
+        continue;
+      }
       const action = String(element.getAttribute('onclick') || '').toLowerCase();
       let description = '';
       if (/openconfigmodal/.test(action)) description = 'Abrir as configurações da conta e das preferências do aplicativo.';
