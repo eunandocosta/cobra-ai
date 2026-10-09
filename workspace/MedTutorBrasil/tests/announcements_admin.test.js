@@ -25,6 +25,7 @@ assert.equal(user.maskedEmail, 'p***@example.com');
 assert.equal(Object.hasOwn(user, 'senha'), false);
 assert.equal(Object.hasOwn(user, 'token'), false);
 assert.equal(serializeUser({ id: 'uid-2', data: () => ({ role: 'Admin' }) }).role, 'user');
+assert.equal(serializeUser({ id: 'uid-3', data: () => ({ role: 'partner' }) }).role, 'partner');
 
 const common = { id: 'notice-1', title: 'Manutenção programada', description: 'Voltaremos em breve.', kind: 'notice' };
 const noticeEmail = renderEmail(common, { uid: 'u1' }, { siteUrl: 'https://medtutorbrasil.com.br', unsubscribeSecret: 'test' });

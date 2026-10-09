@@ -106,7 +106,7 @@ function serializeUser(doc) {
     faculty: String(data.faculdade || '').slice(0, 120),
     period: String(data.periodo_atual || '').slice(0, 60),
     cycle: String(data.ciclo || '').slice(0, 60),
-    role: data.role === 'admin' ? 'admin' : 'user',
+    role: ['admin', 'partner'].includes(data.role) ? data.role : 'user',
     createdAt: dateString(data.data_criacao),
     lastAccess: dateString(data.ultimo_acesso)
   };
@@ -329,7 +329,7 @@ async function updateUserRole(req, res) {
     const adminUid = await requireAdmin(req);
     const targetUid = String(req.params.uid || '').trim();
     const role = String(req.body?.role || '');
-    if (!targetUid || targetUid.length > 160 || !['admin', 'user'].includes(role)) return res.status(400).json({ error: 'Escolha um perfil válido.' });
+    if (!targetUid || targetUid.length > 160 || !['admin', 'partner', 'user'].includes(role)) return res.status(400).json({ error: 'Escolha um perfil válido.' });
     if (adminUid === targetUid && role !== 'admin') return res.status(400).json({ error: 'Você não pode remover seu próprio acesso administrativo.' });
     const db = getFirebaseFirestore();
     const targetRef = db.collection('users').doc(targetUid);

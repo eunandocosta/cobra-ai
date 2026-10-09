@@ -372,7 +372,7 @@
       details.append(name, meta, uid);
       const role = document.createElement('select');
       role.setAttribute('aria-label', `Papel de ${user.name}`);
-      for (const [value, label] of [['user', 'Usuário'], ['admin', 'Administrador']]) {
+      for (const [value, label] of [['user', 'Usuário (Público Geral)'], ['partner', 'Partner (Curadoria)'], ['admin', 'Administrador']]) {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;

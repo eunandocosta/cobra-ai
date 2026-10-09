@@ -931,6 +931,17 @@
         const authUidDisplay = document.getElementById('firebaseAuthUidDisplay');
         if (authUidDisplay) authUidDisplay.textContent = this.currentUser ? this.currentUser.uid : 'local_guest';
 
+        const role = this.userProfile?.role || 'user';
+        const roleLabel = role === 'admin' ? 'Administrador' : (role === 'partner' ? 'Partner (Curadoria)' : 'Público Geral');
+        const roleClass = role === 'admin' ? 'admin' : (role === 'partner' ? 'partner' : 'public');
+        const dropRoleBadge = document.getElementById('dropdownUserRoleBadge');
+        if (dropRoleBadge) {
+          dropRoleBadge.textContent = roleLabel;
+          dropRoleBadge.className = `resource-badge-tag ${roleClass}`;
+        }
+        const quickSelect = document.getElementById('userRoleQuickSelect');
+        if (quickSelect) quickSelect.value = role;
+
         // Oculta o botão 'Ementa' no topo para estudantes da Universo (já possuem ementa canônica)
         const facLower = (school || '').toLowerCase();
         const isUniverso = facLower.includes('universo') || facLower.includes('salgado de oliveira');
@@ -4291,24 +4302,153 @@
 
     function syncStudySubmodeSwitcherUI(mode) {
       const isQz = mode === 'quizzes';
-      ['btnStudySubmodeFc', 'btnStudySubmodeFcQzView'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.classList.toggle('active', !isQz);
-          el.setAttribute('aria-selected', !isQz ? 'true' : 'false');
-        }
-      });
-      ['btnStudySubmodeQz', 'btnStudySubmodeQzQzView'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.classList.toggle('active', isQz);
-          el.setAttribute('aria-selected', isQz ? 'true' : 'false');
-        }
-      });
+      const fcSub = document.getElementById('navSubLinkFlashcards');
+      const qzSub = document.getElementById('navSubLinkQuizzes');
+      if (fcSub) fcSub.classList.toggle('active', !isQz);
+      if (qzSub) qzSub.classList.toggle('active', isQz);
       const navStudy = document.getElementById('navLinkStudy');
       if (navStudy) navStudy.classList.add('active');
     }
     window.syncStudySubmodeSwitcherUI = syncStudySubmodeSwitcherUI;
+
+    function toggleStudySidebarDropdown(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const group = document.getElementById('studyNavGroup');
+      const toggleBtn = document.getElementById('navLinkStudy');
+      if (!group) return;
+      const isOpen = group.classList.toggle('open');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(isOpen));
+    }
+    window.toggleStudySidebarDropdown = toggleStudySidebarDropdown;
+
+    function handleStudySubmenuSelect(submode, event) {
+      if (event) {
+        event.stopPropagation();
+      }
+      const group = document.getElementById('studyNavGroup');
+      const toggleBtn = document.getElementById('navLinkStudy');
+      const appRoot = document.querySelector('.app-root');
+      if (appRoot && appRoot.classList.contains('sidebar-collapsed')) {
+        if (group) group.classList.remove('open');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+      }
+      currentStudySubmode = submode === 'quizzes' ? 'quizzes' : 'flashcards';
+      try { localStorage.setItem('medtutor_study_submode_v1', currentStudySubmode); } catch (e) {}
+      syncStudySubmodeSwitcherUI(currentStudySubmode);
+      navigateTab(currentStudySubmode);
+    }
+    window.handleStudySubmenuSelect = handleStudySubmenuSelect;
+
+    document.addEventListener('click', event => {
+      const group = document.getElementById('studyNavGroup');
+      if (group && group.classList.contains('open') && !group.contains(event.target)) {
+        group.classList.remove('open');
+        document.getElementById('navLinkStudy')?.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    function isCuratorUser() {
+      const role = MedTutorAuthService?.userProfile?.role || 'user';
+      return role === 'partner' || role === 'admin';
+    }
+    window.isCuratorUser = isCuratorUser;
+
+    function setUserRole(role) {
+      if (!MedTutorAuthService) return;
+      if (!MedTutorAuthService.userProfile) MedTutorAuthService.userProfile = {};
+      MedTutorAuthService.userProfile.role = role;
+      try { localStorage.setItem('medtutor_user_profile', JSON.stringify(MedTutorAuthService.userProfile)); } catch (e) {}
+      if (typeof MedTutorAuthService.updateUserTopbarUI === 'function') MedTutorAuthService.updateUserTopbarUI();
+      if (typeof renderSharedStudyItems === 'function' && currentTab === 'flashcards') renderSharedStudyItems();
+      if (typeof renderQuizzesList === 'function' && currentTab === 'quizzes') renderQuizzesList();
+      showToast(`Papel de acesso: ${role === 'partner' ? 'Partner (Curador)' : (role === 'admin' ? 'Administrador' : 'Público Geral')}`);
+    }
+    window.setUserRole = setUserRole;
+
+    var isStudyCurationFilterActive = false;
+    var isQuizCurationFilterActive = false;
+
+    function setStudyCurationFilter(type, forceState) {
+      if (typeof forceState === 'boolean') {
+        isStudyCurationFilterActive = forceState;
+      } else {
+        isStudyCurationFilterActive = !isStudyCurationFilterActive;
+      }
+      srsQueueFilter = isStudyCurationFilterActive ? 'curated' : 'all';
+      currentCardIndex = 0;
+      const btn = document.getElementById('srsQueue-curated');
+      if (btn) {
+        btn.classList.toggle('active', isStudyCurationFilterActive);
+        btn.setAttribute('aria-pressed', String(isStudyCurationFilterActive));
+      }
+      document.querySelectorAll('#flashcardDeck .srs-deck-status-bar button').forEach(b => {
+        if (b !== btn) b.classList.remove('primary', 'active');
+      });
+      if (isStudyCurationFilterActive && btn) btn.classList.add('primary');
+      if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+    }
+    window.setStudyCurationFilter = setStudyCurationFilter;
+
+    function toggleCurationFilter(type) {
+      isQuizCurationFilterActive = !isQuizCurationFilterActive;
+      const btn = document.getElementById('qzCurationFilterBtn');
+      if (btn) btn.classList.toggle('active', isQuizCurationFilterActive);
+      if (typeof renderQuizzesList === 'function') renderQuizzesList();
+    }
+    window.toggleCurationFilter = toggleCurationFilter;
+
+    function toggleCurrentCardCuration() {
+      const list = (typeof getSrsFilteredList === 'function' && typeof getFilteredQuestions === 'function')
+        ? getSrsFilteredList(getFilteredQuestions())
+        : [];
+      if (!list.length || currentCardIndex >= list.length) return;
+      const item = list[currentCardIndex];
+      if (!item) return;
+      item.curated = !item.curated;
+      if (item.curated) {
+        item.curatedBy = MedTutorAuthService?.userProfile?.nome || 'Partner Curador';
+        item.curatedInstitution = MedTutorAuthService?.userProfile?.faculdade || 'Instituição';
+        item.curatedAt = new Date().toISOString();
+        showToast('🏛️ Flashcard salvo na Curadoria da Instituição!');
+      } else {
+        showToast('Flashcard removido da Curadoria.');
+      }
+      saveSharedQuestionsBank();
+      if (typeof renderSharedStudyItems === 'function') renderSharedStudyItems();
+    }
+    window.toggleCurrentCardCuration = toggleCurrentCardCuration;
+
+    function toggleCurateQuestion(questionId, view) {
+      const item = sharedQuestionsBank.find(q => q.id === questionId);
+      if (!item) return;
+      item.curated = !item.curated;
+      if (item.curated) {
+        item.curatedBy = MedTutorAuthService?.userProfile?.nome || 'Partner Curador';
+        item.curatedInstitution = MedTutorAuthService?.userProfile?.faculdade || 'Instituição';
+        item.curatedAt = new Date().toISOString();
+        showToast('🏛️ Questão adicionada à Curadoria da Instituição!');
+      } else {
+        showToast('Questão removida da Curadoria.');
+      }
+      saveSharedQuestionsBank();
+      if (view === 'quizzes' && typeof renderQuizzesList === 'function') {
+        renderQuizzesList();
+      } else if (typeof renderSharedStudyItems === 'function') {
+        renderSharedStudyItems();
+      }
+    }
+    window.toggleCurateQuestion = toggleCurateQuestion;
+
+    function openCuratedStudyDeck() {
+      navigateTab('flashcards');
+      setTimeout(() => {
+        setStudyCurationFilter('flashcards', true);
+      }, 50);
+    }
+    window.openCuratedStudyDeck = openCuratedStudyDeck;
 
     function toggleHomeOnboarding(show) {
       const panel = document.getElementById('homeOnboardingPanel');
@@ -15949,17 +16089,20 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     }
 
     function getSrsQueueCounts(baseList) {
-      const counts = { new: 0, due: 0, tomorrow: 0, upcoming: 0 };
+      const counts = { new: 0, due: 0, tomorrow: 0, upcoming: 0, curated: 0 };
       (baseList || []).forEach(item => {
         const key = getFlashcardQueueKey(item);
-        counts[key]++;
+        if (counts[key] !== undefined) counts[key]++;
+        if (item.curated) counts.curated++;
       });
       return counts;
     }
 
     function getSrsFilteredList(baseList) {
       const list = baseList || getFilteredQuestions();
-      const selected = srsQueueFilter === 'all' ? list : list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter);
+      const selected = srsQueueFilter === 'curated'
+        ? list.filter(item => Boolean(item.curated))
+        : (srsQueueFilter === 'all' ? list : list.filter(item => getFlashcardQueueKey(item) === srsQueueFilter));
       return selected.slice().sort((a, b) => {
         const aDate = a.srs?.dueDate || a.srs?.newScheduledDate || a.createdAt || '';
         const bDate = b.srs?.dueDate || b.srs?.newScheduledDate || b.createdAt || '';
@@ -16044,7 +16187,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         new: `Não feitos: ${counts.new}`,
         due: `Revisão de Hoje: ${counts.due}`,
         tomorrow: `Revisão de amanhã: ${counts.tomorrow}`,
-        upcoming: `Revisão dos próximos dias: ${counts.upcoming}`
+        upcoming: `Revisão dos próximos dias: ${counts.upcoming}`,
+        curated: `🏛️ Curadoria: ${counts.curated || 0}`
       };
       Object.entries(labels).forEach(([key, label]) => {
         const button = document.getElementById(`srsQueue-${key}`);
@@ -16053,6 +16197,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         button.classList.toggle('primary', srsQueueFilter === key);
         button.setAttribute('aria-pressed', srsQueueFilter === key ? 'true' : 'false');
       });
+      const badge = document.getElementById('fcCurationBadge');
+      if (badge) badge.textContent = String(counts.curated || 0);
     }
 
     function resolveFlashcardTitle(item) {
@@ -16223,6 +16369,23 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         } else {
           modelBadge.style.display = 'none';
         }
+      }
+
+      const fcAccessBadge = document.getElementById('fcAccessBadge');
+      const fcCuratedBadge = document.getElementById('fcCuratedBadge');
+      const fcCurateToggleBtn = document.getElementById('fcCurateToggleBtn');
+      if (fcAccessBadge) {
+        fcAccessBadge.style.display = item.curated ? 'none' : 'inline-flex';
+      }
+      if (fcCuratedBadge) {
+        fcCuratedBadge.style.display = item.curated ? 'inline-flex' : 'none';
+        fcCuratedBadge.textContent = item.curatedInstitution ? `🏛️ Curadoria (${item.curatedInstitution})` : '🏛️ Curadoria';
+      }
+      if (fcCurateToggleBtn) {
+        const canCurate = typeof isCuratorUser === 'function' && isCuratorUser();
+        fcCurateToggleBtn.style.display = canCurate ? 'inline-flex' : 'none';
+        fcCurateToggleBtn.classList.toggle('curated', Boolean(item.curated));
+        fcCurateToggleBtn.textContent = item.curated ? '🏛️ Salvo na Curadoria' : '🏛️ Salvar na Curadoria';
       }
 
       // Detecção de Redundância Local (>50% de similaridade) a Custo Zero (Algoritmo Leve)
@@ -17222,6 +17385,15 @@ Retorne EXCLUSIVAMENTE um JSON:
       quizDeck.innerHTML = '';
       let list = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
 
+      const baseList = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
+      const curatedCount = baseList.filter(q => q.curated).length;
+      const qzCurationCountEl = document.getElementById('qzCurationCount');
+      if (qzCurationCountEl) qzCurationCountEl.textContent = String(curatedCount);
+
+      if (typeof isQuizCurationFilterActive !== 'undefined' && isQuizCurationFilterActive) {
+        list = list.filter(q => q.curated);
+      }
+
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
       }
@@ -17231,6 +17403,21 @@ Retorne EXCLUSIVAMENTE um JSON:
       }
 
       if (list.length === 0) {
+        if (typeof isQuizCurationFilterActive !== 'undefined' && isQuizCurationFilterActive) {
+          quizDeck.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; background: var(--bg-surface); border: 1px dashed rgba(255, 183, 3, 0.4); border-radius: 16px; margin: 16px 0;">
+              <div style="font-size: 38px; margin-bottom: 10px;">🏛️</div>
+              <h3 style="font-size: 16px; margin-bottom: 6px; color: var(--text-primary);">Nenhuma Pergunta na Curadoria da Disciplina</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); max-width: 460px; margin: 0 auto 14px auto; line-height: 1.5;">
+                Esta matéria ainda não possui perguntas salvas na curadoria da instituição. Usuários com papel Partner ou Administradores podem selecionar as questões prioritárias para a faculdade.
+              </p>
+              <button class="btn-outline-action primary" onclick="toggleCurationFilter('quizzes')" style="font-size: 12px; margin: 0 auto;">
+                Ver Todas as Questões da Matéria
+              </button>
+            </div>
+          `;
+          return;
+        }
         if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
           quizDeck.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; background: var(--bg-surface); border: 1px dashed var(--border); border-radius: 16px; margin: 16px 0;">
@@ -17273,6 +17460,15 @@ Retorne EXCLUSIVAMENTE um JSON:
           <div class="quiz-card-topbar">
             <div class="quiz-card-metadata">
               <span class="area-badge area-${areaClass}">${areaLabel}</span>
+              ${item.curated ? `
+                <span class="resource-badge-tag partner" title="Questão Curada da Instituição">
+                  🏛️ Curadoria ${item.curatedInstitution ? `• ${escapeHtml(item.curatedInstitution)}` : ''}
+                </span>
+              ` : `
+                <span class="resource-badge-tag public" title="Recurso com acesso para Público Geral">
+                  Público Geral
+                </span>
+              `}
               <span style="font-size: 10px; font-weight: 700; background: rgba(0, 229, 255, 0.12); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.3); padding: 2px 6px; border-radius: 4px;">
                 ${styleLabel}
               </span>
@@ -17302,6 +17498,11 @@ Retorne EXCLUSIVAMENTE um JSON:
               </span>
             </div>
             <div class="quiz-card-actions">
+              ${(typeof isCuratorUser === 'function' && isCuratorUser()) ? `
+                <button class="btn-outline-action btn-curate-inline ${item.curated ? 'curated' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleCurateQuestion('${item.id}', 'quizzes')" title="${item.curated ? 'Remover da Curadoria da Instituição' : 'Salvar esta questão na Curadoria da Instituição'}">
+                  ${item.curated ? '🏛️ Curada' : '🏛️ Curar'}
+                </button>
+              ` : ''}
               <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px;" onclick="openQuestionDiscussionById('${item.id}')" title="Perguntar ao tutor sobre esta questão">
                 💬 Perguntar
               </button>

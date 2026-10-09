@@ -42,6 +42,7 @@
   const semanticRules = [
     [/close|fechar|cancel|dismiss/i, 'close'], [/back|voltar|retornar/i, 'arrow_back'],
     [/next|pr[oó]xim|avançar|avancar/i, 'arrow_forward'], [/chat|mensagem|conversa|d[uú]vida/i, 'chat_bubble'],
+    [/estudo|estudos|estudar|study/i, 'school'],
     [/flash ?card|cart[aã]o/i, 'style'], [/quiz|quest[aã]o|question|caso/i, 'quiz'],
     [/mat[eé]ria|ementa|disciplina|material|livro/i, 'menu_book'], [/sce|waze|rota|cronograma|evolu[cç][aã]o/i, 'monitoring'],
     [/desafio|duelo|combate/i, 'sports_martial_arts'], [/config|settings|prefer[eê]ncia/i, 'settings'],

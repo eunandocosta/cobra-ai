@@ -112,25 +112,47 @@
         <!-- Chat Científico inativo / suspenso -->
         <button class="nav-link" id="navLinkChat" onclick="navigateTab('chat', this)" title="Chat Científico" aria-label="Chat Científico" style="display: none;">
           <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          Chat Científico
+          <span class="nav-link-text">Chat Científico</span>
         </button>
-        <!-- Estudo Ativo unificado (Flashcards + Quizzes) -->
-        <button class="nav-link" id="navLinkStudy" onclick="navigateTab('study', this)" title="Estudo Ativo (Flashcards & Quizzes)" aria-label="Estudo Ativo">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          Estudo Ativo
-        </button>
+
+        <!-- Estudo Ativo com Submenu Dropdown Retrátil -->
+        <div class="sidebar-dropdown-group" id="studyNavGroup">
+          <button class="nav-link nav-link-dropdown-toggle" id="navLinkStudy" type="button" onclick="toggleStudySidebarDropdown(event)" title="Estudo Ativo (Flashcards & Quizzes)" aria-label="Estudo Ativo" aria-haspopup="true" aria-expanded="false">
+            <span class="material-symbol-font icon" aria-hidden="true">school</span>
+            <span class="nav-link-text">Estudo Ativo</span>
+            <span class="resource-badge-tag public">Público Geral</span>
+            <span class="nav-dropdown-chevron material-symbol-font" aria-hidden="true">expand_more</span>
+          </button>
+          <div class="sidebar-submenu" id="studySidebarSubmenu" role="menu" aria-label="Opções de Estudo Ativo">
+            <button class="sidebar-submenu-item" id="navSubLinkFlashcards" type="button" onclick="handleStudySubmenuSelect('flashcards', event)" role="menuitem" title="Flashcards com repetição espaçada (SRS)">
+              <span class="material-symbol-font icon" aria-hidden="true">style</span>
+              <span class="submenu-item-text">Flashcards</span>
+              <span class="resource-badge-tag public">Público Geral</span>
+            </button>
+            <button class="sidebar-submenu-item" id="navSubLinkQuizzes" type="button" onclick="handleStudySubmenuSelect('quizzes', event)" role="menuitem" title="Quizzes e casos clínicos comentados">
+              <span class="material-symbol-font icon" aria-hidden="true">quiz</span>
+              <span class="submenu-item-text">Quizzes & Casos</span>
+              <span class="resource-badge-tag public">Público Geral</span>
+            </button>
+          </div>
+        </div>
+
         <button class="nav-link" id="navLinkQuizzesCompat" onclick="navigateTab('quizzes', this)" title="Quizzes & Casos" aria-label="Quizzes & Casos" style="display: none;"></button>
+
         <button class="nav-link" onclick="navigateTab('curriculum', this)" title="Matérias Curriculares" aria-label="Matérias Curriculares">
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Matérias Curriculares
+          <span class="nav-link-text">Matérias Curriculares</span>
+          <span class="resource-badge-tag public">Público Geral</span>
         </button>
         <button class="nav-link" onclick="navigateTab('sce', this)" title="SCE & Waze de Estudos" aria-label="SCE & Waze de Estudos">
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-          SCE & Waze de Estudos
+          <span class="nav-link-text">SCE & Waze de Estudos</span>
+          <span class="resource-badge-tag public">Público Geral</span>
         </button>
         <button class="nav-link" onclick="navigateTab('challenges', this)" title="Desafios" aria-label="Desafios">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5l-6 6"/><path d="M8 8l-4-4"/><path d="M5 3L3 5"/></svg>
-          Desafios
+          <span class="nav-link-text">Desafios</span>
+          <span class="resource-badge-tag public">Público Geral</span>
         </button>
       </nav>
 
@@ -203,7 +225,19 @@
                   <strong id="dropdownUserName">Estudante de Medicina</strong>
                   <div style="font-size: 11px; color: var(--text-secondary);" id="dropdownUserSchool">Faculdade não informada</div>
                   <div style="font-size: 10.5px; color: var(--neon);" id="dropdownUserEmail">--</div>
+                  <div style="margin-top: 4px;">
+                    <span class="resource-badge-tag public" id="dropdownUserRoleBadge">Público Geral</span>
+                  </div>
                 </div>
+              </div>
+              <div class="user-dropdown-divider"></div>
+              <div class="user-dropdown-item" style="display: flex; justify-content: space-between; align-items: center; cursor: default;">
+                <span style="font-size: 11.5px; color: var(--text-secondary);">Perfil de Acesso:</span>
+                <select id="userRoleQuickSelect" onchange="setUserRole(this.value)" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 11px; cursor: pointer;">
+                  <option value="user">Público Geral</option>
+                  <option value="partner">Partner (Curador)</option>
+                  <option value="admin">Administrador</option>
+                </select>
               </div>
               <div class="user-dropdown-divider"></div>
               <button class="user-dropdown-item" onclick="openMedicalOnboardingModal(true)">
@@ -211,7 +245,7 @@
                 <span>Editar Perfil Médico</span>
               </button>
               <button class="user-dropdown-item" onclick="openConfigModal()" hidden>
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span>Configurações & Nuvem</span>
               </button>
               <button class="user-dropdown-item" onclick="syncAllDataToFirebaseCloud(true)">
@@ -222,6 +256,7 @@
               <a class="user-dropdown-item admin-menu-entry" id="adminPanelMenuEntry" href="/anuncios#annAdmin" hidden>
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.7 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.8 7.5-9.5V6L12 3Z"/><path d="M9 12h6M12 9v6"/></svg>
                 <span>Painel de Administração</span>
+                <span class="resource-badge-tag admin" style="margin-left: auto;">Exclusivo ADM</span>
               </a>
               <div class="user-dropdown-divider"></div>
               <button class="user-dropdown-item danger" onclick="MedTutorAuthService.signOut()">
@@ -351,7 +386,10 @@
                 <div class="home-hub-card featured" onclick="navigateTab('flashcards')">
                   <div class="home-hub-card-header">
                     <span class="home-hub-card-icon">🎯</span>
-                    <span class="home-hub-card-tag">Recomendado</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag">Recomendado</span>
+                      <span class="resource-access-tag public">Público Geral</span>
+                    </div>
                   </div>
                   <h3 class="home-hub-card-title">Estudo Ativo</h3>
                   <p class="home-hub-card-desc">
@@ -362,11 +400,32 @@
                   </div>
                 </div>
 
-                <!-- Card 2: Upload de Material -->
+                <!-- Card 2: Perguntas da Curadoria -->
+                <div class="home-hub-card curated" onclick="openCuratedStudyDeck()">
+                  <div class="home-hub-card-header">
+                    <span class="home-hub-card-icon">🏛️</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag highlight">Exclusivo</span>
+                      <span class="resource-access-tag partner">Curadoria Instituição</span>
+                    </div>
+                  </div>
+                  <h3 class="home-hub-card-title">Perguntas da Curadoria</h3>
+                  <p class="home-hub-card-desc">
+                    Questões de alto rendimento selecionadas e validadas por Partners e professores da sua instituição.
+                  </p>
+                  <div class="home-hub-card-footer">
+                    <span class="home-hub-btn-label">Estudar Curadoria ➔</span>
+                  </div>
+                </div>
+
+                <!-- Card 3: Upload de Material -->
                 <div class="home-hub-card" onclick="openGeneralUploadModal()">
                   <div class="home-hub-card-header">
                     <span class="home-hub-card-icon">📤</span>
-                    <span class="home-hub-card-tag">Conteúdo</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag">Conteúdo</span>
+                      <span class="resource-access-tag public">Público Geral</span>
+                    </div>
                   </div>
                   <h3 class="home-hub-card-title">Adicionar Aulas</h3>
                   <p class="home-hub-card-desc">
@@ -377,11 +436,14 @@
                   </div>
                 </div>
 
-                <!-- Card 3: Grade Curricular -->
+                <!-- Card 4: Grade Curricular -->
                 <div class="home-hub-card" onclick="navigateTab('curriculum')">
                   <div class="home-hub-card-header">
                     <span class="home-hub-card-icon">📚</span>
-                    <span class="home-hub-card-tag">Grade</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag">Grade</span>
+                      <span class="resource-access-tag public">Público Geral</span>
+                    </div>
                   </div>
                   <h3 class="home-hub-card-title">Grade Curricular</h3>
                   <p class="home-hub-card-desc">
@@ -392,11 +454,14 @@
                   </div>
                 </div>
 
-                <!-- Card 4: SCE & Waze -->
+                <!-- Card 5: SCE & Waze -->
                 <div class="home-hub-card" onclick="navigateTab('sce')">
                   <div class="home-hub-card-header">
                     <span class="home-hub-card-icon">📈</span>
-                    <span class="home-hub-card-tag">Retenção</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag">Retenção</span>
+                      <span class="resource-access-tag public">Público Geral</span>
+                    </div>
                   </div>
                   <h3 class="home-hub-card-title">SCE & Waze de Estudos</h3>
                   <p class="home-hub-card-desc">
@@ -407,11 +472,14 @@
                   </div>
                 </div>
 
-                <!-- Card 5: Desafios Clínicos -->
+                <!-- Card 6: Desafios Clínicos -->
                 <div class="home-hub-card" onclick="navigateTab('challenges')">
                   <div class="home-hub-card-header">
                     <span class="home-hub-card-icon">⚔️</span>
-                    <span class="home-hub-card-tag">PvP & Ranking</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag">PvP & Ranking</span>
+                      <span class="resource-access-tag public">Público Geral</span>
+                    </div>
                   </div>
                   <h3 class="home-hub-card-title">Desafios Clínicos</h3>
                   <p class="home-hub-card-desc">
@@ -422,11 +490,14 @@
                   </div>
                 </div>
 
-                <!-- Card 6: Imprimir Provas -->
+                <!-- Card 7: Imprimir Provas -->
                 <div class="home-hub-card" onclick="openQuizPrintModal()">
                   <div class="home-hub-card-header">
                     <span class="home-hub-card-icon">🖨️</span>
-                    <span class="home-hub-card-tag">Papel & PDF</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <span class="home-hub-card-tag">Papel & PDF</span>
+                      <span class="resource-access-tag public">Público Geral</span>
+                    </div>
                   </div>
                   <h3 class="home-hub-card-title">Imprimir Provas & Cadernos</h3>
                   <p class="home-hub-card-desc">
@@ -601,20 +672,6 @@
           <!-- BARRA UNIFICADA DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (PERÍODO > DISCIPLINA > SLIDE) -->
           <div class="unified-study-control-card">
 
-            <!-- SELETOR DE MODALIDADE DO ESTUDO ATIVO: FLASHCARDS ⇄ QUIZZES -->
-            <div class="study-submode-selector-wrap">
-              <div class="study-submode-segmented-control" role="tablist" aria-label="Modalidade de Estudo Ativo">
-                <button type="button" class="study-submode-pill-btn active" id="btnStudySubmodeFc" onclick="setStudyActiveSubmode('flashcards')" role="tab" aria-selected="true" title="Modo Flashcards com repetição espaçada">
-                  <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
-                  <span>🗂️ Flashcards (SRS)</span>
-                </button>
-                <button type="button" class="study-submode-pill-btn" id="btnStudySubmodeQz" onclick="setStudyActiveSubmode('quizzes')" role="tab" aria-selected="false" title="Modo Quizzes e Casos Clínicos com gabarito comentado">
-                  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  <span>📝 Quizzes & Casos Clínicos</span>
-                </button>
-              </div>
-            </div>
-
             <!-- NAVEGAÇÃO HIERÁRQUICA DROPDOWNS -->
             <div class="study-nav-hierarchy">
               <div class="study-nav-field">
@@ -650,6 +707,7 @@
                   🎯 <strong>Carregando...</strong>
                 </span>
                 <span class="study-cycle-pill" id="fcCycleBadge">Ciclo Básico</span>
+                <span class="resource-badge-tag public" id="fcAccessLevelTag" title="Acesso liberado para todos os estudantes">Público Geral</span>
               </div>
 
               <div class="study-buttons-group">
@@ -748,6 +806,7 @@
                  <button id="srsQueue-due" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('due')" aria-pressed="false">Revisão de Hoje: 0</button>
                  <button id="srsQueue-tomorrow" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('tomorrow')" aria-pressed="false">Revisão de amanhã: 0</button>
                  <button id="srsQueue-upcoming" class="btn-outline-action" style="font-size: 10.5px; padding: 4px 8px;" onclick="setSrsQueueFilter('upcoming')" aria-pressed="false">Revisão dos próximos dias: 0</button>
+                 <button id="srsQueue-curated" class="btn-outline-action curation-filter-btn" style="font-size: 10.5px; padding: 4px 8px;" onclick="setStudyCurationFilter('flashcards')" aria-pressed="false" title="Filtrar perguntas da Curadoria da Instituição">🏛️ Curadoria: <span id="fcCurationBadge">0</span></button>
                </div>
              </div>
              <div id="learningGapPanel" class="learning-gap-panel" aria-live="polite"></div>
@@ -759,6 +818,9 @@
                    <div class="card-meta">
                      <div class="flashcard-meta-items">
                        <span id="fcTag">DISCIPLINA</span>
+                       <span class="resource-badge-tag public" id="fcAccessBadge">Público Geral</span>
+                       <span class="resource-badge-tag partner" id="fcCuratedBadge" style="display: none;">🏛️ Curadoria</span>
+                       <button type="button" class="btn-outline-action btn-curate-inline" id="fcCurateToggleBtn" onclick="toggleCurrentCardCuration()" title="Selecionar ou remover este card da Curadoria da Instituição" style="display: none; padding: 2px 7px; font-size: 10px;">🏛️ Salvar na Curadoria</button>
                        <span id="fcDifficultyBadge" style="display: none; font-size: 10px; background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-weight: 700;"></span>
                        <span id="fcLearningAxisBadge" style="display: none; font-size: 10px; background: rgba(0, 229, 255, 0.10); color: var(--neon); border: 1px solid rgba(0, 229, 255, 0.28); padding: 2px 6px; border-radius: 4px; font-weight: 700;"></span>
                        <span id="fcMaterialInspirationBadge" style="display: none; font-size: 10px; background: rgba(183, 148, 246, 0.14); color: #c4b5fd; border: 1px solid rgba(196, 181, 253, 0.35); padding: 2px 6px; border-radius: 4px; font-weight: 700;">✦ Inspiração do material</span>
@@ -862,20 +924,6 @@
           <!-- BARRA UNIFICADA DE CONTROLE E NAVEGAÇÃO HIERÁRQUICA (PERÍODO > DISCIPLINA > SLIDE) -->
           <div class="unified-study-control-card">
 
-            <!-- SELETOR DE MODALIDADE DO ESTUDO ATIVO: FLASHCARDS ⇄ QUIZZES -->
-            <div class="study-submode-selector-wrap">
-              <div class="study-submode-segmented-control" role="tablist" aria-label="Modalidade de Estudo Ativo">
-                <button type="button" class="study-submode-pill-btn" id="btnStudySubmodeFcQzView" onclick="setStudyActiveSubmode('flashcards')" role="tab" aria-selected="false" title="Modo Flashcards com repetição espaçada">
-                  <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/></svg>
-                  <span>🗂️ Flashcards (SRS)</span>
-                </button>
-                <button type="button" class="study-submode-pill-btn active" id="btnStudySubmodeQzQzView" onclick="setStudyActiveSubmode('quizzes')" role="tab" aria-selected="true" title="Modo Quizzes e Casos Clínicos com gabarito comentado">
-                  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  <span>📝 Quizzes & Casos Clínicos</span>
-                </button>
-              </div>
-            </div>
-
             <!-- NAVEGAÇÃO HIERÁRQUICA DROPDOWNS -->
             <div class="study-nav-hierarchy">
               <div class="study-nav-field">
@@ -911,11 +959,16 @@
                   🎯 <strong>Carregando...</strong>
                 </span>
                 <span class="study-cycle-pill" id="qzCycleBadge">Ciclo Básico</span>
+                <span class="resource-badge-tag public" id="qzAccessLevelTag" title="Acesso liberado para todos os estudantes">Público Geral</span>
               </div>
 
               <div class="study-buttons-group">
                 <button class="btn-outline-action primary" onclick="openGenerateStudyModalForActiveSlide()" title="Gerar Flashcards e Quizzes sob demanda (1 a 30 questões)" style="font-weight: 700;">
                   ⚡ Gerar Estudo
+                </button>
+
+                <button class="btn-outline-action curation-action-btn" id="qzCurationFilterBtn" onclick="toggleCurationFilter('quizzes')" title="Filtrar perguntas selecionadas pela Curadoria da instituição">
+                  🏛️ Perguntas da Curadoria (<span id="qzCurationCount">0</span>)
                 </button>
 
                 <button class="btn-outline-action" id="qzUploadMaterialBtn" onclick="openImportStudyMaterialModal('quizzes')" title="Fazer upload de apostila ou material didático para transformar em Quizzes e Flashcards com IA" style="font-weight: 700; border-color: rgba(0, 229, 255, 0.45); color: var(--neon);">
