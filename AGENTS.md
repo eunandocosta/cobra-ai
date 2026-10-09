@@ -7,7 +7,7 @@
    - Havendo alterações locais desde o último commit, revise `git diff --stat` e `git diff --check`.
    - Crie um commit local com mensagem em português que destaque de forma objetiva os arquivos e as diferenças funcionais da versão.
    - Não faça commit vazio.
-   - Não faça push ao GitHub.
+   - Faça push ao GitHub somente quando houver solicitação explícita do usuário.
 5. **Comportamento em Silêncio**: Se não houver alterações locais, permaneça silencioso (ou emita mensagem mínima se a interface exigir texto).
 6. **Leitura Prévia de Código**: Antes de executar código após mais de três horas sem mudanças, leia integralmente os arquivos de código que pretende executar ou modificar.
 7. **Notificações**: Notifique apenas quando houver commit, falha ou necessidade de ação do usuário.
