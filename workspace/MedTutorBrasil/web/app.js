@@ -4292,14 +4292,6 @@
       try { return localStorage.getItem('medtutor_study_submode_v1') || 'flashcards'; } catch (e) { return 'flashcards'; }
     })();
 
-    function setStudyActiveSubmode(mode) {
-      currentStudySubmode = mode === 'quizzes' ? 'quizzes' : 'flashcards';
-      try { localStorage.setItem('medtutor_study_submode_v1', currentStudySubmode); } catch (e) {}
-      syncStudySubmodeSwitcherUI(currentStudySubmode);
-      navigateTab(currentStudySubmode, null, { preserveStudyContext: true });
-    }
-    window.setStudyActiveSubmode = setStudyActiveSubmode;
-
     function syncStudySubmodeSwitcherUI(mode) {
       const isQz = mode === 'quizzes';
       const fcSub = document.getElementById('navSubLinkFlashcards');

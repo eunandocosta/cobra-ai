@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261009-institutional-curation-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261009-sidebar-study-dropdown-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -104,7 +104,10 @@
           <span>Estudo Ativo & Medicina</span>
         </div>
         <button class="sidebar-collapse-btn" type="button" onclick="toggleAppSidebar()" aria-label="Recolher menu lateral" aria-expanded="true" title="Recolher menu lateral">
-          <svg class="icon sidebar-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="toggle-line toggle-line-top" d="M4 6h16"/><path class="toggle-line toggle-line-middle" d="M4 12h16"/><path class="toggle-line toggle-line-bottom" d="M4 18h16"/></svg>
+          <svg class="icon sidebar-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <g class="toggle-menu-lines"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></g>
+            <g class="toggle-close-lines"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></g>
+          </svg>
         </button>
       </div>
 
@@ -118,7 +121,7 @@
         <!-- Estudo Ativo com Submenu Dropdown Retrátil -->
         <div class="sidebar-dropdown-group" id="studyNavGroup">
           <button class="nav-link nav-link-dropdown-toggle" id="navLinkStudy" type="button" onclick="toggleStudySidebarDropdown(event)" title="Estudo Ativo (Flashcards & Quizzes)" aria-label="Estudo Ativo" aria-haspopup="true" aria-expanded="false">
-            <span class="material-symbol-font icon" aria-hidden="true">school</span>
+            <span class="material-symbol-font icon" aria-hidden="true">library_books</span>
             <span class="nav-link-text">Estudo Ativo</span>
             <span class="resource-badge-tag public">Público Geral</span>
             <span class="nav-dropdown-chevron material-symbol-font" aria-hidden="true">expand_more</span>
@@ -4150,7 +4153,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/material-icons.js?v=20261009-compact-sidebar-tooltips-v1"></script>
-  <script defer src="/app.min.js?v=20261009-institutional-curation-v1"></script>
+  <script defer src="/app.min.js?v=20261009-sidebar-study-dropdown-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {
