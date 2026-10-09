@@ -292,10 +292,10 @@
     .app-root.sidebar-collapsed .nav-link .icon,
     .app-root.sidebar-collapsed .sidebar-settings-btn .icon,
     .app-root.sidebar-collapsed .sidebar-support-btn .icon {
-      width: 20px;
-      height: 20px;
-      font-size: 20px;
-      flex: 0 0 20px;
+      width: 24px;
+      height: 24px;
+      font-size: 24px;
+      flex: 0 0 24px;
     }
 
     .app-root.sidebar-collapsed .sidebar-settings-btn,
@@ -746,6 +746,16 @@
       color: var(--neon);
       background: var(--neon-subtle);
       border-color: var(--border-accent);
+    }
+
+    .sidebar .nav-link > .icon,
+    .sidebar .sidebar-settings-btn > .icon,
+    .sidebar .sidebar-support-btn > .icon {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 24px;
+      font-size: 24px;
+      line-height: 1;
     }
 
     /* Nível de acesso é interno; não ocupa espaço nem aparece na navegação. */

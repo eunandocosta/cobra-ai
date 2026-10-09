@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261009-sidebar-permission-labels-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261009-sidebar-icons-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -141,17 +141,17 @@
         <button class="nav-link" id="navLinkQuizzesCompat" onclick="navigateTab('quizzes', this)" title="Quizzes & Casos" aria-label="Quizzes & Casos" style="display: none;"></button>
 
         <button class="nav-link" onclick="navigateTab('curriculum', this)" title="Matérias Curriculares" aria-label="Matérias Curriculares">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span class="material-symbol-font icon" aria-hidden="true">menu_book</span>
           <span class="nav-link-text">Matérias Curriculares</span>
           <span class="resource-badge-tag public">Público Geral</span>
         </button>
         <button class="nav-link" onclick="navigateTab('sce', this)" title="SCE & Waze de Estudos" aria-label="SCE & Waze de Estudos">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span class="material-symbol-font icon" aria-hidden="true">monitoring</span>
           <span class="nav-link-text">SCE & Waze de Estudos</span>
           <span class="resource-badge-tag public">Público Geral</span>
         </button>
         <button class="nav-link" onclick="navigateTab('challenges', this)" title="Desafios" aria-label="Desafios">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5l-6 6"/><path d="M8 8l-4-4"/><path d="M5 3L3 5"/></svg>
+          <span class="material-symbol-font icon" aria-hidden="true">emoji_events</span>
           <span class="nav-link-text">Desafios</span>
           <span class="resource-badge-tag public">Público Geral</span>
         </button>
@@ -159,7 +159,7 @@
 
       <div class="sidebar-footer">
         <button class="btn-outline-action sidebar-settings-btn" onclick="openConfigModal()" title="Abrir configurações de conta, aparência e preferências" aria-label="Abrir configurações de conta, aparência e preferências">
-          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="material-symbol-font icon" aria-hidden="true">settings</span>
           Configurações
         </button>
         <button class="btn-outline-action sidebar-support-btn" onclick="openSupportModal()" title="Abrir suporte e copiar o diagnóstico da última solicitação" aria-label="Abrir suporte e copiar o diagnóstico da última solicitação">
