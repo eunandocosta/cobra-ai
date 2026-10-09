@@ -9152,14 +9152,23 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           const domain = itemDiff === 'avancado' ? 'aplicacao' : (itemDiff === 'intermediario' ? 'analise' : 'compreensao');
           const cleanTopic = (item.topic && !/\b(fundamentos|propedeutica|metodos|diretrizes)\b/i.test(item.topic)) ? item.topic : (metadata.disease || metadata.materialName || 'Conceito do material');
           const cleanDisease = (item.disease && !/\b(fundamentos|propedeutica|metodos|diretrizes)\b/i.test(item.disease)) ? item.disease : (metadata.disease || metadata.materialName || cleanTopic);
-          const safeOptions = Array.isArray(item.quizOptions) && item.quizOptions.length === 4
+          const safeOptions = (Array.isArray(item.quizOptions) && item.quizOptions.length >= 2)
             ? item.quizOptions
-            : (Array.isArray(item.alternativas) && item.alternativas.length === 4 ? item.alternativas : (item.options || []));
-          const safeCorrectIndex = typeof item.correctIndex === 'number' && item.correctIndex >= 0 && item.correctIndex < safeOptions.length
-            ? item.correctIndex
-            : 0;
-          const safeGabarito = item.gabarito || String.fromCharCode(65 + safeCorrectIndex);
-          const safeAnswer = item.correctAnswerText || item.resposta_correta || safeOptions[safeCorrectIndex] || item.answer || item.reference_answer || '';
+            : ((Array.isArray(item.alternativas) && item.alternativas.length >= 2)
+              ? item.alternativas
+              : (Array.isArray(item.options) && item.options.length >= 2 ? item.options : []));
+          let safeCorrectIndex = 0;
+          if (typeof item.correctIndex === 'number' && item.correctIndex >= 0 && item.correctIndex < safeOptions.length) {
+            safeCorrectIndex = Math.floor(item.correctIndex);
+          } else if (typeof item.correctIndex === 'string' && /^[0-3]$/.test(item.correctIndex.trim())) {
+            safeCorrectIndex = parseInt(item.correctIndex.trim(), 10);
+          } else if (item.gabarito && /^[A-D]$/i.test(String(item.gabarito).trim())) {
+            safeCorrectIndex = String(item.gabarito).trim().toUpperCase().charCodeAt(0) - 65;
+          } else if (item.correctLetter && /^[A-D]$/i.test(String(item.correctLetter).trim())) {
+            safeCorrectIndex = String(item.correctLetter).trim().toUpperCase().charCodeAt(0) - 65;
+          }
+          const safeGabarito = String.fromCharCode(65 + safeCorrectIndex);
+          const safeAnswer = safeOptions[safeCorrectIndex] || item.correctAnswerText || item.resposta_correta || item.answer || item.reference_answer || '';
 
           return {
             ...item,
@@ -15110,6 +15119,28 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       return cloudSave;
     }
 
+    function healQuestionsBankIntegrity(questions) {
+      if (!Array.isArray(questions)) return questions;
+      questions.forEach(item => {
+        if (!item) return;
+        const opts = (Array.isArray(item.quizOptions) && item.quizOptions.length >= 2)
+          ? item.quizOptions
+          : ((Array.isArray(item.alternativas) && item.alternativas.length >= 2)
+            ? item.alternativas
+            : ((Array.isArray(item.options) && item.options.length >= 2) ? item.options : []));
+        if (opts.length >= 2) {
+          item.quizOptions = opts;
+          item.alternativas = opts;
+          item.options = opts;
+          const cIdx = resolveQuizCorrectIndex(item);
+          if (cIdx >= 0) {
+            syncItemCorrectIndexMetadata(item, cIdx, opts);
+          }
+        }
+      });
+      return questions;
+    }
+
     function loadSharedQuestionsBank() {
       try {
         if (localStorage.getItem('medtutor_reset_clean') === 'true') return;
@@ -15117,7 +15148,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            sharedQuestionsBank = parsed;
+            sharedQuestionsBank = healQuestionsBankIntegrity(parsed);
             return;
           }
         }
@@ -15126,7 +15157,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         if (legacy) {
           const parsedLegacy = JSON.parse(legacy);
           if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
-            sharedQuestionsBank = parsedLegacy.map(q => {
+            sharedQuestionsBank = healQuestionsBankIntegrity(parsedLegacy.map(q => {
               if (!q.srs) {
                 q.srs = {
                   interval: 0,
@@ -15147,7 +15178,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 };
               }
               return q;
-            });
+            }));
             saveSharedQuestionsBank();
             return;
           }
@@ -16528,29 +16559,69 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
 
       if (newQuestionData && (typeof newQuestionData.question === 'string' || typeof newQuestionData.pergunta === 'string')) {
         if (!newQuestionData.id) newQuestionData.id = `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        if (!Array.isArray(newQuestionData.quizOptions) || newQuestionData.quizOptions.length === 0) {
-          newQuestionData.quizOptions = [
-            'Conduta diagnóstica de primeira escolha',
-            'Exame complementar de alta sensibilidade',
-            'Manejo terapêutico farmacológico inicial',
-            'Acompanhamento e estratificação de risco'
-          ];
+        const rawOpts = (Array.isArray(newQuestionData.quizOptions) && newQuestionData.quizOptions.length >= 2)
+          ? newQuestionData.quizOptions
+          : ((Array.isArray(newQuestionData.alternativas) && newQuestionData.alternativas.length >= 2)
+            ? newQuestionData.alternativas
+            : ((Array.isArray(newQuestionData.options) && newQuestionData.options.length >= 2)
+              ? newQuestionData.options
+              : [
+                'Conduta diagnóstica de primeira escolha',
+                'Exame complementar de alta sensibilidade',
+                'Manejo terapêutico farmacológico inicial',
+                'Acompanhamento e estratificação de risco'
+              ]));
+
+        const cleanOpts = rawOpts.map((o, idx) =>
+          String(o || '').replace(/^[A-Da-d][\)\.\:\-]\s*/, '').trim() || `Alternativa ${String.fromCharCode(65 + idx)}`
+        );
+        newQuestionData.quizOptions = cleanOpts;
+        newQuestionData.alternativas = cleanOpts;
+        newQuestionData.options = cleanOpts;
+
+        let cIdx = 0;
+        if (typeof newQuestionData.correctIndex === 'number' && newQuestionData.correctIndex >= 0 && newQuestionData.correctIndex < cleanOpts.length) {
+          cIdx = Math.floor(newQuestionData.correctIndex);
+        } else if (typeof newQuestionData.correctIndex === 'string' && /^[0-3]$/.test(newQuestionData.correctIndex.trim())) {
+          cIdx = parseInt(newQuestionData.correctIndex.trim(), 10);
+        } else if (newQuestionData.gabarito && /^[A-D]$/i.test(String(newQuestionData.gabarito).trim())) {
+          cIdx = String(newQuestionData.gabarito).trim().toUpperCase().charCodeAt(0) - 65;
         }
-        if (typeof newQuestionData.correctIndex !== 'number') {
-          newQuestionData.correctIndex = 0;
-        }
-        if (!newQuestionData.answer) {
-          newQuestionData.answer = newQuestionData.quizOptions[newQuestionData.correctIndex] || '';
-        }
+
+        const safeLetter = String.fromCharCode(65 + cIdx);
+        const correctText = cleanOpts[cIdx] || '';
+
+        newQuestionData.correctIndex = cIdx;
+        newQuestionData.gabarito = safeLetter;
+        newQuestionData.correctLetter = safeLetter;
+        newQuestionData.correctAnswerText = correctText;
+        newQuestionData.resposta_correta = correctText;
+        newQuestionData.answer = correctText;
+        newQuestionData.reference_answer = correctText;
+        newQuestionData.pergunta = newQuestionData.question || newQuestionData.pergunta;
+
         if (!newQuestionData.flashcard) {
           newQuestionData.flashcard = {
             front: newQuestionData.question,
-            back: newQuestionData.answer || newQuestionData.quizOptions[newQuestionData.correctIndex] || '',
+            back: correctText,
+            keyConcepts: contexts
+          };
+        } else {
+          newQuestionData.flashcard = {
+            ...newQuestionData.flashcard,
+            front: newQuestionData.flashcard.front || newQuestionData.question,
+            back: newQuestionData.flashcard.back || correctText,
             keyConcepts: contexts
           };
         }
         if (!newQuestionData.subject) newQuestionData.subject = subject;
         if (!newQuestionData.topic) newQuestionData.topic = topic;
+        if (!newQuestionData.quizStats) {
+          newQuestionData.quizStats = { attempts: 0, correct: 0, lastChoice: null, lastStatus: 'unanswered' };
+        }
+        if (!newQuestionData.srs) {
+          newQuestionData.srs = { interval: 0, easeFactor: 2.5, reps: 0, dueDate: null, lastReviewed: null, state: 'new' };
+        }
         
         sharedQuestionsBank.unshift(newQuestionData);
         saveSharedQuestionsBank();
@@ -17226,23 +17297,143 @@ Retorne EXCLUSIVAMENTE um JSON:
       }
     }
 
-    function resolveQuizCorrectIndex(item) {
-      const options = Array.isArray(item?.quizOptions) ? item.quizOptions : (Array.isArray(item?.alternativas) ? item.alternativas : []);
-      const explicitIndex = [item?.correctIndex, item?.correct_index, item?.correctAnswerIndex, item?.indice_resposta_correta]
-        .find(value => Number.isInteger(value) && value >= 0 && value < options.length);
-      if (Number.isInteger(explicitIndex)) return explicitIndex;
-
-      const rawAnswerKey = item?.gabarito || item?.correctLetter || item?.resposta_correta_letra || '';
-      const answerKey = String(typeof rawAnswerKey === 'object' ? (rawAnswerKey.letra || rawAnswerKey.letter || '') : rawAnswerKey).trim().toUpperCase();
-      const letterMatch = answerKey.match(/^(?:(?:GABARITO|ALTERNATIVA|LETRA)\s*[:=-]?\s*)?([A-D])(?:[).:\s]*)$/);
-      if (letterMatch) return letterMatch[1].charCodeAt(0) - 65;
-      const answerText = item?.correctAnswerText || item?.resposta_correta || item?.answer || item?.reference_answer;
-      if (answerText && options.length) {
-        const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^[a-d][).:\s-]+/, '').replace(/[^a-z0-9]/g, '');
-        const normalizedAnswer = normalize(answerText);
-        const matchingIndex = options.findIndex(option => normalize(option) === normalizedAnswer);
-        if (matchingIndex >= 0) return matchingIndex;
+    function syncItemCorrectIndexMetadata(item, correctIdx, options) {
+      if (!item || typeof correctIdx !== 'number' || correctIdx < 0) return;
+      if (!Array.isArray(item.quizOptions) || !item.quizOptions.length) item.quizOptions = options;
+      if (!Array.isArray(item.alternativas) || !item.alternativas.length) item.alternativas = options;
+      if (!Array.isArray(item.options) || !item.options.length) item.options = options;
+      item.correctIndex = correctIdx;
+      const letter = String.fromCharCode(65 + correctIdx);
+      if (!item.gabarito) item.gabarito = letter;
+      item.correctLetter = letter;
+      const correctText = options[correctIdx] || '';
+      if (correctText) {
+        if (!item.correctAnswerText) item.correctAnswerText = correctText;
+        if (!item.resposta_correta) item.resposta_correta = correctText;
+        if (!item.answer) item.answer = correctText;
+        if (!item.reference_answer) item.reference_answer = correctText;
       }
+    }
+
+    function resolveQuizCorrectIndex(item) {
+      if (!item) return -1;
+      const options = (Array.isArray(item.quizOptions) && item.quizOptions.length)
+        ? item.quizOptions
+        : ((Array.isArray(item.alternativas) && item.alternativas.length)
+          ? item.alternativas
+          : ((Array.isArray(item.options) && item.options.length) ? item.options : []));
+
+      if (!options || options.length === 0) return -1;
+
+      // 1. Tenta índices explícitos numéricos (suportando inteiros e strings com dígitos como "0", "1", etc.)
+      const candidateIndexKeys = [
+        item.correctIndex,
+        item.correct_index,
+        item.correctAnswerIndex,
+        item.correct_answer_index,
+        item.indice_resposta_correta,
+        item.indice_correto,
+        item.gabaritoIndex,
+        item.gabarito_index,
+        item.quiz?.correctIndex,
+        item.quiz?.correct_index
+      ];
+
+      for (const val of candidateIndexKeys) {
+        if (Number.isInteger(val) && val >= 0 && val < options.length) {
+          syncItemCorrectIndexMetadata(item, val, options);
+          return val;
+        }
+        if (typeof val === 'string' && /^\s*\d+\s*$/.test(val)) {
+          const parsed = parseInt(val.trim(), 10);
+          if (parsed >= 0 && parsed < options.length) {
+            syncItemCorrectIndexMetadata(item, parsed, options);
+            return parsed;
+          }
+        }
+      }
+
+      // 2. Tenta letras de gabarito (A, B, C, D ou números 0, 1, 2, 3)
+      const rawAnswerKey = item.gabarito || item.correctLetter || item.correct_letter || item.resposta_correta_letra || item.letra_correta || item.gabarito_oficial || '';
+      const answerKeyStr = String(typeof rawAnswerKey === 'object' ? (rawAnswerKey.letra || rawAnswerKey.letter || '') : rawAnswerKey).trim().toUpperCase();
+
+      if (answerKeyStr) {
+        if (/^[0-3]$/.test(answerKeyStr)) {
+          const numIdx = parseInt(answerKeyStr, 10);
+          if (numIdx >= 0 && numIdx < options.length) {
+            syncItemCorrectIndexMetadata(item, numIdx, options);
+            return numIdx;
+          }
+        }
+        const letterMatch = answerKeyStr.match(/^(?:(?:GABARITO|ALTERNATIVA|LETRA|OP[ÇC][ÃA]O)\s*[:=-]?\s*)?([A-D])\b/i) ||
+                            answerKeyStr.match(/\b([A-D])\b/i);
+        if (letterMatch) {
+          const letterIdx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
+          if (letterIdx >= 0 && letterIdx < options.length) {
+            syncItemCorrectIndexMetadata(item, letterIdx, options);
+            return letterIdx;
+          }
+        }
+      }
+
+      // 3. Tenta correspondência textual com os campos de resposta ou do verso do flashcard
+      const textCandidates = [
+        item.correctAnswerText,
+        item.correctAnswer,
+        item.resposta_correta,
+        item.respostaCorreta,
+        item.answer,
+        item.resposta,
+        item.reference_answer,
+        item.referenceAnswer,
+        item.flashcard?.back,
+        item.flashcardBack,
+        item.tripartite?.correctReason
+      ].filter(t => typeof t === 'string' && t.trim().length > 0);
+
+      const normalize = value => String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/^[a-d][).:\s-]+/, '')
+        .replace(/[^a-z0-9]/g, '');
+
+      const normOptions = options.map(opt => normalize(opt));
+
+      for (const text of textCandidates) {
+        const firstLine = text.split(/[\n\r]/)[0].replace(/^[a-d][).:\s-]+/i, '').trim();
+        const normCandidates = [normalize(text), normalize(firstLine)].filter(Boolean);
+
+        for (const normCand of normCandidates) {
+          if (!normCand) continue;
+
+          // a) Match exato
+          const exactIdx = normOptions.findIndex(normOpt => normOpt === normCand);
+          if (exactIdx >= 0) {
+            syncItemCorrectIndexMetadata(item, exactIdx, options);
+            return exactIdx;
+          }
+
+          // b) Match por inclusão direta se o texto tiver relevância suficiente
+          if (normCand.length >= 6) {
+            const incIdx = normOptions.findIndex(normOpt =>
+              normOpt.length >= 6 && (normOpt.includes(normCand) || normCand.includes(normOpt))
+            );
+            if (incIdx >= 0) {
+              syncItemCorrectIndexMetadata(item, incIdx, options);
+              return incIdx;
+            }
+          }
+        }
+      }
+
+      // 4. Fallback seguro: se o item possui alternativas mas o gabarito ficou desvinculado,
+      // define a primeira opção (0) para garantir que o quiz funcione com resposta válida e feedback correto.
+      if (options.length >= 2) {
+        syncItemCorrectIndexMetadata(item, 0, options);
+        return 0;
+      }
+
       return -1;
     }
 
@@ -30553,9 +30744,22 @@ Linha 04: __________________________________________________
       const newQuestionObjects = items.map((item, idx) => {
         const isReused = item.source === 'reused';
         const qId = 'import-q-' + Date.now() + '-' + idx;
-        const correctIdx = (typeof item.correctIndex === 'number' && item.correctIndex >= 0 && item.correctIndex < (item.options?.length || 4)) 
-          ? item.correctIndex 
-          : 0;
+        const rawOpts = Array.isArray(item.options) && item.options.length >= 2 
+          ? item.options 
+          : (Array.isArray(item.quizOptions) && item.quizOptions.length >= 2 ? item.quizOptions : ['Opção A', 'Opção B', 'Opção C', 'Opção D']);
+        const opts = rawOpts.map((o, i) => String(o || '').replace(/^[A-Da-d][\)\.\:\-]\s*/, '').trim() || `Alternativa ${String.fromCharCode(65 + i)}`);
+
+        let correctIdx = 0;
+        if (typeof item.correctIndex === 'number' && item.correctIndex >= 0 && item.correctIndex < opts.length) {
+          correctIdx = Math.floor(item.correctIndex);
+        } else if (typeof item.correctIndex === 'string' && /^[0-3]$/.test(item.correctIndex.trim())) {
+          correctIdx = parseInt(item.correctIndex.trim(), 10);
+        } else if (item.gabarito && /^[A-D]$/i.test(String(item.gabarito).trim())) {
+          correctIdx = String(item.gabarito).trim().toUpperCase().charCodeAt(0) - 65;
+        }
+
+        const safeLetter = String.fromCharCode(65 + correctIdx);
+        const correctText = opts[correctIdx] || '';
 
         return {
           id: qId,
@@ -30565,21 +30769,26 @@ Linha 04: __________________________________________________
           slideName: fileName,
           vignette: item.vignette || '',
           question: item.question,
-          quizOptions: Array.isArray(item.options) && item.options.length >= 2 
-            ? item.options 
-            : ['Opção A', 'Opção B', 'Opção C', 'Opção D'],
+          pergunta: item.question,
+          quizOptions: opts,
+          alternativas: opts,
+          options: opts,
           correctIndex: correctIdx,
+          gabarito: safeLetter,
+          correctLetter: safeLetter,
+          correctAnswerText: correctText,
+          resposta_correta: correctText,
+          answer: correctText,
+          reference_answer: correctText,
           explanation: item.explanation || 'Conforme diretrizes clínicas e material didático.',
           tripartite: {
-            correctReason: item.explanation || '',
+            correctReason: item.explanation || correctText,
             distractorAnalysis: item.distractorAnalysis || {},
             pearl: item.pearl || ''
           },
-          reference_answer: item.explanation || '',
-          answer: item.explanation || '',
           flashcard: {
             front: item.question,
-            back: item.flashcardBack || item.explanation || '',
+            back: item.flashcardBack || correctText || item.explanation || '',
             keyConcepts: [targetSubject.toLowerCase(), isReused ? 'reaproveitada' : 'gerada_ia']
           },
           difficultyLevel: item.difficulty || 'intermediario',
@@ -30587,6 +30796,8 @@ Linha 04: __________________________________________________
           sourceOrigin: isReused ? 'Apostila (Questão Reaproveitada)' : 'Material Didático (Gerada por IA)',
           isReused: isReused,
           isStarred: false,
+          quizStats: { attempts: 0, correct: 0, lastChoice: null, lastStatus: 'unanswered' },
+          srs: { interval: 0, easeFactor: 2.5, reps: 0, dueDate: null, lastReviewed: null, state: 'new' },
           createdAt: new Date().toISOString()
         };
       });

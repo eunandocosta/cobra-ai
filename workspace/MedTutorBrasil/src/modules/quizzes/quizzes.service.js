@@ -599,6 +599,11 @@ const derivedQuestionSchema = {
       type: SchemaType.INTEGER,
       description: "Índice (0, 1, 2 ou 3) da alternativa correta no array quizOptions"
     },
+    gabarito: {
+      type: SchemaType.STRING,
+      description: "Letra da alternativa correta: A, B, C ou D",
+      enum: ["A", "B", "C", "D"]
+    },
     explanation: {
       type: SchemaType.STRING,
       description: "Mecanismo central e fundamentação da conduta correta perante os novos contextos"
@@ -615,10 +620,10 @@ const derivedQuestionSchema = {
           type: SchemaType.OBJECT,
           description: "Análise sucinta de cada alternativa",
           properties: {
-            "0": { type: SchemaType.STRING },
-            "1": { type: SchemaType.STRING },
-            "2": { type: SchemaType.STRING },
-            "3": { type: SchemaType.STRING }
+            optA: { type: SchemaType.STRING },
+            optB: { type: SchemaType.STRING },
+            optC: { type: SchemaType.STRING },
+            optD: { type: SchemaType.STRING }
           }
         },
         pearl: {
@@ -1805,9 +1810,20 @@ Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.
       return s.replace(/^[A-Da-d][\)\.\:\-]\s*/, '').trim() || `Alternativa ${String.fromCharCode(65 + i)}`;
     });
 
-    const safeCorrectIdx = (typeof parsed.correctIndex === 'number' && parsed.correctIndex >= 0 && parsed.correctIndex < cleanOptions.length)
-      ? Math.floor(parsed.correctIndex)
-      : 0;
+    const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
+    let safeCorrectIdx = 0;
+    if (typeof parsed.correctIndex === 'number' && parsed.correctIndex >= 0 && parsed.correctIndex < cleanOptions.length) {
+      safeCorrectIdx = Math.floor(parsed.correctIndex);
+    } else if (typeof parsed.correctIndex === 'string' && /^[0-3]$/.test(parsed.correctIndex.trim())) {
+      safeCorrectIdx = parseInt(parsed.correctIndex.trim(), 10);
+    } else if (parsed.gabarito && letterToIndex[String(parsed.gabarito).trim().toUpperCase()] !== undefined) {
+      safeCorrectIdx = letterToIndex[String(parsed.gabarito).trim().toUpperCase()];
+    } else if (typeof parsed.correctIndex === 'string' && letterToIndex[parsed.correctIndex.trim().toUpperCase()] !== undefined) {
+      safeCorrectIdx = letterToIndex[parsed.correctIndex.trim().toUpperCase()];
+    }
+
+    const safeLetter = ['A', 'B', 'C', 'D'][safeCorrectIdx] || 'A';
+    const safeAnswer = cleanOptions[safeCorrectIdx] || '';
 
     const generatedQuestion = {
       id: `deriv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -1815,10 +1831,18 @@ Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.
       topic: parsed.flashcardTitle || topic || 'Pergunta Derivada com Contexto',
       flashcardTitle: parsed.flashcardTitle || topic || 'Pergunta Derivada',
       question: parsed.question || 'Qual a conduta adequada perante os novos achados clínicos?',
+      pergunta: parsed.question || 'Qual a conduta adequada perante os novos achados clínicos?',
       vignette: parsed.vignette || '',
       quizOptions: cleanOptions,
+      alternativas: cleanOptions,
+      options: cleanOptions,
+      gabarito: safeLetter,
+      correctLetter: safeLetter,
       correctIndex: safeCorrectIdx,
-      answer: cleanOptions[safeCorrectIdx] || '',
+      correctAnswerText: safeAnswer,
+      resposta_correta: safeAnswer,
+      answer: safeAnswer,
+      reference_answer: safeAnswer,
       explanation: parsed.explanation || 'Resolução fundamentada na integração do caso clínico com os novos contextos.',
       tripartite: {
         correctReason: parsed.tripartite?.correctReason || parsed.explanation || 'Opção alinhada às diretrizes clínicas vigentes.',
@@ -1827,8 +1851,22 @@ Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.
       },
       flashcard: {
         front: parsed.flashcardFront || parsed.question || 'Qual o diagnóstico/conduta no caso?',
-        back: parsed.flashcardBack || cleanOptions[safeCorrectIdx] || 'Resposta de referência.',
+        back: parsed.flashcardBack || safeAnswer || 'Resposta de referência.',
         keyConcepts: validContexts
+      },
+      quizStats: {
+        attempts: 0,
+        correct: 0,
+        lastChoice: null,
+        lastStatus: 'unanswered'
+      },
+      srs: {
+        interval: 0,
+        easeFactor: 2.5,
+        reps: 0,
+        dueDate: null,
+        lastReviewed: null,
+        state: 'new'
       },
       derivedFromQuestionId: cleanQuestion,
       addedContexts: validContexts,
