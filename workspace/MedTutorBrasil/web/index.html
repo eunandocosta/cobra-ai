@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261009-profile-frames-v2">
+  <link rel="stylesheet" href="/styles.css?v=20261009-drive-spinner-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -1682,7 +1682,7 @@
 
       <!-- STATUS DE VARREDURA -->
       <div id="driveScanProgress" style="display: none; padding: 10px 14px; background: var(--bg-surface); border-radius: 10px; font-size: 12px; color: var(--neon); align-items: center; gap: 8px;">
-        <svg class="icon" style="animation: spin 1.5s linear infinite;" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span class="drive-scan-spinner" aria-hidden="true"></span>
         <span id="driveScanLabel">Conectando ao Google Drive e vasculhando pastas...</span>
       </div>
 
@@ -4171,7 +4171,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/material-icons.js?v=20261009-compact-sidebar-tooltips-v1"></script>
-  <script defer src="/app.min.js?v=20261009-profile-frames-v2"></script>
+  <script defer src="/app.min.js?v=20261009-drive-spinner-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

@@ -1299,6 +1299,17 @@
       to { transform: rotate(360deg); }
     }
 
+    .drive-scan-spinner {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 17px;
+      border: 2px solid color-mix(in srgb, var(--neon) 24%, transparent);
+      border-top-color: var(--neon);
+      border-right-color: var(--neon);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
     /* Zero-State */
     .empty-state {
       display: flex;
