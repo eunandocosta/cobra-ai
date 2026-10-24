@@ -127,19 +127,28 @@ async function redeemCoupon(decodedToken, submittedCode) {
     ]);
     const existingGrant = accessSnapshot(grantDoc.exists ? grantDoc.data() : {});
     if (existingGrant.active) return { active: true, expiresAtMs: existingGrant.expiresAtMs, alreadyActive: true };
-    if (redemptionDoc.exists) {
-      const error = new Error('Este cupom já foi utilizado nesta conta.');
-      error.statusCode = 409;
-      error.code = 'coupon_already_used';
-      throw error;
-    }
 
-    const redeemedCount = Math.max(0, Number(usageDoc.exists ? usageDoc.data().redeemedCount : 0) || 0);
-    if (coupon.maxRedemptions > 0 && redeemedCount >= coupon.maxRedemptions) {
-      const error = new Error('Este cupom atingiu o limite de ativações.');
-      error.statusCode = 409;
-      error.code = 'coupon_exhausted';
-      throw error;
+    // Uma conta que já resgatou este cupom e cujo acesso expirou ou foi removido
+    // pode reativá-lo. A renovação não conta como nova ativação no limite global,
+    // que continua medindo quantas contas diferentes usaram o cupom.
+    const renewal = redemptionDoc.exists;
+    if (renewal) {
+      const previousRenewals = Math.max(0, Number(redemptionDoc.data().renewalCount) || 0);
+      transaction.set(redemptionRef, { renewalCount: previousRenewals + 1, renewedAtMs: now, expiresAtMs }, { merge: true });
+    } else {
+      const redeemedCount = Math.max(0, Number(usageDoc.exists ? usageDoc.data().redeemedCount : 0) || 0);
+      if (coupon.maxRedemptions > 0 && redeemedCount >= coupon.maxRedemptions) {
+        const error = new Error('Este cupom atingiu o limite de ativações.');
+        error.statusCode = 409;
+        error.code = 'coupon_exhausted';
+        throw error;
+      }
+      transaction.set(usageRef, {
+        redeemedCount: redeemedCount + 1,
+        maxRedemptions: coupon.maxRedemptions,
+        updatedAtMs: now
+      }, { merge: true });
+      transaction.create(redemptionRef, { uid: decodedToken.uid, redeemedAtMs: now, expiresAtMs });
     }
 
     const grantData = {
@@ -150,14 +159,8 @@ async function redeemCoupon(decodedToken, submittedCode) {
       grantedAtMs: now,
       expiresAtMs
     };
-    transaction.set(usageRef, {
-      redeemedCount: redeemedCount + 1,
-      maxRedemptions: coupon.maxRedemptions,
-      updatedAtMs: now
-    }, { merge: true });
-    transaction.create(redemptionRef, { uid: decodedToken.uid, redeemedAtMs: now, expiresAtMs });
     transaction.set(grantRef, grantData);
-    return { active: true, expiresAtMs, alreadyActive: false };
+    return { active: true, expiresAtMs, alreadyActive: false, renewed: renewal };
   });
 
   const grant = { active: result.active, expiresAtMs: result.expiresAtMs };
@@ -167,6 +170,7 @@ async function redeemCoupon(decodedToken, submittedCode) {
     active: true,
     access: 'granted',
     alreadyActive: result.alreadyActive,
+    renewed: result.renewed === true,
     expiresAt: grant.expiresAtMs == null ? null : new Date(grant.expiresAtMs).toISOString()
   };
 }

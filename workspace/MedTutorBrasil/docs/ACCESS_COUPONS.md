@@ -13,7 +13,9 @@ Configure estes Environment Variables no serviço web:
 - `FIREBASE_PROJECT_ID=cobra-ai-6549d`.
 - `FIREBASE_SERVICE_ACCOUNT_JSON` com a chave JSON de uma conta de serviço do Firebase Admin. No Render, marque-a como secreta; não a coloque em `.env.example`, no navegador ou no GitHub.
 
-O usuário precisa estar autenticado antes de resgatar. O resgate é atômico no Firestore: evita ultrapassar um limite positivo de ativações, impede reutilização do mesmo cupom pela mesma conta e persiste o direito em `access_grants` antes de liberar as custom claims do Firebase.
+O usuário precisa estar autenticado antes de resgatar. O resgate é atômico no Firestore: evita ultrapassar um limite positivo de ativações e persiste o direito em `access_grants` antes de liberar as custom claims do Firebase.
+
+Se a conta já resgatou o cupom e o acesso ainda está ativo, o resgate apenas confirma a liberação. Se o acesso expirou (com `ACCESS_COUPON_ACCESS_DAYS` maior que 0) ou o documento em `access_grants` foi removido, a mesma conta pode digitar o cupom de novo para reativá-lo, com um novo prazo. A reativação é registrada em `access_coupon_redemptions` (`renewalCount`, `renewedAtMs`) e não conta no limite de `ACCESS_COUPON_MAX_REDEMPTIONS`, que mede quantas contas diferentes usaram o cupom.
 
 ## Regras do Firestore
 
@@ -23,6 +25,6 @@ Antes de ativar em produção, confirme que a conta de serviço tem acesso de es
 
 ## Desativar
 
-Para voltar ao acesso sem cupom, defina `ACCESS_GATE_ENABLED=false` no Render e publique regras do Firestore compatíveis com a política desejada. Não apague `access_grants` sem decidir se pretende revogar as concessões já dadas.
+Para voltar ao acesso sem cupom, defina `ACCESS_GATE_ENABLED=false` no Render e publique regras do Firestore compatíveis com a política desejada. Apagar um documento de `access_grants` retira o acesso da conta até ela digitar o cupom de novo; para bloquear uma conta de forma definitiva, troque `ACCESS_COUPON_CODE` (ou a versão do cupom) em vez de apenas apagar a concessão.
 
 Os eventos de ativação não registram o código em logs. A coleção `access_coupon_usage` contém apenas hash e contador; `access_coupon_redemptions` associa a ativação ao UID do Firebase.

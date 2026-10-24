@@ -260,6 +260,8 @@ const server = http.createServer(async (req, res) => {
 
   let reqPath = parsedUrl.pathname;
   if (reqPath === "/" || reqPath === "") reqPath = "/index.html";
+  // app.min.js é gerado no build (não versionado); sem ele, serve o app.js original.
+  if (reqPath === "/app.min.js" && !fs.existsSync(path.join(WEB_DIR, reqPath))) reqPath = "/app.js";
   const filePath = path.join(WEB_DIR, reqPath);
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {

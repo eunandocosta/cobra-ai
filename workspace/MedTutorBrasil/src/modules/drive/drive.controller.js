@@ -1,4 +1,5 @@
 // src/modules/drive/drive.controller.js
+const { clientErrorMessage } = require('../../shared/http-error');
 const driveService = require('./drive.service');
 
 class DriveController {
@@ -13,7 +14,7 @@ class DriveController {
       return res.json(result);
     } catch (err) {
       console.error('❌ [DriveController] Erro ao varrer pasta do Drive:', err.message);
-      return res.status(500).json({ error: 'Erro ao conectar com o Google Drive', details: err.message });
+      return res.status(500).json({ error: 'Erro ao conectar com o Google Drive', details: clientErrorMessage(err) });
     }
   }
 
@@ -29,7 +30,7 @@ class DriveController {
       return res.send(buffer);
     } catch (err) {
       console.error('❌ [DriveController] Erro ao baixar arquivo:', err.message);
-      return res.status(500).json({ error: 'Erro ao baixar arquivo do Drive', details: err.message });
+      return res.status(500).json({ error: 'Erro ao baixar arquivo do Drive', details: clientErrorMessage(err) });
     }
   }
 }

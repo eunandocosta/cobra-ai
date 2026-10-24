@@ -1,3 +1,4 @@
+const { clientErrorMessage } = require('../../shared/http-error');
 const accessService = require('./access.service');
 
 function getBearerToken(req) {
@@ -12,7 +13,7 @@ class AccessController {
       const result = await accessService.getStatus(token);
       return res.json(result);
     } catch (error) {
-      return res.status(error.statusCode || 503).json({ error: error.message || 'Não foi possível validar o acesso.', code: error.code || 'access_status_failed' });
+      return res.status(error.statusCode || 503).json({ error: clientErrorMessage(error) || 'Não foi possível validar o acesso.', code: error.code || 'access_status_failed' });
     }
   }
 
@@ -23,7 +24,7 @@ class AccessController {
       const result = await accessService.redeemCoupon(token, req.body?.code);
       return res.json(result);
     } catch (error) {
-      return res.status(error.statusCode || 503).json({ error: error.message || 'Não foi possível ativar o cupom.', code: error.code || 'coupon_redemption_failed' });
+      return res.status(error.statusCode || 503).json({ error: clientErrorMessage(error) || 'Não foi possível ativar o cupom.', code: error.code || 'coupon_redemption_failed' });
     }
   }
 }

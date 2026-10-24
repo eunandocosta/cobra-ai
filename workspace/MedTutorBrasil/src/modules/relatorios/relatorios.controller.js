@@ -1,4 +1,5 @@
 // Controlador HTTP do Domínio Relatórios (MedTutor Brasil)
+const { clientErrorMessage } = require('../../shared/http-error');
 const relatoriosService = require('./relatorios.service');
 
 class RelatoriosController {
@@ -33,7 +34,7 @@ class RelatoriosController {
       const report = await relatoriosService.getReportById(req.params.id);
       return res.json(report);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao buscar relatório', details: err.message });
+      return res.status(500).json({ error: 'Erro ao buscar relatório', details: clientErrorMessage(err) });
     }
   }
 
@@ -42,7 +43,7 @@ class RelatoriosController {
       const list = await relatoriosService.getReportsByMaterial(req.params.materialId);
       return res.json({ count: list.length, reports: list });
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao buscar relatórios do material', details: err.message });
+      return res.status(500).json({ error: 'Erro ao buscar relatórios do material', details: clientErrorMessage(err) });
     }
   }
 
@@ -52,7 +53,7 @@ class RelatoriosController {
       const exportInfo = relatoriosService.preparePdfExport(reportId);
       return res.json(exportInfo);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao preparar exportação', details: err.message });
+      return res.status(500).json({ error: 'Erro ao preparar exportação', details: clientErrorMessage(err) });
     }
   }
 }

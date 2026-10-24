@@ -12,3 +12,6 @@ service-account*.json
 *.log
 npm-debug.log*
 .DS_Store
+
+# Bundle gerado por "npm run build" (também executado no postinstall).
+workspace/MedTutorBrasil/web/app.min.js

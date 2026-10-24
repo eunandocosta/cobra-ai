@@ -1,3 +1,4 @@
+const { clientErrorMessage } = require('../../shared/http-error');
 const ementasService = require('./ementas.service');
 
 class EmentasController {
@@ -22,7 +23,7 @@ class EmentasController {
       });
     } catch (err) {
       console.error('❌ [Backend] Erro ao processar ementa no Gemini:', err.message);
-      return res.status(500).json({ error: 'Erro ao processar ementa com IA', details: err.message });
+      return res.status(500).json({ error: 'Erro ao processar ementa com IA', details: clientErrorMessage(err) });
     }
   }
 
@@ -37,7 +38,7 @@ class EmentasController {
         ...classification
       });
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao classificar material', details: err.message });
+      return res.status(500).json({ error: 'Erro ao classificar material', details: clientErrorMessage(err) });
     }
   }
 
@@ -46,7 +47,7 @@ class EmentasController {
       const data = await ementasService.getCurriculum();
       return res.json(data);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao carregar grade', details: err.message });
+      return res.status(500).json({ error: 'Erro ao carregar grade', details: clientErrorMessage(err) });
     }
   }
 
@@ -56,7 +57,7 @@ class EmentasController {
       const details = await ementasService.getSubjectDetails(subjectId);
       return res.json(details);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao buscar matéria', details: err.message });
+      return res.status(500).json({ error: 'Erro ao buscar matéria', details: clientErrorMessage(err) });
     }
   }
 
@@ -66,7 +67,7 @@ class EmentasController {
       const ordered = ementasService.orderMaterialsByPedagogicalFlow(materials || []);
       return res.json({ success: true, count: ordered.length, materials: ordered });
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao ordenar', details: err.message });
+      return res.status(500).json({ error: 'Erro ao ordenar', details: clientErrorMessage(err) });
     }
   }
 
@@ -76,7 +77,7 @@ class EmentasController {
       const result = ementasService.allocateMaterial(materialName, targetSubject, existingMaterials || []);
       return res.json(result);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao alocar', details: err.message });
+      return res.status(500).json({ error: 'Erro ao alocar', details: clientErrorMessage(err) });
     }
   }
 }
