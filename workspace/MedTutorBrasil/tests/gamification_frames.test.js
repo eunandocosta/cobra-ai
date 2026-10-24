@@ -110,6 +110,34 @@ assert(catalog.buildLegacySvg('neon', ['#00f477', '#b2ffd2', '#07552d']).include
 assert.strictEqual(catalog.buildLegacySvg('laurel-13', ['#000', '#000', '#000']), '');
 console.log('  [PASS] Novos Louros e Pulso Neon');
 
+const history = catalog.backfillProgress(catalog.createProgress(), {
+  answeredIds: ['h1', 'h2'], curatedIds: ['h1'], neuroIds: ['h2'], bestCombo: 12,
+  eventIds: [...Array.from({ length: 30 }, (_, i) => `2026-08-${String(1 + (i % 7)).padStart(2, '0')}:quiz:h${encodeURIComponent('q/' + i)}`), '2026-10-20:flashcard:f1', 'inválido']
+});
+assert.strictEqual(history.monthAnswered['2026-08'].length, 30, 'eventos datados de quiz contam no mês em que aconteceram');
+assert(history.monthAnswered['2026-08'].includes('hq/0'), 'ids de eventos são decodificados');
+assert.strictEqual(history.bestStreak, 7, 'dias de eventos (quiz e flashcard) formam a sequência');
+assert.strictEqual(history.bestCombo, 12);
+assert.deepStrictEqual(history.curatedIds, ['h1']);
+const historyMetrics = catalog.metricsFromProgress(history, { level: 1 });
+const october = new Date(2026, 9, 25);
+assert(!catalog.collectNewUnlocks(history, historyMetrics, october).newlyUnlocked.includes('laco-2026-08'), 'sem o modo retroativo, laço de mês encerrado não é concedido');
+assert(catalog.collectNewUnlocks(history, historyMetrics, october, { retroactive: true }).newlyUnlocked.includes('laco-2026-08'), 'no modo retroativo, o histórico concede o laço do mês já cumprido');
+assert(!catalog.collectNewUnlocks(history, historyMetrics, october, { retroactive: true }).newlyUnlocked.includes('laco-2026-11'), 'o retroativo não concede meses futuros');
+assert.strictEqual(catalog.evaluate(catalog.getDefinition('laco-2027-03'), { monthAnswered: { '2027-03': 99 } }, catalog.createProgress(), new Date(2027, 5, 1), { retroactive: true }).unlocked, false, 'o retroativo vale só para 2026');
+const normalizedFlags = catalog.normalizeProgress({ legacySeen: ['laurel-3', 'neon', 'x'], retroGiftShown: true });
+assert.deepStrictEqual(normalizedFlags.legacySeen, ['laurel-3', 'neon']);
+assert.strictEqual(normalizedFlags.retroGiftShown, true);
+assert.strictEqual(catalog.normalizeProgress({}).legacySeen, null, 'louros vistos começam não inicializados');
+console.log('  [PASS] Entrega retroativa única: histórico, laços já cumpridos de 2026 e flags');
+
+const appJs = require('fs').readFileSync(require('path').join(__dirname, '..', 'web', 'app.js'), 'utf8');
+const indexHtml = require('fs').readFileSync(require('path').join(__dirname, '..', 'web', 'index.html'), 'utf8');
+assert(indexHtml.includes('id="frameUnlockModal"') && indexHtml.includes('equipUnlockedFrameFromModal()'), 'existe o modal de moldura conquistada com botão de equipar');
+assert(appJs.includes("Date.parse('2026-10-26T03:00:00Z')") && appJs.includes('user.metadata?.creationTime'), 'o retroativo vale só para contas criadas até 25/10/2026');
+assert(appJs.includes('setupQuizCarousel(quizDeck, list)') && appJs.includes("event.key === 'ArrowRight'"), 'o quiz mostra uma questão por vez com setas e teclado');
+console.log('  [PASS] Modal de conquista e quiz em carrossel presentes');
+
 const fs = require('fs');
 const path = require('path');
 const iconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf8');

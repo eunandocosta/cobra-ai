@@ -443,7 +443,8 @@
           uid: user.uid,
           email: user.email || '',
           displayName: user.displayName || '',
-          photoURL: user.photoURL || ''
+          photoURL: user.photoURL || '',
+          createdAt: user.metadata?.creationTime || ''
         };
         this.authMode = 'firebase';
         this.hydrateLocalProfileForUid(user.uid);
@@ -3730,6 +3731,7 @@
       document.body.style.overflow = levelUpPreviousBodyOverflow;
       if (levelUpReturnFocus?.isConnected) levelUpReturnFocus.focus();
       levelUpReturnFocus = null;
+      if (typeof flushFrameUnlockQueue === 'function') setTimeout(flushFrameUnlockQueue, 350);
     }
 
     document.addEventListener('keydown', event => {
@@ -3899,10 +3901,7 @@
       return /nervos|neuro/i.test([item?.subject, item?.disciplina, item?.topic, item?.period].filter(Boolean).join(' '));
     }
     function getFrameCatalogMetrics(progress = readFrameCatalogProgress()) {
-      const answered = (Array.isArray(sharedQuestionsBank) ? sharedQuestionsBank : []).filter(question => {
-        const stats = question?.quizStats || {};
-        return question?.id && (Number(stats.attempts) > 0 || stats.answered === true || (stats.lastStatus && stats.lastStatus !== 'unanswered'));
-      });
+      const answered = getAnsweredBankQuestions();
       const profile = MedTutorAuthService?.userProfile || {};
       return MedTutorFrameCatalog.metricsFromProgress(progress, {
         level: MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp).level,
@@ -3922,22 +3921,202 @@
         MedTutorFirebaseService.saveUserProfile({ ...profile, molduras_conquistadas: ids }).catch(error => console.warn('[Molduras] Não foi possível sincronizar as conquistas:', error));
       }, 1500);
     }
+    // Entrega única: quem já tinha conta até 25/10/2026 recebe, pelo que já
+    // fez, as molduras que existiam nesta data. Contas novas e molduras futuras
+    // não têm esse benefício. A janela vai até o fim de 2026 para alcançar quem
+    // demora a voltar; repetir a contagem é seguro (nada é concedido duas vezes).
+    var FRAME_RETROACTIVE_ACCOUNT_CUTOFF = Date.parse('2026-10-26T03:00:00Z');
+    var FRAME_RETROACTIVE_UNTIL = Date.parse('2027-01-01T03:00:00Z');
+    function isFrameRetroactiveEligible(now = Date.now()) {
+      const user = MedTutorAuthService?.currentUser;
+      if (!user?.uid || !FRAME_RETROACTIVE_UNTIL || now >= FRAME_RETROACTIVE_UNTIL) return false;
+      const created = [user.createdAt, MedTutorAuthService?.userProfile?.data_criacao]
+        .map(value => Date.parse(value || ''))
+        .filter(Number.isFinite);
+      return created.length > 0 && Math.min(...created) < FRAME_RETROACTIVE_ACCOUNT_CUTOFF;
+    }
+    function getAnsweredBankQuestions() {
+      return (Array.isArray(sharedQuestionsBank) ? sharedQuestionsBank : []).filter(question => {
+        const stats = question?.quizStats || {};
+        return question?.id && (Number(stats.attempts) > 0 || stats.answered === true || (stats.lastStatus && stats.lastStatus !== 'unanswered'));
+      });
+    }
+    function backfillFrameCatalogHistory(progress) {
+      const answered = getAnsweredBankQuestions();
+      return MedTutorFrameCatalog.backfillProgress(progress, {
+        answeredIds: answered.map(question => question.id),
+        curatedIds: answered.filter(question => question.curated || isInstitutionCuratedQuestion(question.id)).map(question => question.id),
+        neuroIds: answered.filter(isNeuroQuestion).map(question => question.id),
+        eventIds: MedTutorGamification.state.recentEventIds || [],
+        bestCombo: MedTutorGamification.state.combo
+      });
+    }
+    function getUnlockedLegacyFrameIds() {
+      const counts = getGamificationFrameCounts();
+      return getGamificationFrameDefinitions()
+        .filter(frame => frame.type === 'laurel' || frame.type === 'neon')
+        .filter(frame => gamificationFrameRequirement(frame.id, counts, MedTutorGamification.state.totalStudySeconds).unlocked)
+        .map(frame => frame.id);
+    }
     function syncFrameCatalogUnlocks({ announce = true } = {}) {
       if (typeof MedTutorFrameCatalog === 'undefined') return [];
-      const current = readFrameCatalogProgress();
-      const { progress, newlyUnlocked } = MedTutorFrameCatalog.collectNewUnlocks(current, getFrameCatalogMetrics(current));
+      const stored = readFrameCatalogProgress();
+      const retroactive = isFrameRetroactiveEligible();
+      const current = retroactive ? backfillFrameCatalogHistory(stored) : stored;
+      const metrics = getFrameCatalogMetrics(current);
+      if (retroactive) {
+        const year = MedTutorFrameCatalog.RETROACTIVE_YEAR;
+        metrics.yearAnswered = { ...metrics.yearAnswered, [year]: Math.max(Number(metrics.yearAnswered?.[year]) || 0, metrics.answered) };
+      }
+      const { progress, newlyUnlocked } = MedTutorFrameCatalog.collectNewUnlocks(current, metrics, new Date(), { retroactive });
+
+      // Louros e Pulso Neon seguem as regras do app; na primeira leitura os já
+      // liberados contam como vistos, para não anunciar o que o aluno já tinha.
+      const legacyUnlocked = getUnlockedLegacyFrameIds();
+      let newLegacy = [];
+      if (progress.legacySeen === null) {
+        progress.legacySeen = legacyUnlocked;
+      } else {
+        newLegacy = legacyUnlocked.filter(id => !progress.legacySeen.includes(id));
+        progress.legacySeen = [...new Set([...progress.legacySeen, ...legacyUnlocked])];
+      }
+
+      let giftIds = [];
+      if (retroactive && !progress.retroGiftShown && Object.keys(progress.unlocked).length) {
+        giftIds = Object.keys(progress.unlocked);
+        progress.retroGiftShown = true;
+      }
+
       const signedIn = Boolean(MedTutorAuthService?.currentUser?.uid && MedTutorAuthService?.userProfile);
       const missingInProfile = signedIn && Object.keys(progress.unlocked).some(id => !(MedTutorAuthService.userProfile.molduras_conquistadas || []).includes(id));
-      if (!newlyUnlocked.length && !missingInProfile) return [];
-      writeFrameCatalogProgress(progress);
-      saveFrameCatalogUnlocksToProfile(progress);
-      if (announce && newlyUnlocked.length && typeof showToast === 'function') {
-        const first = MedTutorFrameCatalog.getDefinition(newlyUnlocked[0]);
-        showToast(newlyUnlocked.length === 1
-          ? `🏅 Nova moldura desbloqueada: ${first?.title || 'veja na Coleção'}!`
-          : `🏅 ${newlyUnlocked.length} novas molduras desbloqueadas! Veja na Coleção.`);
+      if (JSON.stringify(progress) !== JSON.stringify(stored)) writeFrameCatalogProgress(progress);
+      if (newlyUnlocked.length || missingInProfile) saveFrameCatalogUnlocksToProfile(progress);
+      if (announce) {
+        if (giftIds.length) queueFrameUnlockAnnouncement([...giftIds, ...newLegacy], { gift: true });
+        else queueFrameUnlockAnnouncement([...newlyUnlocked, ...newLegacy]);
       }
       return newlyUnlocked;
+    }
+
+    // --- Modal de moldura conquistada (mesmo estilo da subida de nível) ---
+    // var: o perfil pode sincronizar molduras antes deste trecho ser executado.
+    var frameUnlockQueue = [];
+    var frameUnlockActive = false;
+    var frameUnlockHeroFrame = null;
+    var frameUnlockReturnFocus = null;
+    var frameUnlockPreviousInert = false;
+    var frameUnlockPreviousOverflow = '';
+    function queueFrameUnlockAnnouncement(ids, { gift = false } = {}) {
+      const unique = [...new Set((ids || []).filter(Boolean))];
+      if (!unique.length || !Array.isArray(frameUnlockQueue)) return;
+      frameUnlockQueue.push({ ids: unique, gift });
+      // Deixa a subida de nível (se houver) aparecer primeiro.
+      setTimeout(flushFrameUnlockQueue, 700);
+    }
+    function flushFrameUnlockQueue() {
+      if (frameUnlockActive || !Array.isArray(frameUnlockQueue) || !frameUnlockQueue.length) return;
+      if (document.getElementById('levelUpModal')?.classList.contains('active')) return;
+      const pending = frameUnlockQueue.splice(0);
+      showFrameUnlockModal([...new Set(pending.flatMap(item => item.ids))], { gift: pending.some(item => item.gift) });
+    }
+    function frameUnlockReason(frame) {
+      const rule = frame?.rule;
+      if (frame?.type === 'laurel') return `Por responder 50 questões em cada período até o ${frame.period}º.`;
+      if (frame?.type === 'neon') return 'Por acumular 1 hora de prática ativa.';
+      if (!rule) return '';
+      const n = Number(rule.min).toLocaleString('pt-BR');
+      return {
+        level: `Por chegar ao nível ${n} de XP.`,
+        streak: `Por estudar ${n} dias seguidos.`,
+        combo: `Por acertar ${n} questões seguidas.`,
+        challengerVotes: `Por receber ${n} votos positivos nos duelos.`,
+        neuroAnswered: `Por responder ${n} questões de Sistema Nervoso.`,
+        answered: `Por responder ${n} questões diferentes.`,
+        curatedAnswered: `Por responder ${n} questões da curadoria.`,
+        monthAnswered: `Por responder ${n} questões no ${frame.title}.`,
+        yearAnswered: `Por responder ${n} questões em ${rule.year}. Só dava para conquistar neste ano!`
+      }[rule.type] || '';
+    }
+    function showFrameUnlockModal(ids, { gift = false } = {}) {
+      const modal = document.getElementById('frameUnlockModal');
+      if (!modal) return;
+      const definitions = getGamificationFrameDefinitions();
+      const frames = ids.map(id => definitions.find(frame => frame.id === id) || (MedTutorFrameCatalog.getDefinition(id) && { ...MedTutorFrameCatalog.getDefinition(id), type: 'catalog' })).filter(Boolean);
+      if (!frames.length) return;
+      const { initials } = getGamificationProfileInfo();
+      // Destaque: a conquista mais valiosa (anual, Asclépio, níveis...), e
+      // dentro da família o nível mais alto.
+      const familyWeight = { anual: 7, asclepio: 6, curadoria: 5, maratonista: 4, conquistas: 3, laco: 2, louros: 1 };
+      const heroScore = frame => (familyWeight[frame.family] || 0) * 1000 + (Number(frame.tier || frame.period) || Number(String(frame.id).match(/(\d+)$/)?.[1]) || 0);
+      const hero = frames.reduce((best, frame) => (heroScore(frame) >= heroScore(best) ? frame : best), frames[0]);
+      frames.splice(frames.indexOf(hero), 1);
+      frames.push(hero);
+      frameUnlockHeroFrame = hero;
+      const confetti = modal.querySelector('.level-up-confetti');
+      const levelConfetti = document.querySelector('#levelUpModal .level-up-confetti');
+      if (confetti && levelConfetti && !confetti.childElementCount) confetti.innerHTML = levelConfetti.innerHTML;
+      document.getElementById('frameUnlockKicker').textContent = gift ? 'Presente pelo que você já conquistou' : 'Nova conquista desbloqueada';
+      document.getElementById('frameUnlockHeader').textContent = gift
+        ? `Você recebeu ${frames.length} ${frames.length === 1 ? 'moldura' : 'molduras'}!`
+        : (frames.length === 1 ? 'Você ganhou uma nova moldura!' : `Você ganhou ${frames.length} novas molduras!`);
+      document.getElementById('frameUnlockAvatar').innerHTML = frameOptionMarkup(hero.id, hero.colors, initials, false);
+      document.getElementById('frameUnlockTitle').textContent = hero.title;
+      document.getElementById('frameUnlockReason').textContent = gift
+        ? 'Contamos as questões, revisões e dias de estudo que você fez antes das molduras existirem.'
+        : frameUnlockReason(hero);
+      const more = document.getElementById('frameUnlockMore');
+      const others = frames.slice(0, -1);
+      if (more) {
+        more.hidden = !others.length;
+        more.innerHTML = others.slice(-11).map(frame => `<span class="frame-unlock-mini" title="${escapeHtml(frame.title)}" style="--frame-main:${frame.colors[0]};--frame-light:${frame.colors[1]};--frame-deep:${frame.colors[2]}">${buildGamificationFrameSvg(frame.id)}</span>`).join('') +
+          (others.length > 11 ? `<span class="frame-unlock-more-count">+${others.length - 11}</span>` : '');
+      }
+      const appRoot = document.querySelector('.app-root');
+      if (appRoot) { frameUnlockPreviousInert = appRoot.inert; appRoot.inert = true; }
+      frameUnlockPreviousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      frameUnlockReturnFocus = document.activeElement;
+      frameUnlockActive = true;
+      modal.classList.remove('confetti-active');
+      void modal.offsetWidth;
+      modal.classList.add('active', 'confetti-active');
+      modal.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => document.getElementById('frameUnlockEquipButton')?.focus());
+    }
+    function closeFrameUnlockModal() {
+      const modal = document.getElementById('frameUnlockModal');
+      if (!modal || !frameUnlockActive) return;
+      modal.classList.remove('active', 'confetti-active');
+      modal.setAttribute('aria-hidden', 'true');
+      const appRoot = document.querySelector('.app-root');
+      if (appRoot) appRoot.inert = frameUnlockPreviousInert;
+      document.body.style.overflow = frameUnlockPreviousOverflow;
+      if (frameUnlockReturnFocus?.isConnected) frameUnlockReturnFocus.focus();
+      frameUnlockReturnFocus = null;
+      frameUnlockActive = false;
+      setTimeout(flushFrameUnlockQueue, 300);
+    }
+    async function equipUnlockedFrameFromModal() {
+      const frame = frameUnlockHeroFrame;
+      closeFrameUnlockModal();
+      if (!frame) return;
+      await selectGamificationFrame(frame);
+      if (typeof showToast === 'function') showToast(`✨ Moldura ${frame.title} equipada no seu perfil.`);
+    }
+    document.addEventListener('keydown', event => {
+      if (!frameUnlockActive) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeFrameUnlockModal(); }
+      if (event.key === 'Tab') {
+        const buttons = [document.getElementById('frameUnlockEquipButton'), document.getElementById('frameUnlockContinueButton')].filter(Boolean);
+        if (!buttons.length) return;
+        event.preventDefault();
+        const index = buttons.indexOf(document.activeElement);
+        buttons[(index + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length].focus();
+      }
+    });
+    if (typeof window !== 'undefined') {
+      window.closeFrameUnlockModal = closeFrameUnlockModal;
+      window.equipUnlockedFrameFromModal = equipUnlockedFrameFromModal;
     }
     function recordFrameCatalogQuizAnswer(item, isCorrect) {
       if (typeof MedTutorFrameCatalog === 'undefined' || !item?.id) return;
@@ -18166,6 +18345,100 @@ Retorne EXCLUSIVAMENTE um JSON:
           renderQuizFeedbackHtml(item, currentChoice === correctIndex, currentChoice);
         }
       });
+      setupQuizCarousel(quizDeck, list);
+    }
+
+    // Quiz em carrossel: uma questão por vez, com setas, contador, teclado
+    // (← →) e gesto de deslizar. Todas continuam no DOM, para que resposta,
+    // feedback, curadoria e impressão sigam funcionando como antes.
+    var quizCarouselIndex = 0;
+    var quizCarouselSignature = '';
+    var quizCarouselTouchStart = null;
+    function setupQuizCarousel(deck, list) {
+      const boxes = Array.from(deck.querySelectorAll(':scope > .quiz-box'));
+      deck.classList.toggle('quiz-carousel', boxes.length > 1);
+      if (boxes.length <= 1) return;
+      const signature = [typeof currentStudySubject !== 'undefined' ? currentStudySubject : '', quizStudyMode, list.length, list[0]?.id, list[list.length - 1]?.id].join('|');
+      if (signature !== quizCarouselSignature) {
+        quizCarouselSignature = signature;
+        quizCarouselIndex = 0;
+      }
+      const nav = position => `
+        <div class="quiz-carousel-nav quiz-carousel-nav-${position}" role="group" aria-label="Navegação entre questões">
+          <button type="button" class="btn-outline-action quiz-carousel-prev" onclick="navigateQuizCarousel(-1)" aria-label="Questão anterior">◀ Anterior</button>
+          <div class="quiz-carousel-status">
+            <strong class="quiz-carousel-counter" aria-live="polite"></strong>
+            <span class="quiz-carousel-track" aria-hidden="true"><span class="quiz-carousel-fill"></span></span>
+          </div>
+          <button type="button" class="btn-outline-action primary quiz-carousel-next" onclick="navigateQuizCarousel(1)" aria-label="Próxima questão">Próxima ▶</button>
+        </div>`;
+      deck.insertAdjacentHTML('afterbegin', nav('top'));
+      deck.insertAdjacentHTML('beforeend', nav('bottom'));
+      if (!deck.dataset.quizCarouselBound) {
+        deck.dataset.quizCarouselBound = 'true';
+        deck.addEventListener('touchstart', event => {
+          const touch = event.touches[0];
+          quizCarouselTouchStart = touch ? { x: touch.clientX, y: touch.clientY, onOption: Boolean(event.target.closest('.quiz-opt, button, a, input, textarea, select')) } : null;
+        }, { passive: true });
+        deck.addEventListener('touchend', event => {
+          const start = quizCarouselTouchStart;
+          quizCarouselTouchStart = null;
+          const touch = event.changedTouches[0];
+          if (!start || !touch || start.onOption) return;
+          const dx = touch.clientX - start.x;
+          const dy = touch.clientY - start.y;
+          if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) navigateQuizCarousel(dx < 0 ? 1 : -1);
+        }, { passive: true });
+      }
+      showQuizCarouselItem(quizCarouselIndex, { scroll: false });
+    }
+    function showQuizCarouselItem(index, { scroll = true } = {}) {
+      const deck = document.getElementById('quizDeck');
+      if (!deck?.classList.contains('quiz-carousel')) return;
+      const boxes = Array.from(deck.querySelectorAll(':scope > .quiz-box'));
+      if (!boxes.length) return;
+      quizCarouselIndex = Math.max(0, Math.min(index, boxes.length - 1));
+      boxes.forEach((box, boxIndex) => {
+        const active = boxIndex === quizCarouselIndex;
+        box.classList.toggle('is-carousel-active', active);
+        box.setAttribute('aria-hidden', active ? 'false' : 'true');
+      });
+      const current = boxes[quizCarouselIndex];
+      const answered = current.querySelector('.quiz-opt.correct, .quiz-opt.incorrect, .quiz-opt.selected-exam-choice');
+      deck.querySelectorAll('.quiz-carousel-counter').forEach(el => {
+        el.textContent = `Questão ${quizCarouselIndex + 1} de ${boxes.length}${answered ? ' · respondida' : ''}`;
+      });
+      deck.querySelectorAll('.quiz-carousel-fill').forEach(el => { el.style.width = `${((quizCarouselIndex + 1) / boxes.length) * 100}%`; });
+      deck.querySelectorAll('.quiz-carousel-prev').forEach(button => { button.disabled = quizCarouselIndex === 0; });
+      deck.querySelectorAll('.quiz-carousel-next').forEach(button => { button.disabled = quizCarouselIndex === boxes.length - 1; });
+      if (scroll) {
+        const top = deck.getBoundingClientRect().top;
+        if (top < 0 || top > window.innerHeight * 0.4) deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+    function navigateQuizCarousel(direction) {
+      showQuizCarouselItem(quizCarouselIndex + direction);
+    }
+    // Leva o carrossel até uma questão específica (ex.: vinda de outro atalho).
+    function focusQuizCarouselQuestion(questionId) {
+      const deck = document.getElementById('quizDeck');
+      const boxes = deck ? Array.from(deck.querySelectorAll(':scope > .quiz-box')) : [];
+      const index = boxes.findIndex(box => box.id === `quizBox_${questionId}`);
+      if (index >= 0) showQuizCarouselItem(index);
+    }
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const deck = document.getElementById('quizDeck');
+      if (!deck?.classList.contains('quiz-carousel') || !deck.offsetParent) return;
+      if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      if (document.querySelector('.modal.active, .modal-overlay.active, .level-up-overlay.active')) return;
+      event.preventDefault();
+      navigateQuizCarousel(event.key === 'ArrowRight' ? 1 : -1);
+    });
+    if (typeof window !== 'undefined') {
+      window.navigateQuizCarousel = navigateQuizCarousel;
+      window.focusQuizCarouselQuestion = focusQuizCarouselQuestion;
     }
 
     function answerQuizOption(el, isCorrect, qId, optIdx) {
@@ -18221,6 +18494,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       saveSharedQuestionsBank();
       recordFrameCatalogQuizAnswer(item, isCorrect);
       refreshGamificationFramesAfterQuiz();
+      showQuizCarouselItem(quizCarouselIndex, { scroll: false });
       renderSceBars();
       awardQuizGamification(item, { outcome: isCorrect ? 'correct' : 'incorrect' });
 
