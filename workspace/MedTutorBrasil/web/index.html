@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261025-ux-v2">
+  <link rel="stylesheet" href="/styles.css?v=20261025-ux-v3">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -4118,6 +4118,7 @@
       </section>
       <section class="gamification-modal-page" id="gamificationCollectionView" role="tabpanel" aria-labelledby="gamificationCollectionTab" hidden>
         <div class="gamification-collection-heading"><h3>Coleção de molduras</h3><p>Desbloqueie molduras estudando e escolha qual usar no seu perfil.</p></div>
+        <div class="gamification-frame-tabs" id="gamificationFrameTabs" aria-label="Filtrar molduras por família"></div>
         <div class="gamification-frame-grid" id="gamificationFrameGrid" aria-label="Molduras disponíveis"></div>
       </section>
       <section class="gamification-modal-page gamification-level-info" id="gamificationLevelInfoView" hidden aria-label="Regras de progressão">
@@ -4191,7 +4192,7 @@
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/gamification-frames.js?v=20261025-light-v1"></script>
   <script defer src="/material-icons.js?v=20261024-frames-v1"></script>
-  <script defer src="/app.min.js?v=20261025-ux-v1"></script>
+  <script defer src="/app.min.js?v=20261025-ux-v2"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

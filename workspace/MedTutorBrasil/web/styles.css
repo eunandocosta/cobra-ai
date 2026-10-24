@@ -12113,3 +12113,45 @@
       display: inline-flex;
     }
   }
+
+  /* Coleção de molduras: filtros por família e progresso de cada família. */
+  .gamification-frame-tabs { display: flex; gap: 6px; margin: 0 0 12px; padding-bottom: 4px; overflow-x: auto; scrollbar-width: thin; }
+  .gamification-frame-tab { flex: 0 0 auto; min-height: 34px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-surface); color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .gamification-frame-tab small { margin-left: 4px; color: var(--text-muted); font-size: 11px; font-weight: 600; }
+  .gamification-frame-tab.active { border-color: var(--neon); color: var(--text-primary); background: rgba(0, 229, 255, 0.10); }
+  .gamification-frame-tab.active small { color: var(--neon); }
+  .gamification-frame-family { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; }
+  .gamification-frame-family-count { color: var(--text-muted); font-size: 11px; letter-spacing: 0; }
+  .gamification-frame-family-bar { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 99px; background: var(--border); }
+  .gamification-frame-family-bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--neon), #8c9eff); }
+
+  /* Quiz: no desktop o menu ⋮ é transparente; o botão só aparece no celular. */
+  .quiz-actions-toggle { display: none; }
+  .quiz-card-actions-menu { display: contents; }
+  .study-filters-summary { display: none; }
+
+  @media (max-width: 640px) {
+    .quiz-card-topbar { flex-wrap: nowrap; align-items: flex-start; }
+    .quiz-card-topbar .quiz-card-metadata { flex: 1 1 auto; }
+    .quiz-card-actions { position: relative; width: auto; margin-left: auto; flex-wrap: nowrap; flex: 0 0 auto; }
+    .quiz-actions-toggle { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); color: var(--text-primary); cursor: pointer; }
+    .quiz-card-actions.is-menu-open .quiz-actions-toggle { border-color: var(--neon); }
+    .quiz-card-actions-menu { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 210px; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card, var(--bg-surface)); box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4); }
+    .quiz-card-actions.is-menu-open .quiz-card-actions-menu { display: flex; }
+    .quiz-card-actions .quiz-card-actions-menu .btn-outline-action { flex: 0 0 auto; width: 100%; min-height: 44px; justify-content: flex-start; padding: 10px 12px !important; font-size: 13px !important; text-align: left; }
+
+    /* Filtros de estudo recolhidos num resumo tocável. */
+    .study-filters-summary { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650; text-align: left; cursor: pointer; }
+    .study-filters-summary-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .study-filters-summary-arrow { transition: transform .2s ease; }
+    .unified-study-control-card.filters-open .study-filters-summary-arrow { transform: rotate(180deg); }
+    .unified-study-control-card:not(.filters-open) .study-nav-hierarchy { display: none; }
+    .unified-study-control-card.filters-open .study-filters-summary { margin-bottom: 10px; border-color: var(--neon); }
+
+    /* Áreas de toque confortáveis (mínimo de 44px). */
+    .btn-outline-action, .btn-primary-action, .btn-clean-action, .btn-icon, .btn-help-icon, .btn-close-modal,
+    .mobile-nav-btn, .classmates-tab-btn, .challenges-subnav-btn, .thumb-vote-btn, .scientific-pill-btn,
+    .btn-chat-item-action, .doubts-icon-button, .chat-clean-copy-btn, .btn-line-option, .gamification-frame-tab { min-height: 44px; }
+    .btn-close-modal, .btn-icon, .btn-help-icon, .doubts-icon-button, .chat-clean-copy-btn, .btn-chat-item-action { min-width: 44px; }
+  }
+  @media (max-width: 640px) and (prefers-reduced-motion: reduce) { .study-filters-summary-arrow { transition: none; } }
