@@ -1,4 +1,5 @@
 // Controlador HTTP do Domínio Quizzes & Flashcards (MedTutor Brasil)
+const { clientErrorMessage } = require('../../shared/http-error');
 const quizzesService = require('./quizzes.service');
 const { getFirebaseAuth, getFirebaseFirestore } = require('../../shared/firebase-admin');
 
@@ -94,7 +95,7 @@ class QuizzesController {
     } catch (error) {
       const status = error.statusCode || (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error' ? 401 : 500);
       if (status >= 500) console.error('[Curadoria] Falha ao consultar questões:', error);
-      return res.status(status).json({ error: error.message || 'Não foi possível consultar a curadoria.', code: error.code || 'CURATION-LOAD-FAILED' });
+      return res.status(status).json({ error: clientErrorMessage(error) || 'Não foi possível consultar a curadoria.', code: error.code || 'CURATION-LOAD-FAILED' });
     }
   }
 
@@ -111,7 +112,7 @@ class QuizzesController {
     } catch (error) {
       const status = error.statusCode || (String(error.code || '').startsWith('auth/') ? 401 : 500);
       if (status >= 500) console.error('[Curadoria] Falha ao salvar questão:', error);
-      return res.status(status).json({ error: error.message || 'Não foi possível salvar a questão na curadoria.', code: error.code || 'CURATION-SAVE-FAILED' });
+      return res.status(status).json({ error: clientErrorMessage(error) || 'Não foi possível salvar a questão na curadoria.', code: error.code || 'CURATION-SAVE-FAILED' });
     }
   }
 
@@ -128,7 +129,7 @@ class QuizzesController {
     } catch (error) {
       const status = error.statusCode || (String(error.code || '').startsWith('auth/') ? 401 : 500);
       if (status >= 500) console.error('[Curadoria] Falha ao remover questão:', error);
-      return res.status(status).json({ error: error.message || 'Não foi possível remover a questão da curadoria.', code: error.code || 'CURATION-DELETE-FAILED' });
+      return res.status(status).json({ error: clientErrorMessage(error) || 'Não foi possível remover a questão da curadoria.', code: error.code || 'CURATION-DELETE-FAILED' });
     }
   }
 
@@ -139,7 +140,7 @@ class QuizzesController {
     } catch (err) {
       console.error('❌ [Quiz Recommendation] Falha na sugestão pedagógica:', err);
       const status = err.statusCode === 400 || err.statusCode === 413 ? err.statusCode : 502;
-      return res.status(status).json({ error: 'Não foi possível obter a sugestão pedagógica da IA.', details: err.message });
+      return res.status(status).json({ error: 'Não foi possível obter a sugestão pedagógica da IA.', details: clientErrorMessage(err) });
     }
   }
 
@@ -179,7 +180,7 @@ class QuizzesController {
       return res.status(status).json({
         error: status === 422 ? 'As questões geradas não passaram pela validação.' : 'Erro ao gerar questões',
         code: err.code || 'QUIZ-GENERATION-FAILED',
-        details: err.message,
+        details: clientErrorMessage(err),
         retryable: err.retryable !== false,
         diagnostics: err.diagnostics || undefined
       });
@@ -191,7 +192,7 @@ class QuizzesController {
       const result = quizzesService.submitAnswer(req.body || {});
       return res.json(result);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao submeter resposta', details: err.message });
+      return res.status(500).json({ error: 'Erro ao submeter resposta', details: clientErrorMessage(err) });
     }
   }
 
@@ -220,7 +221,7 @@ class QuizzesController {
       });
     } catch (err) {
       console.error("❌ Erro ao avaliar resposta do flashcard:", err);
-      return res.status(500).json({ error: 'Erro ao avaliar resposta com IA', details: err.message });
+      return res.status(500).json({ error: 'Erro ao avaliar resposta com IA', details: clientErrorMessage(err) });
     }
   }
 
@@ -230,7 +231,7 @@ class QuizzesController {
       return res.json(data);
     } catch (err) {
       console.error("❌ Erro no QuizzesController ao analisar material:", err);
-      return res.status(500).json({ error: 'Erro ao analisar material de estudo', details: err.message });
+      return res.status(500).json({ error: 'Erro ao analisar material de estudo', details: clientErrorMessage(err) });
     }
   }
 
@@ -243,7 +244,7 @@ class QuizzesController {
       const status = err.statusCode || (err.status >= 400 && err.status < 600 ? err.status : 500);
       return res.status(status).json({
         error: err.statusCode === 400 ? err.message : 'Erro ao gerar pergunta derivada',
-        details: err.message
+        details: clientErrorMessage(err)
       });
     }
   }

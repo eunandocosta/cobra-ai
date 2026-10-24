@@ -1,6 +1,7 @@
 // src/modules/imagens/imagens.controller.js
 // Controlador HTTP do Domínio de Imagens Médicas (MedTutor Brasil)
 
+const { clientErrorMessage } = require('../../shared/http-error');
 const imagensService = require('./imagens.service');
 
 class ImagensController {
@@ -15,7 +16,7 @@ class ImagensController {
       return res.json(result);
     } catch (err) {
       console.error('❌ [ImagensController] Erro na busca de imagem:', err);
-      return res.status(500).json({ error: 'Erro ao buscar imagem médica', details: err.message });
+      return res.status(500).json({ error: 'Erro ao buscar imagem médica', details: clientErrorMessage(err) });
     }
   }
 
@@ -30,7 +31,7 @@ class ImagensController {
       return res.json({ success: !!curated, image: curated });
     } catch (err) {
       console.error('❌ [ImagensController] Erro na curadoria de imagem:', err);
-      return res.status(500).json({ error: 'Erro na curadoria pericial', details: err.message });
+      return res.status(500).json({ error: 'Erro na curadoria pericial', details: clientErrorMessage(err) });
     }
   }
 
@@ -52,7 +53,7 @@ class ImagensController {
       return res.json({ success: true, association, model: association.model });
     } catch (err) {
       console.error('❌ [ImagensController] Erro na associação visual:', err);
-      return res.status(500).json({ error: 'Erro ao interpretar o material visual', details: err.message });
+      return res.status(500).json({ error: 'Erro ao interpretar o material visual', details: clientErrorMessage(err) });
     }
   }
 
@@ -71,7 +72,7 @@ class ImagensController {
       return res.json({ success: true, ...result });
     } catch (err) {
       console.error('❌ [ImagensController] Erro no lote de associação visual:', err);
-      return res.status(500).json({ error: 'Erro ao interpretar lote visual do material', details: err.message });
+      return res.status(500).json({ error: 'Erro ao interpretar lote visual do material', details: clientErrorMessage(err) });
     }
   }
 
@@ -85,7 +86,7 @@ class ImagensController {
       return res.json({ success: true, mapping, model: mapping.model });
     } catch (err) {
       console.error('❌ [ImagensController] Erro no mapeamento Gemini:', err);
-      return res.status(500).json({ error: 'Erro ao mapear material com Gemini', details: err.message });
+      return res.status(500).json({ error: 'Erro ao mapear material com Gemini', details: clientErrorMessage(err) });
     }
   }
 }

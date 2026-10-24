@@ -1,4 +1,5 @@
 // Controlador HTTP do Domínio Chat & MedCopilot (MedTutor Brasil)
+const { clientErrorMessage } = require('../../shared/http-error');
 const chatService = require('./chat.service');
 
 class ChatController {
@@ -16,7 +17,7 @@ class ChatController {
       const result = await chatService.processMessage(req.body || {});
       return res.json(result);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao processar mensagem', details: err.message });
+      return res.status(500).json({ error: 'Erro ao processar mensagem', details: clientErrorMessage(err) });
     }
   }
 
@@ -25,7 +26,7 @@ class ChatController {
       const session = chatService.getSession(req.params.sessionId);
       return res.json(session);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao buscar sessão', details: err.message });
+      return res.status(500).json({ error: 'Erro ao buscar sessão', details: clientErrorMessage(err) });
     }
   }
 
@@ -35,7 +36,7 @@ class ChatController {
       const evidence = chatService.getEvidenceUrls(topic || 'Medicina', subject || 'Clínica Médica');
       return res.json(evidence);
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao buscar evidências', details: err.message });
+      return res.status(500).json({ error: 'Erro ao buscar evidências', details: clientErrorMessage(err) });
     }
   }
 }
