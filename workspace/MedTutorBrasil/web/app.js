@@ -10606,6 +10606,13 @@ ${cleanText}
         .replace(/"/g, '&quot;');
     }
 
+    // Argumento seguro para handlers inline (onclick="fn(${jsAttrArg(valor)})"):
+    // gera um literal de string JavaScript e o escapa para o atributo HTML. Use no
+    // lugar de '${valor}' sempre que o valor vier de outra conta, da IA ou do Firestore.
+    function jsAttrArg(value) {
+      return escapeHtml(JSON.stringify(String(value ?? '')));
+    }
+
     function getMedTutorReportSiteUrl() {
       const hostname = String(window.location?.hostname || '').toLowerCase();
       if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -17950,7 +17957,7 @@ Retorne EXCLUSIVAMENTE um JSON:
             </div>
             <div class="quiz-card-actions">
               ${(typeof isCuratorUser === 'function' && isCuratorUser()) ? `
-                <button type="button" class="btn-curate-inline curation-rocket-btn ${isCuratedForInstitution ? 'curated' : ''}" data-question-id="${escapeHtml(item.id)}" onclick="toggleCurateQuestion('${escapeHtml(item.id)}', 'quizzes')" title="${isCuratedForInstitution ? 'Remover da Curadoria da Instituição' : 'Enviar para a Curadoria da Instituição'}" aria-label="${isCuratedForInstitution ? 'Remover da Curadoria da Instituição' : 'Enviar para a Curadoria da Instituição'}">
+                <button type="button" class="btn-curate-inline curation-rocket-btn ${isCuratedForInstitution ? 'curated' : ''}" data-question-id="${escapeHtml(item.id)}" onclick="toggleCurateQuestion(${jsAttrArg(item.id)}, 'quizzes')" title="${isCuratedForInstitution ? 'Remover da Curadoria da Instituição' : 'Enviar para a Curadoria da Instituição'}" aria-label="${isCuratedForInstitution ? 'Remover da Curadoria da Instituição' : 'Enviar para a Curadoria da Instituição'}">
                   <span class="material-symbol-font" aria-hidden="true">rocket_launch</span>
                 </button>
               ` : ''}
@@ -21409,7 +21416,7 @@ DIRETRIZES CIRÚRGICAS:
                 <div style="font-size: 11.5px; font-weight: 600; color: var(--text-primary); line-height: 1.3;">
                   ${escapeHtml(it.name)}
                 </div>
-                <button class="btn-outline-action primary" style="font-size: 10px; padding: 3px 8px; flex-shrink: 0;" onclick="selectManualSubjectFromAccordion('${escapeHtml(it.name)}')">
+                <button class="btn-outline-action primary" style="font-size: 10px; padding: 3px 8px; flex-shrink: 0;" onclick="selectManualSubjectFromAccordion(${jsAttrArg(it.name)})">
                   Salvar Aqui & Prosseguir ➔
                 </button>
               </div>
@@ -28532,9 +28539,13 @@ Para cada material, retorne um objeto no JSON com:
              .replace(/<\/p>/gi, '\n')
              .replace(/<\/?div[^>]*>/gi, '\n');
 
-      // Blocos de código ``` ... ```
+      // Blocos de código ``` ... ```: o HTML já escapado fica guardado e a linha
+      // recebe só um marcador, restaurado no fim. Assim nenhum texto da IA ou do
+      // material passa cru para o HTML por conter "<pre>" ou "</pre>".
+      const codeBlocks = [];
       md = md.replace(/```([\s\S]*?)```/g, (m, code) => {
-        return '<pre class="gemini-code-block"><code>' + escapeHtml(code.trim()) + '</code></pre>';
+        codeBlocks.push('<pre class="gemini-code-block"><code>' + escapeHtml(code.trim()) + '</code></pre>');
+        return '\nMEDTUTORCODEBLOCK' + (codeBlocks.length - 1) + 'END\n';
       });
       md = normalizeGeneratedStructuralHtml(md);
 
@@ -28593,9 +28604,10 @@ Para cada material, retorne um objeto no JSON com:
       while (i < lines.length) {
         const line = lines[i];
 
-        if (line.includes('<pre class="gemini-code-block">') || line.includes('</pre>')) {
+        const codeBlockToken = line.trim().match(/^MEDTUTORCODEBLOCK(\d+)END$/);
+        if (codeBlockToken && codeBlocks[Number(codeBlockToken[1])] !== undefined) {
           if (inList) { html += (listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-          html += line;
+          html += codeBlockToken[0];
           i++;
           continue;
         }
@@ -28844,7 +28856,7 @@ Para cada material, retorne um objeto no JSON com:
         </div>
       `);
 
-      return html;
+      return html.replace(/MEDTUTORCODEBLOCK(\d+)END/g, (token, index) => codeBlocks[Number(index)] ?? token);
     }
 
     function formatInlineMd(str) {
@@ -29707,7 +29719,7 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
                   📋 Copiar
                 </button>
               ` : `
-                <button class="chat-clean-copy-btn" onclick="requestMedicalImageForChat(this, '${escapeHtml(text.slice(0, 45)).replace(/'/g, "\\'")}')" title="Buscar exame de imagem ou foto clínica verificada no NIH/ISIC">
+                <button class="chat-clean-copy-btn" onclick="requestMedicalImageForChat(this, ${jsAttrArg(text.slice(0, 45))})" title="Buscar exame de imagem ou foto clínica verificada no NIH/ISIC">
                   🖼️ Ver Imagem Clínica
                 </button>
                 <button class="chat-clean-copy-btn" onclick="emitMessageAsPdf(this)" title="Emitir esta resposta diretamente como PDF A4 formatado">
@@ -32189,17 +32201,17 @@ ${textSample}
         };
 
         const fileIconHtml = file.isBook ? '📖' : (isQuestionsOnly ? '📋' : '📄');
-        const safeId = (file.id || file.name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        const safeSubj = (file.subject || '').replace(/'/g, "\\'");
+        const safeId = jsAttrArg(file.id || file.name);
+        const safeSubj = jsAttrArg(file.subject || '');
 
         item.innerHTML = `
-          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleDriveFileCheck('${safeId}', this.checked)">
+          <input type="checkbox" ${file.selected ? 'checked' : ''} onchange="toggleDriveFileCheck(${safeId}, this.checked)">
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); overflow: hidden; white-space: nowrap;" title="${escapeHtml(file.name)} — clique no nome para renomear">
               <span
                 class="material-name-editable"
                 title="Clique para renomear"
-                onclick="event.stopPropagation(); startMaterialRename('${safeId}', this)"
+                onclick="event.stopPropagation(); startMaterialRename(${safeId}, this)"
               >${fileIconHtml} ${escapeHtml(file.name)}</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px; font-size: 11px; flex-wrap: wrap;">
@@ -32214,8 +32226,8 @@ ${textSample}
             </div>
           </div>
           <div style="display: flex; gap: 5px; margin-left: 6px; flex-shrink: 0;">
-            <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px; border-radius: 6px;" onclick="event.stopPropagation(); openAcademicReportForMaterial('${safeId}', '${safeSubj}', '${escapeHtml(file.name).replace(/'/g, "\\'")}')" title="Gerar relatório exclusivo deste PDF ou slide">📄 Relatório</button>
-            <button class="btn-outline-action danger" style="padding: 2px 7px; font-size: 11px; border-radius: 6px;" onclick="event.stopPropagation(); deleteMaterialFromSubject('${safeId}', '${safeSubj}')" title="Excluir este conteúdo da matéria">🗑️</button>
+            <button class="btn-outline-action" style="padding: 2px 7px; font-size: 10px; border-radius: 6px;" onclick="event.stopPropagation(); openAcademicReportForMaterial(${safeId}, ${safeSubj}, ${jsAttrArg(file.name)})" title="Gerar relatório exclusivo deste PDF ou slide">📄 Relatório</button>
+            <button class="btn-outline-action danger" style="padding: 2px 7px; font-size: 11px; border-radius: 6px;" onclick="event.stopPropagation(); deleteMaterialFromSubject(${safeId}, ${safeSubj})" title="Excluir este conteúdo da matéria">🗑️</button>
           </div>
         `;
         container.appendChild(item);
@@ -33632,7 +33644,6 @@ function escapeHtmlText(str) {
           const isPending = c.status === 'pending';
           const qCount = Array.isArray(c.questions) ? c.questions.length : (c.totalQuestions || 0);
           const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-          const safeId = String(c.id).replace(/"/g, '&quot;');
 
           return `
             <div class="challenge-feed-card ${isPending ? 'pending' : 'completed'}">
@@ -33654,11 +33665,11 @@ function escapeHtmlText(str) {
               </div>
               <div class="challenge-feed-action">
                 ${isPending ? `
-                  <button class="btn-primary-action" style="width: 100%; font-size: 12px; padding: 7px 14px;" onclick="MedTutorChallengesService.startChallengeReview('${safeId}')">
+                  <button class="btn-primary-action" style="width: 100%; font-size: 12px; padding: 7px 14px;" onclick="MedTutorChallengesService.startChallengeReview(${jsAttrArg(c.id)})">
                     🔥 Responder Desafio
                   </button>
                 ` : `
-                  <button class="btn-outline-action" style="width: 100%; font-size: 12px; padding: 7px 14px;" onclick="MedTutorChallengesService.startChallengeReview('${safeId}')">
+                  <button class="btn-outline-action" style="width: 100%; font-size: 12px; padding: 7px 14px;" onclick="MedTutorChallengesService.startChallengeReview(${jsAttrArg(c.id)})">
                     👁️ Ver Respostas & Gabarito
                   </button>
                 `}
@@ -34250,7 +34261,6 @@ function escapeHtmlText(str) {
           const isNeg = score < 0;
           const scoreClass = isPos ? 'score-positive' : (isNeg ? 'score-negative' : 'score-neutral');
           const scorePrefix = isPos ? '+' : '';
-          const safeId = String(q.id).replace(/"/g, '&quot;');
           const totalVotes = (q.thumbsUpCount || 0) + (q.thumbsDownCount || 0);
 
           return `
@@ -34278,7 +34288,7 @@ function escapeHtmlText(str) {
                   <span style="margin: 0 4px;">•</span>
                   <span style="opacity: 0.7;">${totalVotes} avaliações</span>
                 </div>
-                <button class="btn-outline-action primary" style="font-size: 11px; padding: 4px 10px;" onclick="MedTutorChallengesService.addCommunityQuestionToDeck('${safeId}')" title="Copiar questão para a sua repetição espaçada pessoal">
+                <button class="btn-outline-action primary" style="font-size: 11px; padding: 4px 10px;" onclick="MedTutorChallengesService.addCommunityQuestionToDeck(${jsAttrArg(q.id)})" title="Copiar questão para a sua repetição espaçada pessoal">
                   📥 Adicionar aos meus Flashcards
                 </button>
               </div>
@@ -34666,12 +34676,8 @@ function escapeHtmlText(str) {
             repText = `⚠️ Ruim Desafiador (${score} 👎)`;
           }
 
-          const safeEmail = String(u.email).replace(/'/g, "\\'");
-          const safeName = String(name).replace(/'/g, "\\'");
-          const safeUid = String(u.uid || '').replace(/'/g, "\\'");
-
           return `
-            <div class="classmate-card" onclick="openDirectChallenge('${safeEmail}', '${safeName}', '${safeUid}')">
+            <div class="classmate-card" onclick="openDirectChallenge(${jsAttrArg(u.email)}, ${jsAttrArg(name)}, ${jsAttrArg(u.uid || '')})">
               <div class="classmate-card-top">
                 <div class="classmate-avatar">${initials}</div>
                 <div class="classmate-info">
@@ -34686,7 +34692,7 @@ function escapeHtmlText(str) {
                 </span>
               </div>
               <div class="classmate-card-action">
-                <button class="btn-primary-action btn-challenge-colleague" onclick="event.stopPropagation(); openDirectChallenge('${safeEmail}', '${safeName}', '${safeUid}')">
+                <button class="btn-primary-action btn-challenge-colleague" onclick="event.stopPropagation(); openDirectChallenge(${jsAttrArg(u.email)}, ${jsAttrArg(name)}, ${jsAttrArg(u.uid || '')})">
                   ⚔️ Desafiar Colega
                 </button>
               </div>
