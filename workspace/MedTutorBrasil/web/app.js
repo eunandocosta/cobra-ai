@@ -4513,6 +4513,33 @@
       challenges: 'Desafios Médicos & Duelos Clínicos'
     };
 
+    // Versões curtas exibidas na barra superior em telas estreitas (celular),
+    // onde o título completo seria cortado pelos botões de ação.
+    const viewShortTitles = {
+      home: 'Início',
+      study: 'Estudo Ativo',
+      chat: 'Chat Científico',
+      flashcards: 'Flashcards',
+      quizzes: 'Quizzes',
+      curriculum: 'Matérias',
+      sce: 'SCE',
+      challenges: 'Desafios'
+    };
+
+    function setTopbarTitle(tabId) {
+      const titleEl = document.getElementById('currentViewTitle');
+      if (!titleEl) return;
+      const fullTitle = viewTitles[tabId] || 'MedTutor Brasil';
+      const fullEl = document.createElement('span');
+      fullEl.className = 'topbar-title-full';
+      fullEl.textContent = fullTitle;
+      const shortEl = document.createElement('span');
+      shortEl.className = 'topbar-title-short';
+      shortEl.textContent = viewShortTitles[tabId] || fullTitle;
+      titleEl.replaceChildren(fullEl, shortEl);
+      titleEl.title = fullTitle;
+    }
+
     const tabHelpDescriptions = {
       home: {
         title: 'Central de Aprendizado & Boas-Vindas',
@@ -4965,7 +4992,7 @@
       document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
 
       targetTab.classList.add('active');
-      document.getElementById('currentViewTitle').textContent = viewTitles[tabId] || 'MedTutor Brasil';
+      setTopbarTitle(tabId);
 
       if (btn) btn.classList.add('active');
       document.querySelectorAll(`.nav-link[onclick*="${tabId}"], .mobile-nav-btn[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
@@ -7524,18 +7551,27 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       active: 0,
       sequence: 0,
       hideTimer: null,
+      quietTimer: null,
       last: null,
 
+      routeLabels: {
+        '/api/relatorios/gerar': 'Gerando relatório',
+        '/api/quizzes/gerar': 'Gerando questões',
+        '/api/chat/mensagem': 'Gerando resposta do chat',
+        '/api/chat/evidencias': 'Consultando evidências científicas',
+        '/api/ementas/classificar-material': 'Analisando e classificando material',
+        '/api/drive': 'Processando material do Drive'
+      },
+
       describePath(pathname) {
-        const paths = {
-          '/api/relatorios/gerar': 'Gerando relatório',
-          '/api/quizzes/gerar': 'Gerando questões',
-          '/api/chat/mensagem': 'Gerando resposta do chat',
-          '/api/chat/evidencias': 'Consultando evidências científicas',
-          '/api/ementas/classificar-material': 'Analisando e classificando material',
-          '/api/drive': 'Processando material do Drive'
-        };
-        return paths[pathname] || 'Processando solicitação';
+        return this.routeLabels[pathname] || 'Processando solicitação';
+      },
+
+      // Leituras (GET) sem rótulo próprio costumam ser cargas de fundo da tela
+      // (modelos, status de acesso, anúncios). Elas só mostram o cartão se
+      // demorarem e não exibem "concluída" ao terminar; falhas continuam visíveis.
+      isQuiet(url, method) {
+        return method === 'GET' && !Object.prototype.hasOwnProperty.call(this.routeLabels, url.pathname);
       },
 
       render({ state = 'working', title, message, showSupport = false }) {
@@ -7563,7 +7599,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         this.active += 1;
         const route = this.describePath(url.pathname);
         this.last = { requestId, route, endpoint: url.pathname, method, status: 'em andamento', at: new Date().toISOString(), error: '' };
-        this.render({ state: 'working', title: route, message: `Solicitação ${requestId} em andamento.` });
+        const showWorking = () => this.render({ state: 'working', title: route, message: `Solicitação ${requestId} em andamento.` });
+        window.clearTimeout(this.quietTimer);
+        if (this.isQuiet(url, method)) this.quietTimer = window.setTimeout(() => { if (this.active > 0) showWorking(); }, 800);
+        else showWorking();
         return requestId;
       },
 
@@ -7601,6 +7640,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           error: ok ? '' : `HTTP ${status || 'sem resposta'}`
         };
         if (this.active > 0) return;
+        window.clearTimeout(this.quietTimer);
+        if (ok && this.isQuiet(url, method)) {
+          const panel = document.getElementById('requestFeedback');
+          if (panel && !panel.classList.contains('is-success') && !panel.classList.contains('is-error')) this.dismiss();
+          return;
+        }
         this.render(ok
           ? { state: 'success', title: 'Solicitação concluída', message: `${this.last.route} finalizada com sucesso.` }
           : { state: 'error', title: 'Não foi possível concluir a solicitação', message: `${this.last.route} retornou HTTP ${status || 'sem resposta'}.`, showSupport: true });
