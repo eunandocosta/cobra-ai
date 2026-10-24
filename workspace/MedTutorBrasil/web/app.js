@@ -4229,6 +4229,7 @@
       renderGamificationCollection();
     }
     let gamificationTooltipTimer = null;
+    var gamificationFrameFamilyFilter = 'all';
     function renderGamificationCollection() {
       const grid = document.getElementById('gamificationFrameGrid');
       if (!grid) return;
@@ -4238,12 +4239,35 @@
       const equipped = readEquippedGamificationFrame();
       const familyTitles = { louros: 'Louros acadêmicos e Pulso Neon' };
       (typeof MedTutorFrameCatalog !== 'undefined' ? MedTutorFrameCatalog.FAMILIES : []).forEach(family => { familyTitles[family.id] = family.title; });
-      let lastFamily = null;
-      grid.innerHTML = definitions.map(frame => {
+      const states = new Map(definitions.map(frame => [frame.id, gamificationFrameRequirement(frame.id, counts, MedTutorGamification.state.totalStudySeconds)]));
+      const familyStats = new Map();
+      definitions.forEach(frame => {
         const family = frame.family || 'louros';
-        const heading = family !== lastFamily ? `<h4 class="gamification-frame-family">${escapeHtml(familyTitles[family] || '')}</h4>` : '';
+        const stats = familyStats.get(family) || { unlocked: 0, total: 0 };
+        stats.total += 1;
+        if (states.get(frame.id).unlocked) stats.unlocked += 1;
+        familyStats.set(family, stats);
+      });
+      if (gamificationFrameFamilyFilter !== 'all' && !familyStats.has(gamificationFrameFamilyFilter)) gamificationFrameFamilyFilter = 'all';
+      const totalUnlocked = Array.from(familyStats.values()).reduce((sum, stats) => sum + stats.unlocked, 0);
+      const tabs = document.getElementById('gamificationFrameTabs');
+      if (tabs) {
+        const chip = (id, title, stats) => `<button type="button" class="gamification-frame-tab${gamificationFrameFamilyFilter === id ? ' active' : ''}" data-family="${escapeHtml(id)}" aria-pressed="${gamificationFrameFamilyFilter === id ? 'true' : 'false'}">${escapeHtml(title)} <small>${stats.unlocked}/${stats.total}</small></button>`;
+        tabs.innerHTML = chip('all', 'Todas', { unlocked: totalUnlocked, total: definitions.length }) +
+          Array.from(familyStats.entries()).map(([id, stats]) => chip(id, (familyTitles[id] || id).replace(/^Louros acadêmicos e Pulso Neon$/, 'Louros e Neon').split(' · ')[0], stats)).join('');
+        tabs.querySelectorAll('.gamification-frame-tab').forEach(button => button.addEventListener('click', () => {
+          gamificationFrameFamilyFilter = button.dataset.family;
+          renderGamificationCollection();
+        }));
+      }
+      let lastFamily = null;
+      grid.innerHTML = definitions.filter(frame => gamificationFrameFamilyFilter === 'all' || (frame.family || 'louros') === gamificationFrameFamilyFilter).map(frame => {
+        const family = frame.family || 'louros';
+        const stats = familyStats.get(family);
+        const percent = Math.round(stats.unlocked / stats.total * 100);
+        const heading = family !== lastFamily ? `<h4 class="gamification-frame-family"><span>${escapeHtml(familyTitles[family] || '')}</span><span class="gamification-frame-family-count">${stats.unlocked}/${stats.total}</span><span class="gamification-frame-family-bar" role="progressbar" aria-label="Molduras desbloqueadas nesta família" aria-valuemin="0" aria-valuemax="${stats.total}" aria-valuenow="${stats.unlocked}"><i style="width:${percent}%"></i></span></h4>` : '';
         lastFamily = family;
-        const state = gamificationFrameRequirement(frame.id, counts, MedTutorGamification.state.totalStudySeconds);
+        const state = states.get(frame.id);
         const label = state.unlocked ? frame.title : 'Bloqueado';
         const selected = state.unlocked && equipped === frame.id;
         const accessible = state.unlocked ? `Selecionar moldura ${frame.title}${selected ? ', equipada' : ''}` : `Moldura bloqueada. ${state.requirement}`;
@@ -11257,6 +11281,38 @@ ${cleanText}
         qzChangeBtn.style.opacity = hasMaterials ? '1' : '0.5';
         qzChangeBtn.title = hasMaterials ? 'Mover material para outra disciplina da ementa' : 'Nenhum material vinculado a esta disciplina para mover';
       }
+      updateStudyFilterSummaries();
+    }
+
+    function studyFilterOptionLabel(select) {
+      const option = select?.options?.[select.selectedIndex];
+      return option ? option.textContent.replace(/^[^0-9A-Za-zÀ-ÿ]+/, '').trim() : '';
+    }
+    // Resume Período · Disciplina · Slide num botão; no celular os seletores ficam recolhidos atrás dele.
+    function updateStudyFilterSummaries() {
+      document.querySelectorAll('.unified-study-control-card').forEach(card => {
+        const hierarchy = card.querySelector('.study-nav-hierarchy');
+        if (!hierarchy) return;
+        let summary = card.querySelector('.study-filters-summary');
+        if (!summary) {
+          summary = document.createElement('button');
+          summary.type = 'button';
+          summary.className = 'study-filters-summary';
+          summary.setAttribute('aria-expanded', 'false');
+          summary.innerHTML = '<span class="material-symbol-font" aria-hidden="true">tune</span><span class="study-filters-summary-text"></span><span class="material-symbol-font study-filters-summary-arrow" aria-hidden="true">expand_more</span>';
+          summary.addEventListener('click', () => {
+            const open = card.classList.toggle('filters-open');
+            summary.setAttribute('aria-expanded', String(open));
+          });
+          hierarchy.addEventListener('change', updateStudyFilterSummaries);
+          hierarchy.before(summary);
+        }
+        const labels = Array.from(hierarchy.querySelectorAll('select')).map(studyFilterOptionLabel).filter(Boolean);
+        const text = labels.join(' · ') || 'Filtros de estudo';
+        summary.querySelector('.study-filters-summary-text').textContent = text;
+        summary.setAttribute('aria-label', `Filtros: ${text}. Toque para ${card.classList.contains('filters-open') ? 'recolher' : 'alterar'}.`);
+        summary.title = `Filtros: ${text}`;
+      });
     }
 
     function handleSlideSelectChange(slideName) {
@@ -11268,6 +11324,7 @@ ${cleanText}
 
       renderSharedStudyItems();
       saveStudyNavigationState();
+      updateStudyFilterSummaries();
     }
 
     function clearSlideFilter() {
@@ -18288,6 +18345,10 @@ Retorne EXCLUSIVAMENTE um JSON:
                   <span class="material-symbol-font" aria-hidden="true">rocket_launch</span>
                 </button>
               ` : ''}
+              <button type="button" class="quiz-actions-toggle" aria-label="Mais ações da questão" aria-haspopup="true" aria-expanded="false" onclick="toggleQuizActionsMenu(this, event)">
+                <span class="material-symbol-font" aria-hidden="true">more_vert</span>
+              </button>
+              <div class="quiz-card-actions-menu">
               <button class="btn-outline-action" style="padding: 2px 8px; font-size: 10px;" onclick="openQuestionDiscussionById('${item.id}')" title="Perguntar ao tutor sobre esta questão">
                 💬 Perguntar
               </button>
@@ -18297,6 +18358,7 @@ Retorne EXCLUSIVAMENTE um JSON:
               <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')" title="Remove somente esta questão do banco compartilhado com os Flashcards">
                 🗑️ Excluir este quiz
               </button>
+              </div>
             </div>
           </div>
 
@@ -18773,6 +18835,25 @@ Retorne EXCLUSIVAMENTE um JSON:
       `;
       feedbackBanner.style.display = 'block';
     }
+
+    // No celular as ações da questão ficam num menu ⋮; no desktop o menu é transparente.
+    function closeQuizActionsMenus(except) {
+      document.querySelectorAll('.quiz-card-actions.is-menu-open').forEach(actions => {
+        if (actions === except) return;
+        actions.classList.remove('is-menu-open');
+        actions.querySelector('.quiz-actions-toggle')?.setAttribute('aria-expanded', 'false');
+      });
+    }
+    function toggleQuizActionsMenu(button, event) {
+      event?.stopPropagation();
+      const actions = button.closest('.quiz-card-actions');
+      if (!actions) return;
+      closeQuizActionsMenus(actions);
+      const open = actions.classList.toggle('is-menu-open');
+      button.setAttribute('aria-expanded', String(open));
+    }
+    document.addEventListener('click', () => closeQuizActionsMenus());
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeQuizActionsMenus(); });
 
     function deleteQuizItem(id) {
       const item = sharedQuestionsBank.find(q => q.id === id);

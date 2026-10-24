@@ -161,3 +161,17 @@ h1, h2, h3, p { margin-top: 0; }
   .site-footer { grid-template-columns: 1fr; gap: 17px; padding-block: 24px; }.footer-links { justify-content: flex-start; gap: 13px; }.site-footer > p { padding-top: 12px; line-height: 1.6; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+
+/* Legibilidade: textos de leitura nunca abaixo de 12px (as miniaturas ilustrativas ficam como estão). */
+.brand-name small, .footer-brand .brand-name small, .eyebrow, .hero-note, .problem-number, .text-link,
+.feature-card .feature-kicker, .feature-card > a, .format-list span, .footer-links, .site-footer > p,
+.principles-bar small, .button-small, .header-actions .button-quiet { font-size: 12px; }
+.principles-bar b, .problem-grid p, .workflow-steps p, .feature-card p, .learning-list li, .faq-list summary,
+.faq-list details p, .final-cta > p, .hero-actions .button-large,
+.section-heading p, .workflow-intro > p, .learning-copy > p, .materials-copy > p { font-size: 13px; }
+.learning-footnote { font-size: 12px !important; }
+.learning-list li span { width: 20px; height: 20px; flex-basis: 20px; font-size: 12px; }
+@media (max-width: 700px) {
+  .header-actions .button-quiet, .button-small { min-height: 44px; }
+  .footer-links a { display: inline-flex; align-items: center; min-height: 44px; }
+}
