@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  medtutor:
+    name: MedTutor Brasil (testes e build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workspace/MedTutorBrasil
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workspace/MedTutorBrasil/package-lock.json
+      - run: npm ci
+      # Os testes não podem depender de chaves reais nem de rede.
+      - run: npm test
+        env:
+          GEMINI_API_KEY: ''
+          OPENAI_API_KEY: ''
+      - run: npm run build
+
+  agents:
+    name: Fábrica de agentes (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # --ignore-scripts evita o postinstall, que reinstala e compila o MedTutor.
+      - run: npm ci --ignore-scripts
+      - run: npx tsc --noEmit -p .

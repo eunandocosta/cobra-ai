@@ -295,7 +295,7 @@ console.log('[PASS] Firestore exige a versão atual da liberação por cupom');
 const modulesDir = path.join(__dirname, '..', 'src', 'modules');
 assert(fs.existsSync(modulesDir), 'Diretório src/modules deve existir');
 
-const requiredModules = ['auth', 'access', 'ementas', 'relatorios', 'quizzes', 'chat'];
+const requiredModules = ['access', 'ementas', 'relatorios', 'quizzes', 'chat'];
 for (const mod of requiredModules) {
   const modPath = path.join(modulesDir, mod);
   assert(fs.existsSync(modPath), `Módulo '${mod}' deve existir em src/modules/`);
@@ -391,16 +391,13 @@ server.listen(TEST_PORT, async () => {
     assert(paymentPage.rawBody?.includes('accessCouponForm'), 'a rota /pagamento deve entregar o formulário do cupom');
     console.log('[PASS] GET /pagamento -> tela dedicada de acesso por cupom');
 
-    // Test 2: Auth Module
-    const session = await makeRequest('POST', '/api/auth/session', { email: 'aluno@medicina.uf.br' });
-    assert.strictEqual(session.statusCode, 200);
-    assert.strictEqual(session.body.authenticated, true);
-    console.log(`[PASS] POST /api/auth/session -> 200 OK (${session.body.user.email})`);
-
-    const profile = await makeRequest('GET', '/api/auth/profile');
-    assert.strictEqual(profile.statusCode, 200);
-    assert.strictEqual(profile.body.email, 'aluno@medicina.uf.br');
-    console.log(`[PASS] GET /api/auth/profile -> 200 OK (${profile.body.nome})`);
+    // Test 2: a autenticação é feita pelo Firebase no cliente; o antigo módulo
+    // /api/auth (sessões simuladas, sem verificação) não deve mais estar exposto.
+    const legacySession = await makeRequest('POST', '/api/auth/session', { email: 'aluno@medicina.uf.br' });
+    assert.strictEqual(legacySession.statusCode, 404, 'POST /api/auth/session não deve mais existir');
+    const legacyPreferences = await makeRequest('PUT', '/api/auth/preferences', { tema: 'escuro' });
+    assert.strictEqual(legacyPreferences.statusCode, 404, 'PUT /api/auth/preferences não deve mais existir');
+    console.log('[PASS] /api/auth removido -> 404 (autenticação via Firebase)');
 
     const accessStatus = await makeRequest('GET', '/api/access/status');
     assert.strictEqual(accessStatus.statusCode, 200);

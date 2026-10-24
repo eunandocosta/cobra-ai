@@ -2,7 +2,28 @@ require('dotenv').config();
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const quizzesService = require('../src/modules/quizzes/quizzes.service');
+
+// Substitui o Gemini por uma resposta determinística: o teste valida a normalização
+// do gabarito no backend, sem depender de rede nem de GEMINI_API_KEY real.
+process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
+GoogleGenerativeAI.prototype.getGenerativeModel = () => ({
+  generateContent: async () => ({
+    response: {
+      text: () => JSON.stringify({
+        question: 'Paciente alérgico a beta-lactâmicos com endocardite por Streptococcus viridans. Qual a conduta antimicrobiana mais adequada?',
+        vignette: 'Febre e sopro novo após procedimento dentário, com anafilaxia prévia a penicilina.',
+        quizOptions: ['A) Ampicilina', 'B) Ceftriaxona', 'C) Vancomicina', 'D) Amoxicilina'],
+        correctIndex: 2,
+        gabarito: 'C',
+        explanation: 'Na anafilaxia a beta-lactâmicos, a vancomicina é a alternativa de escolha.',
+        flashcardFront: 'Endocardite por S. viridans em alérgico a beta-lactâmicos: qual antimicrobiano?',
+        flashcardBack: 'Vancomicina.'
+      })
+    }
+  })
+});
 
 // Carrega o código do web/app.js e extrai resolveQuizCorrectIndex e healQuestionsBankIntegrity
 const appJsPath = path.join(__dirname, '..', 'web', 'app.js');

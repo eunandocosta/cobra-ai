@@ -45,7 +45,6 @@ clientRoutes.forEach(route => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
 });
 
-app.use('/api/auth', require('./src/modules/auth/auth.routes'));
 app.use('/api/access', require('./src/modules/access/access.routes'));
 app.use('/api/announcements', require('./src/modules/announcements/announcements.routes'));
 app.use('/api/ementas', require('./src/modules/ementas/ementas.routes'));
