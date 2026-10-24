@@ -7158,7 +7158,10 @@
     .frame-unlock-mini { position: relative; width: 38px; height: 38px; border-radius: 50%; background: var(--bg-surface); }
     .frame-unlock-mini .profile-frame-svg { position: absolute; inset: -14%; width: 128%; height: 128%; overflow: visible; }
     .frame-unlock-more-count { color: var(--text-secondary); font-size: 12px; font-weight: 800; }
-    .frame-unlock-actions { display: grid; gap: 8px; margin-top: 18px; }
+    /* Os dois botões com a mesma largura e centralizados (o principal herda
+       width: min(100%, 360px) do botão da subida de nível). */
+    .frame-unlock-actions { display: grid; justify-items: center; gap: 8px; margin-top: 18px; }
+    .frame-unlock-actions > button { width: min(100%, 360px); margin-top: 0; }
     .frame-unlock-later { min-height: 46px; border: 1px solid var(--border); border-radius: 14px; color: var(--text-secondary); background: transparent; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; transition: color .2s ease, border-color .2s ease; }
     .frame-unlock-later:hover, .frame-unlock-later:focus-visible { color: var(--neon); border-color: var(--border-accent); }
     @media (max-width: 520px) { .frame-unlock-hero { min-height: 200px; } .frame-unlock-title { font-size: 17px; } .frame-unlock-reason { font-size: 12.5px; } }
