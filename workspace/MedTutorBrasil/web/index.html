@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261009-drive-spinner-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261024-responsive-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -177,8 +177,8 @@
         <button class="topbar-home-brand-btn" type="button" onclick="navigateTab('home')" title="Início • O que você quer fazer hoje?" aria-label="Início do MedTutor">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </button>
-        <div class="topbar-title" id="currentViewTitle">
-          Início • O que você quer fazer hoje?
+        <div class="topbar-title" id="currentViewTitle" title="Início • O que você quer fazer hoje?">
+          <span class="topbar-title-full">Início • O que você quer fazer hoje?</span><span class="topbar-title-short">Início</span>
         </div>
         <div class="topbar-actions">
           <button class="gamification-topbar" id="gamificationTopbar" type="button" onclick="openGamificationModal()" title="Ver nível, XP e critérios de pontuação" aria-label="Progresso de gamificação">
@@ -281,7 +281,7 @@
               <div class="home-hero-badge-row">
                 <span class="home-greeting-chip">
                   <span class="home-pulse-dot"></span>
-                  <span id="homeGreetingTime">Bom dia</span>, futuro(a) médico(a)
+                  <span><span id="homeGreetingTime">Bom dia</span>, futuro(a) médico(a)</span>
                 </span>
                 <span class="home-period-chip" id="homeUserPeriodChip">Ciclo Básico</span>
               </div>
@@ -4171,7 +4171,7 @@
   <script defer src="/exam-study-planner.js?v=20260927-sce-review-deck-v2"></script>
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/material-icons.js?v=20261009-compact-sidebar-tooltips-v1"></script>
-  <script defer src="/app.min.js?v=20261024-xss-hardening-v1"></script>
+  <script defer src="/app.min.js?v=20261024-responsive-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

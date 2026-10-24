@@ -840,6 +840,27 @@
       text-overflow: ellipsis;
     }
 
+    .topbar-title-full,
+    .topbar-title-short {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar-title-short {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .topbar-title-full {
+        display: none;
+      }
+
+      .topbar-title-short {
+        display: inline;
+      }
+    }
+
     /* O título da seção é texto; ícones acidentais vindos de conteúdo legado
        não devem competir visualmente com a marca nem deslocar o cabeçalho. */
     #currentViewTitle > .material-symbol-font,
