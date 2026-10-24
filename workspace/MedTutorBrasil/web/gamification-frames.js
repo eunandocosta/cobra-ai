@@ -185,12 +185,26 @@
       `<circle class="pf-halo" cx="80" cy="80" r="76" fill="none" stroke="${main}" stroke-width="1.2"/>`;
   }
 
+  // Iluminação do Pulso Neon aplicada às demais molduras: cometa de luz no
+  // anel, cometa fino no sentido contrário e halo pulsando, nas cores da
+  // própria moldura. Fica por baixo de tudo, para não cobrir nenhum desenho.
+  function lightingLayer(colors, radius = 64) {
+    const [main, light] = colors;
+    return `<g class="pf-lighting" aria-hidden="true">` +
+      `<circle class="pf-comet" cx="80" cy="80" r="${radius}" fill="none" stroke="${light}" stroke-width="7" pathLength="100" stroke-linecap="round" opacity=".9"/>` +
+      `<circle class="pf-comet pf-comet-reverse" cx="80" cy="80" r="${radius + 8}" fill="none" stroke="${main}" stroke-width="2.2" pathLength="100" stroke-linecap="round"/>` +
+      `<circle class="pf-halo" cx="80" cy="80" r="${radius + 12}" fill="none" stroke="${main}" stroke-width="1.2"/></g>`;
+  }
+  // Raio do anel principal de cada desenho, para a luz correr exatamente nele.
+  const LIGHT_RADIUS = { ecg: 66, chama: 65, raio: 66, desafiador: 65, sinapse: 66, maratonista: 66, laco: 66 };
+  const lightRadiusFor = definition => LIGHT_RADIUS[definition.id] || LIGHT_RADIUS[definition.family] || 64;
+
   // Molduras antigas (Louros e Pulso Neon): regras e cores continuam no app;
   // aqui fica só o desenho novo.
   function buildLegacySvg(id, colors) {
     const period = Number(String(id).match(/^laurel-(\d{1,2})$/)?.[1] || 0);
     if (period >= 1 && period <= 12) {
-      return `<svg class="profile-frame-svg pf-catalog${period >= 11 ? ' pf-glow' : ''}" viewBox="0 0 160 160" aria-hidden="true">${laurelSvg(period, colors)}</svg>`;
+      return `<svg class="profile-frame-svg pf-catalog pf-glow" viewBox="0 0 160 160" aria-hidden="true">${lightingLayer([colors[1], colors[2]], 63.5)}${laurelSvg(period, colors)}</svg>`;
     }
     if (id === 'neon') return `<svg class="profile-frame-svg pf-catalog pf-glow" viewBox="0 0 160 160" aria-hidden="true">${neonSvg(colors)}</svg>`;
     return '';
@@ -352,8 +366,15 @@
   function buildSvg(id) {
     const definition = getDefinition(id);
     if (!definition) return '';
-    const classes = ['profile-frame-svg', 'pf-catalog', definition.glow ? 'pf-glow' : '', definition.iridescent ? 'pf-iridescent' : ''].filter(Boolean).join(' ');
-    return `<svg class="${classes}" viewBox="0 0 160 160" aria-hidden="true">${definition.svg(definition.colors)}</svg>`;
+    // Todas brilham como o Pulso Neon; a iridescente já tem o próprio brilho.
+    const classes = ['profile-frame-svg', 'pf-catalog', definition.iridescent ? 'pf-iridescent' : 'pf-glow'].join(' ');
+    const art = definition.svg(definition.colors);
+    // Gradientes (<defs>) precisam vir antes; a luz entra logo depois, por baixo do desenho.
+    const defsEnd = art.indexOf('</defs>');
+    const lit = defsEnd >= 0
+      ? art.slice(0, defsEnd + 7) + lightingLayer(definition.colors, lightRadiusFor(definition)) + art.slice(defsEnd + 7)
+      : lightingLayer(definition.colors, lightRadiusFor(definition)) + art;
+    return `<svg class="${classes}" viewBox="0 0 160 160" aria-hidden="true">${lit}</svg>`;
   }
 
   // --- Progresso e regras ---------------------------------------------------
