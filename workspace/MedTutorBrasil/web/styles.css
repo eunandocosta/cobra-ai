@@ -6954,6 +6954,8 @@
     .gamification-frame-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
     .gamification-frame-family { grid-column:1 / -1; margin:10px 2px 0; color:var(--text-secondary); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
     .gamification-frame-family:first-child { margin-top:0; }
+    /* Placas e selos na base das molduras não podem encostar no nome da opção. */
+    .gamification-frame-option .frame-option-avatar { margin-bottom:9px; }
 
     /* Molduras do catálogo (gamification-frames.js): SVG animado só com CSS. */
     .profile-frame-svg text { font-family: inherit; }
@@ -6977,6 +6979,29 @@
     .profile-frame-svg .pf-sway { transform-box:fill-box; transform-origin:50% 0; animation:pfSway 2.4s ease-in-out infinite; }
     .profile-frame-svg.pf-glow { animation:pfGlow 2.4s ease-in-out infinite; }
     .profile-frame-svg.pf-iridescent { animation:pfIridescent 4.8s linear infinite; }
+    .profile-frame-svg .pf-leaf { transform-box:fill-box; transform-origin:0 50%; animation:pfLeaf 2.4s ease-in-out infinite; }
+    .profile-frame-svg .pf-crown { transform-box:fill-box; transform-origin:50% 100%; animation:pfBreathe 2.4s ease-in-out infinite; }
+    .profile-frame-svg .pf-ring-shine { stroke-dasharray:9 91; transform-origin:80px 80px; animation:pfRingShine 2.4s linear infinite; }
+    /* Parado (molduras bloqueadas ou movimento reduzido), o reflexo fica fora da placa. */
+    .profile-frame-svg .pf-sweep { transform:translateX(-80px) skewX(-20deg); animation:pfSweep 2.4s ease-in-out infinite; }
+    .profile-frame-svg .pf-sweep-fast { animation-duration:1.6s; animation-delay:.5s; }
+    .profile-frame-svg .pf-digits-glow { animation:pfDigitsGlow 1.6s ease-in-out infinite; }
+    .profile-frame-svg .pf-plaque-glint { animation:pfPlaqueGlint 2.4s ease-in-out infinite; }
+    .profile-frame-svg .pf-orbit { transform-origin:80px 80px; animation:pfSpin 9.6s linear infinite; }
+    .profile-frame-svg .pf-shine { stroke-dasharray:6 94; animation:pfShine 2.4s linear infinite; }
+    .profile-frame-svg .pf-comet { stroke-dasharray:16 84; transform-origin:80px 80px; animation:pfSpin 2.4s linear infinite; }
+    .profile-frame-svg .pf-comet-reverse { stroke-dasharray:8 92; animation-direction:reverse; animation-duration:4.8s; }
+    .profile-frame-svg .pf-halo { transform-origin:80px 80px; animation:pfHalo 2.4s ease-in-out infinite; }
+    /* O novo Pulso Neon traz o próprio halo animado no SVG. */
+    .gamification-profile-avatar[data-frame="neon"]::after { display:none; }
+    @keyframes pfLeaf { 0%,100% { transform:rotate(-6deg); } 50% { transform:rotate(6deg); } }
+    @keyframes pfRingShine { from { transform:rotate(0); } to { transform:rotate(-360deg); } }
+    /* Reflexo atravessando a placa do ano da direita para a esquerda. */
+    @keyframes pfSweep { 0% { transform:translateX(70px) skewX(-20deg); } 55%,100% { transform:translateX(-80px) skewX(-20deg); } }
+    @keyframes pfDigitsGlow { 0%,100% { filter:drop-shadow(0 0 1px var(--frame-main)); } 50% { filter:drop-shadow(0 0 5px var(--frame-main)); } }
+    @keyframes pfPlaqueGlint { 0%,100% { opacity:.25; } 50% { opacity:.9; } }
+    @keyframes pfShine { from { stroke-dashoffset:0; } to { stroke-dashoffset:-100; } }
+    @keyframes pfHalo { 0%,100% { opacity:.15; transform:scale(.96); } 50% { opacity:.6; transform:scale(1.04); } }
     @keyframes pfPulse { from { stroke-dashoffset:52; } to { stroke-dashoffset:-48; } }
     @keyframes pfBeat { 0%,60%,100% { transform:scale(1); } 14% { transform:scale(1.18); } 28% { transform:scale(.97); } 42% { transform:scale(1.1); } }
     @keyframes pfBreathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.08); } }

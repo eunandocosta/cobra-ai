@@ -3831,6 +3831,11 @@
     }
     function buildGamificationFrameSvg(frameId) {
       if (typeof MedTutorFrameCatalog !== 'undefined' && MedTutorFrameCatalog.isCatalogFrame(frameId)) return MedTutorFrameCatalog.buildSvg(frameId);
+      if (typeof MedTutorFrameCatalog !== 'undefined') {
+        const laurel = gamificationLaurelFrames.find(item => gamificationFrameId(item.period) === frameId);
+        const legacy = MedTutorFrameCatalog.buildLegacySvg(frameId, laurel ? laurel.colors : gamificationNeonFrame.colors);
+        if (legacy) return legacy;
+      }
       const isNeon = frameId === 'neon';
       if (isNeon) return '<svg class="profile-frame-svg" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="64" fill="none" stroke="var(--frame-main)" stroke-width="3"/><circle cx="80" cy="80" r="71" fill="none" stroke="var(--frame-main)" stroke-width="1.5" opacity=".35"/><path d="M80 8v15m0 114v15M8 80h15m114 0h15M28 28l11 11m82 82 11 11m0-104-11 11m-82 82-11 11" fill="none" stroke="var(--frame-light)" stroke-width="3" stroke-linecap="round"/><circle cx="80" cy="15" r="4" fill="var(--frame-light)"/><circle cx="145" cy="80" r="4" fill="var(--frame-light)"/><circle cx="80" cy="145" r="4" fill="var(--frame-light)"/><circle cx="15" cy="80" r="4" fill="var(--frame-light)"/></svg>';
       const leaves = Array.from({ length: 7 }, (_, index) => {

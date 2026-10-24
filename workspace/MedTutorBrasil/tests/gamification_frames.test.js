@@ -80,6 +80,36 @@ assert.deepStrictEqual(normalized.answeredIds, []);
 assert.deepStrictEqual(normalized.activeDays, ['2026-10-01']);
 console.log('  [PASS] Progresso salvo é normalizado com segurança');
 
+const anuais = byFamily('anual');
+assert.deepStrictEqual(anuais.map(item => item.id), [1, 2, 3, 4, 5, 6].map(tier => `anual-2026-${tier}`), 'a Moldura Anual tem 6 níveis no ano corrente');
+assert.deepStrictEqual(anuais.map(item => item.rule.min), [15, 45, 90, 130, 200, 500]);
+assert(catalog.buildSvg('anual-2026-1').includes('>2026</text>'), 'o ano aparece na placa');
+const svgA = catalog.buildSvg('anual-2026-6');
+const svgB = catalog.buildSvg('anual-2026-6');
+assert.notStrictEqual(svgA.match(/id="(pfan[^"]+)p"/)[1], svgB.match(/id="(pfan[^"]+)p"/)[1], 'cada instância usa ids próprios nos gradientes');
+assert(!catalog.buildSvg('anual-2026-2').includes('pf-sweep') && catalog.buildSvg('anual-2026-3').includes('pf-sweep'), 'o reflexo na placa começa no nível 3');
+assert(catalog.buildSvg('anual-2026-5').includes('pf-digits-glow') && svgA.includes('pf-iridescent'), 'números brilham no nível 5 e o nível 6 é prisma');
+const yearMetrics = catalog.metricsFromProgress({ monthAnswered: { '2026-11': Array.from({ length: 50 }, (_, i) => `y${i}`), '2026-12': Array.from({ length: 50 }, (_, i) => `y${i + 25}`) } });
+assert.strictEqual(yearMetrics.yearAnswered['2026'], 75, 'o ano soma questões únicas de todos os meses');
+assert.strictEqual(catalog.evaluate(catalog.getDefinition('anual-2026-2'), yearMetrics, catalog.createProgress(), now).unlocked, true);
+assert.strictEqual(catalog.evaluate(catalog.getDefinition('anual-2026-3'), yearMetrics, catalog.createProgress(), now).unlocked, false);
+const in2027 = catalog.evaluate(catalog.getDefinition('anual-2026-1'), yearMetrics, catalog.createProgress(), new Date(2027, 0, 2));
+assert.strictEqual(in2027.unlocked, false, 'depois do ano a moldura não pode mais ser conquistada');
+assert(in2027.requirement.startsWith('Ano encerrado'));
+const kept = catalog.getDefinitions({ now: new Date(2027, 0, 2), unlockedIds: ['anual-2026-2'] }).map(item => item.id);
+assert(kept.includes('anual-2027-1') && kept.includes('anual-2026-2') && !kept.includes('anual-2026-3'), 'em 2027 surge a anual nova e a de 2026 conquistada continua');
+console.log('  [PASS] Moldura Anual: 6 níveis, ano em destaque, reflexo e conquista só durante o ano');
+
+for (let period = 1; period <= 12; period++) {
+  const svg = catalog.buildLegacySvg(`laurel-${period}`, ['#59402c', '#9a7044', '#d2ae76']);
+  assert(svg.includes('pf-leaf') && svg.includes(`>${period}º</text>`), `louro ${period}: folhas animadas e selo do período`);
+  assert.strictEqual((svg.match(/<g\b/g) || []).length, (svg.match(/<\/g>/g) || []).length);
+}
+assert(catalog.buildLegacySvg('laurel-9', ['#1c677a', '#72ccdd', '#e8fcff']).includes('pf-shine'), 'louros a partir do 9º têm brilho percorrendo a coroa');
+assert(catalog.buildLegacySvg('neon', ['#00f477', '#b2ffd2', '#07552d']).includes('pf-comet'), 'o novo Pulso Neon tem cometa de luz');
+assert.strictEqual(catalog.buildLegacySvg('laurel-13', ['#000', '#000', '#000']), '');
+console.log('  [PASS] Novos Louros e Pulso Neon');
+
 const fs = require('fs');
 const path = require('path');
 const iconScript = fs.readFileSync(path.join(__dirname, '..', 'web', 'material-icons.js'), 'utf8');

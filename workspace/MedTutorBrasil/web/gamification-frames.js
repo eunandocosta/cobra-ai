@@ -95,6 +95,107 @@
       `<path d="${RIBBON_PATH}" fill="none" stroke="${c[0]}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g></g></g>`;
   }
 
+  // Cada SVG com <defs> recebe ids únicos: várias molduras iguais podem estar
+  // na mesma página (perfil e coleção) e ids repetidos quebrariam gradientes.
+  let svgInstance = 0;
+  const star4 = (x, y, size, fill, cls = '', delay = 0) => `<path class="${cls}" style="animation-delay:${delay}s" d="M${f2(x)} ${f2(y - size)} L${f2(x + size * 0.28)} ${f2(y - size * 0.28)} L${f2(x + size)} ${f2(y)} L${f2(x + size * 0.28)} ${f2(y + size * 0.28)} L${f2(x)} ${f2(y + size)} L${f2(x - size * 0.28)} ${f2(y + size * 0.28)} L${f2(x - size)} ${f2(y)} L${f2(x - size * 0.28)} ${f2(y - size * 0.28)}Z" fill="${fill}"/>`;
+
+  function anualSvg(c, tier, year) {
+    const id = `pfan${tier}x${++svgInstance}`;
+    const yearText = attrs => `<text x="80" y="147.6" text-anchor="middle" font-family="inherit" font-size="20.5" font-weight="900" letter-spacing="1.4" ${attrs}>${Number(year)}</text>`;
+    let s = `<defs><linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${tier >= 2 ? c[0] : c[2]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient>` +
+      `<linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c[1]}"/><stop offset="${tier >= 4 ? 0.55 : 1}" stop-color="${tier >= 4 ? c[0] : c[1]}"/><stop offset="1" stop-color="${c[1]}"/></linearGradient>` +
+      `<linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>` +
+      `<clipPath id="${id}c"><rect x="38" y="125" width="84" height="31" rx="9"/></clipPath><clipPath id="${id}t">${yearText('')}</clipPath></defs>`;
+    if (tier >= 6) s += '<g class="pf-spin-slow">' + Array.from({ length: 24 }, (_, index) => {
+      const angle = index * 15 + 7.5;
+      const [x1, y1] = polar(75, angle);
+      const [x2, y2] = polar(index % 2 ? 78 : 81, angle);
+      return `<line x1="${f2(x1)}" y1="${f2(y1)}" x2="${f2(x2)}" y2="${f2(y2)}" stroke="${c[1]}" stroke-width="1.2" opacity=".7"/>`;
+    }).join('') + '</g>';
+    if (tier >= 2) s += ring(69, c[2], 4);
+    s += ring(64, c[0], tier >= 3 ? 3.2 : 2.6);
+    if (tier >= 3) s += ring(73, c[1], 1, 'stroke-dasharray="2 4" opacity=".7"');
+    if (tier >= 4) s += `<circle class="pf-ring-shine" cx="80" cy="80" r="64" fill="none" stroke="${c[1]}" stroke-width="3.6" pathLength="100" stroke-linecap="round"/>`;
+    if (tier >= 3) s += [90, 270].map(angle => gem(c, angle, 72, 7)).join('');
+    if (tier >= 4) s += [-1, 1].map(side => `<g transform="translate(${80 + side * 48} 140) scale(${side} 1)">` + [0, 1, 2].map(index => `<path class="pf-leaf" style="animation-delay:-${(index * 0.2).toFixed(1)}s" transform="rotate(${-20 - index * 28})" d="M0 0 C3 -3 9 -3 12 0 C9 3 3 3 0 0Z" fill="${c[0]}" stroke="${c[2]}" stroke-width=".7"/>`).join('') + '</g>').join('') +
+      `<g class="pf-crown"><path d="M68 15 L72 5 L77 12 L80 2 L83 12 L88 5 L92 15 Z" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.1" stroke-linejoin="round"/><circle cx="80" cy="3" r="1.6" fill="${c[1]}"/></g>`;
+    if (tier >= 5) s += [[30, 1], [62, 0.8], [118, 0.7], [300, 0.9], [330, 1], [242, 0.7]].map(([angle, scale], index) => { const [x, y] = polar(80, angle); return star4(x, y, 4.2 * scale, c[1], 'pf-twinkle', (index * 0.27).toFixed(2)); }).join('');
+    if (tier >= 6) s += '<g class="pf-orbit">' + [45, 225].map(angle => { const [x, y] = polar(77, angle); return star4(x, y, 4.5, '#ffffff'); }).join('') + '</g>';
+    s += `<rect x="38" y="125" width="84" height="31" rx="9" fill="url(#${id}p)" stroke="${c[1]}" stroke-width="${tier >= 4 ? 1.6 : 1.1}"/>` +
+      `<rect class="pf-plaque-glint" x="41" y="128" width="78" height="25" rx="7" fill="none" stroke="${c[1]}" stroke-width=".6" opacity="${tier >= 2 ? 0.55 : 0.25}"/>` +
+      `<g class="${tier >= 5 ? 'pf-digits-glow' : ''}">${yearText(`fill="url(#${id}d)" stroke="${c[2]}" stroke-width="${tier >= 3 ? 0.9 : 0.5}" paint-order="stroke"`)}</g>`;
+    if (tier >= 3) s += `<g clip-path="url(#${id}c)"><rect class="pf-sweep" x="64" y="120" width="18" height="42" fill="url(#${id}s)" opacity="${tier >= 4 ? 0.85 : 0.55}"/></g>`;
+    if (tier >= 5) s += `<g clip-path="url(#${id}t)"><rect class="pf-sweep pf-sweep-fast" x="66" y="126" width="12" height="32" fill="url(#${id}s)"/></g>`;
+    return s;
+  }
+
+  // Louros acadêmicos: coroa que abraça o anel, com selo do período.
+  // colors = [profunda, principal, clara], na mesma ordem do app.
+  function laurelSvg(period, colors) {
+    const [deep, main, light] = colors;
+    const leavesPerSide = period <= 4 ? 5 : period <= 8 ? 6 : 7;
+    const start = 200;
+    const end = period <= 4 ? 300 : period <= 8 ? 316 : 330;
+    const radius = 70;
+    const direction = (degree, side) => {
+      const theta = (degree - 90) * Math.PI / 180;
+      const vector = side < 0 ? [-Math.sin(theta), Math.cos(theta)] : [Math.sin(theta), -Math.cos(theta)];
+      return Math.atan2(vector[1], vector[0]) * 180 / Math.PI;
+    };
+    let stems = '';
+    let leaves = '';
+    [-1, 1].forEach(side => {
+      const points = [];
+      for (let angle = start; angle <= end; angle += 3) points.push(polar(radius, side < 0 ? angle : 360 - angle));
+      stems += `<path d="M${points.map(point => point.map(f2).join(' ')).join(' L')}" fill="none" stroke="${deep}" stroke-width="2" stroke-linecap="round"/>`;
+      for (let index = 0; index < leavesPerSide; index++) {
+        const angle = start + (end - start) * (index + 0.5) / leavesPerSide;
+        const degree = side < 0 ? angle : 360 - angle;
+        const [x, y] = polar(radius, degree);
+        [[side < 0 ? -34 : 34, 17, main], [side < 0 ? 30 : -30, 12, light]].forEach(([offset, length, fill], k) => {
+          const width = length * 0.3;
+          leaves += `<g transform="translate(${f2(x)} ${f2(y)}) rotate(${f2(direction(degree, side) + offset)})"><path class="pf-leaf" style="animation-delay:-${(index * 0.14 + k * 0.07).toFixed(2)}s" d="M0 0 C${f2(length * 0.3)} ${f2(-width)} ${f2(length * 0.75)} ${f2(-width)} ${length} 0 C${f2(length * 0.75)} ${f2(width)} ${f2(length * 0.3)} ${f2(width)} 0 0Z" fill="${fill}" stroke="${deep}" stroke-width=".8"/><path d="M1.5 0 H${length - 2}" stroke="${deep}" stroke-width=".6" opacity=".7"/></g>`;
+        });
+      }
+      const tipDegree = side < 0 ? end : 360 - end;
+      const [tx, ty] = polar(radius, tipDegree);
+      leaves += `<g transform="translate(${f2(tx)} ${f2(ty)}) rotate(${f2(direction(tipDegree, side))})"><path class="pf-leaf" d="M0 0 C4 -4 11 -4 15 0 C11 4 4 4 0 0Z" fill="${main}" stroke="${deep}" stroke-width=".8"/></g>`;
+      if (period >= 5) [0.3, 0.62].forEach(t => {
+        const [bx, by] = polar(radius + 9, side < 0 ? start + (end - start) * t : 360 - (start + (end - start) * t));
+        leaves += `<circle class="pf-beat" cx="${f2(bx)}" cy="${f2(by)}" r="2.4" fill="${light}" stroke="${deep}" stroke-width=".7"/>`;
+      });
+    });
+    const shine = period >= 9 ? `<circle class="pf-shine" cx="80" cy="80" r="70" fill="none" stroke="${light}" stroke-width="5" pathLength="100" stroke-linecap="round" opacity=".55"/>` : '';
+    const star = period >= 9 ? `<path class="pf-twinkle" d="M80 1.5 l2.6 6.2 6.6.5-5 4.3 1.6 6.4-5.8-3.5-5.8 3.5 1.6-6.4-5-4.3 6.6-.5z" fill="${light}" stroke="${main}" stroke-width=".8"/>` : '';
+    return ring(63.5, main, 2.2) + stems + leaves + shine +
+      `<path d="M69 140 L60 135 M91 140 L100 135" stroke="${main}" stroke-width="3" stroke-linecap="round"/>` +
+      `<g class="pf-breathe"><circle cx="80" cy="146" r="12.5" fill="${deep}" stroke="${main}" stroke-width="2"/><text x="80" y="150.6" text-anchor="middle" font-family="inherit" font-size="${period >= 10 ? 10.5 : 12}" font-weight="800" fill="${light}">${period}º</text></g>` + star;
+  }
+
+  function neonSvg(colors) {
+    const [main, light, deep] = colors;
+    const nodes = Array.from({ length: 8 }, (_, index) => {
+      const [x, y] = polar(72, index * 45 + 22.5);
+      return `<circle class="pf-spark" style="animation-delay:${(index * 0.15).toFixed(2)}s" cx="${f2(x)}" cy="${f2(y)}" r="2.6" fill="${light}"/>`;
+    }).join('');
+    return ring(64, deep, 7, 'opacity=".55"') + ring(64, main, 2.4) + ring(72, main, 1, 'opacity=".45"') +
+      `<circle class="pf-comet" cx="80" cy="80" r="64" fill="none" stroke="${light}" stroke-width="4" pathLength="100" stroke-linecap="round"/>` +
+      `<circle class="pf-comet pf-comet-reverse" cx="80" cy="80" r="72" fill="none" stroke="${main}" stroke-width="2.2" pathLength="100" stroke-linecap="round"/>` + nodes +
+      `<circle class="pf-halo" cx="80" cy="80" r="76" fill="none" stroke="${main}" stroke-width="1.2"/>`;
+  }
+
+  // Molduras antigas (Louros e Pulso Neon): regras e cores continuam no app;
+  // aqui fica só o desenho novo.
+  function buildLegacySvg(id, colors) {
+    const period = Number(String(id).match(/^laurel-(\d{1,2})$/)?.[1] || 0);
+    if (period >= 1 && period <= 12) {
+      return `<svg class="profile-frame-svg pf-catalog${period >= 11 ? ' pf-glow' : ''}" viewBox="0 0 160 160" aria-hidden="true">${laurelSvg(period, colors)}</svg>`;
+    }
+    if (id === 'neon') return `<svg class="profile-frame-svg pf-catalog pf-glow" viewBox="0 0 160 160" aria-hidden="true">${neonSvg(colors)}</svg>`;
+    return '';
+  }
+
   const singleSvgs = {
     ecg: c => `<path d="${ECG_PATH}" fill="none" stroke="${c[0]}" stroke-width="3" stroke-linejoin="round"/>` + ring(73, c[2], 1.5, 'stroke-dasharray="2 5"') +
       `<path class="pf-pulse" pathLength="100" d="${ECG_PATH}" fill="none" stroke="${c[1]}" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>`,
@@ -119,6 +220,7 @@
   // --- Definições -----------------------------------------------------------
 
   const FAMILIES = [
+    { id: 'anual', title: 'Moldura Anual · conquiste durante o ano' },
     { id: 'asclepio', title: 'Bastão de Asclépio' },
     { id: 'conquistas', title: 'Conquistas' },
     { id: 'maratonista', title: 'Maratonista' },
@@ -163,6 +265,11 @@
     ['Dezembro Laranja', 'câncer de pele', ['#ff7043', '#ffe0d6', '#5c1a07']]
   ];
   const LACO_MIN_ANSWERS = 30;
+  const ANUAL_TIERS = [
+    ['Grafite', 15, ['#8a9399', '#dfe4e8', '#2b3135']], ['Bronze', 45, ['#c9803f', '#ffd6ad', '#4a2a10']],
+    ['Prata', 90, ['#c9d3dc', '#ffffff', '#3a434c']], ['Ouro', 130, ['#ffc83d', '#fff4c2', '#6b4600']],
+    ['Rubi', 200, ['#ff4d7d', '#ffd6e2', '#5a0a24']], ['Prisma', 500, ['#8ef3ff', '#ffffff', '#3b1c6b']]
+  ];
 
   const STATIC_DEFINITIONS = [
     ...ASCLEPIO_MATERIALS.map(([name, ...colors], index) => ({
@@ -184,6 +291,21 @@
       rule: { type: 'curatedAnswered', min }, svg: c => curadoriaSvg(c, index + 1)
     }))
   ];
+
+  function anualDefinition(year, tier) {
+    const [name, min, colors] = ANUAL_TIERS[tier - 1];
+    return {
+      id: `anual-${year}-${tier}`, family: 'anual', title: `Anual ${year} · ${name}`, colors, year, tier,
+      glow: tier >= 5, iridescent: tier === 6,
+      rule: { type: 'yearAnswered', year, min }, svg: c => anualSvg(c, tier, year)
+    };
+  }
+  function parseAnualId(id) {
+    const match = /^anual-(\d{4})-([1-6])$/.exec(String(id || ''));
+    if (!match) return null;
+    const year = Number(match[1]);
+    return year >= 2026 && year <= 2200 ? { year, tier: Number(match[2]) } : null;
+  }
 
   function lacoDefinition(year, month) {
     const [name, theme, colors] = LACO_MONTHS[month - 1];
@@ -209,13 +331,21 @@
       .filter(item => item && item.year < year)
       .sort((a, b) => b.year - a.year || a.month - b.month)
       .map(item => lacoDefinition(item.year, item.month));
-    return [...STATIC_DEFINITIONS, ...lacos, ...previous];
+    const anuais = Array.from({ length: ANUAL_TIERS.length }, (_, index) => anualDefinition(year, index + 1));
+    const previousAnuais = [...new Set(unlockedIds)]
+      .map(parseAnualId)
+      .filter(item => item && item.year < year)
+      .sort((a, b) => b.year - a.year || a.tier - b.tier)
+      .map(item => anualDefinition(item.year, item.tier));
+    return [...anuais, ...previousAnuais, ...STATIC_DEFINITIONS, ...lacos, ...previous];
   }
   function getDefinition(id) {
     const fixed = STATIC_DEFINITIONS.find(item => item.id === id);
     if (fixed) return fixed;
     const laco = parseLacoId(id);
-    return laco ? lacoDefinition(laco.year, laco.month) : null;
+    if (laco) return lacoDefinition(laco.year, laco.month);
+    const anual = parseAnualId(id);
+    return anual ? anualDefinition(anual.year, anual.tier) : null;
   }
   function isCatalogFrame(id) { return Boolean(getDefinition(id)); }
 
@@ -331,6 +461,17 @@
         met = value('curatedAnswered') >= rule.min;
         requirement = `Responda ${formatNumber(rule.min)} questões da curadoria da sua faculdade. Você respondeu ${formatNumber(value('curatedAnswered'))}.`;
         break;
+      case 'yearAnswered': {
+        const count = (metrics.yearAnswered && Number(metrics.yearAnswered[rule.year])) || 0;
+        const currentYear = now.getFullYear();
+        met = currentYear === rule.year && count >= rule.min;
+        requirement = currentYear < rule.year
+          ? `Disponível em ${rule.year}: responda ${formatNumber(rule.min)} questões diferentes durante o ano.`
+          : currentYear === rule.year
+            ? `Só em ${rule.year}: responda ${formatNumber(rule.min)} questões diferentes até 31/12. Você respondeu ${formatNumber(count)}.`
+            : `Ano encerrado. Esta moldura só podia ser conquistada em ${rule.year}.`;
+        break;
+      }
       case 'monthAnswered': {
         const monthKey = `${rule.year}-${String(rule.month).padStart(2, '0')}`;
         const count = (metrics.monthAnswered && Number(metrics.monthAnswered[monthKey])) || 0;
@@ -365,6 +506,14 @@
     const normalized = normalizeProgress(progress);
     const monthAnswered = {};
     Object.entries(normalized.monthAnswered).forEach(([month, ids]) => { monthAnswered[month] = ids.length; });
+    const yearIds = {};
+    Object.entries(normalized.monthAnswered).forEach(([month, ids]) => {
+      const year = month.slice(0, 4);
+      yearIds[year] = yearIds[year] || new Set();
+      ids.forEach(id => yearIds[year].add(id));
+    });
+    const yearAnswered = {};
+    Object.entries(yearIds).forEach(([year, ids]) => { yearAnswered[year] = ids.size; });
     return {
       level: 1, challengerVotes: 0, ...extra,
       answered: Math.max(Number(extra.answered) || 0, normalized.answeredIds.length),
@@ -372,13 +521,14 @@
       curatedAnswered: normalized.curatedIds.length,
       bestStreak: normalized.bestStreak,
       bestCombo: normalized.bestCombo,
-      monthAnswered
+      monthAnswered,
+      yearAnswered
     };
   }
 
   return {
-    FAMILIES, LACO_MIN_ANSWERS,
-    getDefinitions, getDefinition, isCatalogFrame, buildSvg,
+    FAMILIES, LACO_MIN_ANSWERS, ANUAL_TIERS,
+    getDefinitions, getDefinition, isCatalogFrame, buildSvg, buildLegacySvg,
     createProgress, normalizeProgress, recordActiveDay, recordQuizAnswer, longestStreak,
     evaluate, collectNewUnlocks, metricsFromProgress
   };
