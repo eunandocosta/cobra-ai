@@ -359,7 +359,7 @@
   // --- Progresso e regras ---------------------------------------------------
 
   function createProgress() {
-    return { version: 1, unlocked: {}, answeredIds: [], curatedIds: [], neuroIds: [], monthAnswered: {}, activeDays: [], bestStreak: 0, comboRun: 0, bestCombo: 0 };
+    return { version: 1, unlocked: {}, answeredIds: [], curatedIds: [], neuroIds: [], monthAnswered: {}, activeDays: [], bestStreak: 0, comboRun: 0, bestCombo: 0, legacySeen: null, retroGiftShown: false };
   }
   const cleanIds = value => (Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))].slice(-MAX_TRACKED_IDS) : []);
   function normalizeProgress(value) {
@@ -377,7 +377,11 @@
     return {
       version: 1, unlocked, monthAnswered, activeDays: days,
       answeredIds: cleanIds(progress.answeredIds), curatedIds: cleanIds(progress.curatedIds), neuroIds: cleanIds(progress.neuroIds),
-      bestStreak: whole(progress.bestStreak), comboRun: whole(progress.comboRun), bestCombo: whole(progress.bestCombo)
+      bestStreak: whole(progress.bestStreak), comboRun: whole(progress.comboRun), bestCombo: whole(progress.bestCombo),
+      // Louros/Pulso Neon já vistos (null = ainda não inicializado) e se o
+      // presente retroativo já foi apresentado ao estudante.
+      legacySeen: Array.isArray(progress.legacySeen) ? [...new Set(progress.legacySeen.map(String).filter(id => /^(laurel-(?:[1-9]|1[0-2])|neon)$/.test(id)))] : null,
+      retroGiftShown: progress.retroGiftShown === true
     };
   }
   const addId = (list, id) => (list.includes(id) ? list : [...list, id].slice(-MAX_TRACKED_IDS));
@@ -424,8 +428,34 @@
     return progress;
   }
 
+  // Preenche o progresso com o que o estudante já fez antes das molduras:
+  // questões respondidas, da curadoria, de Sistema Nervoso e os eventos datados
+  // de quiz/flashcard guardados pela gamificação ("AAAA-MM-DD:tipo:id").
+  function backfillProgress(value, { answeredIds = [], curatedIds = [], neuroIds = [], eventIds = [], bestCombo = 0 } = {}) {
+    let progress = normalizeProgress(value);
+    answeredIds.forEach(id => { progress.answeredIds = addId(progress.answeredIds, String(id)); });
+    curatedIds.forEach(id => { progress.curatedIds = addId(progress.curatedIds, String(id)); });
+    neuroIds.forEach(id => { progress.neuroIds = addId(progress.neuroIds, String(id)); });
+    eventIds.forEach(eventId => {
+      const match = /^(\d{4}-\d{2}-\d{2}):([a-z]+):(.+)$/.exec(String(eventId));
+      if (!match) return;
+      const [, dayKey, kind, encodedId] = match;
+      progress = recordActiveDay(progress, dayKey);
+      if (kind !== 'quiz') return;
+      let questionId = encodedId;
+      try { questionId = decodeURIComponent(encodedId); } catch (error) {}
+      const month = dayKey.slice(0, 7);
+      progress.monthAnswered[month] = addId(progress.monthAnswered[month] || [], questionId);
+    });
+    progress.bestCombo = Math.max(progress.bestCombo, Math.max(0, Math.floor(Number(bestCombo) || 0)));
+    return progress;
+  }
+
   const formatNumber = number => Number(number).toLocaleString('pt-BR');
-  function evaluate(definition, metrics = {}, progress = createProgress(), now = new Date()) {
+  // Entrega única para quem já usava o app quando as molduras surgiram: os
+  // laços de meses já encerrados deste ano podem ser concedidos pelo histórico.
+  const RETROACTIVE_YEAR = 2026;
+  function evaluate(definition, metrics = {}, progress = createProgress(), now = new Date(), { retroactive = false } = {}) {
     if (!definition) return { unlocked: false, requirement: 'Esta moldura ainda não está disponível.' };
     const alreadyUnlocked = Boolean(progress.unlocked && progress.unlocked[definition.id]);
     const rule = definition.rule;
@@ -477,7 +507,8 @@
         const count = (metrics.monthAnswered && Number(metrics.monthAnswered[monthKey])) || 0;
         const current = now.getFullYear() * 12 + now.getMonth();
         const target = rule.year * 12 + (rule.month - 1);
-        met = current === target && count >= rule.min;
+        const retroEligible = retroactive && rule.year === RETROACTIVE_YEAR && target <= current;
+        met = (current === target || retroEligible) && count >= rule.min;
         requirement = current < target
           ? `Disponível em ${definition.title}: responda ${rule.min} questões durante o mês da campanha (${definition.theme}).`
           : current === target
@@ -493,10 +524,10 @@
 
   // Marca como conquistadas as molduras cujo critério foi atingido agora; a
   // conquista fica gravada mesmo que a métrica caia depois (ex.: XP perdido).
-  function collectNewUnlocks(value, metrics, now = new Date()) {
+  function collectNewUnlocks(value, metrics, now = new Date(), { retroactive = false } = {}) {
     const progress = normalizeProgress(value);
     const newlyUnlocked = getDefinitions({ now, unlockedIds: Object.keys(progress.unlocked) })
-      .filter(definition => !progress.unlocked[definition.id] && evaluate(definition, metrics, progress, now).unlocked)
+      .filter(definition => !progress.unlocked[definition.id] && evaluate(definition, metrics, progress, now, { retroactive }).unlocked)
       .map(definition => definition.id);
     newlyUnlocked.forEach(id => { progress.unlocked[id] = now.getTime(); });
     return { progress, newlyUnlocked };
@@ -529,7 +560,8 @@
   return {
     FAMILIES, LACO_MIN_ANSWERS, ANUAL_TIERS,
     getDefinitions, getDefinition, isCatalogFrame, buildSvg, buildLegacySvg,
-    createProgress, normalizeProgress, recordActiveDay, recordQuizAnswer, longestStreak,
+    RETROACTIVE_YEAR,
+    createProgress, normalizeProgress, recordActiveDay, recordQuizAnswer, longestStreak, backfillProgress,
     evaluate, collectNewUnlocks, metricsFromProgress
   };
 });
