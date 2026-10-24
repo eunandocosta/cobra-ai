@@ -304,8 +304,16 @@
       height: 48px;
       min-width: 0;
       padding: 0;
+      gap: 0;
       justify-content: center;
       font-size: 0;
+    }
+
+    /* Com a barra recolhida o rótulo sai do fluxo: só com font-size: 0 ele
+       continuava ocupando o gap do botão e deslocava o ícone para a esquerda. */
+    .app-root.sidebar-collapsed .sidebar-settings-btn > span:not(.icon),
+    .app-root.sidebar-collapsed .sidebar-support-btn > span:not(.icon) {
+      display: none;
     }
 
     /* Submenu Dropdown de Estudo Ativo na Sidebar */
