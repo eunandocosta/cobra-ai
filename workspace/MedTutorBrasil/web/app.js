@@ -4671,7 +4671,7 @@
       const storageBucket = document.getElementById('firebaseConfigStorageBucket').value.trim();
 
       if (!apiKey || !projectId) {
-        alert('Por favor informe pelo menos a API Key e o Project ID do Firebase.');
+        appAlert('Informe pelo menos a API Key e o Project ID do Firebase.', { title: 'Configuração incompleta' });
         return;
       }
 
@@ -5467,7 +5467,7 @@
 
         const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
         updateUploadProgress('1. Lendo arquivo...', `A leitura de "${fileName}" ultrapassou ${elapsedSeconds}s. Aguardando sua decisão...`, progress);
-        const keepProcessing = window.confirm(`O arquivo "${fileName}" está levando mais tempo que o esperado para ${label}.\n\nDeseja continuar processando?\n\nSe você continuar, o MedTutor aguardará esta mesma leitura terminar, sem limite de tempo.`);
+        const keepProcessing = await appConfirm(`O arquivo "${fileName}" está levando mais tempo que o esperado para ${label}. Se você continuar, o MedTutor aguardará esta mesma leitura terminar, sem limite de tempo.`, { title: 'Continuar processando?', confirmLabel: 'Continuar', cancelLabel: 'Cancelar leitura' });
         if (!keepProcessing) {
           // APIs de leitura de PDF/PPTX nem sempre permitem abortar a tarefa
           // nativa; consome eventual rejeição para não gerar erro não tratado.
@@ -7839,6 +7839,98 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       if (popover) popover.classList.remove('visible');
     }
 
+    // Diálogos no estilo do app no lugar de alert/confirm/prompt nativos. Abrem um
+    // de cada vez (fila), prendem o foco, fecham com Esc e devolvem o foco ao sair.
+    var appDialogQueue = Promise.resolve();
+    function appDialog({ title = '', message = '', confirmLabel = 'OK', cancelLabel = '', tone = 'default', input = null } = {}) {
+      const run = () => new Promise(resolve => {
+        const previousFocus = document.activeElement;
+        const overlay = document.createElement('div');
+        overlay.className = 'app-dialog-overlay';
+        overlay.innerHTML = `<div class="app-dialog${tone === 'danger' ? ' is-danger' : ''}" role="${cancelLabel ? 'alertdialog' : 'dialog'}" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
+          <h3 class="app-dialog-title" id="appDialogTitle"></h3>
+          <p class="app-dialog-message" id="appDialogMessage"></p>
+          ${input ? '<input class="app-dialog-input" type="text" autocomplete="off">' : ''}
+          <div class="app-dialog-actions">${cancelLabel ? '<button type="button" class="app-dialog-button app-dialog-cancel"></button>' : ''}<button type="button" class="app-dialog-button app-dialog-confirm"></button></div>
+        </div>`;
+        const dialog = overlay.firstElementChild;
+        const titleEl = overlay.querySelector('.app-dialog-title');
+        const messageEl = overlay.querySelector('.app-dialog-message');
+        const field = overlay.querySelector('.app-dialog-input');
+        const confirmButton = overlay.querySelector('.app-dialog-confirm');
+        const cancelButton = overlay.querySelector('.app-dialog-cancel');
+        titleEl.textContent = title || (cancelLabel ? 'Confirmar' : 'Aviso');
+        messageEl.textContent = message;
+        messageEl.hidden = !message;
+        if (!message) dialog.removeAttribute('aria-describedby');
+        confirmButton.textContent = confirmLabel;
+        if (cancelButton) cancelButton.textContent = cancelLabel;
+        if (field) {
+          field.value = input.value || '';
+          field.maxLength = input.maxLength || 250;
+          field.setAttribute('aria-label', input.label || title);
+        }
+        const cancelValue = field ? null : (cancelLabel ? false : undefined);
+        const finish = value => {
+          document.removeEventListener('keydown', onKey, true);
+          overlay.remove();
+          if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+          resolve(value);
+        };
+        const accept = () => finish(field ? field.value : (cancelLabel ? true : undefined));
+        const onKey = event => {
+          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(cancelValue); return; }
+          if (event.key === 'Enter' && event.target === field) { event.preventDefault(); accept(); return; }
+          if (event.key === 'Tab') {
+            const focusable = [field, cancelButton, confirmButton].filter(Boolean);
+            const index = focusable.indexOf(document.activeElement);
+            const next = event.shiftKey ? (index <= 0 ? focusable.length - 1 : index - 1) : (index + 1) % focusable.length;
+            event.preventDefault();
+            focusable[next].focus();
+          }
+        };
+        confirmButton.addEventListener('click', accept);
+        cancelButton?.addEventListener('click', () => finish(cancelValue));
+        overlay.addEventListener('click', event => { if (event.target === overlay) finish(cancelValue); });
+        document.addEventListener('keydown', onKey, true);
+        document.body.appendChild(overlay);
+        if (field) { field.focus(); field.select(); }
+        else (tone === 'danger' && cancelButton ? cancelButton : confirmButton).focus();
+      });
+      const result = appDialogQueue.then(run);
+      appDialogQueue = result;
+      return result;
+    }
+    function appAlert(message, { title = 'Aviso', confirmLabel = 'Entendi' } = {}) {
+      return appDialog({ title, message, confirmLabel });
+    }
+    function appConfirm(message, { title = 'Confirmar', confirmLabel = 'Confirmar', cancelLabel = 'Cancelar', tone = 'default' } = {}) {
+      return appDialog({ title, message, confirmLabel, cancelLabel, tone });
+    }
+    function appPrompt(title, value = '', { message = '', confirmLabel = 'Salvar', cancelLabel = 'Cancelar', maxLength = 250 } = {}) {
+      return appDialog({ title, message, confirmLabel, cancelLabel, input: { value, maxLength, label: title } });
+    }
+    // Toast com ação "Desfazer" para exclusões que podem ser revertidas localmente.
+    var appUndoToastTimer = null;
+    function showUndoToast(message, onUndo, durationMs = 6000) {
+      let toast = document.getElementById('appUndoToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'appUndoToast';
+        toast.className = 'app-undo-toast';
+        toast.setAttribute('role', 'status');
+        toast.innerHTML = '<span class="app-undo-toast-message"></span><button type="button" class="app-undo-toast-button">Desfazer</button>';
+        document.body.appendChild(toast);
+      }
+      clearTimeout(appUndoToastTimer);
+      toast.querySelector('.app-undo-toast-message').textContent = message;
+      const button = toast.querySelector('.app-undo-toast-button');
+      const hide = () => { clearTimeout(appUndoToastTimer); toast.classList.remove('visible'); button.onclick = null; };
+      button.onclick = () => { hide(); onUndo(); };
+      toast.classList.add('visible');
+      appUndoToastTimer = setTimeout(hide, durationMs);
+    }
+
     function showToast(msg) {
       const t = document.getElementById('toast');
       document.getElementById('toastMsg').textContent = msg;
@@ -8176,7 +8268,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       };
     }
 
-    function showCardRedundancyDetails() {
+    async function showCardRedundancyDetails() {
       const baseList = getFilteredQuestions();
       const list = getSrsFilteredList(baseList);
       if (list.length === 0) return;
@@ -8193,11 +8285,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       const info = item.redundancyInfo;
       const matchedTitle = info.matchedCard ? (info.matchedCard.question || info.matchedCard.disease || 'Card existente') : 'Outro card';
 
-      const confirmed = confirm(
-        `⚠️ ALERTA DE REDUNDÂNCIA (>50% de similaridade)\n\n` +
-        `Este card possui ${info.percentage}% de similaridade com outro card do seu acervo:\n` +
-        `"${matchedTitle.slice(0, 90)}..."\n\n` +
-        `Deseja excluir este card redundante para manter seu deck enxuto e sem repetições desnecessárias?`
+      const confirmed = await appConfirm(
+        `Este card tem ${info.percentage}% de similaridade com outro card do seu acervo:\n"${matchedTitle.slice(0, 90)}..."\n\nExcluir este card mantém seu deck enxuto e sem repetições.`,
+        { title: 'Card redundante', confirmLabel: 'Excluir card', cancelLabel: 'Manter', tone: 'danger' }
       );
 
       if (confirmed) {
@@ -14667,10 +14757,10 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     // Funções globais de exibição e exportação do Relatório Acadêmico
     let activeAcademicReportData = null;
 
-    function renameReportTitle(reportId = null) {
+    async function renameReportTitle(reportId = null) {
       const report = reportId ? window.chatGeneratedReports?.[reportId] : activeAcademicReportData;
       if (!report) return;
-      const nextTitle = window.prompt('Novo nome do relatório:', report.title || 'Relatório Acadêmico');
+      const nextTitle = await appPrompt('Renomear relatório', report.title || 'Relatório Acadêmico', { maxLength: 140 });
       if (!nextTitle || !nextTitle.trim()) return;
       report.title = nextTitle.trim().slice(0, 140);
 
@@ -17286,15 +17376,30 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       renderSharedStudyItems();
       renderSceBars();
       updateSubjectFilterMenus();
-      showToast('🗑️ Flashcard excluído.');
+      if (realIdx !== -1) showUndoToast('🗑️ Flashcard excluído.', () => restoreDeletedQuestion(item, realIdx));
+      else showToast('🗑️ Flashcard excluído.');
     }
 
-    function confirmDeleteCurrentCard() {
+    function restoreDeletedQuestion(item, index) {
+      if (!item || sharedQuestionsBank.some(q => q.id === item.id)) return;
+      sharedQuestionsBank.splice(Math.min(index, sharedQuestionsBank.length), 0, item);
+      saveSharedQuestionsBank();
+      renderSharedStudyItems();
+      renderSceBars();
+      updateSubjectFilterMenus();
+      showToast('↩️ Pergunta restaurada.');
+    }
+
+    function questionDeletionMessage(item) {
+      const title = String(item.question || item.pergunta || item.flashcard?.front || 'esta pergunta').replace(/\s+/g, ' ').trim();
+      return `Ela sai do Quiz, dos Flashcards e das filas de revisão.\n\n"${title.slice(0, 180)}${title.length > 180 ? '…' : ''}"`;
+    }
+
+    async function confirmDeleteCurrentCard() {
       const list = getSrsFilteredList(getFilteredQuestions());
       const item = list[currentCardIndex];
       if (!item) return;
-      const title = String(item.question || item.pergunta || item.flashcard?.front || 'esta pergunta').replace(/\s+/g, ' ').trim();
-      if (confirm(`Eliminar esta pergunta do Quiz, dos Flashcards e das filas de revisão?\n\n"${title.slice(0, 180)}${title.length > 180 ? '…' : ''}"`)) {
+      if (await appConfirm(questionDeletionMessage(item), { title: 'Excluir esta pergunta?', confirmLabel: 'Excluir', tone: 'danger' })) {
         deleteCurrentCard();
       }
     }
@@ -18855,18 +18960,18 @@ Retorne EXCLUSIVAMENTE um JSON:
     document.addEventListener('click', () => closeQuizActionsMenus());
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closeQuizActionsMenus(); });
 
-    function deleteQuizItem(id) {
+    async function deleteQuizItem(id) {
       const item = sharedQuestionsBank.find(q => q.id === id);
       if (!item) return;
-      const title = String(item.question || item.pergunta || item.flashcard?.front || 'esta pergunta').replace(/\s+/g, ' ').trim();
-      if (!confirm(`Eliminar esta pergunta do Quiz, dos Flashcards e das filas de revisão?\n\n"${title.slice(0, 180)}${title.length > 180 ? '…' : ''}"`)) return;
+      if (!await appConfirm(questionDeletionMessage(item), { title: 'Excluir esta pergunta?', confirmLabel: 'Excluir', tone: 'danger' })) return;
       const idx = sharedQuestionsBank.findIndex(q => q.id === id);
-      if (idx !== -1) sharedQuestionsBank.splice(idx, 1);
+      if (idx === -1) return;
+      sharedQuestionsBank.splice(idx, 1);
       saveSharedQuestionsBank();
       renderSharedStudyItems();
       renderSceBars();
       updateSubjectFilterMenus();
-      showToast('🗑️ Pergunta eliminada do Quiz e dos Flashcards.');
+      showUndoToast('🗑️ Pergunta eliminada do Quiz e dos Flashcards.', () => restoreDeletedQuestion(item, idx));
     }
 
     function toggleStarQuizItem(id) {
@@ -19854,7 +19959,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         }
       }
 
-      const confirmed = confirm(`Deseja realmente excluir o conteúdo "${targetName}"${targetSubject ? ` da matéria "${targetSubject}"` : ''}?\n\nEsta ação removerá o slide, análises pedagógicas e relatórios acadêmicos associados.`);
+      const confirmed = await appConfirm(`"${targetName}"${targetSubject ? ` da matéria "${targetSubject}"` : ''} será removido junto com o slide, as análises pedagógicas e os relatórios acadêmicos associados. Esta ação não pode ser desfeita.`, { title: 'Excluir este conteúdo?', confirmLabel: 'Excluir', tone: 'danger' });
       if (!confirmed) return;
 
       const requestId = AppRequestFeedback.startOperation('Excluindo aula', `Removendo "${targetName}" do dispositivo e da nuvem...`);
@@ -19921,7 +20026,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         showToast('⚠️ Entre novamente na conta Firebase antes de auditar materiais na nuvem.');
         return;
       }
-      const confirmed = confirm('Auditar e remover cópias com conteúdo integral idêntico?\n\nA identificação usa SHA-256 do texto integral, sem depender do nome do arquivo. Os materiais antigos receberão esse marcador durante a auditoria. Novos uploads também guardam o hash do arquivo original. Mesmo arquivo com conteúdo salvo diferente será preservado. Imagens e o relatório mais completo serão mantidos.');
+      const confirmed = await appConfirm('A identificação usa SHA-256 do texto integral, sem depender do nome do arquivo. Os materiais antigos receberão esse marcador durante a auditoria. Novos uploads também guardam o hash do arquivo original. Mesmo arquivo com conteúdo salvo diferente será preservado. Imagens e o relatório mais completo serão mantidos.', { title: 'Remover cópias idênticas?', confirmLabel: 'Auditar e remover', tone: 'danger' });
       if (!confirmed) return;
       showToast('🔎 Auditando cópias idênticas na nuvem...');
       try {
@@ -19953,7 +20058,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         return;
       }
 
-      const confirmed = confirm(`Deseja realmente excluir TODOS os ${mats.length} conteúdos/slides da matéria "${target}"?\n\nEsta ação liberará memória, cache e removerá os relatórios acadêmicos associados.`);
+      const confirmed = await appConfirm(`Todos os ${mats.length} conteúdos/slides da matéria "${target}" e os relatórios acadêmicos associados serão removidos. Esta ação não pode ser desfeita.`, { title: 'Excluir todos os conteúdos?', confirmLabel: `Excluir ${mats.length} conteúdos`, tone: 'danger' });
       if (!confirmed) return;
 
       const requestId = AppRequestFeedback.startOperation('Excluindo aulas', `Removendo ${mats.length} aula(s) de "${target}". Isso pode levar alguns instantes...`);
@@ -20004,7 +20109,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       const target = subjectName || currentStudySubject;
       if (!target) return;
 
-      const confirmed = confirm(`Deseja realmente excluir todos os materiais, flashcards e quizzes da matéria "${target}"?\n\nEsta ação liberará o cache e memória da sessão.`);
+      const confirmed = await appConfirm(`Todos os materiais, flashcards e quizzes da matéria "${target}" serão removidos. Esta ação não pode ser desfeita.`, { title: 'Excluir dados da matéria?', confirmLabel: 'Excluir tudo', tone: 'danger' });
       if (!confirmed) return;
 
       if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterialsBySubject === 'function') {
@@ -26359,7 +26464,7 @@ Para cada material, retorne um objeto no JSON com:
       if (!review || review.loading || !MedTutorFirebaseService.hasAuthenticatedCloudSession(review.uid)) return;
       const changes = review.items.filter(item => item.status === 'ready');
       if (!changes.length) return;
-      const confirmed = window.confirm(`Aplicar ${changes.length} renomeação(ões) analisadas para ${review.period}? Os arquivos, chunks, imagens, relatórios e IDs serão preservados.`);
+      const confirmed = await appConfirm(`Os arquivos, chunks, imagens, relatórios e IDs serão preservados.`, { title: `Aplicar ${changes.length} renomeação(ões) em ${review.period}?`, confirmLabel: 'Aplicar' });
       if (!confirmed) return;
 
       review.loading = true;
@@ -27517,9 +27622,9 @@ Para cada material, retorne um objeto no JSON com:
         : 'Tarefas não concluídas com data passada foram redistribuídas em cada prova. Atividades concluídas foram preservadas.', failures.length ? 'warning' : 'success');
     }
 
-    function removeExamStudyPlan(planId) {
+    async function removeExamStudyPlan(planId) {
       const plan = examStudyPlans.find(item => item.id === planId);
-      if (!plan || !window.confirm(`Remover o planejamento da prova de ${plan.subject || 'disciplina'} em ${formatExamPlanDate(plan.examDate)}?`)) return;
+      if (!plan || !await appConfirm(`Prova de ${plan.subject || 'disciplina'} em ${formatExamPlanDate(plan.examDate)}.`, { title: 'Remover este planejamento?', confirmLabel: 'Remover', tone: 'danger' })) return;
       examStudyPlans = examStudyPlans.filter(item => item.id !== planId);
       if (getExamPlanContextKey(plan) === examPlanSelectedContextKey) examPlanSelectedMaterialIds = new Set();
       if (examPlanDetailsOpenId === plan.id) closeExamPlanDetails();
@@ -28477,10 +28582,10 @@ Para cada material, retorne um objeto no JSON com:
       }
     }
 
-    function promptRenameChatSession(id) {
+    async function promptRenameChatSession(id) {
       const session = chatSessions.find(s => s.id === id);
       if (!session) return;
-      const newTitle = prompt('Digite o novo título da conversa:', session.title);
+      const newTitle = await appPrompt('Renomear conversa', session.title, { maxLength: 120 });
       if (newTitle && newTitle.trim()) {
         session.title = newTitle.trim();
         session.updatedAt = new Date().toISOString();
@@ -31938,20 +32043,18 @@ Linha 04: __________________________________________________
         // --- Feature 1: Confirmação quando a IA detecta questions_only ---
         let resolvedMaterialType = analysisResult.detectedType === 'questions_only' ? 'questions_only' : 'text';
         if (analysisResult.detectedType === 'questions_only') {
-          const userConfirm = window.confirm(
-            `⚠️ A IA detectou que este material contém apenas questões/perguntas, sem texto teórico de aula.\n\n` +
-            `Deseja salvá-lo como "Banco de Questões"?\n\n` +
-            `[OK] Confirmar como Banco de Questões (recebe tag e destaque amarelo-neon)\n` +
-            `[Cancelar] Salvar como Aula Normal`
+          const userConfirm = await appConfirm(
+            'A IA detectou que este material contém apenas questões, sem texto teórico de aula. Como Banco de Questões, ele recebe a tag e o destaque amarelo-neon.',
+            { title: 'Salvar como Banco de Questões?', confirmLabel: 'Banco de Questões', cancelLabel: 'Aula normal' }
           );
           if (!userConfirm) resolvedMaterialType = 'text';
         }
 
         // --- Feature 2: Confirmação / edição do nome sugerido pela IA ---
-        const userChosenName = window.prompt(
-          `✨ Nome sugerido pela IA para este material:\n(Você pode aceitar ou editar antes de salvar)`,
-          suggestedName
-        );
+        const userChosenName = await appPrompt('Nome do material', suggestedName, {
+          message: '✨ Nome sugerido pela IA. Você pode aceitar ou editar antes de salvar.',
+          cancelLabel: 'Usar sugestão'
+        });
         if (userChosenName !== null && userChosenName.trim().length >= 2) {
           suggestedName = userChosenName.trim().slice(0, 250);
         }
@@ -32775,7 +32878,7 @@ ${textSample}
         return;
       }
       const count = toDelete.length;
-      const confirmed = confirm(`Deseja realmente excluir os ${count} materiais selecionados do Drive?`);
+      const confirmed = await appConfirm('Os materiais selecionados serão removidos do Drive. Esta ação não pode ser desfeita.', { title: `Excluir ${count} ${count === 1 ? 'material' : 'materiais'}?`, confirmLabel: 'Excluir', tone: 'danger' });
       if (!confirmed) return;
 
       if (typeof MedTutorFirebaseService !== 'undefined' && typeof MedTutorFirebaseService.deleteMaterial === 'function') {
@@ -33927,11 +34030,7 @@ function escapeHtmlText(str) {
         } else {
           if (this.selectedQuestionIds.size >= 10) {
             const msg = '⚠️ Limite atingido: cada desafio clínico suporta no máximo 10 questões.';
-            if (typeof showToast === 'function') {
-              showToast(msg);
-            } else {
-              alert(msg);
-            }
+            showToast(msg);
             const chkEl = document.getElementById(`chk-q-${id}`);
             if (chkEl) chkEl.checked = false;
             return;
@@ -33987,24 +34086,24 @@ function escapeHtmlText(str) {
         const selectedSubject = (subjectSelect?.value || '').trim();
 
         if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
-          alert('Por favor, informe um endereço de e-mail válido para o colega desafiado.');
+          appAlert('Informe um endereço de e-mail válido para o colega desafiado.', { title: 'E-mail inválido' });
           emailInput?.focus();
           return;
         }
 
         if (!selectedSubject) {
-          alert('Selecione a disciplina da ementa para este desafio.');
+          appAlert('Selecione a disciplina da ementa para este desafio.', { title: 'Falta a disciplina' });
           subjectSelect?.focus();
           return;
         }
 
         if (this.selectedQuestionIds.size === 0) {
-          alert('Selecione pelo menos uma questão dominada em Flashcard para compor o desafio.');
+          appAlert('Selecione pelo menos uma questão dominada em Flashcard para compor o desafio.', { title: 'Nenhuma questão selecionada' });
           return;
         }
 
         if (this.selectedQuestionIds.size > 10) {
-          alert('⚠️ O limite máximo por desafio é de 10 questões. Por favor, desmarque algumas questões.');
+          appAlert('Cada desafio aceita no máximo 10 questões. Desmarque algumas para continuar.', { title: 'Limite de questões' });
           return;
         }
 
@@ -34069,11 +34168,7 @@ function escapeHtmlText(str) {
           receivedList.unshift(challengeDoc);
           localStorage.setItem('medtutor_challenges_received', JSON.stringify(receivedList));
 
-          if (typeof showToast === 'function') {
-            showToast(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetEmail}!`);
-          } else {
-            alert(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetEmail}!`);
-          }
+          showToast(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetEmail}!`);
 
           // Reseta formulário
           if (emailInput) emailInput.value = '';
@@ -34083,7 +34178,7 @@ function escapeHtmlText(str) {
           this.switchSubtab('sent');
         } catch (err) {
           console.error('[Challenges] Erro ao enviar desafio:', err);
-          alert('Houve um erro ao registrar o desafio na nuvem: ' + (err.message || err));
+          appAlert(`O desafio não foi registrado na nuvem. Verifique sua conexão e tente enviar de novo.\n\nDetalhe: ${err.message || err}`, { title: 'Não foi possível enviar' });
         } finally {
           if (btnSend) {
             btnSend.disabled = false;
@@ -34305,7 +34400,7 @@ function escapeHtmlText(str) {
         }
 
         if (!challenge || !Array.isArray(challenge.questions) || challenge.questions.length === 0) {
-          alert('Não foi possível carregar as questões deste desafio.');
+          appAlert('As questões deste desafio não puderam ser carregadas. Tente abrir de novo em instantes.', { title: 'Desafio indisponível' });
           return;
         }
 
@@ -34836,11 +34931,7 @@ function escapeHtmlText(str) {
         if (typeof saveSharedQuestionsBank === 'function') saveSharedQuestionsBank();
         if (typeof updateCardDisplay === 'function') updateCardDisplay();
 
-        if (typeof showToast === 'function') {
-          showToast(`✅ Questão adicionada aos seus Flashcards de "${newCard.subject}"!`);
-        } else {
-          alert(`✅ Questão adicionada aos seus Flashcards de "${newCard.subject}"!`);
-        }
+        showToast(`✅ Questão adicionada aos seus Flashcards de "${newCard.subject}"!`);
       }
     };
 
@@ -35520,11 +35611,7 @@ function escapeHtmlText(str) {
         } else {
           if (this.directSelectedQuestionIds.size >= 10) {
             const msg = '⚠️ Limite atingido: cada desafio clínico suporta no máximo 10 questões.';
-            if (typeof showToast === 'function') {
-              showToast(msg);
-            } else {
-              alert(msg);
-            }
+            showToast(msg);
             const chkEl = document.getElementById(`chk-dq-${id}`);
             if (chkEl) chkEl.checked = false;
             return;
@@ -35575,7 +35662,7 @@ function escapeHtmlText(str) {
 
       async submitDirectChallenge() {
         if (!this.activeDirectTarget.email) {
-          alert('Colega destinatário não identificado.');
+          appAlert('Não identificamos o colega destinatário. Abra o perfil do colega e tente de novo.', { title: 'Colega não identificado' });
           return;
         }
 
@@ -35583,18 +35670,18 @@ function escapeHtmlText(str) {
         const selectedDiscipline = (discSelect?.value || '').trim();
 
         if (!selectedDiscipline) {
-          alert('Selecione a disciplina da ementa para este desafio.');
+          appAlert('Selecione a disciplina da ementa para este desafio.', { title: 'Falta a disciplina' });
           discSelect?.focus();
           return;
         }
 
         if (this.directSelectedQuestionIds.size === 0) {
-          alert('Selecione pelo menos uma questão dominada em Flashcard para compor o duelo.');
+          appAlert('Selecione pelo menos uma questão dominada em Flashcard para compor o duelo.', { title: 'Nenhuma questão selecionada' });
           return;
         }
 
         if (this.directSelectedQuestionIds.size > 10) {
-          alert('⚠️ O limite máximo por desafio é de 10 questões. Por favor, desmarque algumas questões.');
+          appAlert('Cada desafio aceita no máximo 10 questões. Desmarque algumas para continuar.', { title: 'Limite de questões' });
           return;
         }
 
@@ -35660,11 +35747,7 @@ function escapeHtmlText(str) {
           this.closeDirectChallenge();
           this.closeModal();
 
-          if (typeof showToast === 'function') {
-            showToast(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetName}!`);
-          } else {
-            alert(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetName}!`);
-          }
+          showToast(`⚔️ Desafio com ${selectedQuestions.length} questões enviado para ${targetName}!`);
 
           // Se estiver na aba desafios, atualiza
           if (typeof MedTutorChallengesService !== 'undefined' && MedTutorChallengesService.initChallengesTab) {
@@ -35672,7 +35755,7 @@ function escapeHtmlText(str) {
           }
         } catch (err) {
           console.error('[Classmates] Erro ao enviar desafio direto:', err);
-          alert('Houve um erro ao registrar o desafio: ' + (err.message || err));
+          appAlert(`O desafio não foi registrado. Verifique sua conexão e tente enviar de novo.\n\nDetalhe: ${err.message || err}`, { title: 'Não foi possível enviar' });
         } finally {
           if (btnSend) {
             btnSend.disabled = false;
