@@ -3558,6 +3558,7 @@
         }
         this.state = MedTutorGamificationRules.normalizeState(result.state);
         this.saveLocalState();
+        recordFrameCatalogActiveDay(normalized.dayKey);
         this.render({ transitionFromState: previousState });
         if (!quiet && !result.duplicate) this.showReward(result.award, normalized, previousState.totalXp);
         return result;
@@ -3810,6 +3811,10 @@
       return counts;
     }
     function gamificationFrameRequirement(frameId, counts, studySeconds) {
+      if (typeof MedTutorFrameCatalog !== 'undefined' && MedTutorFrameCatalog.isCatalogFrame(frameId)) {
+        const progress = readFrameCatalogProgress();
+        return MedTutorFrameCatalog.evaluate(MedTutorFrameCatalog.getDefinition(frameId), getFrameCatalogMetrics(progress), progress);
+      }
       if (frameId === 'neon') return {
         unlocked: Number(studySeconds) >= 3600,
         requirement: 'Acumule 1 hora de prática ativa nas áreas de estudo. O tempo é registrado com a página visível e interação recente.'
@@ -3825,6 +3830,7 @@
       };
     }
     function buildGamificationFrameSvg(frameId) {
+      if (typeof MedTutorFrameCatalog !== 'undefined' && MedTutorFrameCatalog.isCatalogFrame(frameId)) return MedTutorFrameCatalog.buildSvg(frameId);
       const isNeon = frameId === 'neon';
       if (isNeon) return '<svg class="profile-frame-svg" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="64" fill="none" stroke="var(--frame-main)" stroke-width="3"/><circle cx="80" cy="80" r="71" fill="none" stroke="var(--frame-main)" stroke-width="1.5" opacity=".35"/><path d="M80 8v15m0 114v15M8 80h15m114 0h15M28 28l11 11m82 82 11 11m0-104-11 11m-82 82-11 11" fill="none" stroke="var(--frame-light)" stroke-width="3" stroke-linecap="round"/><circle cx="80" cy="15" r="4" fill="var(--frame-light)"/><circle cx="145" cy="80" r="4" fill="var(--frame-light)"/><circle cx="80" cy="145" r="4" fill="var(--frame-light)"/><circle cx="15" cy="80" r="4" fill="var(--frame-light)"/></svg>';
       const leaves = Array.from({ length: 7 }, (_, index) => {
@@ -3855,14 +3861,100 @@
       avatar.innerHTML = `${frameId ? buildGamificationFrameSvg(frameId) : ''}<span class="profile-frame-initials">${initials}</span>`;
     }
     function getGamificationFrameDefinitions() {
+      const catalog = typeof MedTutorFrameCatalog !== 'undefined'
+        ? MedTutorFrameCatalog.getDefinitions({ unlockedIds: Object.keys(readFrameCatalogProgress().unlocked) }).map(item => ({ ...item, type: 'catalog' }))
+        : [];
       return [
-        ...gamificationLaurelFrames.map(item => ({ id: gamificationFrameId(item.period), type: 'laurel', period: item.period, title: `Louro acadêmico · ${item.period}º período`, colors: item.colors })),
-        { id: 'neon', type: 'neon', title: 'Pulso Neon', colors: gamificationNeonFrame.colors }
+        ...gamificationLaurelFrames.map(item => ({ id: gamificationFrameId(item.period), type: 'laurel', family: 'louros', period: item.period, title: `Louro acadêmico · ${item.period}º período`, colors: item.colors })),
+        { id: 'neon', type: 'neon', family: 'louros', title: 'Pulso Neon', colors: gamificationNeonFrame.colors },
+        ...catalog
       ];
+    }
+
+    // Progresso das molduras do catálogo (gamification-frames.js). Fica no
+    // navegador; as molduras conquistadas também vão para o perfil, para
+    // acompanharem o estudante em outros dispositivos.
+    let frameCatalogProfileSaveTimer = null;
+    function frameCatalogProgressKey() { return `medtutor_frame_progress_v1_${gamificationUserId()}`; }
+    function readFrameCatalogProgress() {
+      if (typeof MedTutorFrameCatalog === 'undefined') return { unlocked: {} };
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem(frameCatalogProgressKey()) || 'null'); } catch (error) { stored = null; }
+      const progress = MedTutorFrameCatalog.normalizeProgress(stored);
+      const fromProfile = MedTutorAuthService?.userProfile?.molduras_conquistadas;
+      if (Array.isArray(fromProfile)) {
+        fromProfile.forEach(id => { if (MedTutorFrameCatalog.isCatalogFrame(id) && !progress.unlocked[id]) progress.unlocked[id] = 1; });
+      }
+      return progress;
+    }
+    function writeFrameCatalogProgress(progress) {
+      try { localStorage.setItem(frameCatalogProgressKey(), JSON.stringify(progress)); } catch (error) {}
+    }
+    function isNeuroQuestion(item) {
+      return /nervos|neuro/i.test([item?.subject, item?.disciplina, item?.topic, item?.period].filter(Boolean).join(' '));
+    }
+    function getFrameCatalogMetrics(progress = readFrameCatalogProgress()) {
+      const answered = (Array.isArray(sharedQuestionsBank) ? sharedQuestionsBank : []).filter(question => {
+        const stats = question?.quizStats || {};
+        return question?.id && (Number(stats.attempts) > 0 || stats.answered === true || (stats.lastStatus && stats.lastStatus !== 'unanswered'));
+      });
+      const profile = MedTutorAuthService?.userProfile || {};
+      return MedTutorFrameCatalog.metricsFromProgress(progress, {
+        level: MedTutorGamificationRules.getLevel(MedTutorGamification.state.totalXp).level,
+        challengerVotes: Math.max(0, Number(profile.challengerThumbsUp) || 0),
+        answered: new Set(answered.map(question => String(question.id))).size,
+        neuroAnswered: new Set(answered.filter(isNeuroQuestion).map(question => String(question.id))).size
+      });
+    }
+    function saveFrameCatalogUnlocksToProfile(progress) {
+      const profile = MedTutorAuthService?.userProfile;
+      if (!profile || !MedTutorAuthService?.currentUser?.uid) return;
+      clearTimeout(frameCatalogProfileSaveTimer);
+      frameCatalogProfileSaveTimer = setTimeout(() => {
+        const ids = Object.keys(progress.unlocked).sort();
+        profile.molduras_conquistadas = ids;
+        MedTutorAuthService.userProfile = profile;
+        MedTutorFirebaseService.saveUserProfile({ ...profile, molduras_conquistadas: ids }).catch(error => console.warn('[Molduras] Não foi possível sincronizar as conquistas:', error));
+      }, 1500);
+    }
+    function syncFrameCatalogUnlocks({ announce = true } = {}) {
+      if (typeof MedTutorFrameCatalog === 'undefined') return [];
+      const current = readFrameCatalogProgress();
+      const { progress, newlyUnlocked } = MedTutorFrameCatalog.collectNewUnlocks(current, getFrameCatalogMetrics(current));
+      const signedIn = Boolean(MedTutorAuthService?.currentUser?.uid && MedTutorAuthService?.userProfile);
+      const missingInProfile = signedIn && Object.keys(progress.unlocked).some(id => !(MedTutorAuthService.userProfile.molduras_conquistadas || []).includes(id));
+      if (!newlyUnlocked.length && !missingInProfile) return [];
+      writeFrameCatalogProgress(progress);
+      saveFrameCatalogUnlocksToProfile(progress);
+      if (announce && newlyUnlocked.length && typeof showToast === 'function') {
+        const first = MedTutorFrameCatalog.getDefinition(newlyUnlocked[0]);
+        showToast(newlyUnlocked.length === 1
+          ? `🏅 Nova moldura desbloqueada: ${first?.title || 'veja na Coleção'}!`
+          : `🏅 ${newlyUnlocked.length} novas molduras desbloqueadas! Veja na Coleção.`);
+      }
+      return newlyUnlocked;
+    }
+    function recordFrameCatalogQuizAnswer(item, isCorrect) {
+      if (typeof MedTutorFrameCatalog === 'undefined' || !item?.id) return;
+      const progress = MedTutorFrameCatalog.recordQuizAnswer(readFrameCatalogProgress(), {
+        questionId: item.id,
+        correct: Boolean(isCorrect),
+        curated: Boolean(item.curated) || isInstitutionCuratedQuestion(item.id),
+        neuro: isNeuroQuestion(item),
+        dayKey: getLocalDateKey()
+      });
+      writeFrameCatalogProgress(progress);
+      syncFrameCatalogUnlocks();
+    }
+    function recordFrameCatalogActiveDay(dayKey) {
+      if (typeof MedTutorFrameCatalog === 'undefined') return;
+      writeFrameCatalogProgress(MedTutorFrameCatalog.recordActiveDay(readFrameCatalogProgress(), dayKey));
+      syncFrameCatalogUnlocks();
     }
     function renderGamificationProfile() {
       const profileView = document.getElementById('gamificationProfileView');
       if (!profileView) return;
+      syncFrameCatalogUnlocks();
       const { name, initials, course } = getGamificationProfileInfo();
       const nameEl = document.getElementById('gamificationProfileName');
       const courseEl = document.getElementById('gamificationProfileCourse');
@@ -3960,12 +4052,18 @@
       const counts = gamificationFrameCountsCache || (gamificationFrameCountsCache = getGamificationFrameCounts());
       const definitions = getGamificationFrameDefinitions();
       const equipped = readEquippedGamificationFrame();
+      const familyTitles = { louros: 'Louros acadêmicos e Pulso Neon' };
+      (typeof MedTutorFrameCatalog !== 'undefined' ? MedTutorFrameCatalog.FAMILIES : []).forEach(family => { familyTitles[family.id] = family.title; });
+      let lastFamily = null;
       grid.innerHTML = definitions.map(frame => {
+        const family = frame.family || 'louros';
+        const heading = family !== lastFamily ? `<h4 class="gamification-frame-family">${escapeHtml(familyTitles[family] || '')}</h4>` : '';
+        lastFamily = family;
         const state = gamificationFrameRequirement(frame.id, counts, MedTutorGamification.state.totalStudySeconds);
         const label = state.unlocked ? frame.title : 'Bloqueado';
         const selected = state.unlocked && equipped === frame.id;
         const accessible = state.unlocked ? `Selecionar moldura ${frame.title}${selected ? ', equipada' : ''}` : `Moldura bloqueada. ${state.requirement}`;
-        return `<button type="button" class="gamification-frame-option${selected ? ' is-selected' : ''}" data-frame-id="${frame.id}" aria-label="${accessible}" aria-disabled="${state.unlocked ? 'false' : 'true'}" aria-pressed="${selected ? 'true' : 'false'}">${frameOptionMarkup(frame.id, frame.colors, initials, true)}<span class="${state.unlocked ? 'frame-option-name' : 'frame-option-lock'}">${label}</span><span class="gamification-frame-tooltip" role="tooltip">${state.requirement}</span></button>`;
+        return `${heading}<button type="button" class="gamification-frame-option${selected ? ' is-selected' : ''}" data-frame-id="${frame.id}" aria-label="${accessible}" aria-disabled="${state.unlocked ? 'false' : 'true'}" aria-pressed="${selected ? 'true' : 'false'}">${frameOptionMarkup(frame.id, frame.colors, initials, true)}<span class="${state.unlocked ? 'frame-option-name' : 'frame-option-lock'}">${label}</span><span class="gamification-frame-tooltip" role="tooltip">${state.requirement}</span></button>`;
       }).join('');
       grid.querySelectorAll('.gamification-frame-option').forEach(button => {
         const showLater = () => {
@@ -18116,6 +18214,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       item.quizStats.lastChoice = optIdx;
       item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
       saveSharedQuestionsBank();
+      recordFrameCatalogQuizAnswer(item, isCorrect);
       refreshGamificationFramesAfterQuiz();
       renderSceBars();
       awardQuizGamification(item, { outcome: isCorrect ? 'correct' : 'incorrect' });

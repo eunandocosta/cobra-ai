@@ -6952,6 +6952,49 @@
     .gamification-collection-heading h3 { margin:0; font-size:17px; }
     .gamification-collection-heading p { margin:4px 0 0; color:var(--text-secondary); font-size:12px; }
     .gamification-frame-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+    .gamification-frame-family { grid-column:1 / -1; margin:10px 2px 0; color:var(--text-secondary); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .gamification-frame-family:first-child { margin-top:0; }
+
+    /* Molduras do catálogo (gamification-frames.js): SVG animado só com CSS. */
+    .profile-frame-svg text { font-family: inherit; }
+    /* No perfil, os ornamentos das molduras do catálogo chegam à borda do
+       desenho; ocupar só a área do avatar evita cobrir o nome e as abas. */
+    .gamification-profile-avatar .profile-frame-svg.pf-catalog { inset: 0; width: 100%; height: 100%; }
+    .profile-frame-svg .pf-pulse { stroke-dasharray:7 93; animation:pfPulse 2.4s linear infinite; }
+    .profile-frame-svg .pf-beat,
+    .profile-frame-svg .pf-breathe,
+    .profile-frame-svg .pf-twinkle,
+    .profile-frame-svg .pf-spark { transform-box:fill-box; transform-origin:center; }
+    .profile-frame-svg .pf-beat { animation:pfBeat 1.2s ease-in-out infinite; }
+    .profile-frame-svg .pf-breathe { animation:pfBreathe 2.4s ease-in-out infinite; }
+    .profile-frame-svg .pf-twinkle { animation:pfTwinkle 1.6s ease-in-out infinite; }
+    .profile-frame-svg .pf-spark { animation:pfSpark 1.2s ease-in-out infinite; }
+    .profile-frame-svg .pf-spin,
+    .profile-frame-svg .pf-spin-slow { transform-origin:80px 80px; animation:pfSpin 28.8s linear infinite; }
+    .profile-frame-svg .pf-spin-slow { animation-duration:57.6s; }
+    .profile-frame-svg .pf-flicker { transform-box:fill-box; transform-origin:50% 100%; animation:pfFlicker .8s ease-in-out infinite alternate; }
+    .profile-frame-svg .pf-flash { animation:pfFlash 1.2s ease-in-out infinite; }
+    .profile-frame-svg .pf-sway { transform-box:fill-box; transform-origin:50% 0; animation:pfSway 2.4s ease-in-out infinite; }
+    .profile-frame-svg.pf-glow { animation:pfGlow 2.4s ease-in-out infinite; }
+    .profile-frame-svg.pf-iridescent { animation:pfIridescent 4.8s linear infinite; }
+    @keyframes pfPulse { from { stroke-dashoffset:52; } to { stroke-dashoffset:-48; } }
+    @keyframes pfBeat { 0%,60%,100% { transform:scale(1); } 14% { transform:scale(1.18); } 28% { transform:scale(.97); } 42% { transform:scale(1.1); } }
+    @keyframes pfBreathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.08); } }
+    @keyframes pfTwinkle { 50% { opacity:.35; transform:scale(.7); } }
+    @keyframes pfSpark { 0%,100% { transform:scale(1); opacity:.75; } 18% { transform:scale(1.7); opacity:1; } }
+    @keyframes pfSpin { to { transform:rotate(360deg); } }
+    @keyframes pfFlicker { 0% { transform:scale(1,1) skewX(0); } 50% { transform:scale(.92,1.09) skewX(3deg); } 100% { transform:scale(1.05,.94) skewX(-3deg); } }
+    @keyframes pfFlash { 0%,100% { opacity:1; } 45% { opacity:.2; } 55% { opacity:1; } }
+    @keyframes pfSway { 0%,100% { transform:rotate(-6deg); } 50% { transform:rotate(6deg); } }
+    @keyframes pfGlow { 0%,100% { filter:drop-shadow(0 0 3px var(--frame-main)); } 50% { filter:drop-shadow(0 0 10px var(--frame-main)); } }
+    @keyframes pfIridescent { from { filter:drop-shadow(0 0 8px var(--frame-main)) hue-rotate(0deg); } to { filter:drop-shadow(0 0 8px var(--frame-main)) hue-rotate(360deg); } }
+    /* Molduras bloqueadas ficam paradas na coleção: menos distração e menos custo de animação. */
+    .gamification-frame-option[aria-disabled="true"] .profile-frame-svg,
+    .gamification-frame-option[aria-disabled="true"] .profile-frame-svg * { animation:none !important; }
+    @media (prefers-reduced-motion: reduce) {
+      .profile-frame-svg,
+      .profile-frame-svg * { animation:none !important; }
+    }
     .gamification-frame-option { position:relative; min-width:0; min-height:128px; display:grid; justify-items:center; align-content:center; gap:7px; padding:11px 7px; border:1px solid var(--border); border-radius:14px; background:var(--bg-surface); color:var(--text-primary); font:inherit; transition:border-color .2s ease, background .2s ease, transform .2s ease; }
     .gamification-frame-option:not(:disabled):hover { transform:translateY(-2px); border-color:var(--border-accent); background:var(--neon-subtle); }
     .gamification-frame-option.is-selected { border-color:var(--neon); box-shadow:inset 0 0 0 1px var(--neon); }
