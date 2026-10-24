@@ -1,0 +1,385 @@
+(function attachMedTutorFrameCatalog(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.MedTutorFrameCatalog = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function createMedTutorFrameCatalog() {
+  // Catálogo das molduras de perfil conquistáveis. Cada moldura é SVG puro e
+  // anima apenas por classes CSS (pf-*) definidas em styles.css; nenhuma
+  // depende de JavaScript para se mover.
+  const MAX_TRACKED_IDS = 1200;
+  const MAX_TRACKED_DAYS = 400;
+
+  const f2 = value => Number(value).toFixed(2);
+  const polar = (radius, degrees) => [
+    80 + radius * Math.cos((degrees - 90) * Math.PI / 180),
+    80 + radius * Math.sin((degrees - 90) * Math.PI / 180)
+  ];
+  const ring = (radius, stroke, width = 3, extra = '') =>
+    `<circle cx="80" cy="80" r="${radius}" fill="none" stroke="${stroke}" stroke-width="${width}" ${extra}/>`;
+  const gem = (c, angle, radius = 74, size = 6) => {
+    const [x, y] = polar(radius, angle);
+    return `<path class="pf-twinkle" d="M${f2(x)} ${f2(y - size)} l${size * 0.75} ${size} -${size * 0.75} ${size} -${size * 0.75} -${size}z" fill="${c[0]}" stroke="${c[1]}" stroke-width="1"/>`;
+  };
+
+  // --- Desenhos -------------------------------------------------------------
+
+  function ecgRingPath(radius = 66) {
+    const bump = (u, start, end, height) => (u > start && u < end ? height * Math.sin(Math.PI * (u - start) / (end - start)) : 0);
+    const offset = u => bump(u, -34, -22, 4) + bump(u, -8, -4, -3) + bump(u, -4, 1.5, 15) + bump(u, 1.5, 6, -7) + bump(u, 14, 30, 6);
+    const points = [];
+    for (let degree = -180; degree < 180; degree += (Math.abs(degree) < 40 ? 0.5 : 4)) points.push(polar(radius + offset(degree), degree));
+    return 'M' + points.map(point => point.map(f2).join(' ')).join(' L') + 'Z';
+  }
+  const ECG_PATH = ecgRingPath();
+
+  function asclepioMedallion(c) {
+    return `<g class="pf-breathe"><circle cx="80" cy="14" r="13.5" fill="${c[2]}" stroke="${c[0]}" stroke-width="2"/>` +
+      `<line x1="80" y1="4" x2="80" y2="25" stroke="${c[1]}" stroke-width="2.6" stroke-linecap="round"/><circle cx="80" cy="4" r="1.9" fill="${c[1]}"/>` +
+      `<path d="M74.5 23 C86 21.5 86 18 80 16.5 C74 15 74 11.5 80 10 C85 8.8 85 6.6 82.6 5.6" fill="none" stroke="${c[0]}" stroke-width="2.1" stroke-linecap="round"/>` +
+      `<ellipse cx="83.6" cy="5.2" rx="2" ry="1.4" fill="${c[0]}" transform="rotate(-25 83.6 5.2)"/></g>`;
+  }
+  const asclepioWings = c => [-1, 1].map(side => `<g transform="translate(${80 + side * 13} 15) scale(${side} 1)"><path d="M0 0 C6 -6 14 -8 22 -6 C16 -3 10 -1 0 3Z" fill="${c[0]}" stroke="${c[1]}" stroke-width=".8"/><path d="M2 3 C8 1 14 1 19 2 C13 4 8 6 1 6Z" fill="${c[1]}" opacity=".85"/></g>`).join('');
+  const asclepioLaurel = (c, pairs) => Array.from({ length: pairs }, (_, index) => [150 + index * 12, 210 - index * 12].map(angle => {
+    const [x, y] = polar(70, angle);
+    return `<ellipse cx="${f2(x)}" cy="${f2(y)}" rx="7" ry="3" fill="${c[2]}" stroke="${c[0]}" stroke-width=".9" transform="rotate(${angle + 90} ${f2(x)} ${f2(y)})"/>`;
+  }).join('')).join('');
+  const asclepioRays = c => '<g class="pf-spin-slow">' + Array.from({ length: 24 }, (_, index) => {
+    const angle = index * 15 + 7.5;
+    const [x1, y1] = polar(76, angle);
+    const [x2, y2] = polar(index % 2 ? 79 : 82, angle);
+    return `<line x1="${f2(x1)}" y1="${f2(y1)}" x2="${f2(x2)}" y2="${f2(y2)}" stroke="${c[1]}" stroke-width="1.2" opacity=".75"/>`;
+  }).join('') + '</g>';
+  const asclepioOrbit = c => '<g class="pf-spin">' + [30, 210].map(angle => {
+    const [x, y] = polar(78, angle);
+    return `<path d="M${f2(x)} ${f2(y - 5)} L${f2(x + 1.3)} ${f2(y - 1.3)} L${f2(x + 5)} ${f2(y)} L${f2(x + 1.3)} ${f2(y + 1.3)} L${f2(x)} ${f2(y + 5)} L${f2(x - 1.3)} ${f2(y + 1.3)} L${f2(x - 5)} ${f2(y)} L${f2(x - 1.3)} ${f2(y - 1.3)}Z" fill="${c[1]}"/>`;
+  }).join('') + '</g>';
+  function asclepioSvg(c, tier) {
+    return (tier >= 16 ? asclepioRays(c) : '') +
+      (tier >= 3 ? ring(69, c[2], 4) : '') + ring(64, c[0], 3) +
+      (tier >= 5 ? ring(73, c[1], 1, 'opacity=".8" stroke-dasharray="10 4 2 4" class="pf-spin"') : '') +
+      (tier >= 9 ? asclepioLaurel(c, tier >= 13 ? 6 : 4) : '') +
+      (tier >= 7 ? gem(c, 90) + gem(c, 270) : '') +
+      (tier >= 12 ? gem(c, 135, 73, 4.5) + gem(c, 225, 73, 4.5) : '') +
+      (tier >= 11 ? asclepioWings(c) : '') + asclepioMedallion(c) +
+      (tier >= 18 ? asclepioOrbit(c) : '');
+  }
+
+  function maratonistaSvg(c, tier) {
+    return ring(66, c[0], 3) + '<g class="pf-spin-slow">' + Array.from({ length: 60 }, (_, index) => {
+      const big = index % 5 === 0;
+      const [x1, y1] = polar(70, index * 6);
+      const [x2, y2] = polar(big ? 77 : 74, index * 6);
+      return `<line x1="${f2(x1)}" y1="${f2(y1)}" x2="${f2(x2)}" y2="${f2(y2)}" stroke="${big ? c[1] : c[0]}" stroke-width="${big ? 2.2 : 1}" opacity="${big ? 1 : 0.7}"/>`;
+    }).join('') + '</g>' +
+      `<g transform="translate(80 146)"><rect x="-10" y="-13" width="20" height="26" rx="2" fill="${c[2]}" stroke="${c[1]}" stroke-width="1.5"/><path d="M-6 -9 H6 L1 0 L6 9 H-6 L-1 0Z" fill="${c[0]}"/></g>` +
+      (tier >= 3 ? [70, 290].map(angle => gem(c, angle, 80, 6)).join('') : '');
+  }
+
+  function curadoriaSvg(c, tier) {
+    return '<g class="pf-spin-slow">' + Array.from({ length: 24 }, (_, index) => {
+      const [x, y] = polar(69, index * 15);
+      return `<circle cx="${f2(x)}" cy="${f2(y)}" r="7" fill="${c[2]}" stroke="${c[0]}" stroke-width="${tier >= 4 ? 1 : 0}"/>`;
+    }).join('') + '</g>' + ring(64, c[0], 3) +
+      `<path d="M66 140 L60 158 L70 154 L74 162 L78 144 M94 140 L100 158 L90 154 L86 162 L82 144" fill="${c[0]}" stroke="${c[1]}" stroke-width="1"/>` +
+      `<g class="pf-beat"><circle cx="80" cy="12" r="9" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.5"/><path d="M75 12 l3.5 3.5 6.5 -7" fill="none" stroke="${c[2]}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></g>` +
+      (tier >= 3 ? [62, 298].map(angle => gem(c, angle, 80, 6)).join('') : '');
+  }
+
+  const RIBBON_PATH = 'M80 128 C66 112 72 98 80 106 C88 98 94 112 80 128 L68 156 M80 128 L92 156';
+  function lacoSvg(c, year) {
+    return ring(66, c[0], 3) + ring(72, c[1], 1, 'stroke-dasharray="1 4" class="pf-spin"') +
+      `<rect x="61" y="3" width="38" height="15" rx="7.5" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.2"/>` +
+      `<text x="80" y="14.2" text-anchor="middle" font-family="inherit" font-size="10.5" font-weight="800" fill="${c[2]}">${Number(year)}</text>` +
+      `<g transform="translate(140 136) rotate(-18)"><g class="pf-sway"><g transform="scale(.6) translate(-80 -128)">` +
+      `<path d="${RIBBON_PATH}" fill="none" stroke="${c[2]}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="${RIBBON_PATH}" fill="none" stroke="${c[0]}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g></g></g>`;
+  }
+
+  const singleSvgs = {
+    ecg: c => `<path d="${ECG_PATH}" fill="none" stroke="${c[0]}" stroke-width="3" stroke-linejoin="round"/>` + ring(73, c[2], 1.5, 'stroke-dasharray="2 5"') +
+      `<path class="pf-pulse" pathLength="100" d="${ECG_PATH}" fill="none" stroke="${c[1]}" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>`,
+    chama: c => ring(65, c[0], 3) + ring(71, c[2], 1.5) + [[80, 0, 1.15], [55, -14, 0.8], [105, 14, 0.8]].map(([x, rotation, scale], index) =>
+      `<g transform="translate(${x} 146) rotate(${rotation}) scale(${scale})"><g class="pf-flicker" style="animation-delay:${(index * -0.27).toFixed(2)}s"><path d="M0 12 C-14 6 -14 -10 -4 -22 C-4 -12 2 -10 4 -16 C14 -6 14 8 0 12Z" fill="${c[0]}"/><path d="M0 9 C-6 6 -6 -2 -1 -8 C0 -3 3 -2 4 -5 C8 0 7 7 0 9Z" fill="${c[1]}"/></g></g>`).join(''),
+    raio: c => ring(66, c[0], 2.5) + ring(66, c[2], 7, 'opacity=".35"') + [45, 135, 225, 315].map(angle => {
+      const [x, y] = polar(71, angle);
+      return `<path class="pf-flash" style="animation-delay:${(angle / 360 * 1.2).toFixed(2)}s" transform="translate(${f2(x)} ${f2(y)}) rotate(${angle}) scale(1.5)" d="M0 -10 L-5 1 H0 L-3 10 L5 -2 H0 L3 -10Z" fill="${c[0]}" stroke="${c[2]}" stroke-width=".8"/>`;
+    }).join(''),
+    desafiador: c => ring(65, c[0], 3) + ring(71, c[1], 1, 'stroke-dasharray="3 7" class="pf-spin" opacity=".7"') +
+      `<g class="pf-beat"><g transform="translate(80 150) scale(.7) translate(-80 -140)"><line x1="56" y1="118" x2="104" y2="160" stroke="${c[1]}" stroke-width="3" stroke-linecap="round"/><line x1="104" y1="118" x2="56" y2="160" stroke="${c[1]}" stroke-width="3" stroke-linecap="round"/><path d="M66 126 H94 V137 C94 146 87 151 80 155 C73 151 66 146 66 137Z" fill="${c[0]}" stroke="${c[1]}" stroke-width="1.8"/><path d="M80 130 V150 M71 138 H89" stroke="${c[2]}" stroke-width="2"/></g></g>`,
+    sinapse: c => {
+      const points = Array.from({ length: 12 }, (_, index) => polar(index % 2 ? 66 : 72, index * 30));
+      return `<path d="M${points.map(point => point.map(f2).join(' ')).join(' L')}Z" fill="none" stroke="${c[0]}" stroke-width="1.6"/>` + ring(62, c[2], 1.5) +
+        points.map(([x, y], index) => {
+          const [bx, by] = polar(index % 2 ? 76 : 80, index * 30 + 8);
+          return `<line x1="${f2(x)}" y1="${f2(y)}" x2="${f2(bx)}" y2="${f2(by)}" stroke="${c[0]}" stroke-width="1.2"/><circle class="pf-spark" style="animation-delay:${(index * 0.1).toFixed(1)}s" cx="${f2(x)}" cy="${f2(y)}" r="${index % 3 === 0 ? 4.5 : 3}" fill="${c[1]}" stroke="${c[0]}" stroke-width="1"/>`;
+        }).join('');
+    }
+  };
+
+  // --- Definições -----------------------------------------------------------
+
+  const FAMILIES = [
+    { id: 'asclepio', title: 'Bastão de Asclépio' },
+    { id: 'conquistas', title: 'Conquistas' },
+    { id: 'maratonista', title: 'Maratonista' },
+    { id: 'curadoria', title: 'Selo da Curadoria' },
+    { id: 'laco', title: 'Laços das campanhas de saúde' }
+  ];
+
+  const ASCLEPIO_MATERIALS = [
+    ['Carvalho', '#9a6b3f', '#e3c39b', '#3b2512'], ['Cobre', '#c8743f', '#ffd2b3', '#4d2410'],
+    ['Bronze', '#b8864b', '#f3d7a6', '#45300f'], ['Latão', '#d4b24c', '#fff0b8', '#4f3f0c'],
+    ['Ferro polido', '#8d99a6', '#e6ecf2', '#2a3139'], ['Prata', '#c7d0d9', '#ffffff', '#3b444e'],
+    ['Ouro rosé', '#e7a08c', '#ffe3da', '#5c2a20'], ['Ouro', '#ffcc33', '#fff6cc', '#6b4b00'],
+    ['Jade', '#5fbf8f', '#d8f5e6', '#17402b'], ['Esmeralda', '#1fbf73', '#c9ffe3', '#064126'],
+    ['Turmalina', '#2ec4b6', '#d4fbf7', '#06433e'], ['Água-marinha', '#5fd3f3', '#e3f9ff', '#0b4357'],
+    ['Safira', '#3d7bf0', '#d8e5ff', '#0d2559'], ['Ametista', '#a66cf0', '#efe2ff', '#33155c'],
+    ['Rubi', '#e53958', '#ffd6de', '#55091b'], ['Ônix e ouro', '#d9a521', '#fff3c4', '#000000'],
+    ['Platina', '#e4e7f0', '#ffffff', '#4c5161'], ['Opala', '#9fe3e0', '#fff4fb', '#3d4f6b'],
+    ['Diamante', '#bff3ff', '#ffffff', '#1d5a73'], ['Celestial', '#ffd76a', '#ffffff', '#2a1b5c']
+  ];
+  const MARATONISTA_TIERS = [
+    ['Bronze', 100, ['#cd7f32', '#ffd8b0', '#4a2a10']], ['Prata', 500, ['#c0c8d2', '#ffffff', '#3b4450']],
+    ['Ouro', 1000, ['#ffc83d', '#fff4cc', '#6b4b00']], ['Ametista', 2500, ['#b388ff', '#ede7f6', '#311b92']],
+    ['Diamante', 5000, ['#7fe7ff', '#ffffff', '#0b4a63']]
+  ];
+  const CURADORIA_TIERS = [
+    ['Cobre', 25, ['#d9774a', '#ffd9c4', '#5a2410']], ['Prata', 100, ['#b8c4cf', '#ffffff', '#38424d']],
+    ['Ouro', 250, ['#f5c518', '#fff6cf', '#6a5000']], ['Turquesa', 500, ['#26c6da', '#e0f7fa', '#004d55']],
+    ['Platina', 1000, ['#e5e4f0', '#ffffff', '#5b5470']]
+  ];
+  const LACO_MONTHS = [
+    ['Janeiro Branco', 'saúde mental', ['#f2f4f3', '#ffffff', '#5f6b66']],
+    ['Fevereiro Roxo', 'Alzheimer, lúpus e fibromialgia', ['#7e57c2', '#e3d7ff', '#2b1655']],
+    ['Março Lilás', 'câncer do colo do útero', ['#ce93d8', '#f6e3fa', '#5b2a63']],
+    ['Abril Azul', 'autismo (TEA)', ['#4fc3f7', '#e1f5fe', '#0b4660']],
+    ['Maio Amarelo', 'segurança no trânsito', ['#ffb300', '#ffe9b0', '#5c3f00']],
+    ['Junho Vermelho', 'doação de sangue', ['#e53935', '#ffd0cf', '#5c0d0b']],
+    ['Julho Verde', 'câncer de cabeça e pescoço', ['#43a047', '#d4f2d5', '#123d14']],
+    ['Agosto Dourado', 'aleitamento materno', ['#c9a227', '#f7e7b3', '#4f3d05']],
+    ['Setembro Amarelo', 'prevenção do suicídio', ['#fff176', '#fffde7', '#5e5600']],
+    ['Outubro Rosa', 'câncer de mama', ['#ff4f9a', '#ffd6e8', '#6d0f3a']],
+    ['Novembro Azul', 'câncer de próstata', ['#1e63d6', '#cfe0ff', '#0a2457']],
+    ['Dezembro Laranja', 'câncer de pele', ['#ff7043', '#ffe0d6', '#5c1a07']]
+  ];
+  const LACO_MIN_ANSWERS = 30;
+
+  const STATIC_DEFINITIONS = [
+    ...ASCLEPIO_MATERIALS.map(([name, ...colors], index) => ({
+      id: `asclepio-${index + 1}`, family: 'asclepio', title: `Asclépio · ${name}`, colors,
+      glow: index + 1 >= 14, iridescent: index + 1 === 20,
+      rule: { type: 'level', min: (index + 1) * 5 }, svg: c => asclepioSvg(c, index + 1)
+    })),
+    { id: 'ecg', family: 'conquistas', title: 'Ritmo Cardíaco', colors: ['#00e676', '#b9ffd9', '#0a4d2c'], rule: { type: 'level', min: 10 }, svg: singleSvgs.ecg },
+    { id: 'chama', family: 'conquistas', title: 'Chama da Constância', colors: ['#ff7043', '#ffe0b2', '#7a1f00'], rule: { type: 'streak', min: 7 }, svg: singleSvgs.chama },
+    { id: 'raio', family: 'conquistas', title: 'Combo Relâmpago', colors: ['#ffee58', '#fffde7', '#5d4b00'], rule: { type: 'combo', min: 25 }, svg: singleSvgs.raio },
+    { id: 'desafiador', family: 'conquistas', title: 'Escudo do Desafiador', colors: ['#ef5350', '#ffebee', '#5b0f0f'], rule: { type: 'challengerVotes', min: 10 }, svg: singleSvgs.desafiador },
+    { id: 'sinapse', family: 'conquistas', title: 'Sinapse', colors: ['#f06292', '#fce4ec', '#5a1033'], rule: { type: 'neuroAnswered', min: 100 }, svg: singleSvgs.sinapse },
+    ...MARATONISTA_TIERS.map(([name, min, colors], index) => ({
+      id: `maratonista-${index + 1}`, family: 'maratonista', title: `Maratonista · ${name}`, colors, glow: index + 1 >= 4,
+      rule: { type: 'answered', min }, svg: c => maratonistaSvg(c, index + 1)
+    })),
+    ...CURADORIA_TIERS.map(([name, min, colors], index) => ({
+      id: `curadoria-${index + 1}`, family: 'curadoria', title: `Curadoria · ${name}`, colors, glow: index + 1 >= 4,
+      rule: { type: 'curatedAnswered', min }, svg: c => curadoriaSvg(c, index + 1)
+    }))
+  ];
+
+  function lacoDefinition(year, month) {
+    const [name, theme, colors] = LACO_MONTHS[month - 1];
+    return {
+      id: `laco-${year}-${String(month).padStart(2, '0')}`, family: 'laco', title: `${name} ${year}`, theme, colors, year, month,
+      rule: { type: 'monthAnswered', year, month, min: LACO_MIN_ANSWERS }, svg: c => lacoSvg(c, year)
+    };
+  }
+  function parseLacoId(id) {
+    const match = /^laco-(\d{4})-(\d{2})$/.exec(String(id || ''));
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    return year >= 2026 && year <= 2200 && month >= 1 && month <= 12 ? { year, month } : null;
+  }
+
+  // Molduras do ano corrente + laços conquistados em anos anteriores.
+  function getDefinitions({ now = new Date(), unlockedIds = [] } = {}) {
+    const year = now.getFullYear();
+    const lacos = Array.from({ length: 12 }, (_, index) => lacoDefinition(year, index + 1));
+    const previous = [...new Set(unlockedIds)]
+      .map(parseLacoId)
+      .filter(item => item && item.year < year)
+      .sort((a, b) => b.year - a.year || a.month - b.month)
+      .map(item => lacoDefinition(item.year, item.month));
+    return [...STATIC_DEFINITIONS, ...lacos, ...previous];
+  }
+  function getDefinition(id) {
+    const fixed = STATIC_DEFINITIONS.find(item => item.id === id);
+    if (fixed) return fixed;
+    const laco = parseLacoId(id);
+    return laco ? lacoDefinition(laco.year, laco.month) : null;
+  }
+  function isCatalogFrame(id) { return Boolean(getDefinition(id)); }
+
+  function buildSvg(id) {
+    const definition = getDefinition(id);
+    if (!definition) return '';
+    const classes = ['profile-frame-svg', 'pf-catalog', definition.glow ? 'pf-glow' : '', definition.iridescent ? 'pf-iridescent' : ''].filter(Boolean).join(' ');
+    return `<svg class="${classes}" viewBox="0 0 160 160" aria-hidden="true">${definition.svg(definition.colors)}</svg>`;
+  }
+
+  // --- Progresso e regras ---------------------------------------------------
+
+  function createProgress() {
+    return { version: 1, unlocked: {}, answeredIds: [], curatedIds: [], neuroIds: [], monthAnswered: {}, activeDays: [], bestStreak: 0, comboRun: 0, bestCombo: 0 };
+  }
+  const cleanIds = value => (Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))].slice(-MAX_TRACKED_IDS) : []);
+  function normalizeProgress(value) {
+    const progress = value && typeof value === 'object' ? value : {};
+    const unlocked = {};
+    Object.entries(progress.unlocked && typeof progress.unlocked === 'object' ? progress.unlocked : {}).forEach(([id, at]) => {
+      if (isCatalogFrame(id)) unlocked[id] = Number(at) || 0;
+    });
+    const monthAnswered = {};
+    Object.entries(progress.monthAnswered && typeof progress.monthAnswered === 'object' ? progress.monthAnswered : {}).forEach(([month, ids]) => {
+      if (/^\d{4}-\d{2}$/.test(month)) monthAnswered[month] = cleanIds(ids);
+    });
+    const days = Array.isArray(progress.activeDays) ? [...new Set(progress.activeDays.map(String).filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day)))].sort().slice(-MAX_TRACKED_DAYS) : [];
+    const whole = number => Math.max(0, Math.floor(Number(number) || 0));
+    return {
+      version: 1, unlocked, monthAnswered, activeDays: days,
+      answeredIds: cleanIds(progress.answeredIds), curatedIds: cleanIds(progress.curatedIds), neuroIds: cleanIds(progress.neuroIds),
+      bestStreak: whole(progress.bestStreak), comboRun: whole(progress.comboRun), bestCombo: whole(progress.bestCombo)
+    };
+  }
+  const addId = (list, id) => (list.includes(id) ? list : [...list, id].slice(-MAX_TRACKED_IDS));
+
+  function dayNumber(dayKey) {
+    const [year, month, day] = String(dayKey).split('-').map(Number);
+    return Math.round(Date.UTC(year, month - 1, day) / 86400000);
+  }
+  function longestStreak(days) {
+    let best = 0;
+    let run = 0;
+    let previous = null;
+    [...days].sort().forEach(day => {
+      const current = dayNumber(day);
+      run = previous !== null && current - previous === 1 ? run + 1 : (previous === current ? run : 1);
+      previous = current;
+      best = Math.max(best, run);
+    });
+    return best;
+  }
+  function recordActiveDay(value, dayKey) {
+    const progress = normalizeProgress(value);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey)) || progress.activeDays.includes(dayKey)) return progress;
+    progress.activeDays = [...progress.activeDays, dayKey].sort().slice(-MAX_TRACKED_DAYS);
+    progress.bestStreak = Math.max(progress.bestStreak, longestStreak(progress.activeDays));
+    return progress;
+  }
+  // Cada questão conta uma vez por métrica (no mês, para os laços), para que
+  // repetir a mesma pergunta não libere molduras.
+  function recordQuizAnswer(value, { questionId, correct = false, curated = false, neuro = false, dayKey } = {}) {
+    let progress = normalizeProgress(value);
+    const id = String(questionId || '');
+    if (!id) return progress;
+    progress.answeredIds = addId(progress.answeredIds, id);
+    if (curated) progress.curatedIds = addId(progress.curatedIds, id);
+    if (neuro) progress.neuroIds = addId(progress.neuroIds, id);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey))) {
+      const month = String(dayKey).slice(0, 7);
+      progress.monthAnswered[month] = addId(progress.monthAnswered[month] || [], id);
+      progress = recordActiveDay(progress, dayKey);
+    }
+    progress.comboRun = correct ? progress.comboRun + 1 : 0;
+    progress.bestCombo = Math.max(progress.bestCombo, progress.comboRun);
+    return progress;
+  }
+
+  const formatNumber = number => Number(number).toLocaleString('pt-BR');
+  function evaluate(definition, metrics = {}, progress = createProgress(), now = new Date()) {
+    if (!definition) return { unlocked: false, requirement: 'Esta moldura ainda não está disponível.' };
+    const alreadyUnlocked = Boolean(progress.unlocked && progress.unlocked[definition.id]);
+    const rule = definition.rule;
+    const value = key => Math.max(0, Number(metrics[key]) || 0);
+    let met = false;
+    let requirement = '';
+    switch (rule.type) {
+      case 'level':
+        met = value('level') >= rule.min;
+        requirement = `Chegue ao nível ${rule.min} de XP. Você está no nível ${value('level')}.`;
+        break;
+      case 'streak':
+        met = value('bestStreak') >= rule.min;
+        requirement = `Estude ${rule.min} dias seguidos. Sua melhor sequência: ${value('bestStreak')} dia(s).`;
+        break;
+      case 'combo':
+        met = value('bestCombo') >= rule.min;
+        requirement = `Acerte ${rule.min} questões seguidas no quiz. Seu recorde: ${value('bestCombo')}.`;
+        break;
+      case 'challengerVotes':
+        met = value('challengerVotes') >= rule.min;
+        requirement = `Receba ${rule.min} votos positivos como desafiador nos duelos. Você tem ${value('challengerVotes')}.`;
+        break;
+      case 'neuroAnswered':
+        met = value('neuroAnswered') >= rule.min;
+        requirement = `Responda ${rule.min} questões de Sistema Nervoso. Você respondeu ${value('neuroAnswered')}.`;
+        break;
+      case 'answered':
+        met = value('answered') >= rule.min;
+        requirement = `Responda ${formatNumber(rule.min)} questões diferentes. Você respondeu ${formatNumber(value('answered'))}.`;
+        break;
+      case 'curatedAnswered':
+        met = value('curatedAnswered') >= rule.min;
+        requirement = `Responda ${formatNumber(rule.min)} questões da curadoria da sua faculdade. Você respondeu ${formatNumber(value('curatedAnswered'))}.`;
+        break;
+      case 'monthAnswered': {
+        const monthKey = `${rule.year}-${String(rule.month).padStart(2, '0')}`;
+        const count = (metrics.monthAnswered && Number(metrics.monthAnswered[monthKey])) || 0;
+        const current = now.getFullYear() * 12 + now.getMonth();
+        const target = rule.year * 12 + (rule.month - 1);
+        met = current === target && count >= rule.min;
+        requirement = current < target
+          ? `Disponível em ${definition.title}: responda ${rule.min} questões durante o mês da campanha (${definition.theme}).`
+          : current === target
+            ? `Responda ${rule.min} questões diferentes neste mês da campanha (${definition.theme}). Você respondeu ${count}.`
+            : `Campanha encerrada. Este laço era conquistado respondendo ${rule.min} questões no mês.`;
+        break;
+      }
+      default:
+        requirement = 'Esta moldura ainda não está disponível.';
+    }
+    return { unlocked: alreadyUnlocked || met, requirement: alreadyUnlocked ? `Conquistada. ${requirement}` : requirement };
+  }
+
+  // Marca como conquistadas as molduras cujo critério foi atingido agora; a
+  // conquista fica gravada mesmo que a métrica caia depois (ex.: XP perdido).
+  function collectNewUnlocks(value, metrics, now = new Date()) {
+    const progress = normalizeProgress(value);
+    const newlyUnlocked = getDefinitions({ now, unlockedIds: Object.keys(progress.unlocked) })
+      .filter(definition => !progress.unlocked[definition.id] && evaluate(definition, metrics, progress, now).unlocked)
+      .map(definition => definition.id);
+    newlyUnlocked.forEach(id => { progress.unlocked[id] = now.getTime(); });
+    return { progress, newlyUnlocked };
+  }
+
+  function metricsFromProgress(progress, extra = {}) {
+    const normalized = normalizeProgress(progress);
+    const monthAnswered = {};
+    Object.entries(normalized.monthAnswered).forEach(([month, ids]) => { monthAnswered[month] = ids.length; });
+    return {
+      level: 1, challengerVotes: 0, ...extra,
+      answered: Math.max(Number(extra.answered) || 0, normalized.answeredIds.length),
+      neuroAnswered: Math.max(Number(extra.neuroAnswered) || 0, normalized.neuroIds.length),
+      curatedAnswered: normalized.curatedIds.length,
+      bestStreak: normalized.bestStreak,
+      bestCombo: normalized.bestCombo,
+      monthAnswered
+    };
+  }
+
+  return {
+    FAMILIES, LACO_MIN_ANSWERS,
+    getDefinitions, getDefinition, isCatalogFrame, buildSvg,
+    createProgress, normalizeProgress, recordActiveDay, recordQuizAnswer, longestStreak,
+    evaluate, collectNewUnlocks, metricsFromProgress
+  };
+});
