@@ -544,7 +544,8 @@ Retorne JSON puro neste formato: {"items":[{"index":1,"page":1,"isVisualStudyMat
   async searchOpenI(term, limit = 3) {
     try {
       const url = `https://openi.nlm.nih.gov/api/search?query=${encodeURIComponent(term)}&m=1&n=${limit}`;
-      const res = await this.httpGetJson(url, 3000);
+      // O Open-i costuma responder entre 3 e 5 s; 3 s descartava boa parte das buscas.
+      const res = await this.httpGetJson(url, 6000);
 
       if (!res || !Array.isArray(res.list) || res.list.length === 0) {
         return [];
@@ -579,7 +580,7 @@ Retorne JSON puro neste formato: {"items":[{"index":1,"page":1,"isVisualStudyMat
   async searchWikimedia(term, limit = 3) {
     try {
       const q = term;
-      const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata&format=json&origin=*`;
+      const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=800&format=json&origin=*`;
       const res = await this.httpGetJson(url, 6000);
 
       const pages = Object.values(res?.query?.pages || {});
@@ -601,7 +602,9 @@ Retorne JSON puro neste formato: {"items":[{"index":1,"page":1,"isVisualStudyMat
         return {
           id: `wiki-${page.pageid}`,
           imageUrl: info.url,
-          thumbnailUrl: info.url,
+          // Miniatura de 800px: o original da Wikimedia pode ter vários MB e
+          // demorava ou falhava ao carregar no celular.
+          thumbnailUrl: info.thumburl || info.url,
           title: page.title.replace(/^File:/i, '').replace(/_/g, ' ').replace(/\.[a-z0-9]+$/i, ''),
           caption: cleanCaption,
           modality: 'Documentação Médica / Esquema Anatômico',
