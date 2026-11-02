@@ -30,4 +30,35 @@ assert.deepEqual(noConcepts.keyConcepts, [], 'não se devem fabricar conceitos q
 assert.deepEqual(noConcepts.sections, [], 'não se devem fabricar eixos de especialidades para completar o índice');
 assert.match(noConcepts.summaryText, /Nenhum tópico externo foi acrescentado/i);
 
+// Palavras comuns não podem virar conceitos de outra área.
+const embryology = generateIndex('O embrião irá formar os folhetos. As células teriam origem no epiblasto e o processo é vago no início; o tecido acessório se forma na ponte entre estruturas.', 'a.pdf', '', '');
+assert.deepEqual(embryology.keyConcepts, [], '"irá", "teriam", "vago", "acessório" e "ponte" não são IAM, KDIGO, nervos cranianos nem tronco encefálico');
+const ards = generateIndex('A SARA (síndrome da angústia respiratória aguda) cursa com hipoxemia refratária.', 'a.pdf', '', '');
+assert.ok(!ards.keyConcepts.some(concept => /reticular/i.test(concept)), 'SARA respiratória não é formação reticular');
+
+// PowerPoint: título do slide vira seção e a descrição é a primeira frase do slide.
+const pptx = generateIndex([
+  '## Slide 1: Slide 1: Eletrocardiograma no infarto', '', 'Supradesnivelamento do segmento ST em derivações contíguas indica oclusão coronariana aguda.',
+  '## Slide 2: Derivações e paredes', '', 'Parede inferior: DII, DIII e aVF.', 'Parede anterior: V1 a V4.',
+  '## Slide 3', '', 'Troponina ultrassensível', 'Dosar na admissão e repetir em 1 a 3 horas.',
+  '## Slide 4: Referências', '', 'Diretriz brasileira.'
+].join('\n'), 'aula.pptx', '', '');
+assert.deepEqual(pptx.sections.map(section => section.title), ['Eletrocardiograma no infarto', 'Derivações e paredes', 'Troponina ultrassensível'], 'títulos de slide, sem "Slide N:" e sem Referências');
+assert.match(pptx.sections[0].description, /^Supradesnivelamento do segmento ST/, 'descrição vem do próprio slide');
+assert.ok(pptx.sections.every(section => !/Conteúdo programático extraído/.test(section.description)), 'sem frase genérica fixa');
+assert.match(pptx.summaryText, /\(4 slides\).*Aborda: Eletrocardiograma no infarto; Derivações e paredes/);
+
+// PDF de slides sem marcação: primeira linha curta de cada bloco é o título.
+const pdf = generateIndex([
+  'Farmacocinética dos Antibióticos', 'Prof. Dr. João Silva - Universidade X', '',
+  'Absorção e Biodisponibilidade', 'A biodisponibilidade oral dos betalactâmicos varia conforme a formulação e a presença de alimentos.', '',
+  'Distribuição Tecidual', 'O volume de distribuição indica a extensão da distribuição tecidual.', 'Aminoglicosídeos têm baixo volume de distribuição.', '',
+  'Concentração Inibitória Mínima', 'A concentração inibitória mínima orienta a dose.', 'Betalactâmicos dependem do tempo acima da concentração inibitória mínima.', '',
+  'Referências', 'Goodman & Gilman.'
+].join('\n'), 'farmaco.pdf', '', '');
+assert.deepEqual(pdf.sections.map(section => section.title), ['Farmacocinética dos Antibióticos', 'Absorção e Biodisponibilidade', 'Distribuição Tecidual', 'Concentração Inibitória Mínima']);
+assert.ok(!/Prof\.|Universidade/.test(pdf.sections[0].description), 'nome de professor e universidade não viram descrição');
+assert.ok(pdf.keyConcepts.includes('Concentração inibitória mínima'), `conceitos repetidos no próprio texto entram no índice: ${pdf.keyConcepts}`);
+assert.ok(!pdf.keyConcepts.some(concept => /indica|orienta/i.test(concept)), 'pedaços de frase com verbo não são conceitos');
+
 console.log('✅ Índice descritivo: conceitos e seções limitados ao conteúdo textual enviado.');
