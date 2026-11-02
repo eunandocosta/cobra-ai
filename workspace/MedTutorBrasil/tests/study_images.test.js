@@ -74,6 +74,7 @@ const slideXml = text => `<p:sld><p:txBody><a:p><a:r><a:t>${text}</a:t></a:r></a
 const pptx = buildZip([
   { name: 'ppt/slides/slide1.xml', data: slideXml('Ciclo cardíaco &amp; sístole') },
   { name: 'ppt/slides/slide2.xml', data: slideXml('ECG com supra de ST') },
+  { name: 'ppt/slides/slide3.xml', data: '<p:sld><p:sp><p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>Derivações</a:t></a:r><a:r><a:t> e paredes</a:t></a:r></a:p></p:txBody></p:sp><p:sp><p:txBody><a:p><a:r><a:t>Parede inferior: DII, DIII e aVF.</a:t></a:r></a:p><a:p><a:r><a:t>Parede anterior: V1 a V4.</a:t></a:r></a:p></p:txBody></p:sp></p:sld>' },
   { name: 'ppt/slides/_rels/slide2.xml.rels', data: '<Relationships><Relationship Id="rId2" Target="../media/image1.png"/><Relationship Id="rId3" Target="../media/image2.emf"/></Relationships>' },
   { name: 'ppt/media/image1.png', data: png, store: true },
   { name: 'ppt/media/image2.emf', data: Buffer.from('EMF-binario') }
@@ -85,8 +86,8 @@ const withTimeout = (promise, label) => Promise.race([promise, new Promise((_, r
   console.log('🧪 Iniciando testes de imagens e PowerPoint...');
 
   const text = await withTimeout(sandbox.extractTextFromPptx(fakeFile), 'Leitura do texto do PPTX');
-  assert.strictEqual(text, '## Slide 1\n\nCiclo cardíaco & sístole\n\n## Slide 2\n\nECG com supra de ST');
-  console.log('  [PASS] Texto do PPTX compactado é lido sem travar');
+  assert.strictEqual(text, '## Slide 1\n\nCiclo cardíaco & sístole\n\n## Slide 2\n\nECG com supra de ST\n\n## Slide 3: Derivações e paredes\n\nParede inferior: DII, DIII e aVF.\nParede anterior: V1 a V4.');
+  console.log('  [PASS] Texto do PPTX compactado é lido sem travar, com título do slide e um parágrafo por linha');
 
   const images = await withTimeout(sandbox.extractPptxEmbeddedImages(fakeFile), 'Leitura das imagens do PPTX');
   assert.strictEqual(images.length, 1, 'o PNG deve ser extraído');

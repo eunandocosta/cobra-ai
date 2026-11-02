@@ -7589,26 +7589,36 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     // Lê o XML textual das lâminas diretamente do ZIP do PowerPoint no
     // navegador. O arquivo bruto não é enviado a nenhum serviço nesta etapa.
+    // O título do slide (placeholder title/ctrTitle) vira "## Slide N: Título" e
+    // cada parágrafo fica numa linha, para o índice e a IA enxergarem a estrutura.
     async function extractTextFromPptx(file) {
       const entries = await readZipEntries(file);
       if (!entries.length) throw new Error('Estrutura ZIP do PPTX não encontrada.');
       const decoder = new TextDecoder('utf-8');
+      const decodeXml = value => value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+      const paragraphText = paragraph => [...paragraph.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>|<a:br\b[^>]*\/?>/gi)]
+        .map(match => (match[1] !== undefined ? decodeXml(match[1]) : '\n'))
+        .join('')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/ *\n */g, '\n')
+        .trim();
+      const paragraphsOf = xml => [...xml.matchAll(/<a:p\b[^>]*>[\s\S]*?<\/a:p>/gi)].map(match => paragraphText(match[0])).filter(Boolean);
       const slides = [];
       for (const entry of entries) {
         const slideMatch = entry.name.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
         if (!slideMatch) continue;
         const raw = await inflateZipEntry(entry);
         if (!raw) continue;
-        const xml = decoder.decode(raw).replace(/<a:br\b[^>]*\/?\s*>/gi, '\n');
-        const textNodes = [...xml.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>/gi)]
-          .map(match => match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"))
-          .filter(Boolean);
-        const slideText = textNodes.join(' ').replace(/\s*\n\s*/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
-        if (slideText) slides.push({ number: Number(slideMatch[1]), text: slideText });
+        const xml = decoder.decode(raw);
+        const titleShape = [...xml.matchAll(/<p:sp\b[\s\S]*?<\/p:sp>/gi)].map(match => match[0])
+          .find(shape => /<p:ph\b[^>]*type="(?:title|ctrTitle)"/i.test(shape)) || '';
+        const title = titleShape ? paragraphsOf(titleShape).join(' ').replace(/\s+/g, ' ').trim() : '';
+        const body = paragraphsOf(titleShape ? xml.replace(titleShape, '') : xml);
+        if (title || body.length) slides.push({ number: Number(slideMatch[1]), title, text: body.join('\n') });
       }
 
       return slides.sort((a, b) => a.number - b.number)
-        .map(slide => `## Slide ${slide.number}\n\n${slide.text}`)
+        .map(slide => `## Slide ${slide.number}${slide.title ? `: ${slide.title}` : ''}${slide.text ? `\n\n${slide.text}` : ''}`)
         .join('\n\n')
         .trim();
     }
@@ -16167,7 +16177,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       let plainIndexText = '';
       if (descIndex) {
         plainIndexText = `\n\nÍNDICE DESCRITIVO DO MATERIAL ANALISADO:\n` +
-          descIndex.sections.map(s => `${s.number}. ${s.title}: ${s.description}`).join('\n') +
+          descIndex.sections.map(s => `${s.number}. ${s.title}${s.description ? `: ${s.description}` : ''}`).join('\n') +
           (descIndex.keyConcepts && descIndex.keyConcepts.length > 0 ? `\nConceitos-Chave: ${descIndex.keyConcepts.join(', ')}` : '') +
           `\n`;
       }
@@ -21769,311 +21779,241 @@ DIRETRIZES CIRÚRGICAS:
     }
 
     // 6.2.2 Gerador do Índice Descritivo do Material Analisado
+    // Tudo vem do texto extraído do arquivo: títulos de slides/páginas/seções,
+    // a primeira frase de cada trecho como descrição e os termos que o próprio
+    // texto repete. Nome do arquivo, disciplina e tema nunca viram conceito.
     function generateDescriptiveIndexForMaterial(text, fileName, diseaseTopic, matchedSubject) {
-      const fText = (text || '').normalize('NFC');
-      const effectiveTopic = diseaseTopic || '';
-      const effectiveSubj = matchedSubject || '';
+      const fText = String(text || '').normalize('NFC').replace(/\r\n?/g, '\n');
+      const normalize = value => String(value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const cleanInline = value => String(value || '')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+        .replace(/https?:\/\/\S+/g, ' ')
+        .replace(/[*_`#>|•▪●◦■□➢➤►✓✔-]+\s*/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-      // 1. Deteção de Conceitos-Chave e Entidades Clínicas no Texto e Nome
-      const candidateConcepts = [];
+      // 1. Conceitos do dicionário clínico. As regras exigem o termo técnico
+      // inteiro: palavras comuns ("irá", "vago", "ponte", "SARA" respiratória)
+      // não podem disparar conceitos de outra área.
       const conceptDictionary = [
-        // Semiologia & Dermatologia
-        { term: 'Sinal de Auspitz', re: /auspitz|orvalho\s+sangrento/i },
-        { term: 'Curetagem de Brocq', re: /curetagem\s+de\s+brocq|sinal\s+da\s+vela|pel[ií]cula\s+de\s+duncan/i },
-        { term: 'Fenômeno de Koebner', re: /koebner|k[oö]bner/i },
-        { term: 'Placas Eritematodescamativas', re: /eritemato[-\s]descamat/i },
-        { term: 'Estrias de Wickham', re: /wickham/i },
-        { term: 'Regra dos 4 Ps', re: /4\s*ps|poligonal.*pruriginos/i },
-        { term: 'Barreira Epidérmica', re: /barreira\s+epid[eé]rmica|queratin[oó]citos|estrato\s+c[oó]rneo/i },
-        { term: 'Corticoide Tópico', re: /corticoide\s+t[oó]pico|corticoterapia|clobetasol|mometasona/i },
-        { term: 'Imunobiológicos / Anti-TNF', re: /anti-tnf|imunobiol[oó]gico|adalimumabe|ustequinumabe|secuquinumabe/i },
-
-        // Cardiologia & Eletrocardiograma
-        { term: 'Fração de Ejeção', re: /fra[cç][aã]o\s+de\s+eje[cç][aã]o|feve\b|icfer|icfep/i },
-        { term: 'BNP / NT-proBNP', re: /\bbnp\b|nt-probnp|pept[ií]deo\s+natriur[eé]tico/i },
-        { term: 'IECA / BRA', re: /\bieca\b|\bbra(?:\s*-\s*bloqueador|s\b)|enalapril|captopril|ramipril|losartana|valsartana|candesartana/i },
-        { term: 'Espironolactona', re: /espironolactona|antagonista\s+de\s+aldosterona/i },
-        { term: 'Fibrilação Atrial', re: /fibrila[cç][aã]o\s+atrial|\bfa\b/i },
-        { term: 'Supra de ST / IAM', re: /supra\s+de\s+st|infradesnivelamento|iamcst|iam\b/i },
-        { term: 'Intervalo PR & QRS', re: /intervalo\s+pr|complexo\s+qrs|bloqueio\s+de\s+ramo/i },
-        { term: 'Troponina Ultrassensível', re: /troponina/i },
-
-        // Pneumologia
-        { term: 'Espirometria (VEF1/CVF)', re: /espirometria|vef1|cvf/i },
-        { term: 'Broncoespasmo', re: /broncoespasmo|sibilos/i },
-        { term: 'SABA / Corticoide Inalatório', re: /salbutamol|formoterol|budesonida|corticoide\s+inalat/i },
-        { term: 'Escore CURB-65', re: /curb-?65|escore\s+de\s+gravidade/i },
-        { term: 'Gasometria Arterial', re: /gasometria|pao2|paco2|hipoxemia/i },
-
-        // Cirurgia, Trauma & Emergência
-        { term: 'Ponto de McBurney', re: /mcburney/i },
-        { term: 'Sinal de Blumberg', re: /blumberg|descompress[aã]o\s+dolorosa/i },
-        { term: 'Sinal de Rovsing', re: /rovsing/i },
-        { term: 'Protocolo de Sepse / Bundle', re: /bundle|protocolo\s+de\s+sepse|qsofa/i },
-        { term: 'Lactato Sérico', re: /lactato/i },
-        { term: 'Critérios de Ranson', re: /ranson|pancreatite\s+aguda/i },
-        { term: 'Escore ATLS', re: /atls|abcde\s+do\s+trauma/i },
-
-        // Nefrologia & Metabólico
-        { term: 'Critérios KDIGO', re: /kdigo|inj[uú]ria\s+renal\s+aguda|\bira\b/i },
-        { term: 'Taxa de Filtração Glomerular', re: /tfg|filtra[cç][aã]o\s+glomerular|clearance/i },
-        { term: 'Cetoacidose Diabética', re: /cetoacidose|\bcad\b|glicemia\s*>|corpos\s+cet[oô]nicos/i },
-        { term: 'Insulinoterapia', re: /insulina\s+(?:nph|regular|glargina)/i },
-        { term: 'Distúrbio Hidroeletrolítico', re: /\b(?:hiponatremia|hipernatremia|hipocalemia|hipercalemia|hipopotassemia|hiperpotassemia)\b|\bpot[aá]ssio\b|\bs[oó]dio\b/i },
-
-        // Neurologia & Neuroanatomia
-        { term: 'Escala NIHSS', re: /nihss|escala\s+de\s+avc/i },
-        { term: 'Janela Trombolítica (Alteplase)', re: /trombol[ií]t|alteplase|janela\s+de\s+4,5/i },
-        { term: 'Crise Convulsiva / Benzodiazepínico', re: /convuls|epilep|diazepam|midazolam/i },
-        { term: 'Síndrome de Wallenberg (Bulbar Lateral)', re: /wallenberg|bulbar\s+lateral|pica\b|cerebelar\s+inferior\s+posterior/i },
-        { term: 'Síndrome de Dejerine (Bulbar Medial)', re: /dejerine|bulbar\s+medial|espinhal\s+anterior/i },
-        { term: 'Síndromes de Weber & Benedikt (Mesencéfalo)', re: /weber|benedikt|claude|foville|mesenc[eé]fal/i },
-        { term: 'Síndrome do Cativeiro (Locked-in)', re: /locked-?in|cativeiro|base\s+da\s+ponte/i },
-        { term: 'Nervos Cranianos (III ao XII)', re: /nervo\s+craniano|pares\s+cranianos|oculomotor|troclear|trig[eê]meo|abducente|facial|vestibulococlear|glossofar[ií]ngeo|vago|acess[oó]rio|hipoglosso/i },
-        { term: 'Tronco Encefálico (Mesencéfalo, Ponte, Bulbo)', re: /tronco\s+encef[aá]lico|mesenc[eé]falo|ponte\b|bulbo\b|ped[uú]nculo\s+cerebral|quarto\s+ventr[ií]culo/i },
-        { term: 'Vias Longas (Corticoespinhal & Lemnisco)', re: /trato\s+corticoespinhal|via\s+piramidal|lemnisco\s+medial|espinotal[aâ]mico|decussa[cç][aã]o/i },
-        { term: 'SARA & Formação Reticular', re: /\bsara\b|forma[cç][aã]o\s+reticular|n[uú]cleos\s+da\s+rafe|locus\s+coeruleus|subst[aâ]ncia\s+cinzenta\s+periaquedutal/i },
-        { term: 'Síndromes Alternas do Tronco', re: /s[ií]ndrome\s+alterna|hemiparesia\s+cruzada|d[eé]ficit\s+cruzado/i }
+        { term: 'Sinal de Auspitz', re: [/auspitz|orvalho\s+sangrento/i] },
+        { term: 'Curetagem de Brocq', re: [/curetagem\s+de\s+brocq|sinal\s+da\s+vela|pel[ií]cula\s+de\s+duncan/i] },
+        { term: 'Fenômeno de Koebner', re: [/koebner|k[oö]bner/i] },
+        { term: 'Placas Eritematodescamativas', re: [/eritemato[-\s]?descamat/i] },
+        { term: 'Estrias de Wickham', re: [/wickham/i] },
+        { term: 'Barreira Epidérmica', re: [/barreira\s+epid[eé]rmica|queratin[oó]citos|estrato\s+c[oó]rneo/i] },
+        { term: 'Corticoide Tópico', re: [/corticoide\s+t[oó]pico|clobetasol|mometasona/i] },
+        { term: 'Imunobiológicos / Anti-TNF', re: [/anti-?tnf|imunobiol[oó]gico|adalimumabe|ustequinumabe|secuquinumabe/i] },
+        { term: 'Fração de Ejeção', re: [/fra[cç][aã]o\s+de\s+eje[cç][aã]o|\bfeve\b|\bicfer\b|\bicfep\b/i] },
+        { term: 'BNP / NT-proBNP', re: [/\bbnp\b|nt-?probnp|pept[ií]deo\s+natriur[eé]tico/i] },
+        { term: 'IECA / BRA', re: [/\bieca\b|enalapril|captopril|ramipril|losartana|valsartana|candesartana/i] },
+        { term: 'Espironolactona', re: [/espironolactona|antagonista\s+(?:da|de)\s+aldosterona/i] },
+        { term: 'Fibrilação Atrial', re: [/fibrila[cç][aã]o\s+atrial/i] },
+        { term: 'Supra de ST / IAM', re: [/supra(?:desnivelamento)?\s+(?:de|do)\s+(?:segmento\s+)?st\b|infradesnivelamento|\biamcst\b|infarto\s+agudo\s+do\s+mioc[aá]rdio/i, /(?<![A-Za-zÀ-ÿ])IAM(?![A-Za-zÀ-ÿ])/] },
+        { term: 'Intervalo PR & QRS', re: [/intervalo\s+pr\b|complexo\s+qrs|bloqueio\s+de\s+ramo/i] },
+        { term: 'Troponina', re: [/troponina/i] },
+        { term: 'Espirometria (VEF1/CVF)', re: [/espirometria|\bvef1\b/i] },
+        { term: 'Broncoespasmo', re: [/broncoespasmo|sibilos/i] },
+        { term: 'SABA / Corticoide Inalatório', re: [/salbutamol|formoterol|budesonida|corticoide\s+inalat/i] },
+        { term: 'Escore CURB-65', re: [/curb-?65/i] },
+        { term: 'Gasometria Arterial', re: [/gasometria|\bpao2\b|\bpaco2\b/i] },
+        { term: 'SDRA / SARA (síndrome respiratória)', re: [/s[ií]ndrome\s+(?:do\s+desconforto|da\s+ang[uú]stia)\s+respirat[oó]ria/i] },
+        { term: 'Ponto de McBurney', re: [/mcburney/i] },
+        { term: 'Sinal de Blumberg', re: [/blumberg|descompress[aã]o\s+(?:brusca\s+)?dolorosa/i] },
+        { term: 'Sinal de Rovsing', re: [/rovsing/i] },
+        { term: 'Sepse / qSOFA', re: [/\bq?sofa\b|protocolo\s+de\s+sepse|choque\s+s[eé]ptico/i] },
+        { term: 'Lactato Sérico', re: [/lactato/i] },
+        { term: 'Critérios de Ranson', re: [/ranson/i] },
+        { term: 'ATLS / ABCDE do Trauma', re: [/\batls\b|abcde\s+do\s+trauma/i] },
+        { term: 'Critérios KDIGO', re: [/kdigo|les[aã]o\s+renal\s+aguda|inj[uú]ria\s+renal\s+aguda/i, /(?<![A-Za-zÀ-ÿ])IRA(?![A-Za-zÀ-ÿ])/] },
+        { term: 'Taxa de Filtração Glomerular', re: [/\btfg\b|filtra[cç][aã]o\s+glomerular|clearance\s+de\s+creatinina/i] },
+        { term: 'Cetoacidose Diabética', re: [/cetoacidose|corpos\s+cet[oô]nicos/i] },
+        { term: 'Insulinoterapia', re: [/insulina\s+(?:nph|regular|glargina|asparte|lispro)/i] },
+        { term: 'Distúrbio Hidroeletrolítico', re: [/\b(?:hiponatremia|hipernatremia|hipocalemia|hipercalemia|hipopotassemia|hiperpotassemia)\b/i] },
+        { term: 'Escala NIHSS', re: [/nihss/i] },
+        { term: 'Trombólise (Alteplase)', re: [/trombol[ií]tic|trombol[ií]se|alteplase/i] },
+        { term: 'Crise Convulsiva / Epilepsia', re: [/convuls|epilep/i] },
+        { term: 'Síndrome de Wallenberg (Bulbar Lateral)', re: [/wallenberg|bulbar\s+lateral/i, /(?<![A-Za-zÀ-ÿ])PICA(?![A-Za-zÀ-ÿ])/] },
+        { term: 'Síndrome de Dejerine (Bulbar Medial)', re: [/dejerine|bulbar\s+medial/i] },
+        { term: 'Síndromes de Weber & Benedikt', re: [/s[ií]ndrome\s+de\s+(?:weber|benedikt|claude|foville)/i] },
+        { term: 'Síndrome do Cativeiro (Locked-in)', re: [/locked-?in|s[ií]ndrome\s+do\s+cativeiro|base\s+da\s+ponte/i] },
+        { term: 'Nervos Cranianos', re: [/nervos?\s+cranian|pares\s+cranianos|nervo\s+(?:oculomotor|troclear|trig[eê]meo|abducente|facial|vestibulococlear|glossofar[ií]ngeo|vago|acess[oó]rio|hipoglosso)\b/i] },
+        { term: 'Tronco Encefálico', re: [/tronco\s+encef[aá]lico|mesenc[eé]falo|ped[uú]nculos?\s+cerebra|quarto\s+ventr[ií]culo|bulbo\s+raquidiano/i] },
+        { term: 'Vias Longas (Corticoespinhal & Lemnisco)', re: [/trato\s+corticoespinhal|via\s+piramidal|lemnisco\s+medial|espinotal[aâ]mico/i] },
+        { term: 'Formação Reticular / SARA (neuro)', re: [/forma[cç][aã]o\s+reticular|sistema\s+ativador\s+reticular|locus\s+coeruleus|n[uú]cleos\s+da\s+rafe/i] }
       ];
+      const dictionaryConcepts = conceptDictionary.filter(item => item.re.some(re => re.test(fText))).map(item => item.term);
 
-      for (const item of conceptDictionary) {
-        // O índice só pode mapear evidência presente no texto extraído do
-        // arquivo. Nome de arquivo, disciplina e classificação são metadados,
-        // não fontes de conceitos.
-        if (item.re.test(fText)) {
-          if (!candidateConcepts.includes(item.term)) {
-            candidateConcepts.push(item.term);
-          }
+      // 2. Termos que o próprio texto repete (bigramas/trigramas e palavras
+      // longas frequentes). Funciona em qualquer disciplina sem lista fixa.
+      const stopwords = new Set(('a o as os um uma uns umas de do da dos das no na nos nas num numa em por para pelo pela pelos pelas com sem sob sobre entre ate e ou que se nao mais menos muito muita muitos muitas pouco pouca como quando onde qual quais quem ao aos sao ser foi foram sera seu sua seus suas este esta estes estas esse essa esses essas isso isto aquele aquela aquilo pode podem deve devem ha ter tem tendo sendo tambem ja ainda apos antes durante cada todo toda todos todas outro outra outros outras mesmo mesma via tipo tipos vez vezes ex etc pois porque entao assim logo bem so lo la le lhe the of and in to is are for with on by an ' +
+        // Verbos frequentes em frases didáticas não formam conceito ("indica oclusão").
+        'indica indicam apresenta apresentam causa causam ocorre ocorrem leva levam gera geram permite permitem mostra mostram exige exigem varia variam orienta orientam depende dependem possui possuem envolve envolvem inclui incluem cursa cursam sugere sugerem caracteriza caracterizam caracterizado caracterizada chamado chamada considerado considerada utilizado utilizada usado usada realizado realizada feito feita sofre sofrem atravessa atravessam age agem atua atuam promove promovem reduz reduzem aumenta aumentam diminui diminuem'
+        ).split(' '));
+      const generic = new Set(('paciente pacientes tratamento tratamentos diagnostico diagnosticos doenca doencas caso casos exemplo exemplos figura figuras tabela tabelas aula aulas slide slides pagina paginas material materiais conteudo conteudos capitulo capitulos objetivo objetivos introducao conclusao referencia referencias bibliografia questao questoes resposta respostas alternativa alternativas importante importantes principais principal geral gerais forma formas parte partes processo processos fator fatores nivel niveis grupo grupos sistema sistemas funcao funcoes estrutura estruturas celula celulas tecido tecidos orgao orgaos regiao regioes tipo tipos uso efeito efeitos acao acoes presenca ausencia aumento reducao alteracao alteracoes quadro quadros clinico clinica clinicos clinicas medico medica medicina saude dia dias ano anos semana semanas hora horas mg ml kg'
+        ).split(' '));
+      const middleWords = new Set(['de', 'do', 'da', 'dos', 'das']);
+      const counts = new Map();
+      const addCandidate = (tokens, start, size) => {
+        const words = tokens.slice(start, start + size);
+        const norms = words.map(normalize);
+        const first = norms[0];
+        const last = norms[norms.length - 1];
+        const isAcronym = word => /^[A-Z0-9]{2,6}$/.test(word) && /[A-Z]/.test(word);
+        const strong = (norm, word) => !stopwords.has(norm) && (norm.length >= 4 || isAcronym(word));
+        if (!strong(first, words[0]) || !strong(last, words[words.length - 1])) return;
+        // Trigramas: "termo de termo" (ajuste de dose) ou três termos fortes
+        // (concentração inibitória mínima); verbos e palavras vazias barram
+        // pedaços de frase como "derivações contíguas indica".
+        if (size === 3 && !middleWords.has(norms[1]) && !strong(norms[1], words[1])) return;
+        if (norms.every(norm => generic.has(norm) || stopwords.has(norm))) return;
+        if (norms.some(norm => /^\d+$/.test(norm) || norm === 'slide' || norm === 'pagina')) return;
+        const key = norms.join(' ');
+        const entry = counts.get(key) || { count: 0, size, forms: new Map() };
+        entry.count++;
+        const form = words.join(' ');
+        entry.forms.set(form, (entry.forms.get(form) || 0) + 1);
+        counts.set(key, entry);
+      };
+      fText.split(/[\n.;:!?()[\]{}•,"“”]+/).forEach(segment => {
+        const tokens = segment.match(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9-]*/g) || [];
+        for (let index = 0; index < tokens.length; index++) {
+          const norm = normalize(tokens[index]);
+          if (norm.length >= 8 && !stopwords.has(norm) && !generic.has(norm)) addCandidate(tokens, index, 1);
+          if (index + 2 <= tokens.length) addCandidate(tokens, index, 2);
+          if (index + 3 <= tokens.length) addCandidate(tokens, index, 3);
         }
-      }
+      });
+      const minRepeats = fText.length < 4000 ? 2 : 3;
+      const frequentTerms = [...counts.entries()]
+        .filter(([, entry]) => entry.count >= (entry.size === 1 ? Math.max(4, minRepeats + 1) : minRepeats))
+        .map(([key, entry]) => ({ key, score: entry.count * (entry.size === 3 ? 1.4 : (entry.size === 2 ? 1.2 : 1)), form: [...entry.forms.entries()].sort((a, b) => b[1] - a[1])[0][0] }))
+        .sort((a, b) => b.score - a.score);
+      const keyConcepts = [];
+      const takenKeys = [];
+      const pushConcept = (label, key) => {
+        if (keyConcepts.length >= 8) return;
+        if (takenKeys.some(taken => taken.includes(key) || key.includes(taken))) return;
+        takenKeys.push(key);
+        keyConcepts.push(label.charAt(0).toUpperCase() + label.slice(1));
+      };
+      dictionaryConcepts.slice(0, 4).forEach(term => pushConcept(term, normalize(term)));
+      frequentTerms.forEach(term => pushConcept(term.form, term.key));
 
-      const keyConcepts = candidateConcepts.slice(0, 6);
-
-      // 2. Extração / Sintetização de Módulos Temáticos do Índice
-      let extractedSections = [];
-
-      if (fText && fText.length > 50) {
-        const rawLines = fText.split('\n')
-          .map(l => l.trim())
-          .filter(l => l.length >= 6 && l.length <= 90);
-
-        const sectionRegex = /^(?:(?:se[cç][aã]o|m[oó]dulo|t[oó]pico|parte|cap[ií]tulo|aula|slide)\s*\d+|(?:[1-9]\.|\b[IVX]+\.))\s*(.+)$/i;
-        for (const line of rawLines) {
-          const match = line.match(sectionRegex);
-          if (match && match[1]) {
-            let titleCandidate = match[1].replace(/^[#\*\-–•:\s]+/, '').trim();
-            const lower = titleCandidate.toLowerCase();
-            if (!lower.includes('universidade') && !lower.includes('faculdade') && !lower.includes('professor') && titleCandidate.length >= 5) {
-              if (!extractedSections.some(s => s.title.toLowerCase() === titleCandidate.toLowerCase())) {
-                extractedSections.push({
-                  title: titleCandidate.charAt(0).toUpperCase() + titleCandidate.slice(1),
-                  description: 'Conteúdo programático extraído dos tópicos e lâminas da aula.'
-                });
+      // 3. Seções: títulos de slide ("## Slide 3: Título"), títulos Markdown,
+      // tópicos numerados e, em PDFs sem marcação, a primeira linha curta de
+      // cada bloco/página. Cada seção carrega o trecho que vem depois dela.
+      const lines = fText.split('\n');
+      const junkTitle = /^(?:refer[eê]ncias?(?:\s+bibliogr[aá]ficas?)?|bibliografia|obrigad[oa]s?|d[uú]vidas\??|perguntas\??|sum[aá]rio|agenda|roteiro|[ií]ndice|fim|contato|agradecimentos?)\b/i;
+      const isTitleLike = value => {
+        const title = String(value || '').trim();
+        if (title.length < 4 || title.length > 80) return false;
+        if (title.split(/\s+/).length > 11) return false;
+        if (/[.;,]$/.test(title)) return false;
+        if (!/^[A-ZÀ-Ý0-9"“(]/.test(title)) return false;
+        if (!/[A-Za-zÀ-ÿ]{3}/.test(title)) return false;
+        if ((title.match(/[A-Za-zÀ-ÿ]/g) || []).length / title.length < 0.55) return false;
+        if (junkTitle.test(title) || /universidade|faculdade|professor|\bprof\.|\bdra?\.|@|www\./i.test(title)) return false;
+        return true;
+      };
+      const firstSentence = value => {
+        const clean = cleanInline(value);
+        if (!clean) return '';
+        const sentenceEnd = clean.slice(40).search(/[.!?](?:\s|$)/);
+        let sentence = sentenceEnd >= 0 ? clean.slice(0, 40 + sentenceEnd + 1) : clean;
+        if (sentence.length > 170) {
+          sentence = sentence.slice(0, 170);
+          sentence = `${sentence.slice(0, Math.max(sentence.lastIndexOf(' '), 120)).replace(/[\s,;:]+$/, '')}…`;
+        }
+        return sentence;
+      };
+      const candidates = [];
+      const addSection = (title, lineIndex) => {
+        const cleanTitle = cleanInline(title).replace(/[:\-–—\s]+$/, '');
+        if (!isTitleLike(cleanTitle)) return;
+        candidates.push({ title: cleanTitle, lineIndex });
+      };
+      const numberedRe = /^(?:(?:se[cç][aã]o|m[oó]dulo|t[oó]pico|parte|cap[ií]tulo|unidade)\s*\d+|\d{1,2}(?:\.\d{1,2})*[.)]|[IVX]{1,5}[.)])\s*[-–:.]?\s*(.+)$/i;
+      lines.forEach((rawLine, lineIndex) => {
+        const line = rawLine.trim();
+        const heading = line.match(/^#{1,4}\s+(.+)$/);
+        if (heading) {
+          let title = heading[1].trim();
+          const slide = title.match(/^(?:slide|p[aá]gina|l[aâ]mina)\s*\d+\s*[:\-–—.]?\s*(.*)$/i);
+          if (slide) {
+            // Alguns títulos já trazem "Slide N:" escrito no próprio slide.
+            title = slide[1].replace(/^(?:slide|p[aá]gina|l[aâ]mina)\s*\d+\s*[:\-–—.]?\s*/i, '').trim();
+            // Slide sem título: usa a primeira linha curta do próprio slide.
+            if (!title) {
+              for (let next = lineIndex + 1; next < lines.length && next <= lineIndex + 4; next++) {
+                const candidate = lines[next].trim();
+                if (/^#{1,4}\s/.test(candidate)) break;
+                if (isTitleLike(cleanInline(candidate))) { title = candidate; break; }
               }
             }
           }
-          if (extractedSections.length >= 5) break;
+          if (title) addSection(title, lineIndex);
+          return;
         }
+        const numbered = line.match(numberedRe);
+        if (numbered) addSection(numbered[1], lineIndex);
+      });
+      if (candidates.length < 2) {
+        // PDF exportado de slides: cada página/bloco costuma abrir com o título.
+        let blockStart = true;
+        lines.forEach((rawLine, lineIndex) => {
+          const line = rawLine.trim();
+          if (!line) { blockStart = true; return; }
+          const hasBody = lines.slice(lineIndex + 1, lineIndex + 4).some(next => next.trim());
+          if (blockStart && hasBody && !candidates.some(candidate => candidate.lineIndex === lineIndex)) addSection(line, lineIndex);
+          blockStart = false;
+        });
+        candidates.sort((a, b) => a.lineIndex - b.lineIndex);
       }
-
-      if (extractedSections.length === 0 && keyConcepts.length > 0) {
-        extractedSections = keyConcepts.map(concept => ({
+      const seenTitles = new Set();
+      const unique = candidates.filter(candidate => {
+        const key = normalize(candidate.title.replace(/\((?:cont\.?|continua[cç][aã]o)\)|\bcontinua[cç][aã]o\b|\bparte\s+\d+$|\b[ivx]+$/gi, ''));
+        if (!key || seenTitles.has(key)) return false;
+        seenTitles.add(key);
+        return true;
+      });
+      unique.forEach((candidate, index) => {
+        const nextLine = index + 1 < unique.length ? unique[index + 1].lineIndex : lines.length;
+        const body = lines.slice(candidate.lineIndex + 1, Math.min(nextLine, candidate.lineIndex + 40))
+          .filter(line => !/^#{1,4}\s/.test(line.trim()) && !/universidade|faculdade|professor|\bprof\.|\bdra?\.|@|www\./i.test(line))
+          .join(' ');
+        const description = firstSentence(body.replace(new RegExp(`^\\s*${candidate.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), ''));
+        candidate.description = description;
+      });
+      const maxSections = 8;
+      const picked = unique.length <= maxSections
+        ? unique
+        : Array.from({ length: maxSections }, (_, index) => unique[Math.round(index * (unique.length - 1) / (maxSections - 1))]);
+      let extractedSections = picked.map(candidate => ({ title: candidate.title, description: candidate.description || '' }));
+      if (extractedSections.length === 0 && dictionaryConcepts.length > 0) {
+        extractedSections = dictionaryConcepts.slice(0, 5).map(concept => ({
           title: concept,
-          description: 'Conceito identificado explicitamente no texto extraído do arquivo.'
+          description: 'Conceito citado explicitamente no texto do arquivo.'
         }));
       }
 
-      // Os antigos modelos de eixos por especialidade foram desativados: eles
-      // completavam o índice com tópicos típicos da disciplina, mesmo ausentes
-      // dos arquivos enviados.
-      if (false && extractedSections.length < 3) {
-        const isNeuro = effectiveTopic.toLowerCase().includes('neuro') || effectiveTopic.toLowerCase().includes('tronco') || effectiveTopic.toLowerCase().includes('mesenc') || effectiveTopic.toLowerCase().includes('ponte') || effectiveTopic.toLowerCase().includes('bulbo') || effectiveTopic.toLowerCase().includes('cativeiro') || effectiveTopic.toLowerCase().includes('wallenberg') || effectiveSubj.toLowerCase().includes('neuro');
-        const isDerm = effectiveTopic.toLowerCase().includes('psor') || effectiveTopic.toLowerCase().includes('dermat') || effectiveSubj.toLowerCase().includes('dermat');
-        const isCardio = effectiveTopic.toLowerCase().includes('card') || effectiveTopic.toLowerCase().includes('arritmia') || effectiveTopic.toLowerCase().includes('ecg') || effectiveTopic.toLowerCase().includes('infarto') || effectiveSubj.toLowerCase().includes('cardio');
-        const isSurg = effectiveTopic.toLowerCase().includes('cirurg') || effectiveTopic.toLowerCase().includes('trauma') || effectiveTopic.toLowerCase().includes('abdome') || effectiveTopic.toLowerCase().includes('apendic');
-        const isPneumo = effectiveTopic.toLowerCase().includes('asma') || effectiveTopic.toLowerCase().includes('dpoc') || effectiveTopic.toLowerCase().includes('pneumo');
-
-        if (isNeuro) {
-          extractedSections = [
-            {
-              icon: '🧠',
-              title: 'Organização Neuroanatômica & Eixos Segmentares',
-              description: 'Divisão macroscópica em Mesencéfalo, Ponte e Bulbo; assoalho do IV ventrículo, pedúnculos e marcos de superfície.'
-            },
-            {
-              icon: '⚡',
-              title: 'Vias Longas Ascendentes, Descendentes & Nervos Cranianos',
-              description: 'Trato corticoespinhal (piramidal), lemnisco medial, trato espinotalâmico e núcleos dos pares cranianos (III ao XII).'
-            },
-            {
-              icon: '🩺',
-              title: 'Síndromes Clínicas Alternas (Cruzadas) do Tronco',
-              description: 'Síndrome de Wallenberg (bulbar lateral/PICA), Dejerine (bulbar medial), Weber/Benedikt e Síndrome de Locked-in (cativeiro).'
-            },
-            {
-              icon: '🫀',
-              title: 'Formação Reticular, Centros Vitais & SARA',
-              description: 'Sistema Ativador Reticular Ascendente (consciência), centros respiratório e vasomotor do bulbo, e núcleos da rafe/locus coeruleus.'
-            },
-            {
-              icon: '💡',
-              title: 'Vascularização Vértebro-Basilar & Pérolas de Prova',
-              description: 'Territórios vasculares (artérias vertebrais, basilar, PICA, AICA, cerebelar superior), correlações topográficas e pegadinhas de residência.'
-            }
-          ];
-        } else if (isDerm) {
-          extractedSections = [
-            {
-              icon: '🔬',
-              title: 'Histologia & Barreira Cutânea',
-              description: 'Estratos epidérmicos (basal a córneo), queratinócitos, melanócitos e adesão desmossômica.'
-            },
-            {
-              icon: '🩺',
-              title: 'Semiologia & Lesões Elementares',
-              description: 'Identificação de máculas, pápulas, placas descamativas, nódulos e lesões com conteúdo líquido.'
-            },
-            {
-              icon: '📋',
-              title: 'Fisiopatologia & Diagnóstico Diferencial',
-              description: 'Psoríase Vulgar vs Líquen Plano vs Dermatites; Sinal de Auspitz e Fenômeno de Koebner.'
-            },
-            {
-              icon: '💊',
-              title: 'Terapêutica & Farmacologia Dermatológica',
-              description: 'Corticoterapia tópica por potência, imunomoduladores tópicos (tacrolimo) e imunobiológicos.'
-            },
-            {
-              icon: '💡',
-              title: 'Pérolas de Prova & Casos Ambulatoriais',
-              description: 'Pegadinhas frequentes em bancas de residência (ENARE/SUS) e regras de segurança na prescrição.'
-            }
-          ];
-        } else if (isCardio) {
-          extractedSections = [
-            {
-              icon: '🔬',
-              title: 'Fisiopatologia Cardiovascular & Mecanismos',
-              description: 'Sobrecarga hemodinâmica, remodelamento ventricular, ativação neuro-humoral e arritmogênese.'
-            },
-            {
-              icon: '🩺',
-              title: 'Semiologia Cardiovascular & Análise do ECG',
-              description: 'Ausculta (sopros, B3/B4), propedêutica de congestão/baixo débito e interpretação do traçado.'
-            },
-            {
-              icon: '📋',
-              title: 'Critérios Diagnósticos & Exames Complementares',
-              description: 'Ecocardiograma com fração de ejeção, dosagem de biomarcadores (BNP/Troponina) e testes isquêmicos.'
-            },
-            {
-              icon: '💊',
-              title: 'Farmacoterapia Guiada por Diretrizes (GDMT)',
-              description: 'IECA/BRA/INRA, betabloqueadores, espironolactona, inibidores de SGLT2 e antiarrítmicos.'
-            },
-            {
-              icon: '💡',
-              title: 'Conduta de Emergência & Pérolas de Residência',
-              description: 'Estratificação de gravidade (Killip/NYHA), red flags e condutas prioritárias na sala de emergência.'
-            }
-          ];
-        } else if (isSurg) {
-          extractedSections = [
-            {
-              icon: '🔬',
-              title: 'Anatomia Cirúrgica & Fisiopatologia',
-              description: 'Vascularização, inervação somática vs visceral e mecanismos de peritonite e isquemia.'
-            },
-            {
-              icon: '🩺',
-              title: 'Propedêutica Abdominal & Sinais Físicos',
-              description: 'Palpação profunda, sinais de Blumberg, Rovsing, Murphy, irritação peritoneal e abdome agudo.'
-            },
-            {
-              icon: '📋',
-              title: 'Escores de Gravidade & Métodos de Imagem',
-              description: 'Escores preditivos (Alvarado/ATLS), ultrassonografia FAST e tomografia computadorizada com contraste.'
-            },
-            {
-              icon: '💊',
-              title: 'Conduta Pré, Intra e Pós-Operatória',
-              description: 'Estabilização hemodinâmica, antibioticoprofilaxia, hidratação venosa vigorosa e indicação cirúrgica.'
-            },
-            {
-              icon: '💡',
-              title: 'Pérolas de Prova & Complicações Críticas',
-              description: 'Critérios de emergência cirúrgica imediata e padrões cobrados em bancas de residência médica.'
-            }
-          ];
-        } else if (isPneumo) {
-          extractedSections = [
-            {
-              icon: '🔬',
-              title: 'Fisiopatologia Pulmonar & Mecânica Ventilatória',
-              description: 'Limitação do fluxo aéreo, hiper-responsividade brônquica, remodelamento e troca gasosa.'
-            },
-            {
-              icon: '🩺',
-              title: 'Semiologia Respiratória & Avaliação da Crise',
-              description: 'Ausculta de sibilos e estertores, tiragem intercostal, uso de musculatura acessória e padrão ventilatório.'
-            },
-            {
-              icon: '📋',
-              title: 'Diagnóstico Funcional & Imagem Torácica',
-              description: 'Espirometria com prova broncodilatadora (VEF1/CVF), gasometria arterial e radiografia de tórax.'
-            },
-            {
-              icon: '💊',
-              title: 'Terapêutica Inalatória & Protocolos de Manejo',
-              description: 'Broncodilatadores de ação curta/longa (SABA/LABA), corticoides inalatórios e oxigenoterapia.'
-            },
-            {
-              icon: '💡',
-              title: 'Pérolas de Prova & Critérios de Internação/UTI',
-              description: 'Escores de estratificação (CURB-65, gravidade da asma) e condutas prioritárias nas provas.'
-            }
-          ];
-        } else {
-          extractedSections = [
-            {
-              icon: '🔬',
-              title: 'Fundamentos Etiopatogênicos & Fisiopatologia',
-              description: `Mecanismos biológicos centrais, etiopatogenia e alterações teciduais associadas a ${effectiveTopic}.`
-            },
-            {
-              icon: '🩺',
-              title: 'Propedêutica Clínica, Semiologia & Quadro Clínico',
-              description: 'Anamnese direcionada, sinais cardinais no exame físico e padrões de apresentação clínica.'
-            },
-            {
-              icon: '📋',
-              title: 'Estratificação Diagnóstica & Exames Complementares',
-              description: 'Critérios clínicos validados, exames laboratoriais de triagem e propedêutica armada direcionada.'
-            },
-            {
-              icon: '💊',
-              title: 'Abordagem Terapêutica & Diretrizes Clínicas Oficiais',
-              description: 'Manejo de primeira linha, farmacologia aplicada, posologia e diretrizes terapêuticas SUS/CFM.'
-            },
-            {
-              icon: '💡',
-              title: 'Diagnóstico Diferencial, Casos & Pérolas de Prova',
-              description: 'Mimetizadores sindrômicos, sinais de alarme ("Red Flags") e tópicos de alta frequência no ENARE.'
-            }
-          ];
-        }
-      }
-
-      const defaultIcons = ['🔬', '🩺', '📋', '💊', '💡', '📌', '⚡'];
-      const sections = extractedSections.map((s, idx) => ({
-        number: idx + 1,
-        icon: s.icon || defaultIcons[idx % defaultIcons.length],
-        title: s.title,
-        description: s.description || 'Tópico de alta relevância curricular e clínica.'
+      const defaultIcons = ['🔬', '🩺', '📋', '💊', '💡', '📌', '⚡', '🧠'];
+      const sections = extractedSections.map((section, index) => ({
+        number: index + 1,
+        icon: defaultIcons[index % defaultIcons.length],
+        title: section.title,
+        description: section.description
       }));
 
+      // 4. Resumo específico do material, ainda limitado ao texto extraído.
+      const slideCount = (fText.match(/^## Slide \d+/gm) || []).length;
+      const unitLabel = slideCount ? ` (${slideCount} slides)` : '';
+      const topicList = sections.slice(0, 4).map(section => section.title);
+      const covers = topicList.length
+        ? ` Aborda: ${topicList.join('; ')}${sections.length > topicList.length ? `; e mais ${sections.length - topicList.length}` : ''}.`
+        : '';
       const summaryText = sections.length || keyConcepts.length
-        ? `Mapeamento baseado exclusivamente no texto extraído do arquivo: ${sections.length} seção(ões) identificada(s) e ${keyConcepts.length} conceito(s) explícito(s).`
+        ? `Mapeamento feito exclusivamente no texto extraído do arquivo${unitLabel}: ${sections.length} seção(ões) e ${keyConcepts.length} conceito(s).${covers}`
         : 'O texto extraído não contém títulos de seção ou conceitos reconhecidos suficientes para mapear. Nenhum tópico externo foi acrescentado.';
 
       return {
@@ -22462,7 +22402,7 @@ DIRETRIZES CIRÚRGICAS:
             </span>
           `).join('');
         } else {
-          indexTagsEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Conceitos gerais de clínica médica</span>`;
+          indexTagsEl.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">Nenhum conceito identificado no texto</span>`;
         }
       }
 
