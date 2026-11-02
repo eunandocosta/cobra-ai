@@ -12200,3 +12200,51 @@
 
   /* Caderno de Erros ativo. */
   .btn-outline-action.is-active-filter { background: rgba(255, 99, 99, 0.14); border-color: #ff6b6b; color: #ff8a8a; }
+
+  /* Simulado configurável. */
+  .exam-setup { display: grid; gap: 14px; }
+  .exam-setup .app-dialog-title { margin-bottom: 0; }
+  .exam-setup-group { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .exam-setup-group legend { margin-bottom: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .exam-setup-option { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); cursor: pointer; }
+  .exam-setup-option:has(input:checked) { border-color: var(--neon); background: rgba(0, 229, 255, 0.08); }
+  .exam-setup-option:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+  .exam-setup-option span { display: grid; gap: 2px; font-size: 14px; font-weight: 650; }
+  .exam-setup-option small { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+  .exam-setup-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .exam-setup-chip { position: relative; cursor: pointer; }
+  .exam-setup-chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .exam-setup-chip span { display: inline-flex; align-items: center; justify-content: center; min-width: 52px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-surface); font-weight: 800; }
+  .exam-setup-chip input:checked + span { border-color: var(--neon); background: var(--neon); color: #04130b; }
+  .exam-setup-chip input:focus-visible + span, .exam-setup-option input:focus-visible { outline: 2px solid var(--neon); outline-offset: 2px; }
+  .exam-setup-summary { margin: 0; color: var(--text-primary); font-size: 13px; font-weight: 650; }
+  .app-dialog-confirm:disabled { opacity: .5; cursor: not-allowed; }
+  #quizExamTimer.is-ending { color: #ff8a8a !important; border-color: rgba(255, 99, 99, 0.5) !important; background: rgba(255, 99, 99, 0.12) !important; }
+
+  /* Barras de evolução (simulados e semanas). */
+  .exam-history-mini { display: grid; gap: 8px; margin: 4px 0 14px; }
+  .exam-history-mini > strong { font-size: 12px; color: var(--text-secondary); }
+  .exam-history-bars { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; align-items: end; }
+  .exam-history-bar { display: grid; justify-items: center; gap: 4px; min-width: 0; }
+  .exam-history-value { font-size: 11px; font-weight: 800; color: var(--text-primary); }
+  .exam-history-track { position: relative; width: 100%; max-width: 34px; height: 64px; overflow: hidden; border-radius: 6px; background: var(--bg-surface); border: 1px solid var(--border); }
+  .exam-history-track > i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 4px 4px 0 0; }
+  .exam-history-bar small { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+  .tone-good { background: #22c55e; } .tone-mid { background: #f59e0b; } .tone-low { background: #ef4444; } .tone-empty { background: transparent; }
+
+  /* Conjunto ativo no quiz (simulado ou treino de tema). */
+  .quiz-active-set-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--border-accent, var(--border)); border-radius: 12px; background: var(--bg-card); font-size: 13px; }
+
+  /* Seu desempenho (SCE). */
+  .study-performance { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 18px; }
+  .study-performance-block h4 { margin: 0 0 10px; font-size: 13px; font-weight: 800; }
+  .study-performance-empty { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+  .study-topic-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .study-topic-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); }
+  .study-topic-info { display: grid; gap: 3px; flex: 1; min-width: 0; }
+  .study-topic-info strong { font-size: 13.5px; overflow-wrap: anywhere; }
+  .study-topic-info small { color: var(--text-secondary); font-size: 12px; }
+  .study-topic-bar { height: 5px; overflow: hidden; border-radius: 99px; background: rgba(239, 68, 68, 0.35); }
+  .study-topic-bar > i { display: block; height: 100%; background: #22c55e; }
+  @media (max-width: 900px) { .study-performance { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .study-topic-row { flex-wrap: wrap; } .study-topic-row .btn-outline-action { width: 100%; } }

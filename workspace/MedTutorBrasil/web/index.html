@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261102-loop-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261102-perf-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -1271,6 +1271,17 @@
             </div>
             <div class="sce-review-bucket-grid" id="sceReviewBuckets" aria-live="polite"></div>
           </section>
+
+          <!-- DESEMPENHO POR TEMA E EVOLUÇÃO SEMANAL -->
+          <div class="sce-chart-card">
+            <div class="sce-chart-header">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 4px;">Seu desempenho</h3>
+                <p style="font-size: 12px; color: var(--text-secondary);">Acerto semana a semana e os temas que mais merecem revisão</p>
+              </div>
+            </div>
+            <div id="sceTopicPerformance" class="study-performance"></div>
+          </div>
 
           <!-- GRÁFICOS DO SCE (EVOLUÇÃO POR DISCIPLINA) -->
           <div class="sce-chart-card">
@@ -4200,7 +4211,7 @@
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/gamification-frames.js?v=20261025-light-v1"></script>
   <script defer src="/material-icons.js?v=20261024-frames-v1"></script>
-  <script defer src="/app.min.js?v=20261102-loop-v1"></script>
+  <script defer src="/app.min.js?v=20261102-perf-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {
