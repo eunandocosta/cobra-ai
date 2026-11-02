@@ -2660,6 +2660,10 @@
                 evidence: firestoreSafeValue(q.evidence, 6000)
               };
               Object.entries(richFields).forEach(([key, value]) => { if (value !== undefined) payload[key] = value; });
+              if (typeof q.userNote === 'string') {
+                payload.userNote = q.userNote.slice(0, 2000);
+                if (q.userNoteUpdatedAt) payload.userNoteUpdatedAt = String(q.userNoteUpdatedAt);
+              }
               const fingerprint = firestoreFingerprint(payload);
               if (registry[docId] === fingerprint) return;
               operations.push({ type: 'set', ref: docRef, data: { ...payload, atualizadoEm: new Date().toISOString() } });
@@ -4783,6 +4787,11 @@
     };
     const APP_TAB_BY_ROUTE = Object.fromEntries(Object.entries(APP_ROUTE_BY_TAB).map(([tab, route]) => [route, tab]));
     APP_TAB_BY_ROUTE['/'] = 'home';
+    // O Chat IA está inativado: a aba fica invisível e qualquer caminho até ela
+    // (link antigo /chat-ia, aba salva, atalho) leva ao Início. O "Perguntar"
+    // das questões usa outro modal e continua funcionando.
+    var CHAT_MODULE_ENABLED = false;
+    if (!CHAT_MODULE_ENABLED) APP_TAB_BY_ROUTE['/chat-ia'] = 'home';
     APP_TAB_BY_ROUTE['/inicio'] = 'home';
     let pendingRoutePath = (typeof window !== 'undefined' && window.location.pathname) || '/login';
 
@@ -5276,6 +5285,194 @@
     }
     window.toggleHomeOnboarding = toggleHomeOnboarding;
 
+    // ===== Meta diária e lembrete de estudo =====
+    var DAILY_GOAL_OPTIONS = [10, 20, 30, 50, 100];
+
+    function localDayKey(date = new Date()) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function dailyGoalStorageKey() {
+      let uid = 'local';
+      try { uid = MedTutorFirebaseService.getUserId() || 'local'; } catch (error) {}
+      return `medtutor_daily_goal_v1_${uid}`;
+    }
+
+    function readDailyGoalSettings() {
+      const defaults = { goal: 20, reminderEnabled: false, reminderTime: '19:00', lastReminderDay: '', celebratedDay: '' };
+      try {
+        const saved = JSON.parse(localStorage.getItem(dailyGoalStorageKey()) || '{}');
+        const merged = { ...defaults, ...(saved && typeof saved === 'object' ? saved : {}) };
+        if (!DAILY_GOAL_OPTIONS.includes(Number(merged.goal))) merged.goal = defaults.goal;
+        if (!/^\d{2}:\d{2}$/.test(merged.reminderTime)) merged.reminderTime = defaults.reminderTime;
+        merged.goal = Number(merged.goal);
+        return merged;
+      } catch (error) {
+        return defaults;
+      }
+    }
+
+    function writeDailyGoalSettings(settings) {
+      try { localStorage.setItem(dailyGoalStorageKey(), JSON.stringify(settings)); } catch (error) {}
+    }
+
+    // Conta o que foi feito hoje: respostas no Quiz (quizStats.history) e
+    // avaliações de Flashcards/SCE (srs.history que não vieram de erro no Quiz).
+    function countTodayStudyAnswers(questions = sharedQuestionsBank, now = new Date()) {
+      const today = localDayKey(now);
+      let quiz = 0;
+      let cards = 0;
+      (questions || []).forEach(question => {
+        (question?.quizStats?.history || []).forEach(entry => { if (entry?.d === today) quiz++; });
+        (question?.srs?.history || []).forEach(entry => {
+          if (!entry?.date || entry.source === 'quiz') return;
+          const date = new Date(entry.date);
+          if (!Number.isNaN(date.getTime()) && localDayKey(date) === today) cards++;
+        });
+      });
+      return { quiz, cards, total: quiz + cards };
+    }
+
+    function getDailyGoalStatus(now = new Date()) {
+      const settings = readDailyGoalSettings();
+      const done = countTodayStudyAnswers(sharedQuestionsBank, now).total;
+      const due = getSrsQueueCounts(sharedQuestionsBank || []).due;
+      return { settings, done, due, goal: settings.goal, reached: done >= settings.goal };
+    }
+
+    function renderDailyGoalCard() {
+      const card = document.getElementById('homeGoalCard');
+      if (!card) return;
+      const { settings, done, due, goal, reached } = getDailyGoalStatus();
+      const pct = Math.min(100, Math.round(done / goal * 100));
+      const hint = [
+        reached ? '✅ Meta batida! O que vier agora é bônus.' : `Faltam ${goal - done}.`,
+        due ? `Você tem ${due} ${due === 1 ? 'revisão' : 'revisões'} para hoje.` : 'Nenhuma revisão vencida.',
+        settings.reminderEnabled ? `🔔 Lembrete às ${settings.reminderTime}.` : ''
+      ].filter(Boolean).join(' ');
+      card.innerHTML = `<div class="home-goal-main">
+          <div class="home-goal-head"><span class="home-goal-kicker">🎯 Meta de hoje</span><button type="button" class="home-goal-edit" onclick="openDailyGoalSettings()">Ajustar meta e lembrete</button></div>
+          <strong class="home-goal-count">${done} / ${goal} <small>questões e cards</small></strong>
+          <div class="home-goal-track${reached ? ' is-reached' : ''}" role="progressbar" aria-label="Progresso da meta de hoje" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${Math.min(done, goal)}"><i style="width:${pct}%"></i></div>
+          <p class="home-goal-hint">${hint}</p>
+        </div>
+        <button type="button" class="btn-outline-action primary home-goal-start" onclick="startDailyGoalSession()">${due ? 'Fazer revisões de hoje' : 'Praticar no Quiz'}</button>`;
+    }
+
+    function startDailyGoalSession() {
+      const { due } = getDailyGoalStatus();
+      if (due > 0) {
+        navigateTab('sce');
+        openSceReviewModal('today');
+        return;
+      }
+      navigateTab('quizzes');
+    }
+
+    // Chamada (com atraso) depois de cada resposta salva: atualiza o cartão da
+    // Home e comemora uma vez por dia quando a meta é batida.
+    var dailyGoalRefreshTimer = null;
+    function scheduleDailyGoalRefresh() {
+      clearTimeout(dailyGoalRefreshTimer);
+      dailyGoalRefreshTimer = setTimeout(() => {
+        const status = getDailyGoalStatus();
+        renderDailyGoalCard();
+        const today = localDayKey();
+        if (status.reached && status.done > 0 && status.settings.celebratedDay !== today) {
+          writeDailyGoalSettings({ ...status.settings, celebratedDay: today });
+          showToast(`🎯 Meta do dia batida: ${status.done} de ${status.goal}! Bom trabalho.`);
+        }
+      }, 400);
+    }
+
+    function openDailyGoalSettings() {
+      document.querySelector('.daily-goal-overlay')?.remove();
+      const settings = readDailyGoalSettings();
+      const overlay = document.createElement('div');
+      overlay.className = 'app-dialog-overlay daily-goal-overlay';
+      overlay.innerHTML = `<form class="app-dialog exam-setup" role="dialog" aria-modal="true" aria-labelledby="dailyGoalTitle">
+        <h3 class="app-dialog-title" id="dailyGoalTitle">🎯 Meta diária e lembrete</h3>
+        <fieldset class="exam-setup-group"><legend>Questões e cards por dia</legend>
+          <div class="exam-setup-chips">${DAILY_GOAL_OPTIONS.map(goal => `<label class="exam-setup-chip"><input type="radio" name="dailyGoal" value="${goal}" ${goal === settings.goal ? 'checked' : ''}><span>${goal}</span></label>`).join('')}</div>
+        </fieldset>
+        <fieldset class="exam-setup-group"><legend>Lembrete</legend>
+          <label class="exam-setup-option"><input type="checkbox" name="reminderEnabled" ${settings.reminderEnabled ? 'checked' : ''}><span>Me lembrar de estudar <small>avisa se houver revisões ou se a meta não foi batida</small></span></label>
+          <label class="exam-setup-option daily-goal-time"><span>Horário</span><input type="time" name="reminderTime" value="${settings.reminderTime}" required></label>
+          <p class="daily-goal-note">O lembrete aparece quando o MedTutor está aberto no navegador, mesmo em outra aba. Com o app fechado, o navegador não consegue avisar.</p>
+        </fieldset>
+        <div class="app-dialog-actions"><button type="button" class="app-dialog-button app-dialog-cancel">Cancelar</button><button type="submit" class="app-dialog-button app-dialog-confirm">Salvar</button></div>
+      </form>`;
+      const form = overlay.firstElementChild;
+      const previousFocus = document.activeElement;
+      const close = () => { document.removeEventListener('keydown', onKey, true); overlay.remove(); previousFocus?.focus?.(); };
+      const onKey = event => { if (event.key === 'Escape') { event.preventDefault(); close(); } };
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const data = new FormData(form);
+        const next = {
+          ...readDailyGoalSettings(),
+          goal: Number(data.get('dailyGoal')) || settings.goal,
+          reminderEnabled: data.get('reminderEnabled') === 'on',
+          reminderTime: String(data.get('reminderTime') || settings.reminderTime)
+        };
+        // Mudar o horário permite um novo lembrete hoje.
+        if (next.reminderTime !== settings.reminderTime || (next.reminderEnabled && !settings.reminderEnabled)) next.lastReminderDay = '';
+        writeDailyGoalSettings(next);
+        close();
+        if (next.reminderEnabled && 'Notification' in window && Notification.permission === 'default') {
+          try { await Notification.requestPermission(); } catch (error) {}
+        }
+        if (next.reminderEnabled && 'Notification' in window && Notification.permission === 'denied') {
+          showToast('🔔 Lembrete salvo. As notificações estão bloqueadas no navegador, então o aviso aparece dentro do app.');
+        } else {
+          showToast(`🎯 Meta de ${next.goal} por dia salva${next.reminderEnabled ? ` • lembrete às ${next.reminderTime}` : ''}.`);
+        }
+        renderDailyGoalCard();
+        checkStudyReminder();
+      });
+      form.querySelector('.app-dialog-cancel').addEventListener('click', close);
+      overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+      document.addEventListener('keydown', onKey, true);
+      document.body.appendChild(overlay);
+      form.querySelector('input:checked')?.focus();
+    }
+
+    // Verificado a cada minuto com o app aberto: depois do horário escolhido,
+    // avisa uma vez por dia se há revisões vencidas ou se a meta não foi batida.
+    function checkStudyReminder(now = new Date()) {
+      const status = getDailyGoalStatus(now);
+      const { settings } = status;
+      if (!settings.reminderEnabled) return false;
+      const today = localDayKey(now);
+      if (settings.lastReminderDay === today) return false;
+      const [hours, minutes] = settings.reminderTime.split(':').map(Number);
+      if (now.getHours() * 60 + now.getMinutes() < hours * 60 + minutes) return false;
+      writeDailyGoalSettings({ ...settings, lastReminderDay: today });
+      if (status.reached && !status.due) return false;
+      const body = status.due
+        ? `Você tem ${status.due} ${status.due === 1 ? 'revisão esperando' : 'revisões esperando'} e fez ${status.done} de ${status.goal} da meta de hoje.`
+        : `Faltam ${status.goal - status.done} para a meta de hoje.`;
+      showStudyReminderNotification('📚 Hora de estudar no MedTutor', body);
+      return true;
+    }
+
+    async function showStudyReminderNotification(title, body) {
+      const canNotify = 'Notification' in window && Notification.permission === 'granted';
+      if (canNotify && document.visibilityState === 'hidden') {
+        try {
+          const registration = await navigator.serviceWorker?.getRegistration?.();
+          if (registration?.showNotification) {
+            await registration.showNotification(title, { body, icon: '/icons/medtutor-icon.svg?v=20261005-ecg-v1', tag: 'medtutor-daily-reminder' });
+            return;
+          }
+          new Notification(title, { body, tag: 'medtutor-daily-reminder' });
+          return;
+        } catch (error) {}
+      }
+      showToast(`🔔 ${body}`);
+    }
+    setInterval(() => { try { checkStudyReminder(); } catch (error) {} }, 60_000);
+
     function renderHomeView() {
       const hour = new Date().getHours();
       const greeting = hour < 12 ? 'Bom dia' : (hour < 18 ? 'Boa tarde' : 'Boa noite');
@@ -5295,6 +5492,8 @@
       const dueCount = queueCounts ? queueCounts.due : 0;
       const dueEl = document.getElementById('homeMetricDueCount');
       if (dueEl) dueEl.textContent = `${dueCount} ${dueCount === 1 ? 'card' : 'cards'}`;
+      renderDailyGoalCard();
+      checkStudyReminder();
 
       const lvlLabel = document.getElementById('gamificationLevelLabel')?.textContent || 'Nível 1';
       const xpLabel = document.getElementById('gamificationXpLabel')?.textContent || '0 XP';
@@ -5335,6 +5534,7 @@
       if (tabId === 'study') {
         tabId = currentStudySubmode || 'flashcards';
       }
+      if (tabId === 'chat' && !CHAT_MODULE_ENABLED) tabId = 'home';
       const targetTab = document.getElementById('tab-' + tabId);
       if (!targetTab) return;
       const tabChanged = currentTab !== tabId;
@@ -7960,7 +8160,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         overlay.innerHTML = `<div class="app-dialog${tone === 'danger' ? ' is-danger' : ''}" role="${cancelLabel ? 'alertdialog' : 'dialog'}" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
           <h3 class="app-dialog-title" id="appDialogTitle"></h3>
           <p class="app-dialog-message" id="appDialogMessage"></p>
-          ${input ? '<input class="app-dialog-input" type="text" autocomplete="off">' : ''}
+          ${input ? (input.multiline ? '<textarea class="app-dialog-input app-dialog-textarea" rows="6"></textarea>' : '<input class="app-dialog-input" type="text" autocomplete="off">') : ''}
           <div class="app-dialog-actions">${cancelLabel ? '<button type="button" class="app-dialog-button app-dialog-cancel"></button>' : ''}<button type="button" class="app-dialog-button app-dialog-confirm"></button></div>
         </div>`;
         const dialog = overlay.firstElementChild;
@@ -7990,7 +8190,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const accept = () => finish(field ? field.value : (cancelLabel ? true : undefined));
         const onKey = event => {
           if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(cancelValue); return; }
-          if (event.key === 'Enter' && event.target === field) { event.preventDefault(); accept(); return; }
+          // Em campo de várias linhas, Enter quebra a linha e Ctrl/Cmd+Enter salva.
+          if (event.key === 'Enter' && event.target === field && (!input.multiline || event.ctrlKey || event.metaKey)) { event.preventDefault(); accept(); return; }
           if (event.key === 'Tab') {
             const focusable = [field, cancelButton, confirmButton].filter(Boolean);
             const index = focusable.indexOf(document.activeElement);
@@ -8017,8 +8218,8 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     function appConfirm(message, { title = 'Confirmar', confirmLabel = 'Confirmar', cancelLabel = 'Cancelar', tone = 'default' } = {}) {
       return appDialog({ title, message, confirmLabel, cancelLabel, tone });
     }
-    function appPrompt(title, value = '', { message = '', confirmLabel = 'Salvar', cancelLabel = 'Cancelar', maxLength = 250 } = {}) {
-      return appDialog({ title, message, confirmLabel, cancelLabel, input: { value, maxLength, label: title } });
+    function appPrompt(title, value = '', { message = '', confirmLabel = 'Salvar', cancelLabel = 'Cancelar', maxLength = 250, multiline = false } = {}) {
+      return appDialog({ title, message, confirmLabel, cancelLabel, input: { value, maxLength, label: title, multiline } });
     }
     // Toast com ação "Desfazer" para exclusões que podem ser revertidas localmente.
     var appUndoToastTimer = null;
@@ -16403,6 +16604,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
     // 4.1 Persistência e Recuperação do Banco Compartilhado e Materiais
     function saveSharedQuestionsBank() {
+      scheduleDailyGoalRefresh();
       try {
         localStorage.setItem('medtutor_shared_questions_v2', JSON.stringify(sharedQuestionsBank));
       } catch (e) {}
@@ -17406,7 +17608,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const frontImageEl = document.getElementById('fcFrontImage');
       if (frontImageEl) frontImageEl.innerHTML = renderStudySupportImage(item, { asStimulus: true });
       if (backEl) backEl.innerHTML = formatStudyRichText(item.flashcard?.back || item.reference_answer || item.answer || '');
-      if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item));
+      if (backEl) backEl.insertAdjacentHTML('beforeend', renderStudySupportImage(item) + questionNoteSlotHtml(item));
 
       if (visualBadge) {
         if (item.requer_imagem) {
@@ -17522,6 +17724,48 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       renderSceBars();
       updateSubjectFilterMenus();
       showToast('↩️ Pergunta restaurada.');
+    }
+
+    // ===== Anotações pessoais nas questões (Quiz, Flashcards e SCE) =====
+    function renderQuestionNoteHtml(item) {
+      const note = String(item?.userNote || '').trim();
+      if (!note) return '';
+      return `<div class="question-user-note"><div class="question-user-note-head"><strong>📝 Sua anotação</strong><button type="button" class="question-user-note-edit" onclick="editQuestionNote(${jsAttrArg(item.id)})">Editar</button></div><p>${escapeHtml(note)}</p></div>`;
+    }
+
+    function questionNoteSlotHtml(item) {
+      return `<div class="question-user-note-slot" data-note-for="${escapeHtml(item?.id || '')}">${renderQuestionNoteHtml(item)}</div>`;
+    }
+
+    async function editQuestionNote(questionId) {
+      const item = sharedQuestionsBank.find(question => question.id === questionId);
+      if (!item) return;
+      const value = await appPrompt('📝 Sua anotação', item.userNote || '', {
+        message: 'Pegadinhas, mnemônicos, o que você confundiu… Só você vê. Ctrl+Enter salva.',
+        confirmLabel: 'Salvar anotação',
+        maxLength: 2000,
+        multiline: true
+      });
+      if (value === null) return;
+      item.userNote = value.trim().slice(0, 2000);
+      item.userNoteUpdatedAt = new Date().toISOString();
+      saveSharedQuestionsBank();
+      document.querySelectorAll('.question-user-note-slot').forEach(slot => {
+        if (slot.dataset.noteFor === item.id) slot.innerHTML = renderQuestionNoteHtml(item);
+      });
+      document.querySelectorAll('.question-note-button').forEach(button => {
+        if (button.dataset.noteFor === item.id) button.textContent = item.userNote ? '📝 Ver anotação' : '📝 Anotar';
+      });
+      showToast(item.userNote ? '📝 Anotação salva.' : 'Anotação removida.');
+    }
+
+    function editCurrentCardNote() {
+      const item = getSrsFilteredList(getFilteredQuestions())[currentCardIndex];
+      if (!item) {
+        showToast('Selecione um flashcard para anotar.');
+        return;
+      }
+      editQuestionNote(item.id);
     }
 
     function questionDeletionMessage(item) {
@@ -18862,6 +19106,7 @@ Retorne EXCLUSIVAMENTE um JSON:
               <button class="btn-outline-action star ${item.isStarred ? 'starred' : ''}" style="padding: 2px 8px; font-size: 10px;" onclick="toggleStarQuizItem('${item.id}')">
                 ${item.isStarred ? 'Favorito ⭐' : 'Favoritar'}
               </button>
+              <button type="button" class="btn-outline-action question-note-button" data-note-for="${escapeHtml(item.id)}" style="padding: 2px 8px; font-size: 10px;" onclick="editQuestionNote(${jsAttrArg(item.id)})" title="Escrever uma anotação pessoal nesta questão">${item.userNote ? '📝 Ver anotação' : '📝 Anotar'}</button>
               <button class="btn-outline-action danger" style="padding: 2px 8px; font-size: 10px;" onclick="deleteQuizItem('${item.id}')" title="Remove somente esta questão do banco compartilhado com os Flashcards">
                 🗑️ Excluir este quiz
               </button>
@@ -18881,6 +19126,7 @@ Retorne EXCLUSIVAMENTE um JSON:
           <div class="quiz-question-prompt">
             ${formatStudyRichText(item.question)}
           </div>
+          ${questionNoteSlotHtml(item)}
 
           ${renderStudySupportImage(item, { asStimulus: true })}
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtutor-static-v143';
+const CACHE_NAME = 'medtutor-static-v144';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -6,13 +6,13 @@ const APP_SHELL = [
   '/material-icons.css?v=20261005-material-symbols-v3',
   '/material-icons.js?v=20261024-frames-v1',
   '/landing.css?v=20261025-ux-v1',
-  '/styles.css?v=20261102-perf-v1',
+  '/styles.css?v=20261102-goal-v1',
   '/academic-report-renderer.js?v=20260922-report-print-v5',
   '/exam-study-planner.js?v=20260927-sce-review-deck-v2',
   '/gamification-rules.js?v=20261006-linear-level-curve-v1',
   '/gamification-frames.js?v=20261025-light-v1',
   '/announcement-prompt.js?v=20261005-consent-prompt-v1',
-  '/app.min.js?v=20261102-perf-v1',
+  '/app.min.js?v=20261102-goal-v1',
   '/manifest.webmanifest',
   '/icons/medtutor-icon.svg?v=20261005-ecg-v1'
 ];
@@ -54,4 +54,13 @@ self.addEventListener('fetch', event => {
       return response;
     }).catch(() => caches.match(request))
   );
+});
+
+// Lembrete de estudo: tocar na notificação traz o MedTutor para a frente.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
+    const open = windows.find(client => 'focus' in client);
+    return open ? open.focus() : self.clients.openWindow('/inicio');
+  }));
 });

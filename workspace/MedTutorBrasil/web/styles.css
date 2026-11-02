@@ -12248,3 +12248,38 @@
   .study-topic-bar > i { display: block; height: 100%; background: #22c55e; }
   @media (max-width: 900px) { .study-performance { grid-template-columns: 1fr; } }
   @media (max-width: 640px) { .study-topic-row { flex-wrap: wrap; } .study-topic-row .btn-outline-action { width: 100%; } }
+
+  /* Chat IA inativado: a aba e o link ficam invisíveis. */
+  #tab-chat, #navLinkChat { display: none !important; }
+
+  /* Meta diária (Home). */
+  .home-goal-card { display: flex; align-items: center; gap: 18px; margin: 16px 0 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-card); }
+  .home-goal-card:empty { display: none; }
+  .home-goal-main { display: grid; gap: 6px; flex: 1; min-width: 0; }
+  .home-goal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .home-goal-kicker { color: var(--text-secondary); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .home-goal-edit { min-height: 32px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--neon); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .home-goal-edit:hover { background: var(--neon-subtle, rgba(0, 229, 255, 0.08)); }
+  .home-goal-count { font-size: 22px; line-height: 1.2; }
+  .home-goal-count small { color: var(--text-secondary); font-size: 13px; font-weight: 600; }
+  .home-goal-track { height: 8px; overflow: hidden; border-radius: 99px; background: var(--bg-surface); border: 1px solid var(--border); }
+  .home-goal-track > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--neon), #8c9eff); transition: width .4s ease; }
+  .home-goal-track.is-reached > i { background: #22c55e; }
+  .home-goal-hint { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+  .home-goal-start { flex: 0 0 auto; min-height: 44px; }
+  .daily-goal-time { justify-content: space-between; }
+  .daily-goal-time input { min-height: 40px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); color: var(--text-primary); font: inherit; }
+  .daily-goal-note { margin: 2px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+  @media (max-width: 640px) {
+    .home-goal-card { flex-direction: column; align-items: stretch; }
+    .home-goal-start { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .home-goal-track > i { transition: none; } }
+
+  /* Anotações pessoais nas questões. */
+  .app-dialog-textarea { min-height: 140px; resize: vertical; line-height: 1.5; }
+  .question-user-note { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid rgba(250, 204, 21, 0.35); border-left: 4px solid #facc15; border-radius: 10px; background: rgba(250, 204, 21, 0.07); }
+  .question-user-note-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .question-user-note-head strong { font-size: 12.5px; color: #facc15; }
+  .question-user-note p { margin: 6px 0 0; color: var(--text-primary); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .question-user-note-edit { min-height: 32px; padding: 2px 10px; border: 1px solid rgba(250, 204, 21, 0.4); border-radius: 8px; background: transparent; color: #facc15; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
