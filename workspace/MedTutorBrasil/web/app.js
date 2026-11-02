@@ -1295,6 +1295,37 @@
       return chunks.length ? chunks : [''];
     }
 
+    // Campos ricos da questão (imagem, explicação) só sobem para o Firestore se
+    // forem JSON simples, sem arrays aninhados (o Firestore recusa o lote inteiro)
+    // e dentro de um limite de tamanho.
+    function firestoreSafeValue(value, maxChars = 12000) {
+      if (value == null || value === '') return undefined;
+      let json;
+      try { json = JSON.stringify(value); } catch (error) { return undefined; }
+      if (!json || json.length > maxChars) return undefined;
+      const parsed = JSON.parse(json);
+      const hasNestedArray = node => Array.isArray(node)
+        ? node.some(child => Array.isArray(child) || hasNestedArray(child))
+        : (node && typeof node === 'object' ? Object.values(node).some(hasNestedArray) : false);
+      return hasNestedArray(parsed) ? undefined : parsed;
+    }
+
+    function questionImageForCloud(image) {
+      if (!image || !/^https?:\/\//i.test(image.imageUrl || '')) return undefined;
+      return firestoreSafeValue({
+        id: String(image.id || ''),
+        imageUrl: image.imageUrl,
+        thumbnailUrl: /^https?:\/\//i.test(image.thumbnailUrl || '') ? image.thumbnailUrl : image.imageUrl,
+        title: String(image.title || '').slice(0, 300),
+        source: String(image.source || '').slice(0, 300),
+        sourceUrl: /^https?:\/\//i.test(image.sourceUrl || '') ? image.sourceUrl : '',
+        caption: String(image.caption || '').slice(0, 600),
+        page: Number(image.page) || null,
+        visibleStructures: Array.isArray(image.visibleStructures) ? image.visibleStructures.slice(0, 20).map(String) : [],
+        visualAssociation: String(image.visualAssociation || '').slice(0, 1500)
+      }, 8000);
+    }
+
     function compactMaterialForFirestore(material, docId, markdown) {
       const report = material.academicReport || material.relatorio_academico || null;
       const safeImages = (Array.isArray(material.clinicalImages) ? material.clinicalImages : []).map(image => ({
@@ -2613,6 +2644,22 @@
                 ...(q.sourceType ? { sourceType: q.sourceType } : {}),
                 ...(q.sourceRange ? { sourceRange: q.sourceRange } : {})
               };
+              // Imagem e explicação também precisam voltar em outro aparelho;
+              // antes só a marcação requer_imagem subia e a figura sumia.
+              const richFields = {
+                medicalImage: questionImageForCloud(q.medicalImage || (Array.isArray(q.medicalImages) ? q.medicalImages[0] : null)),
+                pagina_origem_pdf: Number(q.pagina_origem_pdf) || undefined,
+                imageOrigin: typeof q.imageOrigin === 'string' && q.imageOrigin ? q.imageOrigin : undefined,
+                explanation: firestoreSafeValue(q.explanation, 8000),
+                justificativa: firestoreSafeValue(q.justificativa, 8000),
+                tripartite: firestoreSafeValue(q.tripartite, 12000),
+                flashcard: firestoreSafeValue(q.flashcard, 8000),
+                correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : undefined,
+                gabarito: typeof q.gabarito === 'string' && q.gabarito ? q.gabarito.slice(0, 20) : undefined,
+                correctAnswerText: firestoreSafeValue(q.correctAnswerText, 4000),
+                evidence: firestoreSafeValue(q.evidence, 6000)
+              };
+              Object.entries(richFields).forEach(([key, value]) => { if (value !== undefined) payload[key] = value; });
               const fingerprint = firestoreFingerprint(payload);
               if (registry[docId] === fingerprint) return;
               operations.push({ type: 'set', ref: docRef, data: { ...payload, atualizadoEm: new Date().toISOString() } });
@@ -3059,6 +3106,7 @@
                   cognitiveDomain: q.cognitiveDomain || q.dominio_cognitivo || (difficultyLevel === 'iniciante' ? 'conceitual' : (difficultyLevel === 'intermediario' ? 'mecanismo' : 'aplicacao')),
                   generatorModel: q.generatorModel || q.modelo_gerador || '',
                   requer_imagem: q.requer_imagem || false,
+                  ...(q.medicalImage && !q.medicalImages ? { medicalImages: [q.medicalImage] } : {}),
                   sourceQuestionOrigin: q.sourceQuestionOrigin || q.origem_pergunta || '',
                   learningAxis: q.learningAxis || q.eixo_aprendizagem || '',
                   materialInspired: !!(q.materialInspired || q.inspiracao_material || q.sourceQuestionOrigin || q.origem_pergunta),
@@ -5716,6 +5764,12 @@
         });
       }
 
+      // O .ppt antigo é binário (não é ZIP) e não há leitor no navegador.
+      if (file.name && /\.ppt$/i.test(file.name)) {
+        appAlert(`"${file.name}" está no formato antigo do PowerPoint (.ppt), que o navegador não consegue ler. Abra o arquivo no PowerPoint ou no Google Slides, salve como .pptx ou PDF e envie de novo.`, { title: 'Formato .ppt não suportado' });
+        return '';
+      }
+
       // 3. PowerPoint (.pptx): é um ZIP com o texto de cada lâmina em
       // ppt/slides/slide*.xml. Sem esta etapa, todo PPTX chegava como 0
       // caracteres, apesar de conter uma apresentação completa.
@@ -7220,9 +7274,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return images;
     }
 
-    // Slides PPTX são ZIPs: lê somente ppt/media/* no navegador, sem enviar o
-    // arquivo bruto a terceiros. Suporta as entradas compactadas mais comuns.
-    async function extractPptxEmbeddedImages(file, limit = Number.POSITIVE_INFINITY) {
+    // PPTX é um ZIP. Lê o diretório central uma vez e devolve as entradas ainda
+    // compactadas; nada do arquivo bruto sai do navegador nesta etapa.
+    async function readZipEntries(file) {
       if (typeof file?.arrayBuffer !== 'function') return [];
       const bytes = new Uint8Array(await file.arrayBuffer());
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -7231,68 +7285,10 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         if (view.getUint32(index, true) === 0x06054b50) { eocd = index; break; }
       }
       if (eocd < 0) return [];
-      const entries = view.getUint16(eocd + 10, true);
-      let cursor = view.getUint32(eocd + 16, true);
-      const decoder = new TextDecoder();
-      const images = [];
-      for (let entry = 0; entry < entries && cursor + 46 <= bytes.length && images.length < limit; entry++) {
-        if (view.getUint32(cursor, true) !== 0x02014b50) break;
-        const compression = view.getUint16(cursor + 10, true);
-        const compressedSize = view.getUint32(cursor + 20, true);
-        const nameLength = view.getUint16(cursor + 28, true);
-        const extraLength = view.getUint16(cursor + 30, true);
-        const commentLength = view.getUint16(cursor + 32, true);
-        const localOffset = view.getUint32(cursor + 42, true);
-        const name = decoder.decode(bytes.slice(cursor + 46, cursor + 46 + nameLength));
-        cursor += 46 + nameLength + extraLength + commentLength;
-        if (!/^ppt\/media\/[^/]+\.(?:png|jpe?g|webp|gif)$/i.test(name) || localOffset + 30 > bytes.length) continue;
-        if (view.getUint32(localOffset, true) !== 0x04034b50) continue;
-        const localNameLength = view.getUint16(localOffset + 26, true);
-        const localExtraLength = view.getUint16(localOffset + 28, true);
-        const dataStart = localOffset + 30 + localNameLength + localExtraLength;
-        const compressed = bytes.slice(dataStart, dataStart + compressedSize);
-        let raw = compressed;
-        if (compression === 8 && typeof DecompressionStream !== 'undefined') {
-          const stream = new DecompressionStream('deflate-raw');
-          const writer = stream.writable.getWriter();
-          await writer.write(compressed);
-          await writer.close();
-          raw = new Uint8Array(await new Response(stream.readable).arrayBuffer());
-        } else if (compression !== 0) {
-          continue;
-        }
-        const extension = name.split('.').pop().toLowerCase();
-        const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : (extension === 'gif' ? 'image/gif' : (extension === 'webp' ? 'image/webp' : 'image/png'));
-        const dataUrl = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ''));
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(new Blob([raw], { type: mime }));
-        });
-        if (!dataUrl) continue;
-        const dimensions = await getImageDimensions(dataUrl);
-        images.push({ id: `pptx-${entry}`, title: name.split('/').pop(), clinicalLabel: 'Imagem extraída do slide', width: dimensions.width, height: dimensions.height, originalSizeKB: Math.round(raw.length / 1024), src: dataUrl });
-      }
-      return images;
-    }
-
-    // Lê o XML textual das lâminas diretamente do ZIP do PowerPoint no
-    // navegador. O arquivo bruto não é enviado a nenhum serviço nesta etapa.
-    async function extractTextFromPptx(file) {
-      if (typeof file?.arrayBuffer !== 'function') return '';
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      let eocd = -1;
-      for (let index = bytes.length - 22; index >= Math.max(0, bytes.length - 65557); index--) {
-        if (view.getUint32(index, true) === 0x06054b50) { eocd = index; break; }
-      }
-      if (eocd < 0) throw new Error('Estrutura ZIP do PPTX não encontrada.');
-
       const totalEntries = view.getUint16(eocd + 10, true);
       let cursor = view.getUint32(eocd + 16, true);
       const decoder = new TextDecoder('utf-8');
-      const slides = [];
-
+      const entries = [];
       for (let entry = 0; entry < totalEntries && cursor + 46 <= bytes.length; entry++) {
         if (view.getUint32(cursor, true) !== 0x02014b50) break;
         const compression = view.getUint16(cursor + 10, true);
@@ -7301,26 +7297,108 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const extraLength = view.getUint16(cursor + 30, true);
         const commentLength = view.getUint16(cursor + 32, true);
         const localOffset = view.getUint32(cursor + 42, true);
-        const name = decoder.decode(bytes.slice(cursor + 46, cursor + 46 + nameLength));
+        const name = decoder.decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
         cursor += 46 + nameLength + extraLength + commentLength;
+        if (localOffset + 30 > bytes.length || view.getUint32(localOffset, true) !== 0x04034b50) continue;
+        const dataStart = localOffset + 30 + view.getUint16(localOffset + 26, true) + view.getUint16(localOffset + 28, true);
+        entries.push({ index: entry, name, compression, data: bytes.subarray(dataStart, dataStart + compressedSize) });
+      }
+      return entries;
+    }
 
-        const slideMatch = name.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
-        if (!slideMatch || localOffset + 30 > bytes.length || view.getUint32(localOffset, true) !== 0x04034b50) continue;
-        const localNameLength = view.getUint16(localOffset + 26, true);
-        const localExtraLength = view.getUint16(localOffset + 28, true);
-        const dataStart = localOffset + 30 + localNameLength + localExtraLength;
-        const compressed = bytes.slice(dataStart, dataStart + compressedSize);
-        let raw = compressed;
-        if (compression === 8 && typeof DecompressionStream !== 'undefined') {
-          const stream = new DecompressionStream('deflate-raw');
-          const writer = stream.writable.getWriter();
-          await writer.write(compressed);
-          await writer.close();
-          raw = new Uint8Array(await new Response(stream.readable).arrayBuffer());
-        } else if (compression !== 0) {
+    // Escreve e lê o DecompressionStream em paralelo. Aguardar a escrita antes de
+    // começar a leitura trava para sempre (o fluxo espera alguém consumir a saída),
+    // e era isso que congelava o upload de qualquer PowerPoint.
+    async function inflateZipEntry(entry) {
+      if (entry.compression === 0) return entry.data;
+      if (entry.compression !== 8 || typeof DecompressionStream === 'undefined') return null;
+      const stream = new DecompressionStream('deflate-raw');
+      const writer = stream.writable.getWriter();
+      writer.write(entry.data).catch(() => {});
+      writer.close().catch(() => {});
+      return new Uint8Array(await new Response(stream.readable).arrayBuffer());
+    }
+
+    // Mapeia cada mídia ao primeiro slide que a usa (ppt/slides/_rels/slideN.xml.rels),
+    // para que a figura saiba de qual slide veio, como as páginas de um PDF.
+    async function mapPptxMediaToSlides(entries) {
+      const mediaSlide = new Map();
+      const rels = entries.filter(entry => /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/i.test(entry.name))
+        .map(entry => ({ entry, slide: Number(entry.name.match(/slide(\d+)\.xml\.rels$/i)[1]) }))
+        .sort((a, b) => a.slide - b.slide);
+      const decoder = new TextDecoder('utf-8');
+      for (const { entry, slide } of rels) {
+        try {
+          const raw = await inflateZipEntry(entry);
+          if (!raw) continue;
+          for (const match of decoder.decode(raw).matchAll(/Target="(?:\.\.\/)?media\/([^"]+)"/gi)) {
+            const mediaName = `ppt/media/${match[1]}`.toLowerCase();
+            if (!mediaSlide.has(mediaName)) mediaSlide.set(mediaName, slide);
+          }
+        } catch (error) {
+          console.warn(`[MedTutor PPTX] Não foi possível ler as relações do slide ${slide}:`, error);
+        }
+      }
+      return mediaSlide;
+    }
+
+    const PPTX_IMAGE_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+
+    // Slides PPTX são ZIPs: lê somente ppt/media/* no navegador, sem enviar o
+    // arquivo bruto a terceiros. Formatos que o navegador não exibe (EMF, WMF,
+    // TIFF) são contados em unsupportedCount para avisar o estudante.
+    async function extractPptxEmbeddedImages(file, limit = Number.POSITIVE_INFINITY) {
+      const entries = await readZipEntries(file);
+      const mediaEntries = entries.filter(entry => /^ppt\/media\/[^/]+\.[a-z0-9]+$/i.test(entry.name));
+      const mediaSlide = await mapPptxMediaToSlides(entries);
+      const images = [];
+      images.unsupportedCount = 0;
+      for (const entry of mediaEntries) {
+        if (images.length >= limit) break;
+        const extension = entry.name.split('.').pop().toLowerCase();
+        const mime = PPTX_IMAGE_MIME[extension];
+        if (!mime) {
+          if (/^(?:emf|wmf|tiff?|wdp|jxr)$/.test(extension)) images.unsupportedCount++;
           continue;
         }
+        let raw = null;
+        try { raw = await inflateZipEntry(entry); } catch (error) { console.warn(`[MedTutor PPTX] Imagem ${entry.name} corrompida:`, error); }
+        if (!raw) continue;
+        const dataUrl = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(new Blob([raw], { type: mime }));
+        });
+        if (!dataUrl) continue;
+        const dimensions = await getImageDimensions(dataUrl);
+        const slide = mediaSlide.get(entry.name.toLowerCase()) || null;
+        images.push({
+          id: `pptx-${entry.index}`,
+          title: slide ? `Slide ${slide}` : entry.name.split('/').pop(),
+          clinicalLabel: slide ? `Imagem do slide ${slide}` : 'Imagem extraída do slide',
+          page: slide,
+          width: dimensions.width,
+          height: dimensions.height,
+          originalSizeKB: Math.round(raw.length / 1024),
+          src: dataUrl
+        });
+      }
+      return images;
+    }
 
+    // Lê o XML textual das lâminas diretamente do ZIP do PowerPoint no
+    // navegador. O arquivo bruto não é enviado a nenhum serviço nesta etapa.
+    async function extractTextFromPptx(file) {
+      const entries = await readZipEntries(file);
+      if (!entries.length) throw new Error('Estrutura ZIP do PPTX não encontrada.');
+      const decoder = new TextDecoder('utf-8');
+      const slides = [];
+      for (const entry of entries) {
+        const slideMatch = entry.name.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
+        if (!slideMatch) continue;
+        const raw = await inflateZipEntry(entry);
+        if (!raw) continue;
         const xml = decoder.decode(raw).replace(/<a:br\b[^>]*\/?\s*>/gi, '\n');
         const textNodes = [...xml.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>/gi)]
           .map(match => match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"))
@@ -7353,27 +7431,50 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       // Não imponha teto arbitrário: um material de 46 páginas pode conter
       // muitas lâminas, esquemas ou marcos anatômicos relevantes.
       const selectedImages = filterAndProcessClinicalImages(rawImages).clinicalImages;
-      if (!selectedImages.length) return;
+      if (!selectedImages.length) {
+        if (Number(rawImages.unsupportedCount) > 0) {
+          material.imagePersistenceWarning = `${rawImages.unsupportedCount} figura(s) do PowerPoint estão em formato que o navegador não lê (EMF/WMF/TIFF)`;
+          showToast(`⚠️ "${material.name}": ${material.imagePersistenceWarning}. Exportar o arquivo como PDF costuma preservar todas as figuras.`);
+        }
+        return;
+      }
       const uploadedImages = [];
       const storageProviders = new Set();
       let persistenceStoppedEarly = false;
+      let pausedForStorage = false;
+      let consecutiveFailures = 0;
       for (let index = 0; index < selectedImages.length; index++) {
         const image = selectedImages[index];
-        const url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
+        let url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
+        if (!/^https?:\/\//i.test(url || '') && !pausedForStorage) {
+          // A primeira falha abre um intervalo de proteção de 1 minuto. Em vez de
+          // abandonar o restante do material, espera esse intervalo uma vez e
+          // tenta a mesma imagem de novo.
+          pausedForStorage = true;
+          const waitMs = Math.min(65_000, Math.max(0, Number(MedTutorFirebaseService.clinicalImageStorageCircuitUntil || 0) - Date.now()) + 500);
+          showToast(`⏳ O armazenamento de imagens oscilou; nova tentativa em ${Math.ceil(waitMs / 1000)}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          url = await MedTutorFirebaseService.uploadClinicalImage(image.src, material.id, index + 1);
+        }
         if (!/^https?:\/\//i.test(url || '')) {
-          if (Date.now() < Number(MedTutorFirebaseService.clinicalImageStorageCircuitUntil || 0)) {
+          consecutiveFailures++;
+          // Três falhas seguidas depois da pausa indicam armazenamento fora do ar.
+          if (consecutiveFailures >= 3) {
             persistenceStoppedEarly = true;
             break;
           }
           continue; // Nunca grava Base64 no Markdown/Firestore
         }
+        consecutiveFailures = 0;
         if (MedTutorFirebaseService.lastClinicalImageStorageProvider) {
           storageProviders.add(MedTutorFirebaseService.lastClinicalImageStorageProvider);
         }
+        // Só usa a descrição da própria imagem/página. Sem correspondência, a
+        // imagem fica sem descrição em vez de herdar a de outra página.
         const association = visualAssociations.find(item =>
           item?.sourceImageId === image.id ||
           (Number.isFinite(Number(item?.sourcePage)) && Number(item.sourcePage) === Number(image.page))
-        ) || visualAssociations[index] || null;
+        ) || null;
         uploadedImages.push({
           ...image,
           imageUrl: url,
@@ -7385,6 +7486,15 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           studyQuestion: association?.studyQuestion || '',
           source: 'PDF/slide enviado pelo estudante'
         });
+      }
+      const missingCount = selectedImages.length - uploadedImages.length;
+      const unsupportedCount = Number(rawImages.unsupportedCount) || 0;
+      material.imagePersistenceWarning = [
+        missingCount > 0 ? `${missingCount} de ${selectedImages.length} imagem(ns) não puderam ser salvas na nuvem` : '',
+        unsupportedCount > 0 ? `${unsupportedCount} figura(s) do PowerPoint estão em formato que o navegador não lê (EMF/WMF/TIFF)` : ''
+      ].filter(Boolean).join('; ');
+      if (material.imagePersistenceWarning) {
+        showToast(`⚠️ "${material.name}": ${material.imagePersistenceWarning}. Exportar o arquivo como PDF costuma preservar todas as figuras.`);
       }
       if (!uploadedImages.length) {
         const stoppedMessage = persistenceStoppedEarly ? ' A tentativa foi interrompida para evitar repetição de requisições.' : '';
@@ -7628,7 +7738,7 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
         const uploadStatus = material.imagePersistenceError ? 'parcial' : 'sucesso';
         reportUploadDiagnostic(material, uploadStatus);
         showToast(material.imagePersistenceError
-          ? `⚠️ Gemini analisou ${associations.length} figura(s), mas o armazenamento de imagens não persistiu as URLs. Veja o terminal.`
+          ? `⚠️ Gemini analisou ${associations.length} figura(s), mas as imagens não puderam ser salvas na nuvem. Tente enviar o material de novo em alguns minutos.`
           : (associations.length ? `✅ ${associations.length} associação(ões) visuais criada(s) com Gemini.` : 'ℹ️ O Gemini não identificou figuras anatômicas suficientes neste arquivo.'));
       } catch (error) {
         console.error('[Associação visual] Falha no upload universal:', error);
@@ -17171,6 +17281,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     function updateCardDisplay(filteredList) {
       const baseList = filteredList || getFilteredQuestions();
       const list = getSrsFilteredList(baseList);
+      relinkMissingStudyImages(list);
 
       // Atualiza badges de contagem da fila SRS no deck
       const queueCounts = getSrsQueueCounts(baseList);
@@ -18343,6 +18454,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
       }
+      relinkMissingStudyImages(list);
 
       if (typeof updateSuperQuestionsCount === 'function') {
         updateSuperQuestionsCount();
@@ -19334,9 +19446,10 @@ Retorne EXCLUSIVAMENTE um JSON:
         const materials = pool.filter(material => {
           if (!Array.isArray(material?.clinicalImages) || !material.clinicalImages.length) return false;
           if (preferredMaterial) return true;
-          const materialName = normalizeVisualMatchText(material.name || material.originalFileName || '');
+          if (item.sourceMaterialId && material.id === item.sourceMaterialId) return true;
+          const materialNames = [material.name, material.originalFileName].map(normalizeVisualMatchText).filter(Boolean);
           const materialSubject = normalizeVisualMatchText(material.subject || '');
-          return (itemMaterial && materialName === itemMaterial) || (!itemMaterial && itemSubject && materialSubject === itemSubject);
+          return (itemMaterial && materialNames.includes(itemMaterial)) || (!itemMaterial && itemSubject && materialSubject === itemSubject);
         });
         const candidates = materials.flatMap(material => (material.clinicalImages || []).map(image => ({ image, material })));
         if (!candidates.length) return;
@@ -19376,6 +19489,22 @@ Retorne EXCLUSIVAMENTE um JSON:
       return attached;
     }
 
+    // Questões geradas antes de as imagens terminarem de subir, vindas de outro
+    // aparelho ou de material renomeado recebem a figura na hora de exibir. Cada
+    // questão é tentada de novo só quando o total de imagens dos materiais muda.
+    var studyImageRelinkTried = new Set();
+    function relinkMissingStudyImages(items) {
+      if (!Array.isArray(chatDriveMaterials)) return 0;
+      const totalImages = chatDriveMaterials.reduce((sum, material) => sum + (Array.isArray(material?.clinicalImages) ? material.clinicalImages.length : 0), 0);
+      if (!totalImages) return 0;
+      const pending = (items || []).filter(item => item?.id && !getStudySupportImage(item) && !studyImageRelinkTried.has(`${item.id}:${totalImages}`));
+      if (!pending.length) return 0;
+      pending.forEach(item => studyImageRelinkTried.add(`${item.id}:${totalImages}`));
+      const attached = attachMaterialImagesToStudyItems(pending);
+      if (attached) saveSharedQuestionsBank();
+      return attached;
+    }
+
     function renderStudySupportImage(item, { asStimulus = false } = {}) {
       const image = getStudySupportImage(item);
       if (!image?.imageUrl) return '';
@@ -19392,9 +19521,59 @@ Retorne EXCLUSIVAMENTE um JSON:
         ? 'Use a figura do material como estímulo para responder. A identificação e a explicação aparecem após a correção.'
         : `🖼️ <strong>O que observar:</strong> ${title}. <strong>Estrutura/tema:</strong> ${structure}. <strong>Função/mecanismo:</strong> ${functionOrMechanism}. <strong>Se alterada:</strong> ${consequence}. <span style="opacity:.8">Fonte: ${source}</span>`;
       return `<figure style="margin: 12px 0 4px; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-surface);">
-        <img src="${escapeHtml(image.thumbnailUrl || image.imageUrl)}" alt="${title}" loading="lazy" style="display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: 6px; background: #fff;">
+        <img src="${escapeHtml(image.thumbnailUrl || image.imageUrl)}" alt="${title}" loading="lazy" data-question-id="${escapeHtml(item.id || '')}" data-page="${escapeHtml(String(image.page || ''))}" onerror="handleStudyImageError(this)" style="display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: 6px; background: #fff;">
         <figcaption style="font-size: 10.5px; color: var(--text-secondary); margin-top: 6px; line-height: 1.45;">${caption}</figcaption>
       </figure>`;
+    }
+
+    // Caminho do arquivo dentro do bucket a partir de uma URL assinada do Supabase.
+    function supabaseSignedImagePath(url, bucket) {
+      const match = String(url || '').match(/\/storage\/v1\/object\/sign\/([^/?]+)\/([^?]+)/);
+      if (!match || (bucket && decodeURIComponent(match[1]) !== bucket)) return null;
+      return decodeURIComponent(match[2]);
+    }
+
+    // Os links assinados das figuras valem 1 ano. Quando um link vence ou falha,
+    // tenta gerar um novo (funciona no navegador que enviou a imagem) e atualiza
+    // a questão e o material; se não der, troca a imagem quebrada por um aviso.
+    async function handleStudyImageError(img) {
+      if (!img || img.dataset.renewAttempted === 'true') return showStudyImageUnavailable(img);
+      img.dataset.renewAttempted = 'true';
+      const brokenUrl = img.getAttribute('src');
+      // Imagens da internet (Wikimedia, NIH) não têm link renovável.
+      if (!supabaseSignedImagePath(brokenUrl)) return showStudyImageUnavailable(img);
+      try {
+        const { client, config } = await getSupabaseStorageClient();
+        const path = supabaseSignedImagePath(brokenUrl, config.bucket);
+        if (!path) throw new Error('A imagem não é do armazenamento do MedTutor.');
+        const { data, error } = await client.storage.from(config.bucket).createSignedUrl(path, 60 * 60 * 24 * 365);
+        if (error || !data?.signedUrl) throw error || new Error('Sem link renovado.');
+        const sameFile = url => supabaseSignedImagePath(url, config.bucket) === path;
+        sharedQuestionsBank.forEach(question => [question.medicalImage, ...(question.medicalImages || [])].forEach(image => {
+          if (image && sameFile(image.imageUrl)) { image.imageUrl = data.signedUrl; image.thumbnailUrl = data.signedUrl; }
+        }));
+        (chatDriveMaterials || []).forEach(material => (material.clinicalImages || []).forEach(image => {
+          if (image && sameFile(image.imageUrl)) { image.imageUrl = data.signedUrl; image.thumbnailUrl = data.signedUrl; }
+        }));
+        saveSharedQuestionsBank();
+        saveChatDriveMaterials();
+        img.src = data.signedUrl;
+      } catch (error) {
+        console.warn('[Imagens] Não foi possível renovar o link da figura:', error?.message || error);
+        showStudyImageUnavailable(img);
+      }
+    }
+
+    function showStudyImageUnavailable(img) {
+      const figure = img?.closest('figure');
+      if (!figure || figure.dataset.unavailable === 'true') return;
+      figure.dataset.unavailable = 'true';
+      const page = img.dataset.page ? ` (página/slide ${img.dataset.page} do material)` : '';
+      const notice = document.createElement('div');
+      notice.className = 'study-image-unavailable';
+      notice.setAttribute('role', 'note');
+      notice.textContent = `🖼️ A figura desta questão não pôde ser carregada${page}. Consulte o material original ou envie o arquivo de novo para recuperar as imagens.`;
+      img.replaceWith(notice);
     }
 
     async function enrichStudyItemsWithMedicalImages(items) {
@@ -27867,6 +28046,7 @@ Para cada material, retorne um objeto no JSON com:
 
     function renderSceReviewCard(card, index) {
       const question = card.question;
+      relinkMissingStudyImages([question]);
       const rawFront = String(question?.flashcard?.front || question?.question || question?.pergunta || '').trim();
       const sanitizedFront = typeof sanitizeSharedQuestionStem === 'function' ? sanitizeSharedQuestionStem(rawFront) : rawFront;
       const front = typeof isSharedQuestionStemValid === 'function' && !isSharedQuestionStemValid(sanitizedFront) ? rawFront : sanitizedFront;

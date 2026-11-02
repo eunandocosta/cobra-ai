@@ -12194,3 +12194,6 @@
     .app-dialog-overlay, .app-dialog { animation: none; }
     .app-undo-toast { transition: none; }
   }
+
+  /* Figura de questão que não carregou (link vencido ou fonte fora do ar). */
+  .study-image-unavailable { padding: 14px 12px; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; line-height: 1.5; text-align: center; }
