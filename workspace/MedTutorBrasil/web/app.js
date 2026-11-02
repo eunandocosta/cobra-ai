@@ -11310,6 +11310,7 @@ ${cleanText}
     }
 
     function handlePeriodSelectChange(periodVal) {
+      if (activeQuizSet?.kind === 'topic') activeQuizSet = null;
       currentStudyPeriodFilter = periodVal || 'all';
 
       const fcPeriodSelect = document.getElementById('fcPeriodSelect');
@@ -11337,6 +11338,7 @@ ${cleanText}
     }
 
     function handleDisciplineSelectChange(subjectVal) {
+      if (activeQuizSet?.kind === 'topic') activeQuizSet = null;
       if (!subjectVal) return;
       currentStudySubject = subjectVal;
       currentQuizSlideFilter = 'all';
@@ -11532,6 +11534,7 @@ ${cleanText}
     }
 
     function handleSlideSelectChange(slideName) {
+      if (activeQuizSet?.kind === 'topic') activeQuizSet = null;
       currentQuizSlideFilter = slideName;
       const qzSelect = document.getElementById('quizTargetSlideSelect');
       if (qzSelect && qzSelect.value !== slideName) qzSelect.value = slideName;
@@ -16526,8 +16529,12 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       timerId: null,
       elapsedSeconds: 0,
       userChoices: {},
-      finished: false
+      finished: false,
+      timeLimitSeconds: 0
     };
+    // Conjunto de questões em uso no quiz, acima do filtro da disciplina: um
+    // simulado configurado (kind 'exam') ou o treino de um tema (kind 'topic').
+    var activeQuizSet = null;
 
     function setSrsQueueFilter(filter) {
       const allowedFilters = new Set(['new', 'due', 'tomorrow', 'upcoming', 'all']);
@@ -17058,9 +17065,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       const hasFlashcardItems = srsQueueFilter === 'curated'
         ? institutionCuratedStudyQuestions.some(item => getCuratedQuestionTypes(item).flashcards)
         : filtered.length > 0;
-      const hasQuizItems = isQuizCurationFilterActive
+      const hasQuizItems = activeQuizSet ? true : (isQuizCurationFilterActive
         ? institutionCuratedStudyQuestions.some(item => getCuratedQuestionTypes(item).quizzes)
-        : filtered.some(item => !item.flashcardOnly);
+        : filtered.some(item => !item.flashcardOnly));
 
       if (fcEmpty) fcEmpty.style.display = hasFlashcardItems ? 'none' : 'flex';
       if (fcDeck) fcDeck.style.display = hasFlashcardItems ? 'block' : 'none';
@@ -18304,26 +18311,166 @@ Retorne EXCLUSIVAMENTE um JSON:
 
     // 4.3 Modos de Quiz: Tutor (Feedback Imediato) vs Simulado ENARE (Cronometrado)
     function setQuizStudyMode(mode) {
-      quizStudyMode = mode;
-      const btnTutor = document.getElementById('btnQuizModeTutor');
-      const btnExam = document.getElementById('btnQuizModeExam');
+      // O Simulado agora é configurado antes de começar (escopo, quantidade e tempo).
+      if (mode === 'exam') {
+        openExamSetupDialog();
+        return;
+      }
+      quizStudyMode = 'tutor';
+      document.getElementById('btnQuizModeTutor')?.classList.add('active');
+      document.getElementById('btnQuizModeExam')?.classList.remove('active');
       const controls = document.getElementById('quizExamControls');
       const resultBanner = document.getElementById('quizExamResultBanner');
+      if (controls) controls.style.display = 'none';
+      if (resultBanner) resultBanner.style.display = 'none';
+      stopExamTimer();
+      if (activeQuizSet?.kind === 'exam') activeQuizSet = null;
+      showToast('🩺 Modo Tutor ativado. Feedback imediato habilitado.');
+      renderSharedStudyItems();
+    }
 
-      if (btnTutor) btnTutor.classList.toggle('active', mode === 'tutor');
-      if (btnExam) btnExam.classList.toggle('active', mode === 'exam');
+    function isQuizCapableQuestion(question) {
+      if (!question || question.flashcardOnly) return false;
+      const options = question.quizOptions || question.alternativas || question.options;
+      return Array.isArray(options) && options.length >= 2 && resolveQuizCorrectIndex(question) >= 0;
+    }
 
-      if (mode === 'exam') {
-        if (controls) controls.style.display = 'flex';
-        if (resultBanner) resultBanner.style.display = 'none';
-        startExamTimer();
-        showToast('⏱️ Modo Simulado ENARE ativado. Cronômetro iniciado!');
-      } else {
-        if (controls) controls.style.display = 'none';
-        stopExamTimer();
-        showToast('🩺 Modo Tutor ativado. Feedback imediato habilitado.');
+    function shuffleQuestions(list) {
+      const copy = list.slice();
+      for (let index = copy.length - 1; index > 0; index--) {
+        const swap = Math.floor(Math.random() * (index + 1));
+        [copy[index], copy[swap]] = [copy[swap], copy[index]];
       }
-      renderQuizzesList();
+      return copy;
+    }
+
+    function getActiveQuizSetItems() {
+      if (!activeQuizSet) return null;
+      const byId = new Map(sharedQuestionsBank.map(question => [question.id, question]));
+      return activeQuizSet.ids.map(id => byId.get(id)).filter(Boolean);
+    }
+
+    function clearActiveQuizSet({ render = true } = {}) {
+      if (!activeQuizSet) return;
+      if (activeQuizSet.kind === 'exam') {
+        setQuizStudyMode('tutor');
+        return;
+      }
+      activeQuizSet = null;
+      if (render) renderSharedStudyItems();
+    }
+
+    // Questões disponíveis para o simulado em cada escopo.
+    function getExamQuestionPool(scope) {
+      let pool;
+      if (scope === 'subject') {
+        pool = getFilteredQuestions();
+      } else if (scope === 'period' && currentStudyPeriodFilter && currentStudyPeriodFilter !== 'all') {
+        const names = getDisciplinesForPeriod(currentStudyPeriodFilter).map(discipline => discipline.name);
+        pool = sharedQuestionsBank.filter(question => names.some(name => isSameCurriculumSubject(question.subject || question.disciplina, name)));
+      } else {
+        pool = sharedQuestionsBank.slice();
+      }
+      return pool.filter(isQuizCapableQuestion);
+    }
+
+    function getExamScopeLabel(scope) {
+      if (scope === 'subject') return currentStudySubject || 'Disciplina atual';
+      if (scope === 'period' && currentStudyPeriodFilter && currentStudyPeriodFilter !== 'all') return `Todas as disciplinas do ${currentStudyPeriodFilter}`;
+      return 'Todas as disciplinas';
+    }
+
+    // Diálogo de configuração do simulado: escopo, quantidade e tempo de prova.
+    function openExamSetupDialog() {
+      document.querySelector('.exam-setup-overlay')?.remove();
+      const scopes = ['subject', 'period', 'all']
+        .filter(scope => scope !== 'period' || (currentStudyPeriodFilter && currentStudyPeriodFilter !== 'all'))
+        .map(scope => ({ scope, label: getExamScopeLabel(scope), count: getExamQuestionPool(scope).length }));
+      const history = readExamHistory();
+      const overlay = document.createElement('div');
+      overlay.className = 'app-dialog-overlay exam-setup-overlay';
+      overlay.innerHTML = `<form class="app-dialog exam-setup" role="dialog" aria-modal="true" aria-labelledby="examSetupTitle">
+        <h3 class="app-dialog-title" id="examSetupTitle">⏱️ Montar simulado</h3>
+        <fieldset class="exam-setup-group"><legend>Questões de</legend>
+          ${scopes.map((item, index) => `<label class="exam-setup-option"><input type="radio" name="examScope" value="${item.scope}" ${index === 0 ? 'checked' : ''} ${item.count ? '' : 'disabled'}><span>${escapeHtml(item.label)} <small>${item.count} ${item.count === 1 ? 'questão' : 'questões'}</small></span></label>`).join('')}
+        </fieldset>
+        <fieldset class="exam-setup-group"><legend>Quantidade</legend>
+          <div class="exam-setup-chips">${[10, 20, 30, 50].map((count, index) => `<label class="exam-setup-chip"><input type="radio" name="examCount" value="${count}" ${index === 1 ? 'checked' : ''}><span>${count}</span></label>`).join('')}<label class="exam-setup-chip"><input type="radio" name="examCount" value="all"><span>Todas</span></label></div>
+        </fieldset>
+        <fieldset class="exam-setup-group"><legend>Tempo</legend>
+          <label class="exam-setup-option"><input type="radio" name="examTime" value="exam" checked><span>Ritmo de prova <small>3 min por questão, com contagem regressiva</small></span></label>
+          <label class="exam-setup-option"><input type="radio" name="examTime" value="free"><span>Sem limite <small>só cronômetro</small></span></label>
+        </fieldset>
+        <p class="exam-setup-summary" id="examSetupSummary" aria-live="polite"></p>
+        ${history.length ? `<div class="exam-history-mini"><strong>Seus últimos simulados</strong>${renderExamHistoryBars(history)}</div>` : ''}
+        <div class="app-dialog-actions"><button type="button" class="app-dialog-button app-dialog-cancel">Cancelar</button><button type="submit" class="app-dialog-button app-dialog-confirm">Começar simulado</button></div>
+      </form>`;
+      const form = overlay.firstElementChild;
+      const previousFocus = document.activeElement;
+      const readConfig = () => {
+        const data = new FormData(form);
+        const scope = data.get('examScope') || 'subject';
+        const available = scopes.find(item => item.scope === scope)?.count || 0;
+        const requested = data.get('examCount') === 'all' ? available : Number(data.get('examCount'));
+        return { scope, count: Math.min(available, requested), timeMode: data.get('examTime') || 'exam', available };
+      };
+      const updateSummary = () => {
+        const config = readConfig();
+        const minutes = config.timeMode === 'exam' ? ` em ${config.count * 3} min` : ' sem limite de tempo';
+        form.querySelector('#examSetupSummary').textContent = config.count
+          ? `${config.count} ${config.count === 1 ? 'questão sorteada' : 'questões sorteadas'}${minutes}.`
+          : 'Não há questões neste escopo. Gere questões ou escolha outro escopo.';
+        form.querySelector('.app-dialog-confirm').disabled = !config.count;
+      };
+      const close = () => { document.removeEventListener('keydown', onKey, true); overlay.remove(); previousFocus?.focus?.(); };
+      const onKey = event => { if (event.key === 'Escape') { event.preventDefault(); close(); } };
+      form.addEventListener('change', updateSummary);
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const config = readConfig();
+        if (!config.count) return;
+        close();
+        startConfiguredExam(config);
+      });
+      form.querySelector('.app-dialog-cancel').addEventListener('click', close);
+      overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+      document.addEventListener('keydown', onKey, true);
+      document.body.appendChild(overlay);
+      updateSummary();
+      form.querySelector('input:checked')?.focus();
+    }
+
+    function startConfiguredExam({ scope = 'subject', count = 20, timeMode = 'exam' } = {}) {
+      const selected = shuffleQuestions(getExamQuestionPool(scope)).slice(0, count);
+      if (!selected.length) {
+        showToast('Não há questões disponíveis para este simulado.');
+        return;
+      }
+      quizStudyMode = 'exam';
+      activeQuizSet = { kind: 'exam', ids: selected.map(question => question.id), label: `Simulado • ${getExamScopeLabel(scope)}` };
+      document.getElementById('btnQuizModeExam')?.classList.add('active');
+      document.getElementById('btnQuizModeTutor')?.classList.remove('active');
+      const controls = document.getElementById('quizExamControls');
+      const resultBanner = document.getElementById('quizExamResultBanner');
+      if (controls) controls.style.display = 'flex';
+      if (resultBanner) resultBanner.style.display = 'none';
+      quizExamState.timeLimitSeconds = timeMode === 'exam' ? selected.length * 180 : 0;
+      quizExamState.scopeLabel = getExamScopeLabel(scope);
+      startExamTimer();
+      quizCarouselIndex = 0;
+      renderSharedStudyItems();
+      document.getElementById('quizDeck')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showToast(quizExamState.timeLimitSeconds
+        ? `⏱️ Simulado com ${selected.length} questões: ${selected.length * 3} min. Boa prova!`
+        : `⏱️ Simulado com ${selected.length} questões, sem limite de tempo.`);
+    }
+
+    function formatExamClock(totalSeconds) {
+      const safe = Math.max(0, Math.round(totalSeconds));
+      const hours = Math.floor(safe / 3600);
+      const mins = String(Math.floor((safe % 3600) / 60)).padStart(2, '0');
+      const secs = String(safe % 60).padStart(2, '0');
+      return hours ? `${hours}:${mins}:${secs}` : `${mins}:${secs}`;
     }
 
     function startExamTimer() {
@@ -18333,13 +18480,32 @@ Retorne EXCLUSIVAMENTE um JSON:
       quizExamState.elapsedSeconds = 0;
       quizExamState.userChoices = {};
       quizExamState.finished = false;
+      quizExamState.timedOut = false;
 
       const timerEl = document.getElementById('quizExamTimer');
+      const paint = () => {
+        const limit = quizExamState.timeLimitSeconds || 0;
+        if (!timerEl) return;
+        timerEl.textContent = limit
+          ? `⏳ ${formatExamClock(limit - quizExamState.elapsedSeconds)} restantes`
+          : `⏱️ ${formatExamClock(quizExamState.elapsedSeconds)}`;
+        timerEl.classList.toggle('is-ending', Boolean(limit) && limit - quizExamState.elapsedSeconds <= 300);
+      };
+      paint();
       quizExamState.timerId = setInterval(() => {
-        quizExamState.elapsedSeconds++;
-        const mins = String(Math.floor(quizExamState.elapsedSeconds / 60)).padStart(2, '0');
-        const secs = String(quizExamState.elapsedSeconds % 60).padStart(2, '0');
-        if (timerEl) timerEl.textContent = `⏱️ ${mins}:${secs}`;
+        // Usa o relógio real: abas em segundo plano atrasam o setInterval.
+        quizExamState.elapsedSeconds = Math.floor((Date.now() - quizExamState.startTime) / 1000);
+        paint();
+        const limit = quizExamState.timeLimitSeconds || 0;
+        if (!limit) return;
+        const remaining = limit - quizExamState.elapsedSeconds;
+        if (remaining === 300) showToast('⏳ Faltam 5 minutos para o fim do simulado.');
+        if (remaining <= 0) {
+          quizExamState.timedOut = true;
+          quizExamState.elapsedSeconds = limit;
+          showToast('⌛ Tempo esgotado! O simulado foi corrigido automaticamente.');
+          finishExamMode();
+        }
       }, 1000);
     }
 
@@ -18352,10 +18518,13 @@ Retorne EXCLUSIVAMENTE um JSON:
     }
 
     function finishExamMode() {
+      if (quizExamState.finished) return;
       stopExamTimer();
       quizExamState.finished = true;
+      const examControls = document.getElementById('quizExamControls');
+      if (examControls) examControls.style.display = 'none';
 
-      const list = getFilteredQuestions();
+      const list = getActiveQuizSetItems() || getFilteredQuestions();
       if (list.length === 0) return;
 
       let correctCount = 0;
@@ -18375,6 +18544,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         if (isCorrect) item.quizStats.correct++;
         item.quizStats.lastChoice = userChoice;
         item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
+        if (typeof userChoice === 'number') recordQuizAnswerHistory(item, isCorrect);
         if (typeof userChoice === 'number' && !isCorrect) scheduleQuizMistakeReview(item);
 
         // Estatística por área
@@ -18410,6 +18580,21 @@ Retorne EXCLUSIVAMENTE um JSON:
       const scorePct = Math.round((correctCount / total) * 100);
       const mins = String(Math.floor(quizExamState.elapsedSeconds / 60)).padStart(2, '0');
       const secs = String(quizExamState.elapsedSeconds % 60).padStart(2, '0');
+      const examHistory = recordExamHistory({
+        date: new Date().toISOString(),
+        scope: quizExamState.scopeLabel || currentStudySubject || 'Simulado',
+        total,
+        answered: answeredItems.length,
+        correct: correctCount,
+        pct: scorePct,
+        durationSec: quizExamState.elapsedSeconds,
+        timeLimitSec: quizExamState.timeLimitSeconds || 0,
+        timedOut: Boolean(quizExamState.timedOut)
+      });
+      const previousExam = examHistory[examHistory.length - 2];
+      const trendText = previousExam
+        ? (scorePct === previousExam.pct ? 'mesma nota do simulado anterior' : `${scorePct > previousExam.pct ? '▲ +' : '▼ '}${scorePct - previousExam.pct} pontos em relação ao simulado anterior`)
+        : 'primeiro simulado registrado';
 
       const banner = document.getElementById('quizExamResultBanner');
       if (banner) {
@@ -18421,8 +18606,9 @@ Retorne EXCLUSIVAMENTE um JSON:
                 📊 Relatório de Desempenho do Simulado ENARE
               </div>
               <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
-                Tempo total de resolução: <strong>${mins}m ${secs}s</strong> • Média: ${(quizExamState.elapsedSeconds / total).toFixed(1)}s por questão
+                Tempo total de resolução: <strong>${mins}m ${secs}s</strong>${quizExamState.timedOut ? ' (tempo esgotado)' : ''} • Média: ${(quizExamState.elapsedSeconds / total).toFixed(1)}s por questão • ${answeredItems.length} de ${total} respondidas
               </div>
+              <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(quizExamState.scopeLabel || '')} • ${trendText}</div>
             </div>
             <div style="font-size: 22px; font-weight: 800; color: ${scorePct >= 70 ? '#00ff66' : (scorePct >= 50 ? '#ffaa00' : 'var(--danger)')};">
               ${scorePct}% de Acerto (${correctCount}/${total})
@@ -18440,6 +18626,8 @@ Retorne EXCLUSIVAMENTE um JSON:
             `).join('')}
           </div>
 
+          <div class="exam-history-mini"><strong>Evolução nos simulados</strong>${renderExamHistoryBars(examHistory)}</div>
+
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <span style="font-size: 12px; color: var(--text-secondary);">
               🔍 Todas as questões abaixo foram corrigidas com o comentário tripartido e a análise de distratores aberta.
@@ -18456,12 +18644,79 @@ Retorne EXCLUSIVAMENTE um JSON:
       showToast(`🏁 Simulado finalizado! Nota: ${scorePct}% (${correctCount}/${total})`);
     }
 
+    function examHistoryStorageKey() {
+      let uid = 'local';
+      try { uid = MedTutorFirebaseService.getUserId() || 'local'; } catch (error) {}
+      return `medtutor_exam_history_v1_${uid}`;
+    }
+
+    function readExamHistory() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(examHistoryStorageKey()) || '[]');
+        return Array.isArray(parsed) ? parsed.filter(entry => entry && typeof entry.pct === 'number') : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    // Guarda os 30 simulados mais recentes neste aparelho para mostrar a evolução.
+    function recordExamHistory(entry) {
+      const history = readExamHistory().concat([entry]).slice(-30);
+      try { localStorage.setItem(examHistoryStorageKey(), JSON.stringify(history)); } catch (error) {}
+      return history;
+    }
+
+    function renderExamHistoryBars(history) {
+      const recent = (history || []).slice(-8);
+      if (!recent.length) return '';
+      return `<div class="exam-history-bars" role="list">${recent.map(entry => {
+        const date = new Date(entry.date);
+        const label = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const tone = entry.pct >= 70 ? 'good' : (entry.pct >= 50 ? 'mid' : 'low');
+        return `<div class="exam-history-bar" role="listitem" title="${escapeHtml(`${label} • ${entry.scope || 'Simulado'} • ${entry.correct}/${entry.total}`)}" aria-label="${escapeHtml(`${label}: ${entry.pct}% de acerto em ${entry.total} questões`)}"><span class="exam-history-value">${entry.pct}%</span><span class="exam-history-track"><i class="tone-${tone}" style="height:${Math.max(4, entry.pct)}%"></i></span><small>${label}</small></div>`;
+      }).join('')}</div>`;
+    }
+
+    // Histórico curto de respostas por questão (data e acerto) para a evolução
+    // semanal e o desempenho por tema. Sobe para a nuvem junto com quizStats.
+    function recordQuizAnswerHistory(item, isCorrect, now = new Date()) {
+      if (!item) return;
+      if (!item.quizStats) item.quizStats = { attempts: 0, correct: 0, lastChoice: null, lastStatus: 'unanswered' };
+      const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const history = Array.isArray(item.quizStats.history) ? item.quizStats.history : [];
+      item.quizStats.history = history.concat([{ d: day, ok: Boolean(isCorrect) }]).slice(-20);
+    }
+
+    function renderActiveQuizSetBanner(setItems) {
+      const deck = document.getElementById('quizDeck');
+      if (!deck) return;
+      let banner = document.getElementById('quizActiveSetBanner');
+      if (!activeQuizSet) { banner?.remove(); return; }
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'quizActiveSetBanner';
+        banner.className = 'quiz-active-set-banner';
+        banner.setAttribute('role', 'status');
+        deck.parentNode.insertBefore(banner, deck);
+      }
+      const exam = activeQuizSet.kind === 'exam';
+      const action = exam ? (quizExamState.finished ? 'Novo simulado' : 'Abandonar simulado') : 'Sair do treino';
+      banner.innerHTML = `<span><strong>${escapeHtml(activeQuizSet.label)}</strong> • ${(setItems || []).length} ${(setItems || []).length === 1 ? 'questão' : 'questões'}</span><button type="button" class="btn-outline-action">${action}</button>`;
+      banner.querySelector('button').onclick = async () => {
+        if (exam && quizExamState.finished) return openExamSetupDialog();
+        if (exam && !quizExamState.finished && !await appConfirm('As respostas marcadas até agora não serão corrigidas nem entram no histórico.', { title: 'Abandonar o simulado?', confirmLabel: 'Abandonar', tone: 'danger' })) return;
+        clearActiveQuizSet();
+      };
+    }
+
     function renderQuizzesList(filteredList) {
       const quizDeck = document.getElementById('quizDeck');
       if (!quizDeck) return;
       loadInstitutionCuratedQuestions(currentStudySubject);
       quizDeck.innerHTML = '';
-      const ordinaryList = (filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
+      const setItems = getActiveQuizSetItems();
+      const ordinaryList = (setItems || filteredList || getFilteredQuestions()).filter(item => !item.flashcardOnly);
+      renderActiveQuizSetBanner(setItems);
       const curatedList = institutionCuratedStudyQuestions.filter(item => getCuratedQuestionTypes(item).quizzes);
       let list = isQuizCurationFilterActive ? curatedList.slice() : ordinaryList;
 
@@ -18806,6 +19061,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       const wasMistake = item.quizStats.lastStatus === 'incorrect';
       item.quizStats.lastChoice = optIdx;
       item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
+      recordQuizAnswerHistory(item, isCorrect);
       if (!isCorrect && scheduleQuizMistakeReview(item)) showToast('🔁 Questão agendada para revisão amanhã e guardada no Caderno de Erros.');
       else if (isCorrect && wasMistake) showToast('✅ Acertou! A questão saiu do Caderno de Erros.');
       saveSharedQuestionsBank();
@@ -22793,22 +23049,9 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
         return;
       }
 
-      const shuffled = available.slice().sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, Math.min(10, Math.max(5, shuffled.length)));
-
       currentQuizSlideFilter = 'all';
-      quizStudyMode = 'exam';
-      quizExamState = { active: true, finished: false, userChoices: {} };
-
-      const modeBtn = document.getElementById('btnModeExam');
-      if (modeBtn) setQuizStudyMode('exam');
-
-      renderQuizzesList(selected);
-
-      const deckEl = document.getElementById('quizDeck');
-      if (deckEl) deckEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-      showToast(`🎲 Banco Global Ativado! Simulado rápido com ${selected.length} questões de todos os slides de "${targetSubj}".`);
+      startConfiguredExam({ scope: 'subject', count: 10, timeMode: 'free' });
+      showToast(`🎲 Banco Global Ativado! Simulado rápido com até 10 questões de todos os slides de "${targetSubj}".`);
     }
 
     // 6.5 Super Questões (★)
@@ -28538,7 +28781,106 @@ Para cada material, retorne um objeto no JSON com:
         || isSameCurriculumSubject(item.name, materialSubject)) || null;
     }
 
+    // ===== Desempenho por tema e evolução semanal =====
+    var studyTopicGroups = new Map();
+
+    function getStudyTopicLabel(question) {
+      return String(question.topic || question.disease || question.flashcardTitle || question.slideName || '').replace(/\s+/g, ' ').trim() || 'Tema não identificado';
+    }
+
+    // Agrupa as questões já respondidas por disciplina + tema e soma acertos/erros.
+    function getTopicPerformance(questions = sharedQuestionsBank) {
+      const groups = new Map();
+      (questions || []).forEach(question => {
+        const attempts = Number(question?.quizStats?.attempts) || 0;
+        if (!attempts || !isQuizCapableQuestion(question)) return;
+        const subject = String(question.subject || question.disciplina || 'Sem disciplina').trim();
+        const label = getStudyTopicLabel(question);
+        const key = `${normalizeVisualMatchText(subject)}|${normalizeVisualMatchText(label)}`;
+        const group = groups.get(key) || { key, subject, label, attempts: 0, correct: 0, mistakes: 0, ids: [] };
+        group.attempts += attempts;
+        group.correct += Math.min(attempts, Number(question.quizStats.correct) || 0);
+        if (isQuizMistake(question)) group.mistakes += 1;
+        group.ids.push(question.id);
+        groups.set(key, group);
+      });
+      return [...groups.values()].map(group => ({ ...group, errors: group.attempts - group.correct, accuracy: Math.round(group.correct / group.attempts * 100) }));
+    }
+
+    // Acerto por semana (segunda a domingo) nas últimas `weeks` semanas.
+    function getWeeklyAccuracy(questions = sharedQuestionsBank, weeks = 8, now = new Date()) {
+      const today = getStartOfDay(now);
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(currentWeekStart.getDate() - ((today.getDay() + 6) % 7));
+      const buckets = Array.from({ length: weeks }, (_, index) => {
+        const start = new Date(currentWeekStart);
+        start.setDate(start.getDate() - (weeks - 1 - index) * 7);
+        return { start, answered: 0, correct: 0 };
+      });
+      (questions || []).forEach(question => (question?.quizStats?.history || []).forEach(entry => {
+        const date = getStartOfDay(new Date(`${entry.d}T12:00:00`));
+        for (let index = buckets.length - 1; index >= 0; index--) {
+          if (date >= buckets[index].start) {
+            const end = new Date(buckets[index].start);
+            end.setDate(end.getDate() + 7);
+            if (date < end) { buckets[index].answered++; if (entry.ok) buckets[index].correct++; }
+            break;
+          }
+        }
+      }));
+      return buckets.map(bucket => ({ ...bucket, pct: bucket.answered ? Math.round(bucket.correct / bucket.answered * 100) : null }));
+    }
+
+    function renderStudyPerformancePanel() {
+      const container = document.getElementById('sceTopicPerformance');
+      if (!container) return;
+      const weekly = getWeeklyAccuracy();
+      const hasWeekly = weekly.some(week => week.answered);
+      const topics = getTopicPerformance().filter(topic => topic.errors > 0)
+        .sort((a, b) => b.errors - a.errors || a.accuracy - b.accuracy)
+        .slice(0, 6);
+      studyTopicGroups = new Map(topics.map(topic => [topic.key, topic]));
+      const weeklyHtml = hasWeekly
+        ? `<div class="exam-history-bars weekly" role="list">${weekly.map((week, index) => {
+            const label = index === weekly.length - 1 ? 'Esta' : week.start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const tone = week.pct == null ? 'empty' : (week.pct >= 70 ? 'good' : (week.pct >= 50 ? 'mid' : 'low'));
+            return `<div class="exam-history-bar" role="listitem" aria-label="${week.pct == null ? `Semana de ${label}: sem respostas` : `Semana de ${label}: ${week.pct}% de acerto em ${week.answered} respostas`}"><span class="exam-history-value">${week.pct == null ? '–' : `${week.pct}%`}</span><span class="exam-history-track"><i class="tone-${tone}" style="height:${week.pct == null ? 0 : Math.max(4, week.pct)}%"></i></span><small>${label}</small></div>`;
+          }).join('')}</div>`
+        : '<p class="study-performance-empty">Responda questões no Quiz para ver aqui o seu acerto semana a semana.</p>';
+      const topicsHtml = topics.length
+        ? `<ul class="study-topic-list">${topics.map(topic => `<li class="study-topic-row">
+            <div class="study-topic-info"><strong>${escapeHtml(topic.label)}</strong><small>${escapeHtml(topic.subject)} • acertou ${topic.correct} de ${topic.attempts} (${topic.accuracy}%)${topic.mistakes ? ` • ${topic.mistakes} no Caderno de Erros` : ''}</small>
+              <span class="study-topic-bar" aria-hidden="true"><i style="width:${topic.accuracy}%"></i></span></div>
+            <button type="button" class="btn-outline-action" data-topic-key="${escapeHtml(topic.key)}">Treinar tema</button>
+          </li>`).join('')}</ul>`
+        : '<p class="study-performance-empty">Nenhum tema com erros por enquanto. Os temas em que você mais errar aparecem aqui.</p>';
+      container.innerHTML = `<div class="study-performance-block"><h4>Acerto por semana</h4>${weeklyHtml}</div><div class="study-performance-block"><h4>Onde focar: temas com mais erros</h4>${topicsHtml}</div>`;
+      container.querySelectorAll('[data-topic-key]').forEach(button => button.addEventListener('click', () => startTopicPractice(button.dataset.topicKey)));
+    }
+
+    // Treino de um tema: abre o Quiz só com as questões daquele tema, erradas primeiro.
+    function startTopicPractice(topicKey) {
+      const topic = studyTopicGroups.get(topicKey);
+      if (!topic) return;
+      if (activeQuizSet?.kind === 'exam' && !quizExamState.finished) {
+        appAlert('Termine ou abandone o simulado em andamento antes de treinar um tema.', { title: 'Simulado em andamento' });
+        return;
+      }
+      const byId = new Map(sharedQuestionsBank.map(question => [question.id, question]));
+      const questions = topic.ids.map(id => byId.get(id)).filter(isQuizCapableQuestion)
+        .sort((a, b) => Number(isQuizMistake(b)) - Number(isQuizMistake(a)));
+      if (!questions.length) return;
+      if (quizStudyMode === 'exam') setQuizStudyMode('tutor');
+      questions.forEach(question => { delete quizTutorChoices[question.id]; });
+      activeQuizSet = { kind: 'topic', ids: questions.map(question => question.id), label: `Treino • ${topic.label}` };
+      quizCarouselIndex = 0;
+      navigateTab('quizzes');
+      renderSharedStudyItems();
+      showToast(`🎯 Treinando "${topic.label}": ${questions.length} ${questions.length === 1 ? 'questão' : 'questões'}, erradas primeiro.`);
+    }
+
     function renderSceBars() {
+      renderStudyPerformancePanel();
       const container = document.getElementById('sceDisciplineBars');
       if (!container) return;
 
