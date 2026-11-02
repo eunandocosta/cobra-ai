@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261102-img-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261102-loop-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -1006,6 +1006,11 @@
                   ⭐ Super Questões (<span id="qzSuperCount">0</span>)
                 </button>
 
+                <!-- CADERNO DE ERROS -->
+                <button class="btn-outline-action" id="qzMistakesBtn" onclick="toggleMistakeNotebookFilter()" aria-pressed="false" title="Refazer só as questões que você errou na última tentativa">
+                  ❌ Caderno de Erros (<span id="qzMistakesCount">0</span>)
+                </button>
+
                 <!-- CENTRAL DE DESAFIOS PvP -->
                 <button class="btn-outline-action" id="qzPvpBtn" style="border-color: rgba(255, 68, 68, 0.45); color: #ff6666;" onclick="openPvpChallengeModal()" title="Batalha rápida PvP contra colega de turma ou Residente IA">
                   ⚔️ Desafio PvP
@@ -1029,6 +1034,9 @@
                     </div>
                     <div class="dropdown-item" onclick="toggleSuperQuestionsFilter('qz')">
                       ⭐ Filtrar Super Questões (★)
+                    </div>
+                    <div class="dropdown-item" onclick="toggleMistakeNotebookFilter()">
+                      ❌ Caderno de Erros (refazer o que errei)
                     </div>
                     <div class="dropdown-item" onclick="openPvpChallengeModal()">
                       ⚔️ Central de Desafios (PvP)
@@ -1184,9 +1192,9 @@
                 <svg class="icon" style="color: var(--neon);" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
                 Roteiro Adaptativo de Estudos ("Waze da Medicina")
               </div>
-              <div id="wazeStatusTag" class="waze-status-tag delayed">
+              <div id="wazeStatusTag" class="waze-status-tag on-track">
                 <svg class="icon" style="width: 14px; height: 14px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span id="wazeStatusLabel">2 Tarefas Atrasadas</span>
+                <span id="wazeStatusLabel">Calculando rota…</span>
               </div>
             </div>
 
@@ -1199,7 +1207,7 @@
                 <svg class="icon" id="recalcIcon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                 <span id="recalcBtnText">Recalcular Rota Agora</span>
               </button>
-              <span style="font-size: 12px; color: var(--text-muted);" id="lastRecalcInfo">Última otimização: hoje às 08:30</span>
+              <span style="font-size: 12px; color: var(--text-muted);" id="lastRecalcInfo">Última otimização: calculando…</span>
             </div>
           </div>
 
@@ -4192,7 +4200,7 @@
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/gamification-frames.js?v=20261025-light-v1"></script>
   <script defer src="/material-icons.js?v=20261024-frames-v1"></script>
-  <script defer src="/app.min.js?v=20261102-img-v1"></script>
+  <script defer src="/app.min.js?v=20261102-loop-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {

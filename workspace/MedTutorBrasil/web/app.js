@@ -8559,6 +8559,22 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
     }
 
     // 3.2 Motor de Repetição Espaçada SM-2 (SuperMemo / Padrão Anki)
+    // Errar no quiz (Tutor ou Simulado) traz a questão de volta para a revisão de
+    // amanhã nos Flashcards e no SCE, como um "Repetir" do SRS. Acertos não mexem
+    // na agenda, e vários erros no mesmo dia contam como um só.
+    function scheduleQuizMistakeReview(item, now = new Date()) {
+      if (!item) return false;
+      const previous = item.srs || null;
+      const lastEntry = Array.isArray(previous?.history) ? previous.history[previous.history.length - 1] : null;
+      if (lastEntry?.source === 'quiz' && lastEntry.rating === 1 && getStartOfDay(new Date(lastEntry.date)).getTime() === getStartOfDay(now).getTime()) return false;
+      const next = calculateSrsNext(previous, 1);
+      // Um card que já vencia antes de amanhã não é adiado pelo erro.
+      if (previous?.lastReviewed && previous.dueDate && new Date(previous.dueDate) < new Date(next.dueDate)) next.dueDate = previous.dueDate;
+      next.history[next.history.length - 1].source = 'quiz';
+      item.srs = next;
+      return true;
+    }
+
     function calculateSrsNext(currentSrs, rating) {
       let srs = currentSrs ? Object.assign({}, currentSrs) : {
         reps: 0,
@@ -18359,6 +18375,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         if (isCorrect) item.quizStats.correct++;
         item.quizStats.lastChoice = userChoice;
         item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
+        if (typeof userChoice === 'number' && !isCorrect) scheduleQuizMistakeReview(item);
 
         // Estatística por área
         const area = item.areaLabel || 'Clínica Médica';
@@ -18368,6 +18385,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       });
 
       saveSharedQuestionsBank();
+      updateMistakeNotebookCount();
       renderSceBars();
 
       if (answeredItems.length) {
@@ -18454,6 +18472,8 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
       }
+      if (isMistakeNotebookFilterActive) list = list.filter(isQuizMistake);
+      updateMistakeNotebookCount();
       relinkMissingStudyImages(list);
 
       if (typeof updateSuperQuestionsCount === 'function') {
@@ -18470,6 +18490,21 @@ Retorne EXCLUSIVAMENTE um JSON:
                 Esta matéria ainda não possui perguntas salvas na curadoria da instituição. Usuários com papel Partner ou Administradores podem selecionar as questões prioritárias para a faculdade.
               </p>
               <button class="btn-outline-action primary" onclick="toggleCurationFilter('quizzes')" style="font-size: 12px; margin: 0 auto;">
+                Ver Todas as Questões da Matéria
+              </button>
+            </div>
+          `;
+          return;
+        }
+        if (isMistakeNotebookFilterActive) {
+          quizDeck.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; background: var(--bg-surface); border: 1px dashed var(--border); border-radius: 16px; margin: 16px 0;">
+              <div style="font-size: 38px; margin-bottom: 10px;">🎉</div>
+              <h3 style="font-size: 16px; margin-bottom: 6px; color: var(--text-primary);">Nenhum erro pendente</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); max-width: 440px; margin: 0 auto 14px auto; line-height: 1.5;">
+                Toda questão que você errar em "${escapeHtml(currentStudySubject || 'Geral')}" aparece aqui até você acertá-la.
+              </p>
+              <button class="btn-outline-action primary" onclick="toggleMistakeNotebookFilter()" style="font-size: 12px; margin: 0 auto;">
                 Ver Todas as Questões da Matéria
               </button>
             </div>
@@ -18768,9 +18803,13 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (!item.quizStats) item.quizStats = { attempts: 0, correct: 0, lastChoice: null, lastStatus: 'unanswered' };
       item.quizStats.attempts++;
       if (isCorrect) item.quizStats.correct++;
+      const wasMistake = item.quizStats.lastStatus === 'incorrect';
       item.quizStats.lastChoice = optIdx;
       item.quizStats.lastStatus = isCorrect ? 'correct' : 'incorrect';
+      if (!isCorrect && scheduleQuizMistakeReview(item)) showToast('🔁 Questão agendada para revisão amanhã e guardada no Caderno de Erros.');
+      else if (isCorrect && wasMistake) showToast('✅ Acertou! A questão saiu do Caderno de Erros.');
       saveSharedQuestionsBank();
+      updateMistakeNotebookCount();
       recordFrameCatalogQuizAnswer(item, isCorrect);
       refreshGamificationFramesAfterQuiz();
       showQuizCarouselItem(quizCarouselIndex, { scroll: false });
@@ -19112,6 +19151,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
       }
+      if (isMistakeNotebookFilterActive) list = list.filter(isQuizMistake);
       return list;
     }
 
@@ -20349,6 +20389,12 @@ Retorne EXCLUSIVAMENTE um JSON:
     var pendingUploadQueue = [];
     var currentUploadQueueIndex = 0;
     var isSuperQuestionsFilterActive = false;
+    // Caderno de Erros: questões cuja última resposta foi errada. Ao acertar, a
+    // questão sai do caderno na próxima vez que a lista é montada.
+    var isMistakeNotebookFilterActive = false;
+    function isQuizMistake(question) {
+      return question?.quizStats?.lastStatus === 'incorrect';
+    }
     var pvpBattleState = {
       active: false,
       subject: '',
@@ -22795,6 +22841,29 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
         return isSameCurriculumSubject(q.subject || q.disciplina, targetSubj);
       }).length;
       countEl.textContent = count;
+    }
+
+    function toggleMistakeNotebookFilter() {
+      isMistakeNotebookFilterActive = !isMistakeNotebookFilterActive;
+      const btn = document.getElementById('qzMistakesBtn');
+      if (btn) {
+        btn.classList.toggle('is-active-filter', isMistakeNotebookFilterActive);
+        btn.setAttribute('aria-pressed', String(isMistakeNotebookFilterActive));
+      }
+      // No Tutor uma questão respondida fica travada na sessão; no caderno, as
+      // erradas voltam a ficar respondíveis para o estudante tentar de novo.
+      if (isMistakeNotebookFilterActive) sharedQuestionsBank.filter(isQuizMistake).forEach(question => { delete quizTutorChoices[question.id]; });
+      quizCarouselIndex = 0;
+      renderQuizzesList();
+      showToast(isMistakeNotebookFilterActive ? '❌ Caderno de Erros: refaça o que você errou.' : 'Exibindo todas as questões da matéria.');
+    }
+
+    function updateMistakeNotebookCount() {
+      const countEl = document.getElementById('qzMistakesCount');
+      if (!countEl) return;
+      const targetSubj = currentStudySubject;
+      countEl.textContent = String(sharedQuestionsBank.filter(q => isQuizMistake(q) && !q.flashcardOnly &&
+        (!targetSubj || targetSubj === 'all' || isSameCurriculumSubject(q.subject || q.disciplina, targetSubj))).length);
     }
 
     // 6.6 Atribuição de XP e Central de Desafios PvP (Duelos Clínicos)
@@ -27935,7 +28004,9 @@ Para cada material, retorne um objeto no JSON com:
       return { day: weekday.charAt(0).toUpperCase() + weekday.slice(1), date: formatted };
     }
 
+    var lastStudyRouteRebuildAt = null;
     function rebuildStudyRouteSchedule() {
+      lastStudyRouteRebuildAt = new Date();
       const today = getStartOfDay();
       const canonicalDisciplines = typeof getSceCanonicalDisciplines === 'function'
         ? getSceCanonicalDisciplines()
@@ -28323,6 +28394,10 @@ Para cada material, retorne um objeto no JSON com:
       if (!container) return;
       container.innerHTML = '';
       rebuildStudyRouteSchedule();
+      const lastRecalc = document.getElementById('lastRecalcInfo');
+      if (lastRecalc && lastStudyRouteRebuildAt) {
+        lastRecalc.textContent = `Última otimização: hoje às ${lastStudyRouteRebuildAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      }
 
       if (studyRouteSchedule.length === 0) {
         container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px; width: 100%;">Nenhum roteiro agendado no momento. Conecte o Drive ou faça upload de aulas para traçar sua rota.</div>';
@@ -28398,8 +28473,6 @@ Para cada material, retorne um objeto no JSON com:
 
         if (icon) icon.style.transform = 'none';
         if (text) text.textContent = 'Recalcular Rota Agora';
-        const lastRecalc = document.getElementById('lastRecalcInfo');
-        if (lastRecalc) lastRecalc.textContent = 'Última otimização: agora mesmo';
         renderSceTimeline();
         showToast('🧭 Waze da Medicina: Rota recalculada com sucesso! Tarefas atrasadas equilibradas sem sobrecarga.');
       }, 700);

@@ -12197,3 +12197,6 @@
 
   /* Figura de questão que não carregou (link vencido ou fonte fora do ar). */
   .study-image-unavailable { padding: 14px 12px; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; line-height: 1.5; text-align: center; }
+
+  /* Caderno de Erros ativo. */
+  .btn-outline-action.is-active-filter { background: rgba(255, 99, 99, 0.14); border-color: #ff6b6b; color: #ff8a8a; }
