@@ -28,7 +28,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
   <!-- Contingência de Storage para imagens de materiais; a chave é publicável. -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=20261102-perf-v1">
+  <link rel="stylesheet" href="/styles.css?v=20261102-goal-v1">
   <script>
     // Disponibilidade imediata das funções do modal de impressão de quiz
     function openQuizPrintModal() {
@@ -328,6 +328,9 @@
                 </div>
               </div>
             </div>
+
+            <!-- META DIÁRIA E LEMBRETE -->
+            <div class="home-goal-card" id="homeGoalCard"></div>
 
             <!-- JORNADA DE PRIMEIRO ACESSO / ONBOARDING AMIGÁVEL -->
             <div class="home-onboarding-panel" id="homeOnboardingPanel">
@@ -920,6 +923,9 @@
                 </button>
                 <button class="btn-outline-action primary" onclick="openDerivedQuestionModalFromCurrentFlashcard()" title="Gerar nova pergunta a partir desta explicação com novos contextos">
                   ✨ Pergunta com Contexto
+                </button>
+                <button class="btn-outline-action" onclick="editCurrentCardNote()" title="Escrever uma anotação pessoal neste card">
+                  📝 Anotar
                 </button>
                 <button class="btn-outline-action danger" onclick="confirmDeleteCurrentCard()" title="Remove esta pergunta do Quiz, Flashcards e filas de revisão">
                   🗑️ Eliminar pergunta
@@ -4211,7 +4217,7 @@
   <script defer src="/gamification-rules.js?v=20261006-linear-level-curve-v1"></script>
   <script defer src="/gamification-frames.js?v=20261025-light-v1"></script>
   <script defer src="/material-icons.js?v=20261024-frames-v1"></script>
-  <script defer src="/app.min.js?v=20261102-perf-v1"></script>
+  <script defer src="/app.min.js?v=20261102-goal-v1"></script>
   <script defer src="/announcement-prompt.js?v=20261005-consent-prompt-v1"></script>
   <script>
     window.addEventListener('load', () => {
