@@ -21097,6 +21097,13 @@ Retorne EXCLUSIVAMENTE um JSON:
       return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     }
 
+    // Carga horária e rótulos administrativos do nome ("(48 horas na Atenção
+    // Básica)", "Internato", "Optativas") não dizem nada sobre o conteúdo e
+    // empatavam qualquer aula que citasse "horas" com sete disciplinas de internato.
+    function stripCurriculumLoad(value) {
+      return String(value || '').replace(/\(\s*\d+\s*h(?:oras?)?\b[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
+    }
+
     function curriculumTerms(value, genericTerms) {
       return normalizeCurriculumText(value).split(/[^a-z0-9]+/)
         .filter(term => term.length >= 4 && !genericTerms.has(term));
@@ -21120,8 +21127,8 @@ Retorne EXCLUSIVAMENTE um JSON:
     }
 
     function scoreSubjectContentFit(subject, source, genericTerms) {
-      const subjectName = subject.name || '';
-      const topics = Array.isArray(subject.topics) ? subject.topics : [];
+      const subjectName = stripCurriculumLoad(subject.name || '');
+      const topics = (Array.isArray(subject.topics) ? subject.topics : []).map(stripCurriculumLoad);
       const subjectContext = `${subjectName} ${subject.description || ''} ${topics.join(' ')}`;
       const subjectNormalized = normalizeCurriculumText(subjectName);
       const evidence = [];
@@ -21167,14 +21174,22 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       const domainRules = [
         [/\b(neuro|nervoso|encefal|mening|liquor|avc|epilep|cefale)/, /\b(neuro|nervoso|encefal|mening|liquor|avc|epilep|cefale)/],
-        [/\b(dermat|tegument|cutane|pele|psorias|eczema|urticaria)/, /\b(dermat|tegument|cutane|pele|psorias|eczema|urticaria)/],
+        [/\b(dermat|tegument|cutane|pele|psorias|eczema|urticaria)/, /\b(dermat|tegument|cutane|pele|epiderm|psorias|eczema|urticaria)/],
         [/\b(cardio|coracao|coronari|arritmi|ecg|valvopatia|miocard)/, /\b(cardio|coracao|coronari|arritmi|ecg|valvopatia|miocard)/],
         [/\b(pneumo|pulmon|respirator|asma|dpoc|espirometr)/, /\b(pneumo|pulmon|respirator|asma|dpoc|espirometr)/],
         [/\b(nefro|renal|glomerul|dialise|filtracao)/, /\b(nefro|renal|glomerul|dialise|filtracao)/],
         [/\b(gastro|hepat|figado|pancrea|intestinal)/, /\b(gastro|hepat|figado|pancrea|intestinal)/],
         [/\b(pediatr|infancia|neonat|lactente)/, /\b(pediatr|infancia|neonat|lactente)/],
         [/\b(gineco|obstet|gestac|prenatal|parto)/, /\b(gineco|obstet|gestac|prenatal|parto)/],
-        [/\b(anatom|histolog|embriolog|fisiolog|semiolog|propedeut|farmacolog|patolog)/, /\b(anatom|histolog|embriolog|fisiolog|semiolog|propedeut|farmacolog|patolog)/]
+        // Ciências básicas em grupos separados: uma aula de histologia não pode
+        // pontuar para Farmacologia só por serem ambas "básicas".
+        [/\b(anatom)/, /\b(anatom)/],
+        [/\b(histolog|embriolog|citolog)/, /\b(histolog|embriolog|citolog)/],
+        [/\b(fisiolog)/, /\b(fisiolog)/],
+        [/\b(semiolog|propedeut)/, /\b(semiolog|propedeut)/],
+        [/\b(farmacolog|farmaco)/, /\b(farmacolog|farmacocinet|farmacodinam)/],
+        [/\b(patolog)/, /\b(patolog)/],
+        [/\b(imagem|radiolog)/, /\b(radiograf|radiolog|tomograf|ressonancia|ultrassom|ultrassonograf|raio[- ]?x|mamograf)/]
       ];
       domainRules.forEach(([subjectPattern, documentPattern]) => {
         if (subjectPattern.test(normalizeCurriculumText(subjectContext)) && documentPattern.test(source.combined)) {
@@ -21256,7 +21271,18 @@ Retorne EXCLUSIVAMENTE um JSON:
       ];
 
       // Palavras genéricas médicas que não devem pontuar sozinhas
-      const GENERIC_MED_WORDS = new Set(['medica', 'médica', 'medico', 'médico', 'clinica', 'clínica', 'geral', 'humana', 'humano', 'integrada', 'integracao', 'integração', 'sistemas', 'estudo', 'saude', 'saúde', 'pratica', 'prática', 'curso', 'departamento', 'disciplina', 'modulo', 'módulo']);
+      const GENERIC_MED_WORDS = new Set(['medica', 'médica', 'medico', 'médico', 'clinica', 'clínica', 'geral', 'humana', 'humano', 'humanos', 'integrada', 'integracao', 'integração', 'sistemas', 'estudo', 'saude', 'saúde', 'pratica', 'prática', 'curso', 'departamento', 'disciplina', 'modulo', 'módulo',
+        'horas', 'hora', 'internato', 'semestre', 'periodo', 'período', 'optativa', 'optativas', 'eletiva', 'eletivas', 'estagio', 'estágio', 'supervisionado', 'atividades', 'complementares',
+        // Palavras comuns em nomes de disciplina que não são tema médico
+        // ("Preparação para a Vida Profissional" não é aula sobre "minuto de vida").
+        'vida', 'preparacao', 'preparação', 'profissional', 'profissionais', 'formacao', 'formação', 'cidada', 'cidadã', 'habilidades', 'atitudes', 'acoes', 'ações', 'integrais', 'ensino', 'servico', 'serviço', 'bases', 'metodos', 'métodos', 'aplicada', 'aplicadas', 'topicos', 'tópicos', 'especiais', 'fundamentos', 'introducao', 'introdução', 'nocoes', 'noções', 'extensao', 'extensão', 'curriculares',
+        // Termos que aparecem em qualquer aula clínica e não indicam disciplina.
+        'diagnostico', 'diagnóstico', 'diagnosticos', 'diagnósticos', 'tratamento', 'tratamentos', 'manejo', 'conduta', 'condutas', 'abordagem', 'terapeutica', 'terapêutica']);
+      // Comparação por palavra inteira (sem acento): "sus" não pode bater em
+      // "suspeita", "uti" em "utilizado" nem "esf" em "esfíncter".
+      const combinedNormalized = normalizeCurriculumText(combined);
+      const fileNameNormalized = normalizeCurriculumText(fName);
+      const mentions = (text, term) => hasCurriculumPhrase(text, term);
       const allocationEvidence = getMaterialAllocationEvidence(fName, fText);
 
       // Extração precisa de cabeçalhos institucionais
@@ -21282,7 +21308,7 @@ Retorne EXCLUSIVAMENTE um JSON:
       disciplines.forEach(d => {
         let score = 0;
         const evidence = [];
-        const dNameLower = (d.name || '').toLowerCase();
+        const dNameLower = stripCurriculumLoad(d.name || '').toLowerCase();
         const dPeriodLower = (d.period || '').toLowerCase();
         const dCycle = d.cycle || 'clinico';
 
@@ -21324,7 +21350,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         // 3. Palavras específicas no nome do arquivo (+30 pontos)
         let fileNameHits = 0;
         specificKeywords.forEach(kw => {
-          if (fName.toLowerCase().includes(kw)) {
+          if (mentions(fileNameNormalized, kw)) {
             score += 30;
             fileNameHits++;
             evidence.push(`arquivo "${kw}"`);
@@ -21334,7 +21360,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         // 4. Ocorrências no texto dos slides (+5 pontos cada, max 30)
         let textOccurrences = 0;
         specificKeywords.forEach(kw => {
-          if (combined.includes(kw)) {
+          if (mentions(combinedNormalized, kw)) {
             textOccurrences++;
             evidence.push(kw);
           }
@@ -21344,8 +21370,8 @@ Retorne EXCLUSIVAMENTE um JSON:
         // 5. Tópicos cadastrados na ementa da disciplina (+15 pontos cada)
         if (Array.isArray(d.topics) && d.topics.length > 0) {
           d.topics.forEach(top => {
-            const topStr = String(top).toLowerCase();
-            if (topStr.length >= 4 && combined.includes(topStr)) {
+            const topStr = stripCurriculumLoad(top).toLowerCase();
+            if (topStr.length >= 4 && mentions(combinedNormalized, topStr)) {
               score += 15;
               evidence.push(`tópico "${topStr}"`);
             }
@@ -21372,26 +21398,26 @@ Retorne EXCLUSIVAMENTE um JSON:
 
         // 7. Correlação por Eixo Temático Biomédico
         if (dCycle === 'basico') {
-          const axisHits = EIXO_BASICO.filter(kw => combined.includes(kw));
+          const axisHits = EIXO_BASICO.filter(kw => mentions(combinedNormalized, kw));
           if (axisHits.length > 0) {
             score += Math.min(16, axisHits.length * 4);
             evidence.push('eixo celular/anatômico');
           }
         } else if (dCycle === 'clinico') {
-          const axisHits = EIXO_CLINICO.filter(kw => combined.includes(kw));
+          const axisHits = EIXO_CLINICO.filter(kw => mentions(combinedNormalized, kw));
           if (axisHits.length > 0) {
             score += Math.min(16, axisHits.length * 4);
             evidence.push('eixo clínico-cirúrgico');
           }
           if (dNameLower.includes('semiologia') || dNameLower.includes('farmacologia')) {
-            const propHits = EIXO_PROPEDEUTICO.filter(kw => combined.includes(kw));
+            const propHits = EIXO_PROPEDEUTICO.filter(kw => mentions(combinedNormalized, kw));
             if (propHits.length > 0) {
               score += Math.min(16, propHits.length * 4);
               evidence.push('eixo propedêutico');
             }
           }
         } else if (dCycle === 'internato') {
-          const axisHits = EIXO_INTERNATO.filter(kw => combined.includes(kw));
+          const axisHits = EIXO_INTERNATO.filter(kw => mentions(combinedNormalized, kw));
           if (axisHits.length > 0) {
             score += Math.min(20, axisHits.length * 5);
             evidence.push('eixo emergência/SUS');
@@ -21756,6 +21782,16 @@ DIRETRIZES CIRÚRGICAS:
       return refineAcademicMaterialTitle(rawTitle, fileName, text, diseaseTopic, matchedSubject);
     }
 
+    // Primeiro título real do material, pelas mesmas regras do índice descritivo
+    // (títulos de slide, Markdown ou 1ª linha curta de página), pulando capas e
+    // títulos genéricos como "Introdução", "Objetivos" ou "Sumário".
+    function extractMaterialContentTitle(text) {
+      const index = generateDescriptiveIndexForMaterial(String(text || '').slice(0, 20000), '', '', '');
+      const generic = /^(?:introdu[cç][aã]o|objetivos?(?:\s+da\s+aula)?|sum[aá]rio|apresenta[cç][aã]o|agenda|roteiro|plano\s+de\s+aula|conte[uú]do(?:\s+program[aá]tico)?|aula\s*\d*|caso\s+cl[ií]nico|revis[aã]o|exerc[ií]cios?|quest[oõ]es)$/i;
+      const section = (index.sections || []).find(item => !generic.test(String(item.title || '').trim()));
+      return section ? section.title : '';
+    }
+
     // A IA pode repetir o nome do PDF/slide em "refinedTitle". Quando esse
     // nome é genérico, ele não identifica a aula e não deve sobreviver ao
     // processamento. Priorizamos o conteúdo e o tema efetivamente detectado.
@@ -21776,7 +21812,10 @@ DIRETRIZES CIRÚRGICAS:
       const inferred = generateSmartMaterialTitle(fileName, text, diseaseTopic, matchedSubject);
       const directTopic = String(diseaseTopic || '').trim();
       const subjectLabel = String(matchedSubject || '').replace(/^\d+[ºo]?\s*per[ií]odo\s*[-–]\s*/i, '').trim();
-      const chosen = [aiSuggestedTitle, inferred, directTopic].find(isValid);
+      // O título escrito no próprio material (1º slide, 1º título) vem antes do
+      // nome do arquivo, que costuma ser "aula_iam" ou "Slides 3 FINAL".
+      const contentTitle = extractMaterialContentTitle(text);
+      const chosen = [aiSuggestedTitle, contentTitle, inferred, directTopic].find(isValid);
       if (chosen) return String(chosen).trim().slice(0, 250);
       return subjectLabel ? `${subjectLabel}: Conteúdo de Estudo` : 'Conteúdo de Estudo';
     }
