@@ -15612,7 +15612,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         const quizNotice = quizError
           ? `<section style="margin:14px auto;padding:12px 14px;max-width:820px;border:1px solid #d97706;border-radius:8px;background:#f8fafc;color:#263238;font:10pt Arial,sans-serif;"><strong>Quiz vinculado à revisão</strong><div id="disciplineReviewQuizStatus" style="margin-top:5px;">A revisão foi concluída, mas a geração do quiz falhou: ${escapeHtml(quizError.message)}.</div><button id="disciplineReviewQuizRetry" class="btn-outline-action" type="button" onclick="retryDisciplineReviewQuiz()" style="margin-top:9px;">🔁 Tentar gerar o quiz novamente</button><div style="margin-top:10px;"><button class="btn-outline-action primary" data-subject="${escapeHtml(subject)}" type="button" onclick="closeModals(); openSubjectInTab(this.dataset.subject, 'quizzes');">Abrir quiz da disciplina</button></div></section>`
           : renderDisciplineReviewQuizStatus(quizSummary, !!pendingDisciplineReviewQuiz, subject);
-        contentEl.innerHTML = `${quizNotice}${sourceNote}${window.AcademicReportRenderer.render(result.markdown || '', { title: result.title, subject })}`;
+        // O contêiner aplica o estilo do relatório (tabelas, listas, fonte) também à revisão.
+        contentEl.innerHTML = `${quizNotice}${sourceNote}<div class="academic-article-container">${window.AcademicReportRenderer.render(result.markdown || '', { title: result.title, subject })}</div>`;
         document.getElementById('disciplineReviewModal')?.classList.remove('active');
         reader.classList.add('active');
       } catch (error) {
@@ -15694,7 +15695,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             .report-list-numbered { list-style-type: decimal; }
             .report-list-subalineas { list-style: none; margin: 2pt 0 2pt 0.6cm; padding: 0; }
             .academic-report-table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; margin: 8pt 0; font-size: 9pt; line-height: 1.3; }
-            .academic-report-table th, .academic-report-table td { padding: 4pt 5pt; border: 0.6pt solid #737373; vertical-align: top; text-indent: 0; white-space: normal; overflow-wrap: anywhere; word-break: normal; }
+            .academic-report-table thead { display: table-header-group; }
+            .academic-report-table tr { page-break-inside: avoid; }
+            .academic-report-table th, .academic-report-table td { padding: 4pt 5pt; border: 0.6pt solid #737373; vertical-align: top; text-indent: 0; white-space: normal; overflow-wrap: break-word; word-break: normal; }
             .academic-report-table th { font-weight: bold; background: #f2f2f2; }
             .academic-report-figure { max-width: 100%; margin: 8pt auto; text-align: center; page-break-inside: avoid; }
             .academic-report-figure img { max-width: 100%; max-height: 17cm; height: auto; }
