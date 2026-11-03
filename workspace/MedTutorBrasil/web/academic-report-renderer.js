@@ -5,6 +5,10 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function createAcademicReportRenderer() {
   'use strict';
 
+  // Quebra de linha dentro de célula de tabela. Caractere de uso privado: não é
+  // espaço (sobrevive a .replace(/\s+/)) e nunca aparece em texto real.
+  const CELL_BREAK = '\uE000';
+  const CELL_BREAK_RE = /\uE000/g;
   const escapeHtml = value => String(value == null ? '' : value)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -81,10 +85,13 @@
     text = text.replace(/<table\b[^>]*>([\s\S]*?)<\/table\s*>/gi, (_, body) => {
       const rows = [...String(body).matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi)].map(([, row]) => ({
         heading: /<th\b/i.test(row),
-        cells: [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]\s*>/gi)].map(([, cell]) => inlineText(cell).replace(/\|/g, '\\|'))
+        cells: [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]\s*>/gi)].map(([, cell]) => inlineText(cell.replace(/<br\b[^>]*\/?>/gi, CELL_BREAK)).replace(/\|/g, '\\|'))
       })).filter(row => row.cells.length);
       if (!rows.length) return '\n';
-      if (!rows[0].heading) return '\n' + rows.map(row => '- ' + row.cells.join('; ')).join('\n') + '\n';
+      // Sem <th>, a primeira linha vira cabeçalho quando todas têm o mesmo
+      // número de colunas (tabela HTML comum); senão vira lista.
+      const sameWidth = rows.every(row => row.cells.length === rows[0].cells.length);
+      if (!rows[0].heading && !(rows.length >= 2 && sameWidth && rows[0].cells.length >= 2)) return '\n' + rows.map(row => '- ' + row.cells.join('; ')).join('\n') + '\n';
       const head = rows[0].cells;
       return '\n| ' + head.join(' | ') + ' |\n| ' + head.map(() => '---').join(' | ') + ' |\n'
         + rows.slice(1).map(row => '| ' + row.cells.join(' | ') + ' |').join('\n') + '\n';
@@ -131,53 +138,90 @@
     return output.join('\n').replace(/\n{3,}/g, '\n\n');
   }
 
+  // Linha separadora: aceita "---", "-", ":--:" e bordas sem barra ("--- | ---").
+  const SEPARATOR_RE = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$/;
+  const hasUnescapedPipe = line => /(?<!\\)\|/.test(String(line || '').replace(/`[^`]*`/g, ''));
+
+  function splitTableRow(line) {
+    let row = String(line || '').trim();
+    if (row.startsWith('|')) row = row.slice(1);
+    if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1);
+    return row.split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
+  }
+
+  // Lê uma tabela a partir da linha do cabeçalho (seguida do separador). Aceita
+  // linhas com ou sem barras nas pontas e acerta o número de células de cada
+  // linha pelo separador: falta vira célula vazia; sobra vai para a última.
   function readMarkdownTable(lines, start) {
-    const rows = [];
-    let index = start;
-    while (index < lines.length && /^\s*\|.*\|\s*$/.test(lines[index])) {
-      const line = lines[index];
-      if (!/^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line)) {
-        rows.push(line.trim().replace(/^\|/, '').replace(/\|$/, '')
-          .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|')));
+    const width = splitTableRow(lines[start + 1]).length;
+    const fit = cells => {
+      const row = cells.slice(0, width);
+      if (cells.length > width) {
+        const extra = cells.slice(width).filter(Boolean);
+        if (extra.length) row[width - 1] = [row[width - 1], ...extra].filter(Boolean).join(' / ');
       }
+      while (row.length < width) row.push('');
+      return row;
+    };
+    const rows = [fit(splitTableRow(lines[start]))];
+    let index = start + 2;
+    while (index < lines.length && lines[index].trim() && hasUnescapedPipe(lines[index]) && !SEPARATOR_RE.test(lines[index])) {
+      rows.push(fit(splitTableRow(lines[index])));
       index += 1;
     }
+    while (index < lines.length && SEPARATOR_RE.test(lines[index])) index += 1;
     return { rows, next: index };
   }
 
+  function isTableStart(lines, index) {
+    return hasUnescapedPipe(lines[index]) && !SEPARATOR_RE.test(lines[index]) && SEPARATOR_RE.test(lines[index + 1] || '')
+      && splitTableRow(lines[index]).length >= 2;
+  }
+
+  // Limites alinhados ao pedido feito à IA (até 4 colunas, células de até ~30
+  // palavras), com folga. Acima disso a tabela não cabe com leitura confortável
+  // numa folha A4 e vira lista rotulada.
   function tableFitsA4(headers, rows) {
-    if (!headers.length || headers.length > 3 || rows.length < 1) return false;
+    if (headers.length < 2 || headers.length > 5 || rows.length < 1) return false;
     const matrix = [headers, ...rows];
     return matrix.every(row => row.length === headers.length && row.every(cell => {
-      const value = String(cell).replace(/[*_`]/g, '').trim();
-      return value.length <= 100 && value.split(/\s+/).filter(Boolean).length <= 16;
-    })) && rows.every(row => row.reduce((sum, cell) => sum + String(cell).length, 0) <= 240);
+      const value = String(cell).replace(/[*_`]/g, '').replace(CELL_BREAK_RE, ' ').trim();
+      return value.length <= 320 && value.split(/\s+/).filter(Boolean).length <= 45;
+    })) && rows.every(row => row.reduce((sum, cell) => sum + String(cell).length, 0) <= 900);
   }
 
   function normalize(markdown) {
-    const lines = removeDiagramSyntax(legacyHtmlToMarkdown(String(markdown || '').replace(/\r\n?/g, '\n'))).split('\n');
+    // A IA às vezes quebra a célula com <br>; sem esta proteção a conversão de
+    // HTML partia a linha da tabela em várias e a tabela inteira desmontava.
+    const protectedBreaks = String(markdown || '').replace(/\r\n?/g, '\n').split('\n')
+      .map(line => (hasUnescapedPipe(line) ? line.replace(/<br\b[^>]*>/gi, CELL_BREAK) : line))
+      .join('\n');
+    const lines = removeDiagramSyntax(legacyHtmlToMarkdown(protectedBreaks)).split('\n');
     const output = [];
+    const escapeCell = cell => String(cell).replace(/\|/g, '\\|').replace(CELL_BREAK_RE, '<br>');
     for (let index = 0; index < lines.length;) {
-      if (!/^\s*\|.*\|\s*$/.test(lines[index])) { output.push(lines[index++]); continue; }
-      const parsed = readMarkdownTable(lines, index);
-      const hasHeader = /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[index + 1] || '');
-      if (!hasHeader || parsed.rows.length < 2) {
-        output.push(lines[index++].replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, ''));
+      if (!isTableStart(lines, index)) {
+        // Linha solta com barras (sem separador) não é tabela: some com as barras das pontas.
+        const line = lines[index++];
+        output.push(/^\s*\|.*\|\s*$/.test(line) ? line.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '').replace(/\s*(?<!\\)\|\s*/g, ' — ') : line);
         continue;
       }
+      const parsed = readMarkdownTable(lines, index);
       const [headers, ...rows] = parsed.rows;
+      if (output.length && output[output.length - 1].trim()) output.push('');
       if (tableFitsA4(headers, rows)) {
-        output.push(`| ${headers.join(' | ')} |`, `| ${headers.map(() => '---').join(' | ')} |`);
-        rows.forEach(row => output.push(`| ${row.join(' | ')} |`));
+        output.push(`| ${headers.map(escapeCell).join(' | ')} |`, `| ${headers.map(() => '---').join(' | ')} |`);
+        rows.forEach(row => output.push(`| ${row.map(escapeCell).join(' | ')} |`));
       } else {
         rows.forEach(row => {
-          const fields = row.map((cell, cellIndex) => cell ? `**${headers[cellIndex] || 'Item'}:** ${cell}` : '').filter(Boolean);
+          const fields = row.map((cell, cellIndex) => cell ? `**${(headers[cellIndex] || 'Item').replace(CELL_BREAK_RE, ' ')}:** ${cell.replace(CELL_BREAK_RE, '; ')}` : '').filter(Boolean);
           if (fields.length) output.push(`- ${fields.join('; ')}`);
         });
       }
+      output.push('');
       index = parsed.next;
     }
-    return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    return output.join('\n').replace(CELL_BREAK_RE, ' ').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   function safeHttpUrl(value) {
@@ -251,6 +295,43 @@
     return { html: `${html}</ol>`, next: i };
   }
 
+  // Célula com quebras (<br>) é renderizada parte a parte, sem liberar HTML.
+  function inlineCell(cell, options) {
+    return String(cell || '').split(/<br\s*\/?>/i).map(part => inline(part.trim(), options)).join('<br>');
+  }
+
+  // Largura de cada coluna proporcional ao texto que ela carrega (entre 12% e
+  // 55%), para "Classe" não ocupar o mesmo espaço que "Mecanismo".
+  function columnWidths(headers, rows) {
+    const plain = cell => String(cell || '').replace(/<br\s*\/?>/gi, ' ').replace(/[*_`]/g, '').trim();
+    const weights = headers.map((header, column) => {
+      const lengths = [header, ...rows.map(row => row[column])].map(cell => plain(cell).length);
+      const average = lengths.reduce((sum, value) => sum + value, 0) / lengths.length;
+      return Math.max(6, Math.sqrt(average * Math.max(...lengths)));
+    });
+    // Piso por coluna: cabe a palavra mais longa dela (≈4,8pt por caractere a
+    // 9,5pt numa área útil de 16 cm), para não hifenizar "Betabloqueador".
+    const floors = headers.map((header, column) => {
+      const longestWord = Math.max(0, ...[header, ...rows.map(row => row[column])]
+        .flatMap(cell => plain(cell).split(/\s+/)).map(word => word.length));
+      return Math.min(30, Math.max(10, (longestWord * 4.8 + 14) / 453 * 100));
+    });
+    let widths = weights.map(weight => weight / weights.reduce((sum, value) => sum + value, 0) * 100);
+    for (let pass = 0; pass < 4; pass++) {
+      widths = widths.map((width, column) => Math.min(55, Math.max(floors[column], width)));
+      const total = widths.reduce((sum, value) => sum + value, 0);
+      widths = widths.map(width => width / total * 100);
+    }
+    return widths.map(width => Math.round(width * 10) / 10);
+  }
+
+  function renderTable(headers, rows, options) {
+    const widths = columnWidths(headers, rows);
+    return `<table class="academic-report-table"><colgroup>${widths.map(width => `<col style="width:${width}%">`).join('')}</colgroup>`
+      + `<thead><tr>${headers.map(cell => `<th scope="col">${inlineCell(cell, options)}</th>`).join('')}</tr></thead>`
+      + `<tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${inlineCell(cell, options)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  }
+
   function render(markdown, options = {}) {
     if (Array.isArray(options.allowedImageUrls)) options.allowedImageUrls = options.allowedImageUrls.map(safeHttpUrl).filter(Boolean);
     const lines = normalize(markdown).split('\n');
@@ -261,11 +342,11 @@
       const sectionHeading = heading(line, options);
       if (sectionHeading) { html.push(sectionHeading); i += 1; continue; }
       if (/^\s*(?:[-*_]\s*){3,}$/.test(line)) { i += 1; continue; }
-      if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[i + 1] || '')) {
+      if (isTableStart(lines, i)) {
         const parsed = readMarkdownTable(lines, i);
         const [headers = [], ...rows] = parsed.rows;
         if (tableFitsA4(headers, rows)) {
-          html.push(`<table class="academic-report-table"><thead><tr>${headers.map(cell => `<th scope="col">${inline(cell, options)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${inline(cell, options)}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
+          html.push(renderTable(headers, rows, options));
           i = parsed.next;
           continue;
         }
@@ -291,7 +372,8 @@
       i += 1;
       while (i < lines.length && lines[i].trim() && !heading(lines[i], options)
         && !/^\s*(?:[-*+]\s+|\d+[.)]\s+|>)/.test(lines[i])
-        && !/^\s*\|.*\|\s*$/.test(lines[i])
+        && !/^\s*\|.*\|\s*$/.test(lines[i]) && !isTableStart(lines, i)
+        && !/^\s*(?:[-*_]\s*){3,}$/.test(lines[i])
         && !/^!\[[^\]]*\]\(https?:\/\/[^\s)]+(?:\s+"[^"]*")?\)$/.test(lines[i].trim())) paragraph.push(lines[i++].trim());
       html.push(`<p class="academic-report-paragraph">${inline(paragraph.join(' '), options)}</p>`);
     }

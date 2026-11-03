@@ -130,7 +130,27 @@ function normalizeReportTextArtifacts(markdown) {
     output.push(balancedBlock.replace(/([.!?])([)]+)$/g, '$2$1'));
     blockLines = [];
   };
+  // Linha de tabela é balanceada célula a célula: fechar o parêntese no fim do
+  // "parágrafo" colava ")))" depois da última barra e quebrava a tabela.
+  const balanceCell = cell => {
+    let depth = 0;
+    const visible = cell.replace(/<[^>]*>/g, ' ');
+    for (let index = 0; index < visible.length; index += 1) {
+      if (visible[index] === '\\') { index += 1; continue; }
+      if (visible[index] === '(') depth += 1;
+      else if (visible[index] === ')' && depth > 0) depth -= 1;
+    }
+    if (!depth) return cell;
+    const trailing = cell.match(/\s*$/)[0];
+    return cell.slice(0, cell.length - trailing.length).replace(/([.!?]?)$/, ')'.repeat(depth) + '$1') + trailing;
+  };
+  const isTableRow = line => /^\s*\|.*\|\s*$/.test(line);
   for (const line of lines) {
+    if (isTableRow(line)) {
+      flushBlock();
+      output.push(/^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$/.test(line) ? line : line.split(/(?<!\\)\|/).map(balanceCell).join('|'));
+      continue;
+    }
     const startsBlock = /^\s*(?:#{1,6}\s|[-*+]\s|>\s)/.test(line);
     if (!line.trim() || (startsBlock && blockLines.length)) flushBlock();
     if (line.trim()) blockLines.push(line);
@@ -364,6 +384,7 @@ DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
 2. DIAGRAMAÇÃO SEGURA PARA A4:
    - Não gere diagramas, fluxogramas, mapas conceituais, Mermaid, esquemas ASCII, caixas de caracteres nem sequências visuais de setas.
    - Tabelas são permitidas quando forem a forma mais clara de comparar dados. Limite a 4 colunas, use cabeçalhos curtos e consistentes e mantenha cada célula concisa (preferencialmente uma frase curta ou até 30 palavras). Não coloque parágrafos, listas longas ou subtítulos dentro das células.
+   - Formato obrigatório de tabela em Markdown (GFM): linha de cabeçalho, linha separadora (| --- | --- |) logo abaixo, barras "|" no início e no fim de toda linha, o mesmo número de colunas em todas as linhas, uma linha de tabela por linha de texto, sem linhas em branco no meio, sem <br> nem quebras dentro das células e uma linha em branco antes e depois da tabela.
    - Se uma comparação ficar larga ou exigir explicações extensas, divida-a em tabelas menores ou apresente-a como lista rotulada. Cada tabela deve ter cabeçalho semântico, linhas alinhadas e informação suficiente para ser entendida sem depender de cor.
    - Apresente relações causais em frases ou listas numeradas curtas, não em setas ou diagramas.
 3. INTEGRAÇÃO DE ILUSTRAÇÕES MÉDICAS:

@@ -65,7 +65,7 @@ na linha seguinte sem depender de br.
 
 | Campo extenso | Explicação |
 | --- | --- |
-| A | ${'descrição muito longa '.repeat(12)} |
+| A | ${'descrição muito longa '.repeat(25)} |
 
 \<h4 class="gemini-h4">2.1.1 Via TRIF (<em>interna</em>)</h4>
 \<ul><li><strong>Receptores:</strong> TLR3 e TLR4.</li></ul>
