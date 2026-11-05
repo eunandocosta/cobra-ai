@@ -55,7 +55,16 @@ assert.deepEqual(figures[1].visibleStructures, ['zona medial', 'zona lateral']);
 const pptxPages = plain([...ctx.getMaterialPageTexts('## Slide 3: Estruturas\n\nVermis\nHemisférios').entries()]);
 assert.deepEqual(pptxPages[0], [3, { page: 3, title: 'Estruturas', text: 'Vermis; Hemisférios' }]);
 assert.match(appSource, /fullPdfText \+= `## Página \$\{pageNum\}\\n\\n\$\{pageText\}\\n\\n`;/, 'o texto do PDF marca o início de cada página');
-console.log('  [PASS] Figuras levam título e texto da página de origem');
+const repaired = plain(ctx.collectPersistedReportFigures({ markdownText: 'Texto antigo sem marcação.', clinicalImages: [
+  { imageUrl: 'https://img/capa.jpg', title: 'Capa da aula', page: 1, hiddenFromFigures: true, visualAnalysisCompleted: true },
+  { imageUrl: 'https://img/p4.jpg', title: 'Flóculo, nódulo e tonsila', page: 4, visualAnalysisCompleted: true, transcription: 'Flóculo, nódulo e tonsila; pode herniar pelo forame magno' }
+] }));
+assert.deepEqual(repaired.map(item => item.url), ['https://img/p4.jpg'], 'página ocultada (capa) não entra no relatório');
+assert.equal(repaired[0].pageTitle, 'Flóculo, nódulo e tonsila', 'título da análise visual vira título da página');
+assert.match(repaired[0].pageText, /forame magno/, 'transcrição vira o texto da página em materiais antigos');
+assert.match(appSource, /\(material\.clinicalImages \|\| \[\]\)\.filter\(image => !image\?\.hiddenFromFigures\)/, 'questões não são ligadas a páginas ocultadas');
+assert.match(appSource, /hiddenFromFigures: association\.isVisualStudyMaterial === false/, 'a análise visual oculta capa e slide de texto');
+console.log('  [PASS] Figuras levam título e texto da página de origem; páginas ocultadas ficam de fora');
 
 // 3. Servidor: a IA só escolhe onde a figura entra; legenda vem do material.
 const reportFigures = service.sanitizeReportFigures([
