@@ -5,6 +5,8 @@
   'use strict';
 
   const PAGES_PER_BATCH = 2;
+  const SAVE_EVERY_PAGES = 10;
+  const SAVE_TIMEOUT_MS = 180000;
   const ESTIMATE_BRL_PER_PAGE = { low: 0.03, high: 0.07 };
 
   const pageFromTitle = image => Number(image?.page) || Number(String(image?.title || '').match(/p[aá]gina\s+(\d+)/i)?.[1]) || null;
@@ -206,9 +208,51 @@
     let failed = 0;
     let lastError = '';
     let saveFailed = false;
+    let slowSaves = 0;
+    const paintTotals = () => {
+      ui.bar.style.width = `${Math.round(done / Math.max(1, plan.pendingPages) * 100)}%`;
+      ui.text.textContent = `${done} de ${plan.pendingPages} páginas • ${hidden} ocultada(s) • ${failed} com falha • custo até agora: ${brl(spent)}`;
+    };
+
+    // Grava as análises acumuladas do material de uma vez (a cada
+    // SAVE_EVERY_PAGES páginas e no fim do material).
+    async function flush(item, label, pendingAnalyzed) {
+      if (!pendingAnalyzed.length) return;
+      const analyzed = pendingAnalyzed.splice(0);
+      const images = item.material.clinicalImages.map(image => ({ ...image, page: pageFromTitle(image) }));
+      const previousImages = item.material.clinicalImages;
+      ui.log.textContent = `${label} — gravando ${analyzed.length} página(s) no banco…`;
+      try {
+        await withTimeout(MedTutorFirebaseService.saveMaterialVisualAssociations(item.material.id, analyzed, images, { skipLocalCache: true }), SAVE_TIMEOUT_MS, 'gravação');
+        slowSaves = 0;
+      } catch (error) {
+        if (/tempo esgotado/.test(String(error?.message))) {
+          // A gravação lenta continua na fila do Firestore; só desiste se
+          // repetir, para não seguir gastando IA sem conseguir gravar.
+          slowSaves++;
+          lastError = `gravação lenta no banco (${label}); ela segue em segundo plano`;
+          console.warn('[Reparo de imagens] Gravação demorou; segue em segundo plano.', label, error);
+          if (slowSaves < 2) return;
+        }
+        console.warn('[Reparo de imagens] Falha ao gravar; reparo interrompido.', label, error);
+        lastError = `gravação no banco (${label}): ${String(error?.message || error)}`;
+        stop = true;
+        saveFailed = true;
+        if (!/tempo esgotado/.test(String(error?.message))) {
+          // Desfaz a marcação local para essas páginas serem refeitas depois.
+          item.material.clinicalImages = previousImages;
+          item.material.figuras_clinicas = previousImages;
+        }
+        return;
+      }
+      hidden += analyzed.filter(association => association.isVisualStudyMaterial === false).length;
+      paintTotals();
+    }
+
     for (const item of plan.work) {
       if (stop) break;
       const label = item.material.name || item.material.originalFileName || 'Material';
+      const pendingAnalyzed = [];
       for (let offset = 0; offset < item.pending.length && !stop; offset += PAGES_PER_BATCH) {
         const batch = item.pending.slice(offset, offset + PAGES_PER_BATCH);
         const where = `${label}: páginas ${offset + 1}–${offset + batch.length} de ${item.pending.length}`;
@@ -230,30 +274,21 @@
           clearInterval(ticker);
         }
         if (outcome.failed.length) lastError = outcome.failed[outcome.failed.length - 1].reason;
-        if (stop) break;
-        if (outcome.analyzed.length) {
-          const images = item.material.clinicalImages.map(image => ({ ...image, page: pageFromTitle(image) }));
-          const previousImages = item.material.clinicalImages;
-          try {
-            await withTimeout(MedTutorFirebaseService.saveMaterialVisualAssociations(item.material.id, outcome.analyzed, images), 60000, 'gravação');
-          } catch (error) {
-            // Sem gravar, cada lote seguinte só gastaria IA à toa: interrompe.
-            console.warn('[Reparo de imagens] Falha ao gravar o lote; reparo interrompido.', label, error);
-            lastError = `gravação no banco (${label}): ${String(error?.message || error)}`;
-            stop = true;
-            saveFailed = true;
-            // Desfaz a marcação local para essas páginas serem refeitas depois.
-            item.material.clinicalImages = previousImages;
-            item.material.figuras_clinicas = previousImages;
-          }
-          hidden += outcome.analyzed.filter(association => association.isVisualStudyMaterial === false).length;
-        }
+        pendingAnalyzed.push(...outcome.analyzed);
         spent += outcome.cost;
         failed += outcome.failed.length;
         done += batch.length;
-        ui.bar.style.width = `${Math.round(done / Math.max(1, plan.pendingPages) * 100)}%`;
-        ui.text.textContent = `${done} de ${plan.pendingPages} páginas • ${hidden} ocultada(s) • ${failed} com falha • custo até agora: ${brl(spent)}`;
+        paintTotals();
+        if (pendingAnalyzed.length >= SAVE_EVERY_PAGES) await flush(item, label, pendingAnalyzed);
       }
+      // Mesmo ao clicar em Parar, o que já foi pago é gravado.
+      if (!saveFailed) await flush(item, label, pendingAnalyzed);
+    }
+    try {
+      ui.log.textContent = 'Atualizando a cópia local dos materiais…';
+      await withTimeout(MedTutorLocalDB.set('materials', MedTutorFirebaseService.getUserId(), chatDriveMaterials), SAVE_TIMEOUT_MS, 'cópia local');
+    } catch (error) {
+      console.warn('[Reparo de imagens] Cópia local não atualizada.', error);
     }
     if (!document.body.contains(ui.overlay)) document.body.appendChild(ui.overlay);
     if (saveFailed) {

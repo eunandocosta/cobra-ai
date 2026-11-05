@@ -2568,7 +2568,7 @@
         }
       },
 
-      async saveMaterialVisualAssociations(materialId, associations, sourceImages = []) {
+      async saveMaterialVisualAssociations(materialId, associations, sourceImages = [], options = {}) {
         if (!materialId || !Array.isArray(associations) || !associations.length) return false;
         const uid = this.getUserId();
         const material = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : []).find(item => item.id === materialId);
@@ -2596,7 +2596,9 @@
         if (material) {
           material.clinicalImages = images;
           material.figuras_clinicas = images;
-          try { await MedTutorLocalDB.set('materials', uid, chatDriveMaterials); } catch (error) {
+          // Quem grava muitos lotes seguidos (reparo em massa) salva o cache
+          // local uma vez só no fim, em vez de regravar a biblioteca inteira.
+          if (!options.skipLocalCache) try { await MedTutorLocalDB.set('materials', uid, chatDriveMaterials); } catch (error) {
             console.warn('[Firestore Visual] Não foi possível atualizar o cache local das figuras:', error);
           }
         }
