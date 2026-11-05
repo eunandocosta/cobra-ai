@@ -1064,8 +1064,37 @@
     // documento retornado diretamente do Firestore ou o Markdown com links
     // persistidos. Reunir as três fontes impede que uma atualização da tela
     // deixe o relatório sem as figuras já armazenadas na nuvem.
+    // Título e texto de cada página/slide a partir dos marcadores "## Página N" e
+    // "## Slide N: Título" gravados na extração.
+    function getMaterialPageTexts(markdown) {
+      const pages = new Map();
+      let current = null;
+      String(markdown || '').split('\n').forEach(line => {
+        const marker = line.match(/^#{1,4}\s+(?:p[aá]gina|slide|l[aâ]mina)\s*(\d+)\s*[:\-–—.]?\s*(.*)$/i);
+        if (marker) {
+          current = { page: Number(marker[1]), title: marker[2].replace(/^(?:slide|p[aá]gina)\s*\d+\s*[:\-–—.]?\s*/i, '').trim(), lines: [] };
+          if (!pages.has(current.page)) pages.set(current.page, current);
+          return;
+        }
+        if (/^#{1,4}\s/.test(line)) { current = null; return; }
+        if (current && line.trim()) current.lines.push(line.trim());
+      });
+      pages.forEach(entry => {
+        if (!entry.title && entry.lines.length && entry.lines[0].length <= 90) entry.title = entry.lines.shift();
+        entry.text = entry.lines.join('; ').replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/[•▪●◦■□➢➤►]\s*/g, '').replace(/(?:;\s*){2,}/g, '; ').replace(/\s+/g, ' ').trim().slice(0, 320);
+        delete entry.lines;
+      });
+      return pages;
+    }
+
     function collectPersistedReportFigures(...sources) {
       const figuresByUrl = new Map();
+      const pageTexts = new Map();
+      sources.filter(Boolean).forEach(source => {
+        [source?.material_md, source?.conteudo_md, source?.markdownText, source?.text, source?.texto, source?.content]
+          .filter(value => typeof value === 'string' && value.trim())
+          .forEach(text => getMaterialPageTexts(text).forEach((entry, page) => { if (!pageTexts.has(page)) pageTexts.set(page, entry); }));
+      });
       const addFigure = (image, index = 0) => {
         const url = String(image?.imageUrl || image?.thumbnailUrl || image?.src || '').trim();
         if (!/^https?:\/\//i.test(url)) return;
@@ -1074,9 +1103,15 @@
           id: image?.id || current?.id || `figura-${figuresByUrl.size + 1}`,
           url,
           description: String(image?.clinicalLabel || image?.title || current?.description || `Figura ${index + 1} do material`).trim(),
-          page: Number(image?.page) || current?.page || null,
-          association: String(image?.visualAssociation || current?.association || '').trim()
+          // Materiais antigos perderam o campo page, mas o título guardado é "Página N do material".
+          page: Number(image?.page) || Number(String(image?.title || '').match(/p[aá]gina\s+(\d+)/i)?.[1]) || current?.page || null,
+          association: String(image?.visualAssociation || current?.association || '').trim(),
+          visibleStructures: Array.isArray(image?.visibleStructures) && image.visibleStructures.length ? image.visibleStructures.slice(0, 12) : (current?.visibleStructures || []),
+          analyzedTitle: String((image?.visualAssociation ? image?.title : '') || current?.analyzedTitle || '').trim()
         };
+        const pageEntry = next.page ? pageTexts.get(next.page) : null;
+        next.pageTitle = pageEntry?.title || current?.pageTitle || '';
+        next.pageText = pageEntry?.text || current?.pageText || '';
         figuresByUrl.set(url, next);
       };
 
@@ -6024,7 +6059,9 @@
                   }
 
                   if (pageText && pageText.trim()) {
-                    fullPdfText += pageText + '\n\n';
+                    // O marcador liga cada trecho à sua página: o índice usa como
+                    // seção e o relatório descreve a figura daquela página.
+                    fullPdfText += `## Página ${pageNum}\n\n${pageText}\n\n`;
                   }
                 }
 
@@ -7312,6 +7349,12 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       for (const img of rawImages) {
         const width = img.width || 0;
         const height = img.height || 0;
+
+        // Página de PDF sem imagem relevante (capa com logo, slide só de texto).
+        if (img.hasFigure === false) {
+          discardedCount++;
+          continue;
+        }
         const name = (img.name || img.title || '').toLowerCase();
         const alt = (img.alt || '').toLowerCase();
         const searchStr = `${img.name || ''} ${img.title || ''} ${img.alt || ''}`.toLowerCase().replace(/[_\.\-]+/g, ' ');
@@ -7360,6 +7403,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           width: width || 800,
           height: height || 600,
           originalSizeKB: img.originalSizeKB || (width * height * 3 / 1024) || 2048,
+          // Sem a página, a figura não sabe de onde veio e o relatório não
+          // consegue descrevê-la pelo texto daquela página.
+          page: Number(img.page) || null,
           src: img.src || img.dataUrl || ''
         });
       }
@@ -7435,6 +7481,34 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       });
     }
 
+    // Mede quanto da página é ocupado por imagens (matriz de transformação de
+    // cada desenho de imagem) e quantos traçados vetoriais existem. Capa com
+    // logo, slide só de texto ou com um ícone pequeno não são figura de estudo.
+    function measurePdfPageFigures(fnArray, argsArray, OPS, pageArea) {
+      const imageOps = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject, OPS.paintJpegXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter(op => op !== undefined));
+      const pathOps = new Set([OPS.constructPath, OPS.stroke, OPS.fill, OPS.eoFill, OPS.fillStroke].filter(op => op !== undefined));
+      const multiply = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+      const stack = [];
+      let ctm = [1, 0, 0, 1, 0, 0];
+      let coverage = 0;
+      let largest = 0;
+      let images = 0;
+      let paths = 0;
+      (fnArray || []).forEach((fn, index) => {
+        if (fn === OPS.save) stack.push(ctm);
+        else if (fn === OPS.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+        else if (fn === OPS.transform && Array.isArray(argsArray[index])) ctm = multiply(ctm, argsArray[index]);
+        else if (imageOps.has(fn)) {
+          const area = Math.abs(ctm[0] * ctm[3] - ctm[1] * ctm[2]) / Math.max(1, pageArea);
+          coverage += Math.min(1, area);
+          largest = Math.max(largest, Math.min(1, area));
+          images++;
+        } else if (pathOps.has(fn)) paths++;
+      });
+      const hasFigure = largest >= 0.05 || coverage >= 0.1 || paths >= 150;
+      return { coverage: Math.min(1, coverage), largest, images, paths, hasFigure };
+    }
+
     // PDF.js renderiza páginas como WebP. Para PDFs, uma página é a unidade visual
     // mais fiel: preserva figuras, esquemas, lâminas e suas respectivas legendas.
     async function extractPdfVisualPages(file, limit = Number.POSITIVE_INFINITY) {
@@ -7457,7 +7531,17 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
           const context = canvas.getContext('2d', { alpha: false });
           if (!context) continue;
           await page.render({ canvasContext: context, viewport }).promise;
+          let figureStats = null;
+          try {
+            const baseViewport = page.getViewport({ scale: 1 });
+            const operators = await page.getOperatorList();
+            figureStats = measurePdfPageFigures(operators.fnArray, operators.argsArray, window.pdfjsLib.OPS || {}, baseViewport.width * baseViewport.height);
+          } catch (statsError) {
+            console.warn(`[Imagens do material] Não foi possível medir as figuras da página ${pageNumber}:`, statsError);
+          }
           images.push({
+            hasFigure: figureStats ? figureStats.hasFigure : true,
+            figureCoverage: figureStats ? Math.round(figureStats.coverage * 100) / 100 : null,
             id: `pdf-page-${pageNumber}`,
             title: `Página ${pageNumber} do material`,
             clinicalLabel: `Página ilustrada ${pageNumber}`,
@@ -12884,12 +12968,16 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         // modelo. Incluímos o anexo visual diretamente no HTML para garantir
         // que relatórios também exibam imagens quando o Gemini não as citar.
         reportData.html = removeInternalReportAuthoringInstructions(reportData.html);
-        if (reportFigures.length) {
+        // O apêndice mostra só as figuras que o texto não usou (o servidor
+        // insere as usadas com a legenda certa), sem repetir as mesmas imagens.
+        const usedFigureUrls = new Set([...String(aiGeneratedArticle || '').matchAll(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)/g)].map(match => match[1]));
+        const appendixFigures = reportFigures.filter(figure => !usedFigureUrls.has(figure.url));
+        if (appendixFigures.length) {
           // A galeria precisa ficar dentro do corpo do artigo e antes do
           // rodapé. Anexá-la após o HTML completo deixa as figuras fora do
           // contêiner paginado do relatório e pode fazê-las desaparecer na
           // visualização/impressão, embora as URLs tenham sido enviadas.
-          const figureGalleryHtml = this.renderMaterialFiguresHtml(reportFigures);
+          const figureGalleryHtml = this.renderMaterialFiguresHtml(appendixFigures);
           const footerIndex = reportData.html.lastIndexOf('<footer class="academic-report-print-footer"');
           const articleEndIndex = reportData.html.lastIndexOf('</div>');
           const insertionIndex = footerIndex >= 0 ? footerIndex : articleEndIndex;
@@ -12898,7 +12986,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           } else {
             reportData.html = `${reportData.html}${figureGalleryHtml}`;
           }
-          reportData.markdown = `${reportData.markdown || ''}\n\n${this.renderMaterialFiguresMarkdown(reportFigures)}`;
+          reportData.markdown = `${reportData.markdown || ''}\n\n${this.renderMaterialFiguresMarkdown(appendixFigures)}`;
           console.info('[Relatório MedTutor] Figuras anexadas ao corpo do relatório', {
             arquivo: effectiveTitle,
             figuras: reportFigures.length,
@@ -12923,7 +13011,19 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
 
       renderMaterialFiguresMarkdown(figures = []) {
         if (!figures.length) return '';
-        return `## Figuras do Material Original\n\n${figures.map((figure, index) => `![${figure.description}](${figure.url})\n*Figura ${index + 1}${figure.page ? ` — página ${figure.page}` : ''}: ${figure.description}.*`).join('\n\n')}`;
+        return `## Figuras do Material Original\n\n${figures.map(figure => `![${this.materialFigureLabel(figure)}](${figure.url})\n*${this.materialFigureCaption(figure)}*`).join('\n\n')}`;
+      },
+
+      // Legenda do apêndice com o que se sabe da figura: título da análise
+      // visual ou o título da própria página/slide. Nunca uma descrição inventada.
+      materialFigureLabel(figure) {
+        return String(figure?.analyzedTitle || figure?.pageTitle || 'Imagem do material original').trim();
+      },
+
+      materialFigureCaption(figure) {
+        const where = figure?.page ? `Página ${figure.page} do material` : 'Material original';
+        const label = String(figure?.analyzedTitle || figure?.pageTitle || '').trim();
+        return label ? `${where} — ${label}` : where;
       },
 
       renderMaterialFiguresHtml(figures = []) {
@@ -12937,7 +13037,7 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
                 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
                   ${figures.map((figure, index) => `<figure style="margin:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; break-inside:avoid;">
                     <img src="${escapeHtml(figure.url)}" alt="${escapeHtml(figure.description)}" loading="eager" decoding="async" style="display:block; width:100%; max-height:360px; object-fit:contain; background:#fff; border-radius:5px;">
-                    <figcaption style="margin-top:8px; color:#1e293b; font-size:10.5pt; line-height:1.45;"><strong>Figura ${index + 1}${figure.page ? ` — página ${figure.page}` : ''}.</strong> ${escapeHtml(figure.description)}${figure.association ? `<br><span style="color:#475569;">${escapeHtml(figure.association)}</span>` : ''}</figcaption>
+                    <figcaption style="margin-top:8px; color:#1e293b; font-size:10.5pt; line-height:1.45;"><strong>${escapeHtml(this.materialFigureCaption(figure))}.</strong>${figure.association ? `<br><span style="color:#475569;">${escapeHtml(figure.association)}</span>` : ''}</figcaption>
                   </figure>`).join('')}
                 </div>
               </div>

@@ -164,6 +164,107 @@ function normalizeReportTextArtifacts(markdown) {
   return text.replace(/\n{3,}/g, '\n\n');
 }
 
+// ===== Figuras do relatório =====
+// A IA que escreve o relatório não vê as imagens. Por isso ela só escolhe ONDE
+// cada figura entra (marcador [[FIGURA_n]]); imagem, URL e legenda são
+// montadas aqui com o que o próprio material diz sobre aquela página.
+const cleanFigureText = (value, max) => String(value || '').replace(/\s+/g, ' ').replace(/["“”]/g, "'").trim().slice(0, max);
+
+function sanitizeReportFigures(figures) {
+  return (Array.isArray(figures) ? figures : [])
+    .filter(figure => /^https?:\/\//i.test(String(figure?.url || '')))
+    .map((figure, index) => ({
+      id: `FIGURA_${index + 1}`,
+      url: String(figure.url),
+      page: Number(figure.page) || null,
+      pageTitle: cleanFigureText(figure.pageTitle, 120),
+      pageText: cleanFigureText(figure.pageText, 320),
+      analyzedTitle: cleanFigureText(figure.analyzedTitle, 120),
+      association: cleanFigureText(figure.association, 400),
+      visibleStructures: (Array.isArray(figure.visibleStructures) ? figure.visibleStructures : []).map(item => cleanFigureText(item, 60)).filter(Boolean).slice(0, 12)
+    }));
+}
+
+function figureHasFacts(figure) {
+  return Boolean(figure.analyzedTitle || figure.association || figure.visibleStructures.length || figure.pageTitle || figure.pageText);
+}
+
+function buildFigureCatalogText(figures) {
+  if (!figures.length) return 'Nenhuma figura disponível no material.';
+  return figures.map(figure => {
+    const facts = [
+      figure.page ? `página ${figure.page} do material` : 'material original',
+      figure.pageTitle ? `título da página: "${figure.pageTitle}"` : '',
+      figure.pageText ? `texto da página: "${figure.pageText}"` : '',
+      figure.analyzedTitle ? `análise visual: "${figure.analyzedTitle}"` : '',
+      figure.visibleStructures.length ? `estruturas visíveis: ${figure.visibleStructures.join(', ')}` : '',
+      figure.association ? `descrição visual: "${figure.association}"` : ''
+    ].filter(Boolean).join(' | ');
+    return `- [[${figure.id}]] → ${facts}${figureHasFacts(figure) ? '' : ' | SEM DESCRIÇÃO: não insira esta figura no texto'}`;
+  }).join('\n');
+}
+
+function figureCaption(figure) {
+  const where = figure.page ? `página ${figure.page} do material` : 'material original';
+  let label = figure.analyzedTitle || figure.pageTitle;
+  // Título de slide costuma ser vago ("Estruturas"): completa com o começo do
+  // texto daquela página, que é o que de fato ela mostra.
+  if (!figure.analyzedTitle && figure.pageText && (!label || label.length < 30)) {
+    let excerpt = figure.pageText.slice(0, 90);
+    if (figure.pageText.length > 90) excerpt = `${excerpt.slice(0, Math.max(excerpt.lastIndexOf(' '), 50)).replace(/[\s,;:.(-]+$/, '')}…`;
+    label = label ? `${label}: ${excerpt}` : excerpt;
+  }
+  const structures = figure.visibleStructures.length ? ` (estruturas: ${figure.visibleStructures.slice(0, 6).join(', ')})` : '';
+  return label ? `${label}${structures} — ${where}` : `Imagem da ${where}`;
+}
+
+// Troca [[FIGURA_n]] pela imagem com legenda factual e numera na ordem em que
+// aparecem. Imagens que a IA tenha escrito por conta própria viram o mesmo
+// bloco (se a URL é do catálogo) ou somem (se não é), e legendas inventadas
+// logo depois de uma figura são removidas.
+function applyReportFigurePlaceholders(markdown, rawFigures) {
+  const figures = Array.isArray(rawFigures) && rawFigures.length && rawFigures[0]?.id?.startsWith?.('FIGURA_') ? rawFigures : sanitizeReportFigures(rawFigures);
+  const byId = new Map(figures.map(figure => [figure.id, figure]));
+  const byUrl = new Map(figures.map(figure => [figure.url, figure]));
+  const used = [];
+  const block = figure => {
+    if (!figure || used.includes(figure.id)) return '';
+    used.push(figure.id);
+    const caption = figureCaption(figure);
+    return `\n\n![${caption.replace(/[\[\]]/g, '')}](${figure.url})\n*Figura ${used.length}: ${caption}.*\n\n`;
+  };
+  let text = String(markdown || '')
+    .replace(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)(?:\s+"[^"]*")?\)/g, (_, url) => {
+      const figure = byUrl.get(url);
+      return figure ? `[[${figure.id}]]` : '';
+    })
+    .replace(/\[\[\s*FIGURA[_\s-]?(\d+)\s*\]\]/gi, (_, number) => `[[FIGURA_${Number(number)}]]`);
+  const lines = text.split('\n');
+  const output = [];
+  let afterFigure = 0;
+  for (const line of lines) {
+    const markers = [...line.matchAll(/\[\[(FIGURA_\d+)\]\]/g)].map(match => match[1]);
+    if (markers.length) {
+      const rest = line.replace(/\[\[FIGURA_\d+\]\]/g, '').trim();
+      if (rest && !/^[*_\s]*figura\b/i.test(rest)) output.push(rest);
+      markers.forEach(id => {
+        const html = block(byId.get(id));
+        if (html) output.push(html);
+      });
+      afterFigure = 3;
+      continue;
+    }
+    // Legenda escrita pela IA ("*Figura: ...*", "Figura 3: ...") logo após a figura.
+    if (afterFigure > 0 && /^\s*[*_]*\s*figura\b[^\n]*$/i.test(line)) { afterFigure--; continue; }
+    if (line.trim()) afterFigure = Math.max(0, afterFigure - 1);
+    output.push(line);
+  }
+  return {
+    markdown: output.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+    usedFigureIds: used
+  };
+}
+
 function normalizeReportMarkdownForPrint(markdown) {
   return normalizeReportTextArtifacts(AcademicReportRenderer.normalize(markdown));
 }
@@ -355,13 +456,10 @@ class RelatoriosService {
       figuras: Array.isArray(figures) ? figures.length : 0
     });
 
-    // 1. Constrói o catálogo de figuras autorizadas para ilustração
-    let figuresCatalogText = 'Nenhuma figura recortada disponível no material.';
-    if (Array.isArray(figures) && figures.length > 0) {
-      figuresCatalogText = figures
-        .map((fig, index) => `- [FIGURA_${index + 1}]: "${fig.description || 'Ilustração médica'}" | URL: ${fig.url}`)
-        .join('\n');
-    }
+    // 1. Catálogo de figuras com o que o material diz de cada uma (sem URL:
+    // a IA só escolhe onde a figura entra; a imagem é inserida pelo servidor).
+    const reportFigures = sanitizeReportFigures(figures);
+    const figuresCatalogText = buildFigureCatalogText(reportFigures);
 
     // 2. System Instruction com regras editoriais e anti-diagramas confusos
     const systemInstruction = `
@@ -388,11 +486,10 @@ DIRETRIZES VISUAIS E DE DIAGRAMAÇÃO:
    - Se uma comparação ficar larga ou exigir explicações extensas, divida-a em tabelas menores ou apresente-a como lista rotulada. Cada tabela deve ter cabeçalho semântico, linhas alinhadas e informação suficiente para ser entendida sem depender de cor.
    - Apresente relações causais em frases ou listas numeradas curtas, não em setas ou diagramas.
 3. INTEGRAÇÃO DE ILUSTRAÇÕES MÉDICAS:
-   - Você tem acesso a um catálogo de figuras do material.
-   - Quando explicar um corte anatômico, ECG, radiografia ou mecanismo correspondente a uma dessas figuras, insira-a imediatamente após o parágrafo explicativo:
-     ![Descrição técnica detalhada](URL_EXATA_DO_CATÁLOGO)
-     *Figura: Detalhamento clínico dos marcos anatômicos ou achados observáveis.*
-   - NUNCA invente links externos de imagem. Utilize APENAS as URLs fornecidas no catálogo.
+   - Você NÃO vê as imagens. O catálogo diz, para cada figura, a página de origem e o título/texto daquela página do material (e, às vezes, uma análise visual).
+   - Para inserir uma figura, escreva SOMENTE o marcador dela sozinho numa linha, logo após o parágrafo que trata exatamente do mesmo assunto do título/texto daquela página. Exemplo: [[FIGURA_3]]
+   - Não escreva legenda, descrição, "Figura:", link nem URL de imagem: o sistema insere a imagem e a legenda a partir do catálogo.
+   - Use cada marcador no máximo uma vez. Não use figuras marcadas "SEM DESCRIÇÃO" nem figuras cujo título/texto não corresponda ao parágrafo; na dúvida, não insira.
 `;
 
     // 3. Montagem do prompt contextualizado
@@ -515,7 +612,8 @@ REQUISITO OBRIGATÓRIO DA SEÇÃO 5:
         generatedMarkdown = await generateWithGemini();
       }
 
-      generatedMarkdown = normalizeReportMarkdownForPrint(generatedMarkdown);
+      const figurePlacement = applyReportFigurePlaceholders(generatedMarkdown, reportFigures);
+      generatedMarkdown = normalizeReportMarkdownForPrint(figurePlacement.markdown);
       const generatedTitle = AcademicReportRenderer.extractReportTitle(generatedMarkdown, cleanTitle, cleanSubject);
 
       // Monta os nomes de arquivo sanitizados para download
@@ -632,3 +730,6 @@ module.exports.getGeminiReportCandidateModels = getGeminiReportCandidateModels;
 module.exports.normalizeGeneratedStructuralHtml = normalizeGeneratedStructuralHtml;
 module.exports.normalizeReportTextArtifacts = normalizeReportTextArtifacts;
 module.exports.normalizeReportMarkdownForPrint = normalizeReportMarkdownForPrint;
+module.exports.sanitizeReportFigures = sanitizeReportFigures;
+module.exports.buildFigureCatalogText = buildFigureCatalogText;
+module.exports.applyReportFigurePlaceholders = applyReportFigurePlaceholders;
