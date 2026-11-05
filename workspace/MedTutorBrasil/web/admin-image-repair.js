@@ -173,7 +173,20 @@
     const ui = openPanel();
     let stop = false;
     ui.close.addEventListener('click', () => { stop = true; ui.overlay.remove(); });
-    const plan = collectWork();
+    // Depois de recarregar, os materiais chegam da nuvem alguns segundos
+    // depois; contar antes disso dava "0 materiais".
+    ui.text.textContent = 'Aguardando os materiais carregarem da nuvem…';
+    let plan = collectWork();
+    for (let waited = 0; !plan.images && waited < 90 && !stop; waited++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      ui.text.textContent = `Aguardando os materiais carregarem da nuvem… ${waited + 1} s`;
+      plan = collectWork();
+    }
+    if (stop) return;
+    if (!plan.images) {
+      ui.text.textContent = 'Os materiais ainda não carregaram. Abra a tela de materiais, espere a lista aparecer e rode a ferramenta de novo.';
+      return;
+    }
     const low = plan.pendingPages * ESTIMATE_BRL_PER_PAGE.low;
     const high = plan.pendingPages * ESTIMATE_BRL_PER_PAGE.high;
     ui.text.textContent = plan.pendingPages
@@ -184,6 +197,7 @@
     await new Promise(resolve => ui.start.addEventListener('click', resolve, { once: true }));
     ui.start.disabled = true;
     ui.start.hidden = true;
+    plan = collectWork();
     ui.close.textContent = 'Parar';
 
     let done = 0;
