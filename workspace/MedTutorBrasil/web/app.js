@@ -965,6 +965,7 @@
         const uid = user?.uid || '';
         if (!uid || this.authMode !== 'firebase' || !this.authStateResolved) {
           entry.hidden = true;
+          document.querySelectorAll('.admin-menu-entry').forEach(item => { item.hidden = true; });
           if (divider) divider.hidden = true;
           this.adminMenuStatusUid = '';
           this.adminMenuCheckedAt = 0;
@@ -974,6 +975,7 @@
         if (!force && this.adminMenuStatusUid === uid && Date.now() - this.adminMenuCheckedAt < 60000) return;
         if (this.adminMenuStatusUid && this.adminMenuStatusUid !== uid) {
           entry.hidden = true;
+          document.querySelectorAll('.admin-menu-entry').forEach(item => { item.hidden = true; });
           if (divider) divider.hidden = true;
         }
         if (this.adminMenuStatusPromise) return this.adminMenuStatusPromise;
@@ -992,6 +994,8 @@
           }
           if (firebaseAuth?.currentUser?.uid === requestedUid && this.currentUser?.uid === requestedUid) {
             entry.hidden = !isAdmin;
+            // Outros itens exclusivos do admin seguem a mesma confirmação.
+            document.querySelectorAll('.admin-menu-entry').forEach(item => { item.hidden = !isAdmin; });
             if (divider) divider.hidden = !isAdmin;
             this.adminMenuStatusUid = requestedUid;
             this.adminMenuCheckedAt = Date.now();
@@ -1097,7 +1101,7 @@
       });
       const addFigure = (image, index = 0) => {
         const url = String(image?.imageUrl || image?.thumbnailUrl || image?.src || '').trim();
-        if (!/^https?:\/\//i.test(url)) return;
+        if (!/^https?:\/\//i.test(url) || image?.hiddenFromFigures) return;
         const current = figuresByUrl.get(url);
         const next = {
           id: image?.id || current?.id || `figura-${figuresByUrl.size + 1}`,
@@ -1110,8 +1114,11 @@
           analyzedTitle: String((image?.visualAssociation ? image?.title : '') || current?.analyzedTitle || '').trim()
         };
         const pageEntry = next.page ? pageTexts.get(next.page) : null;
-        next.pageTitle = pageEntry?.title || current?.pageTitle || '';
-        next.pageText = pageEntry?.text || current?.pageText || '';
+        // Sem marcação de página no texto (materiais antigos), a transcrição da
+        // análise visual faz o papel do texto daquela página.
+        const transcription = String(image?.transcription || '').replace(/\s+/g, ' ').trim().slice(0, 320);
+        next.pageTitle = pageEntry?.title || current?.pageTitle || (image?.visualAnalysisCompleted ? String(image?.title || '').trim() : '');
+        next.pageText = pageEntry?.text || current?.pageText || transcription;
         figuresByUrl.set(url, next);
       };
 
@@ -1376,7 +1383,9 @@
         transcription: image?.transcription || '',
         visualAnalysisCaution: image?.visualAnalysisCaution || '',
         visualAnalysisModel: image?.visualAnalysisModel || '',
-        visualAnalysisCompleted: Boolean(image?.visualAnalysisCompleted)
+        visualAnalysisCompleted: Boolean(image?.visualAnalysisCompleted),
+        ...(typeof image?.isVisualStudyMaterial === 'boolean' ? { isVisualStudyMaterial: image.isVisualStudyMaterial } : {}),
+        hiddenFromFigures: Boolean(image?.hiddenFromFigures)
       }));
       return {
         id: docId,
@@ -2578,7 +2587,10 @@
             transcription: association.transcription || '',
             visualAnalysisCaution: association.caution || '',
             visualAnalysisModel: association.model || '',
-            visualAnalysisCompleted: true
+            visualAnalysisCompleted: true,
+            isVisualStudyMaterial: association.isVisualStudyMaterial !== false,
+            // Capa, logo e slide só de texto continuam guardados, mas não viram figura.
+            hiddenFromFigures: association.isVisualStudyMaterial === false
           };
         });
         if (material) {
@@ -2602,7 +2614,9 @@
           transcription: String(image?.transcription || '').slice(0, 3000),
           visualAnalysisCaution: String(image?.visualAnalysisCaution || '').slice(0, 500),
           visualAnalysisModel: String(image?.visualAnalysisModel || '').slice(0, 80),
-          visualAnalysisCompleted: Boolean(image?.visualAnalysisCompleted)
+          visualAnalysisCompleted: Boolean(image?.visualAnalysisCompleted),
+          ...(typeof image?.isVisualStudyMaterial === 'boolean' ? { isVisualStudyMaterial: image.isVisualStudyMaterial } : {}),
+          hiddenFromFigures: Boolean(image?.hiddenFromFigures)
         }));
         try {
           await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').doc(materialId)
@@ -20099,21 +20113,21 @@ Retorne EXCLUSIVAMENTE um JSON:
         const itemMaterial = normalizeVisualMatchText(item.slideName || '');
         const itemSubject = normalizeVisualMatchText(item.subject || '');
         const materials = pool.filter(material => {
-          if (!Array.isArray(material?.clinicalImages) || !material.clinicalImages.length) return false;
+          if (!Array.isArray(material?.clinicalImages) || !material.clinicalImages.some(image => !image?.hiddenFromFigures)) return false;
           if (preferredMaterial) return true;
           if (item.sourceMaterialId && material.id === item.sourceMaterialId) return true;
           const materialNames = [material.name, material.originalFileName].map(normalizeVisualMatchText).filter(Boolean);
           const materialSubject = normalizeVisualMatchText(material.subject || '');
           return (itemMaterial && materialNames.includes(itemMaterial)) || (!itemMaterial && itemSubject && materialSubject === itemSubject);
         });
-        const candidates = materials.flatMap(material => (material.clinicalImages || []).map(image => ({ image, material })));
+        const candidates = materials.flatMap(material => (material.clinicalImages || []).filter(image => !image?.hiddenFromFigures).map(image => ({ image, material })));
         if (!candidates.length) return;
 
         const targetText = `${item.question || item.pergunta || ''} ${item.topic || ''} ${item.disease || ''}`;
         const keywords = getVisualKeywords(targetText);
         const expectedPage = Number(item.pagina_origem_pdf || item.sourcePage) || null;
         const ranked = candidates.map(candidate => {
-          const imageText = normalizeVisualMatchText(`${candidate.image.title || ''} ${candidate.image.clinicalLabel || ''} ${candidate.image.visualAssociation || ''} ${(candidate.image.visibleStructures || []).join(' ')} ${candidate.image.studyQuestion || ''}`);
+          const imageText = normalizeVisualMatchText(`${candidate.image.title || ''} ${candidate.image.clinicalLabel || ''} ${candidate.image.visualAssociation || ''} ${(candidate.image.visibleStructures || []).join(' ')} ${candidate.image.studyQuestion || ''} ${String(candidate.image.transcription || '').slice(0, 600)}`);
           let score = expectedPage && Number(candidate.image.page) === expectedPage ? 100 : 0;
           score += keywords.reduce((sum, keyword) => sum + (imageText.includes(keyword) ? 3 : 0), 0);
           if (candidate.image.visualAssociation || (candidate.image.visibleStructures || []).length) score += 1;
