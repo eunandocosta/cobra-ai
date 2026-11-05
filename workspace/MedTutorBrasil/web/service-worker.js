@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtutor-static-v149';
+const CACHE_NAME = 'medtutor-static-v150';
 const APP_SHELL = [
   '/',
   '/index.html',
