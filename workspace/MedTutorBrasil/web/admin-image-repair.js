@@ -205,6 +205,7 @@
     let hidden = 0;
     let failed = 0;
     let lastError = '';
+    let saveFailed = false;
     for (const item of plan.work) {
       if (stop) break;
       const label = item.material.name || item.material.originalFileName || 'Material';
@@ -232,11 +233,18 @@
         if (stop) break;
         if (outcome.analyzed.length) {
           const images = item.material.clinicalImages.map(image => ({ ...image, page: pageFromTitle(image) }));
+          const previousImages = item.material.clinicalImages;
           try {
             await withTimeout(MedTutorFirebaseService.saveMaterialVisualAssociations(item.material.id, outcome.analyzed, images), 60000, 'gravação');
           } catch (error) {
-            console.warn('[Reparo de imagens] Falha ao gravar o lote.', label, error);
-            lastError = String(error?.message || error);
+            // Sem gravar, cada lote seguinte só gastaria IA à toa: interrompe.
+            console.warn('[Reparo de imagens] Falha ao gravar o lote; reparo interrompido.', label, error);
+            lastError = `gravação no banco (${label}): ${String(error?.message || error)}`;
+            stop = true;
+            saveFailed = true;
+            // Desfaz a marcação local para essas páginas serem refeitas depois.
+            item.material.clinicalImages = previousImages;
+            item.material.figuras_clinicas = previousImages;
           }
           hidden += outcome.analyzed.filter(association => association.isVisualStudyMaterial === false).length;
         }
@@ -248,6 +256,11 @@
       }
     }
     if (!document.body.contains(ui.overlay)) document.body.appendChild(ui.overlay);
+    if (saveFailed) {
+      ui.log.textContent = `Interrompido para não gastar IA à toa: a gravação no banco falhou. ${done} página(s) processada(s). Custo: ${brl(spent)}. Erro: ${lastError}`;
+      ui.close.textContent = 'Fechar';
+      return;
+    }
     ui.log.textContent = 'Religando as questões às figuras…';
     const links = relinkQuestions();
     ui.log.textContent = `${stop ? 'Interrompido' : 'Concluído'}: ${done} página(s) processada(s), ${hidden} ocultada(s), ${failed} com falha (pode rodar de novo para tentar só as que faltaram). Questões: ${links.unlinked} desligada(s) e ${links.relinked} religada(s). Custo: ${brl(spent)}.${lastError ? ` Última falha: ${lastError}` : ''}`;
