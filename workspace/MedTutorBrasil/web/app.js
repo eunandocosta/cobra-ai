@@ -2619,8 +2619,21 @@
           hiddenFromFigures: Boolean(image?.hiddenFromFigures)
         }));
         try {
-          await firestoreDb.collection('users').doc(uid).collection('materiais_estudo').doc(materialId)
-            .set({ figuras_clinicas: safeImages, atualizadoEm: new Date().toISOString() }, { merge: true });
+          const docRef = firestoreDb.collection('users').doc(uid).collection('materiais_estudo').doc(materialId);
+          // As regras validam o documento inteiro (id, nome, disciplina,
+          // conteudo_md). Materiais antigos sem algum desses campos recusavam
+          // a gravação das figuras; completa só o que falta ou é inválido.
+          const stored = (await docRef.get()).data() || {};
+          const requiredFields = {};
+          if (typeof stored.id !== 'string' || !stored.id || stored.id.length > 128) requiredFields.id = String(materialId).slice(0, 128);
+          if (typeof stored.nome !== 'string' || stored.nome.length < 2 || stored.nome.length > 250) {
+            requiredFields.nome = String(material?.name || material?.nome || material?.originalFileName || 'Aula Médica').padEnd(2, ' ').slice(0, 250);
+          }
+          if (typeof stored.disciplina !== 'string' || stored.disciplina.length > 200) requiredFields.disciplina = String(material?.subject || material?.disciplina || '').slice(0, 200);
+          if (typeof stored.conteudo_md !== 'string' || stored.conteudo_md.length > 1000000) {
+            requiredFields.conteudo_md = String(material?.markdownText || material?.conteudo_md || material?.text || '').slice(0, FIRESTORE_TEXT_CHUNK_SIZE);
+          }
+          await docRef.set({ ...requiredFields, figuras_clinicas: safeImages, atualizadoEm: new Date().toISOString() }, { merge: true });
           await this.markCloudDataRevision(uid);
           console.info('[Firestore Visual] Análise visual vinculada ao material:', { materialId, paginasAnalisadas: associations.length });
           return true;
