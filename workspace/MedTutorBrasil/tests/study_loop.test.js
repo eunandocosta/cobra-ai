@@ -62,3 +62,22 @@ console.log('🎉 Testes do ciclo de estudo concluídos!\n');
   require('assert').ok(!/Pérola Clínica de Plantão|class="commentary-pearl"/.test(appCode), 'a pérola clínica saiu da correção do estudo ativo');
   console.log('  [PASS] Correção do estudo ativo sem a Pérola Clínica de Plantão');
 }
+
+// Curadoria: a questão enviada nunca leva referências circulares.
+{
+  const appCode = require('fs').readFileSync(require('path').join(__dirname, '..', 'web', 'app.js'), 'utf8');
+  const start = appCode.indexOf('function buildCurationQuestionPayload(');
+  let depth = 0; let end = appCode.indexOf(') {', start) + 2;
+  for (; end < appCode.length; end++) { if (appCode[end] === '{') depth++; else if (appCode[end] === '}' && --depth === 0) break; }
+  const build = new Function(`${appCode.slice(start, end + 1)}; return buildCurationQuestionPayload;`)();
+  const question = { id: 'q1', question: 'Qual estrutura coordena o equilíbrio?', answer: 'Vestibulocerebelo', quizOptions: ['A', { text: 'B' }], correctAnswerIndex: 1, topic: 'Cerebelo' };
+  question.self = question;
+  question.medicalImage = { owner: question };
+  const payload = build(question, 'quizzes');
+  require('assert').doesNotThrow(() => JSON.stringify(payload));
+  require('assert').deepEqual(payload.quizOptions, ['A', 'B']);
+  require('assert').equal(payload.correctAnswerIndex, 1);
+  require('assert').equal(payload.__curationType, 'quizzes');
+  require('assert').ok(appCode.includes('question: buildCurationQuestionPayload(item, type)'));
+  console.log('  [PASS] Curadoria envia só os campos da questão, sem referências circulares');
+}

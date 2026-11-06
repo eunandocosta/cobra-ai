@@ -5243,6 +5243,33 @@
     }
     window.openCuratedStudyContent = openCuratedStudyContent;
 
+    // Envia à curadoria só os campos que o servidor grava, como texto e listas
+    // de texto. Mandar a questão inteira falhava no Safari ("JSON.stringify
+    // cannot serialize cyclic structures") quando ela carregava referências a
+    // objetos da tela ou do material.
+    function buildCurationQuestionPayload(item, type) {
+      const text = (value, max = 5000) => (value == null || typeof value === 'object') ? '' : String(value).slice(0, max);
+      const optionText = option => (option && typeof option === 'object')
+        ? text(option.text ?? option.label ?? option.texto ?? option.value ?? '', 1000)
+        : text(option, 1000);
+      const rawOptions = [item?.quizOptions, item?.options, item?.alternatives, item?.alternativas].find(Array.isArray) || [];
+      const index = [item?.correctAnswerIndex, item?.correctIndex, item?.correctOptionIndex].find(Number.isInteger);
+      return {
+        id: text(item?.id, 200),
+        __curationType: type === 'quizzes' ? 'quizzes' : 'flashcards',
+        question: text(item?.question || item?.pergunta || item?.flashcard?.front || item?.front),
+        answer: text(item?.answer || item?.referenceAnswer || item?.reference_answer || item?.correctAnswer || item?.resposta_correta || item?.gabarito || item?.flashcard?.back || item?.back),
+        quizOptions: rawOptions.slice(0, 8).map(optionText),
+        ...(Number.isInteger(index) ? { correctAnswerIndex: index } : {}),
+        flashcardOnly: item?.flashcardOnly === true,
+        topic: text(item?.topic, 200),
+        slideName: text(item?.slideName || item?.materialName, 250),
+        difficultyLevel: text(item?.difficultyLevel || item?.nivel_dificuldade, 40),
+        learningAxis: text(item?.learningAxis || item?.eixo_aprendizagem, 40),
+        explanation: text(item?.explanation || item?.justification || item?.explicacao)
+      };
+    }
+
     async function toggleInstitutionCuratedQuestion(item, type) {
       if (!isCuratorUser()) {
         showToast('A Curadoria está disponível somente para Partner e Administradores.');
@@ -5264,7 +5291,7 @@
           response = await fetch('/api/quizzes/curadoria', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ discipline, question: { ...item, __curationType: type } })
+            body: JSON.stringify({ discipline, question: buildCurationQuestionPayload(item, type) })
           });
         }
         const result = await response.json().catch(() => ({}));
