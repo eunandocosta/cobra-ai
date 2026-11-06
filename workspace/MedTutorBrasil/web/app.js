@@ -1142,6 +1142,21 @@
         .replace(/<p\b[^>]*>\s*Elabore\s+\d+\s+quest(?:ão|ões)\b[\s\S]*?<\/p>/gi, '');
     }
 
+    // Ids de upload carregam o instante do envio ("upload-mat-1730000000000-ab12c").
+    function materialUploadTimeFromId(id) {
+      const ms = Number(String(id || '').match(/^upload-mat-(\d{12,14})\b/)?.[1]);
+      return ms ? new Date(ms).toISOString() : '';
+    }
+
+    // Ordem cronológica: data de criação do arquivo original (metadado) e, para
+    // materiais antigos sem esse dado, a data do envio.
+    function materialChronologyTime(material) {
+      return Date.parse(material?.sourceCreatedAt || material?.data_criacao_arquivo || '')
+        || Date.parse(materialUploadTimeFromId(material?.id))
+        || Date.parse(material?.createdAt || material?.criadoEm || '')
+        || 0;
+    }
+
     function normalizeMaterial(m) {
       if (!m || typeof m !== 'object') return m;
       const effectiveName = m.name || m.nome || m.originalFileName || 'Aula Médica';
@@ -1207,6 +1222,9 @@
         nome: effectiveName,
         originalFileName: m.originalFileName || effectiveName,
         sourceFileHash: String(m.sourceFileHash || m.source_file_sha256 || ''),
+        sourceCreatedAt: String(m.sourceCreatedAt || m.data_criacao_arquivo || ''),
+        sourceCreatedAtOrigin: String(m.sourceCreatedAtOrigin || m.origem_data_criacao_arquivo || ''),
+        createdAt: m.createdAt || materialUploadTimeFromId(m.id) || m.criadoEm || '',
         sourceFileHashes: [...new Set([...(Array.isArray(m.sourceFileHashes) ? m.sourceFileHashes : Array.isArray(m.source_file_sha256_aliases) ? m.source_file_sha256_aliases : []), m.sourceFileHash, m.source_file_sha256].filter(value => /^[a-f0-9]{64}$/i.test(String(value || ''))).map(value => String(value).toLowerCase()))],
         contentHash: String(m.contentHash || m.content_sha256 || ''),
         subject: effectiveSubject,
@@ -1414,7 +1432,9 @@
           data_geracao: report.createdAt || report.data_geracao || null,
           sincronizado_localmente: true
         } : null,
-        criadoEm: material.createdAt || new Date().toISOString(),
+        data_criacao_arquivo: String(material.sourceCreatedAt || material.data_criacao_arquivo || ''),
+        origem_data_criacao_arquivo: String(material.sourceCreatedAtOrigin || material.origem_data_criacao_arquivo || ''),
+        criadoEm: material.createdAt || materialUploadTimeFromId(material.id) || material.criadoEm || new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
       };
     }
@@ -7589,6 +7609,42 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
 
     // PPTX é um ZIP. Lê o diretório central uma vez e devolve as entradas ainda
     // compactadas; nada do arquivo bruto sai do navegador nesta etapa.
+    // Data de criação gravada no próprio arquivo: CreationDate/xmp:CreateDate
+    // do PDF ou docProps/core.xml (dcterms:created) do PPTX/DOCX. Na falta
+    // dela, usa a data de modificação informada pelo sistema.
+    function parsePdfDate(value) {
+      const match = String(value || '').match(/^D?:?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?\s*(Z|[+-])?\s*(\d{2})?'?(\d{2})?/);
+      if (!match) return '';
+      const [, y, mo = '01', d = '01', h = '00', mi = '00', se = '00', sign, oh = '00', om = '00'] = match;
+      const zone = sign && sign !== 'Z' ? `${sign}${oh}:${om}` : 'Z';
+      const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${se}${zone}`);
+      return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+    }
+
+    async function readSourceFileCreatedAt(file) {
+      const name = String(file?.name || '');
+      const valid = iso => { const time = Date.parse(iso || ''); return time > Date.UTC(1990, 0, 1) && time < Date.now() + 86400000 ? new Date(time).toISOString() : ''; };
+      try {
+        if (/\.pdf$/i.test(name) && typeof file.arrayBuffer === 'function' && file.size <= 80 * 1024 * 1024) {
+          const raw = new TextDecoder('latin1').decode(new Uint8Array(await file.arrayBuffer()));
+          const xmp = raw.match(/<xmp:CreateDate>\s*([^<]+)</i) || raw.match(/xmp:CreateDate="([^"]+)"/i);
+          const info = raw.match(/\/CreationDate\s*\(([^)]+)\)/);
+          const found = valid(xmp?.[1]?.trim()) || valid(parsePdfDate(info?.[1]));
+          if (found) return { createdAt: found, source: 'metadado do PDF' };
+        } else if (/\.(?:pptx|docx|xlsx)$/i.test(name)) {
+          const core = (await readZipEntries(file)).find(entry => /^docProps\/core\.xml$/i.test(entry.name));
+          const raw = core ? await inflateZipEntry(core) : null;
+          const created = raw ? new TextDecoder('utf-8').decode(raw).match(/<dcterms:created[^>]*>\s*([^<]+)</i)?.[1] : '';
+          const found = valid(created?.trim());
+          if (found) return { createdAt: found, source: 'metadado do Office' };
+        }
+      } catch (error) {
+        console.warn(`[Upload MedTutor] Data de criação não lida em "${name}":`, error);
+      }
+      const modified = valid(Number(file?.lastModified) ? new Date(Number(file.lastModified)).toISOString() : '');
+      return modified ? { createdAt: modified, source: 'data de modificação do arquivo' } : { createdAt: '', source: '' };
+    }
+
     async function readZipEntries(file) {
       if (typeof file?.arrayBuffer !== 'function') return [];
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -21915,10 +21971,46 @@ DIRETRIZES CIRÚRGICAS:
     // (títulos de slide, Markdown ou 1ª linha curta de página), pulando capas e
     // títulos genéricos como "Introdução", "Objetivos" ou "Sumário".
     function extractMaterialContentTitle(text) {
-      const index = generateDescriptiveIndexForMaterial(String(text || '').slice(0, 20000), '', '', '');
       const generic = /^(?:introdu[cç][aã]o|objetivos?(?:\s+da\s+aula)?|sum[aá]rio|apresenta[cç][aã]o|agenda|roteiro|plano\s+de\s+aula|conte[uú]do(?:\s+program[aá]tico)?|aula\s*\d*|caso\s+cl[ií]nico|revis[aã]o|exerc[ií]cios?|quest[oõ]es)$/i;
+      const cover = extractMaterialCoverTitle(text);
+      if (cover && !generic.test(cover)) return cover;
+      const index = generateDescriptiveIndexForMaterial(String(text || '').slice(0, 20000), '', '', '');
       const section = (index.sections || []).find(item => !generic.test(String(item.title || '').trim()));
       return section ? section.title : '';
+    }
+
+    // Título da capa (1ª página/slide). Ignora a "chamada" acima do título
+    // ("MEDICINA · SISTEMA TEGUMENTAR"), contadores ("01 / 24"), professor,
+    // instituição e datas, e junta o título quebrado em duas linhas
+    // ("Hipersensibilidades e" + "autoimunidade na pele").
+    function extractMaterialCoverTitle(text) {
+      const source = String(text || '').replace(/\r\n?/g, '\n').slice(0, 6000);
+      const markers = [...source.matchAll(/^#{1,3}\s*(?:P[aá]gina|Slide)\s+\d+\b[^\n]*$/gim)];
+      let block = source;
+      let markerTitle = '';
+      if (markers.length) {
+        const first = markers[0];
+        markerTitle = (first[0].match(/^#{1,3}\s*Slide\s+\d+\s*:\s*(?:Slide\s+\d+\s*:\s*)?(.+)$/i) || [])[1] || '';
+        block = source.slice(first.index + first[0].length, markers[1] ? markers[1].index : undefined);
+      }
+      const skip = line => !line || line.length > 120 || (line.match(/\p{L}/gu) || []).length < 4
+        || /[·|•]/.test(line)
+        || /^\d+\s*\/\s*\d+$/.test(line)
+        || /\b(?:prof(?:\.|essora?\b|a\.)|dr\.?a?\s|universidade|faculdade|centro universit[aá]rio|curso de|per[ií]odo|semestre|turma)\b/i.test(line)
+        || /\b20\d\d\b/.test(line)
+        || /^!\[|^https?:\/\//i.test(line);
+      const lines = [markerTitle, ...block.split('\n')]
+        .map(line => line.replace(/^#{1,6}\s*/, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim());
+      const start = lines.findIndex(line => !skip(line));
+      if (start < 0) return '';
+      let title = lines[start];
+      for (let next = start + 1; next < lines.length; next++) {
+        const line = lines[next];
+        const continues = /\s(?:e|ou|de|da|do|das|dos|na|no|nas|nos|em|para|com|a|o|à|ao|sobre)$/i.test(title) || /^[a-zà-ú]/.test(line || '');
+        if (!line || !continues || skip(line) || `${title} ${line}`.length > 110) break;
+        title = `${title} ${line}`;
+      }
+      return title.length >= 4 ? title : '';
     }
 
     // A IA pode repetir o nome do PDF/slide em "refinedTitle". Quando esse
@@ -21929,14 +22021,27 @@ DIRETRIZES CIRÚRGICAS:
         .replace(/\.(?:pdf|pptx?|docx?|txt)$/i, '')
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-      const sourceTitle = normalizeTitle(fileName);
-      const isGenericSourceTitle = /^(?:(?:aula|slide|revisao|resumo|material|documento|arquivo|apresentacao|teste|sem titulo)(?:\s+\d+)*|\d+)$/i.test(sourceTitle);
+      // O nome do arquivo (com ou sem "Cópia de", acentos quebrados como
+      // "INFLAMAC_A_O" e sufixos de ano/versão) nunca vira sugestão de título.
+      const fileKey = value => normalizeTitle(value)
+        .replace(/^(?:copia de|copy of)\s+/, '')
+        .replace(/\b(?:20\d\d(?:\s+\d)?|final|v\d+|versao \d+)\b/g, ' ')
+        .replace(/\s+/g, '');
+      const sourceTitle = fileKey(fileName);
       const isValid = candidate => {
         const normalized = normalizeTitle(candidate);
         if (normalized.length < 5 || normalized.length > 115) return false;
         if (/^(?:material|documento|arquivo|aula|slide|conteudo|resumo)(?:\s+(?:de\s+)?(?:aula|estudo))?$/i.test(normalized)) return false;
-        return !(isGenericSourceTitle && normalized === sourceTitle);
+        if (/^(?:aula|slide|modulo|capitulo|parte|semana|ed|estudo dirigido)\s*\d+$/i.test(normalized)) return false;
+        return !sourceTitle || fileKey(candidate) !== sourceTitle;
       };
+      const tidy = value => {
+        let title = String(value || '').replace(/^\s*(?:c[oó]pia de|copy of)\s+/i, '').replace(/\s+/g, ' ').trim();
+        // "INFLAMAÇÃO" vira "Inflamação"; siglas curtas dentro de títulos mistos ficam.
+        if (title.length > 3 && !/\p{Ll}/u.test(title)) title = title.charAt(0) + title.slice(1).toLocaleLowerCase('pt-BR');
+        return title.slice(0, 250);
+      };
+      const aiCandidates = (Array.isArray(aiSuggestedTitle) ? aiSuggestedTitle : [aiSuggestedTitle]).map(tidy);
 
       const inferred = generateSmartMaterialTitle(fileName, text, diseaseTopic, matchedSubject);
       const directTopic = String(diseaseTopic || '').trim();
@@ -21944,8 +22049,12 @@ DIRETRIZES CIRÚRGICAS:
       // O título escrito no próprio material (1º slide, 1º título) vem antes do
       // nome do arquivo, que costuma ser "aula_iam" ou "Slides 3 FINAL".
       const contentTitle = extractMaterialContentTitle(text);
-      const chosen = [aiSuggestedTitle, contentTitle, inferred, directTopic].find(isValid);
-      if (chosen) return String(chosen).trim().slice(0, 250);
+      const chosen = [...aiCandidates, tidy(contentTitle), tidy(inferred), tidy(directTopic)].find(isValid);
+      if (chosen) return chosen;
+      // Último recurso: o título escrito no próprio material, mesmo que o
+      // arquivo tenha o mesmo nome (sem o "Cópia de").
+      const sameAsFile = tidy(contentTitle);
+      if (normalizeTitle(sameAsFile).length >= 5 && !/^(?:aula|slide)\s*\d*$/i.test(normalizeTitle(sameAsFile))) return sameAsFile;
       return subjectLabel ? `${subjectLabel}: Conteúdo de Estudo` : 'Conteúdo de Estudo';
     }
 
@@ -22252,7 +22361,7 @@ DIRETRIZES CIRÚRGICAS:
             const translation = await translateMaterialToMarkdownWithAI(item.text || '', item.fileName || '', item.defaultSubject, updateUploadProgress);
             item.markdownText = translation.markdownText;
             if (translation.detectedTitle && translation.detectedTitle !== 'Material de Aula') {
-              item.suggestedTitle = translation.detectedTitle;
+              item.translatedTitle = translation.detectedTitle;
             }
             if (translation.detectedSubject && translation.detectedSubject !== 'Clínica Médica') {
               item.detectedSubject = translation.detectedSubject;
@@ -22270,7 +22379,7 @@ DIRETRIZES CIRÚRGICAS:
         // Se o item já tiver preloadedAnalysis, preserva
         if (!item.preloadedAnalysis) {
           let analysis = null;
-          let suggestedTitle = item.suggestedTitle || '';
+          let suggestedTitle = '';
 
           if (serverGeminiAvailable && String(item.text || '').trim().length >= 40) {
             try {
@@ -22297,16 +22406,14 @@ DIRETRIZES CIRÚRGICAS:
               );
             }
           } else {
-            if (!suggestedTitle) {
-              suggestedTitle = resolveProcessedMaterialTitle(
-                item.fileName, item.text, analysis.diseaseTopic, analysis.fullName,
-                analysis.suggestedTitle || analysis.refinedTitle || suggestedTitle
-              );
-            }
+            suggestedTitle = resolveProcessedMaterialTitle(
+              item.fileName, item.text, analysis.diseaseTopic, analysis.fullName,
+              [analysis.suggestedTitle || analysis.refinedTitle || '', item.translatedTitle || '', item.suggestedTitle || '']
+            );
           }
 
           suggestedTitle = resolveProcessedMaterialTitle(
-            item.fileName, item.text, item.disease || analysis.diseaseTopic, analysis.fullName, suggestedTitle
+            item.fileName, item.text, item.disease || analysis.diseaseTopic, analysis.fullName, [suggestedTitle, item.translatedTitle || '']
           );
 
           const descIndex = generateDescriptiveIndexForMaterial(
@@ -22931,6 +23038,9 @@ DIRETRIZES CIRÚRGICAS:
         name: finalTitle,
         originalFileName: currentMat.fileName,
         sourceFileHash: String(currentMat.sourceFileHash || ''),
+        sourceCreatedAt: String(currentMat.sourceCreatedAt || ''),
+        sourceCreatedAtOrigin: String(currentMat.sourceCreatedAtOrigin || ''),
+        createdAt: new Date().toISOString(),
         sizeStr: currentMat.sizeStr || `${optimization.compressionStats.compressedSizeKB} KB`,
         type: (currentMat.fileName && currentMat.fileName.includes('.ppt')) ? 'slide' : 'doc',
         selected: true,
@@ -23304,12 +23414,15 @@ Por favor, faça a transcrição, tradução e revisão didática completa deste
           let sourceFileHash = '';
           try { sourceFileHash = await sha256FileHex(f); }
           catch (hashError) { console.warn(`[Upload MedTutor] Hash do arquivo original indisponível para "${f.name}":`, hashError); }
+          const sourceDate = await readSourceFileCreatedAt(f);
           queue.push({
             fileName: f.name,
             text: combinedText,
             sizeStr: f.sizeStr || `${sizeMB >= 1 ? sizeMB.toFixed(1) + ' MB' : Math.round(sizeMB * 1024) + ' KB'}`,
             file: f,
             sourceFileHash,
+            sourceCreatedAt: sourceDate.createdAt,
+            sourceCreatedAtOrigin: sourceDate.source,
             visualAssociationAuthorized,
             extractedImageCount
           });
@@ -26478,6 +26591,10 @@ ${rawText}`;
       copy.forEach(m => calculatePedagogicalScore(m, subjectContext));
 
       copy.sort((a, b) => {
+        // Pedido do estudante: do arquivo mais antigo para o mais recente.
+        const ta = materialChronologyTime(a);
+        const tb = materialChronologyTime(b);
+        if (ta && tb && ta !== tb) return ta - tb;
         const pa = a.pedagogicalProfile;
         const pb = b.pedagogicalProfile;
         if (pa.phase !== pb.phase) return pa.phase - pb.phase;
