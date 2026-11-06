@@ -15815,6 +15815,26 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
     window.generateDisciplineReview = generateDisciplineReview;
     window.retryDisciplineReviewQuiz = retryDisciplineReviewQuiz;
 
+    // O navegador usa document.title como nome sugerido do PDF ("Salvar como
+    // PDF") e no cabeçalho da impressão. Troca pelo título do relatório só
+    // durante a impressão e restaura o título do app depois.
+    function printWithDocumentTitle(title) {
+      const cleanTitle = String(title || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150);
+      const previousTitle = document.title;
+      if (!cleanTitle) { window.print(); return; }
+      let restored = false;
+      const restore = () => {
+        if (restored) return;
+        restored = true;
+        document.title = previousTitle;
+      };
+      document.title = cleanTitle;
+      window.addEventListener('afterprint', restore, { once: true });
+      window.print();
+      // Navegadores que não disparam afterprint: restaura após o diálogo fechar.
+      window.setTimeout(restore, 60000);
+    }
+
     async function printAcademicReport() {
       const container = document.getElementById('readerModalContent');
       const images = container ? [...container.querySelectorAll('img[src]')] : [];
@@ -15828,7 +15848,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
             window.setTimeout(resolve, 4000);
           });
       await Promise.all(images.map(waitForImage));
-      window.print();
+      const reportTitle = document.getElementById('readerModalTitle')?.textContent?.trim() || activeAcademicReportData?.title || '';
+      printWithDocumentTitle(reportTitle);
     }
 
     function downloadActiveReportAsWord() {
@@ -31809,7 +31830,7 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
       modal.classList.add('active');
       showToast('🖨️ Abrindo diálogo para emissão em PDF...');
       setTimeout(() => {
-        window.print();
+        printWithDocumentTitle(title);
       }, 350);
     }
 
@@ -32613,7 +32634,7 @@ Linha 04: __________________________________________________
       modal.classList.add('active');
       showToast('🖨️ Abrindo diálogo para impressão da apostila em PDF A4...');
       setTimeout(() => {
-        window.print();
+        printWithDocumentTitle(title);
       }, 350);
     }
 

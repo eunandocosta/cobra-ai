@@ -135,3 +135,9 @@ assert.match(chatWordExport, /<div class="academic-institution abnt-institution 
 console.log('Normalização de estrutura, cifrões, parênteses e Markdown validada.');
 console.log('Renderizador dedicado de relatórios, listas e limites de tabela A4 validado.');
 console.log('Padrão tipográfico, cabeçalho MedTutor, títulos no Word e rodapés paginados validados.');
+
+// O PDF salvo pela impressão recebe o título do relatório como nome.
+assert.match(appSource, /function printWithDocumentTitle\(title\)[\s\S]*?document\.title = cleanTitle;[\s\S]*?window\.print\(\);/);
+assert.match(appSource, /async function printAcademicReport\(\)[\s\S]*?printWithDocumentTitle\(reportTitle\);/);
+assert.doesNotMatch(appSource.slice(appSource.indexOf('async function printAcademicReport'), appSource.indexOf('function downloadActiveReportAsWord')), /\n\s*window\.print\(\);/);
+console.log('Nome do PDF impresso igual ao título do relatório validado.');
