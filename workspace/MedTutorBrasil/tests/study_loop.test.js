@@ -55,3 +55,10 @@ assert(!indexHtml.includes('hoje às 08:30') && !indexHtml.includes('2 Tarefas A
 assert(/Última otimização: hoje às \$\{lastStudyRouteRebuildAt\.toLocaleTimeString/.test(appSource), 'o SCE deve mostrar o horário real do cálculo');
 console.log('  [PASS] SCE mostra o horário real da última otimização');
 console.log('🎉 Testes do ciclo de estudo concluídos!\n');
+
+// A correção da questão no estudo ativo não mostra mais a "Pérola Clínica de Plantão".
+{
+  const appCode = require('fs').readFileSync(require('path').join(__dirname, '..', 'web', 'app.js'), 'utf8');
+  require('assert').ok(!/Pérola Clínica de Plantão|class="commentary-pearl"/.test(appCode), 'a pérola clínica saiu da correção do estudo ativo');
+  console.log('  [PASS] Correção do estudo ativo sem a Pérola Clínica de Plantão');
+}

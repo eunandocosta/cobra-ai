@@ -19773,19 +19773,6 @@ Retorne EXCLUSIVAMENTE um JSON:
             }).join('')}
           </div>` : (isCorrect ? '' : '<div class="commentary-distractors"><div class="commentary-title">🔴 Análise dos Distratores</div><p>Não há justificativas específicas disponíveis para as alternativas desta questão.</p></div>')}
 
-          <!-- 3. Pérola Clínica ("Take-home message") -->
-          <div class="commentary-pearl">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
-              <div class="commentary-title" style="margin: 0;">💡 Pérola Clínica de Plantão (Take-home message):</div>
-              <button class="btn-outline-action" style="padding: 3px 8px; font-size: 11px; background: rgba(0, 229, 255, 0.12); border-color: var(--neon); color: var(--neon);" onclick="togglePinPearl('${(tripartite.pearl || '').replace(/'/g, "\\'")}', '${item.disease || item.subject}', '${item.area || 'clinica'}')">
-                ⭐ Salvar no Mural de Plantão
-              </button>
-            </div>
-            <div style="font-style: italic; color: #ffffff; font-size: 12.5px; line-height: 1.5;">
-              "${(typeof formatInlineMd === 'function') ? formatInlineMd(tripartite.pearl || 'Atenção aos sinais de alarme e às diretrizes terapêuticas vigentes.') : (tripartite.pearl || 'Atenção aos sinais de alarme e às diretrizes terapêuticas vigentes.')}"
-            </div>
-          </div>
-
           <!-- 4. Evidências Científicas & Bases Indexadas -->
           <div class="commentary-evidence" style="margin-top: 10px; padding: 10px 12px; background: rgba(0, 229, 255, 0.04); border: 1px dashed rgba(0, 229, 255, 0.25); border-radius: 8px;">
             <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
