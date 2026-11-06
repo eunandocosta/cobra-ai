@@ -23,7 +23,7 @@ const declaration = name => {
 const functions = ['classifyMedicalDocumentSemantically', 'getOfficialCurriculumDisciplineList', 'matchPeriodSemester',
   'extractClinicalTopicFromContent', 'extractDiseaseFromFilename', 'getMaterialAllocationEvidence', 'normalizeCurriculumText',
   'scoreSubjectContentFit', 'curriculumTerms', 'hasCurriculumPhrase', 'stripCurriculumLoad', 'generateSmartMaterialTitle',
-  'analyzeMedicalContentForTitle', 'refineAcademicMaterialTitle', 'resolveProcessedMaterialTitle', 'extractMaterialContentTitle',
+  'analyzeMedicalContentForTitle', 'refineAcademicMaterialTitle', 'resolveProcessedMaterialTitle', 'extractMaterialContentTitle', 'extractMaterialCoverTitle',
   'generateDescriptiveIndexForMaterial'];
 const context = vm.createContext({ console, window: {}, currentStudySubject: '' });
 vm.runInContext([declaration('CANONICAL_UNIVERSO_CURRICULUM'), declaration('MEDICAL_TOPIC_REGISTRY'),
@@ -54,5 +54,10 @@ const title = text => context.resolveProcessedMaterialTitle('aula_iam.pptx', tex
 assert.equal(title('## Slide 1: Eletrocardiograma no infarto\n\nSupradesnivelamento do segmento ST.'), 'Eletrocardiograma no infarto', 'título vem do 1º slide, não do nome do arquivo');
 assert.equal(title('## Slide 1: Introdução\n\nVisão geral.\n\n## Slide 2: Reanimação neonatal\n\nVentilação.'), 'Reanimação neonatal', 'pula títulos genéricos como "Introdução"');
 assert.equal(context.resolveProcessedMaterialTitle('x.pdf', '## Slide 1: Tema do slide\n\nTexto.', '', '', 'Título sugerido pela IA'), 'Título sugerido pela IA', 'sugestão da IA continua tendo prioridade');
+// Nome do arquivo nunca vira título quando o material diz o tema.
+assert.equal(context.resolveProcessedMaterialTitle('AULA_7__INFLAMAC_A_O_2026_2.pdf', '## Página 1\n\nINFLAMAÇÃO\n\n## Página 2\n\nFases gerais.', '', '', ['AULA_7__INFLAMAC_A_O_2026_2', 'AULA_7__INFLAMAC_A_O_2026_2']), 'Inflamação', 'sugestão igual ao nome do arquivo é descartada e caixa-alta vira título');
+assert.equal(context.resolveProcessedMaterialTitle('Aula 9.pdf', '## Página 1\n\nMEDICINA · SISTEMA TEGUMENTAR\nHipersensibilidades e\nautoimunidade na pele\nDo mastócito à quebra de tolerância\n01 / 24\n\n## Página 2\n\nConceito.', '', '', ['Aula 9']), 'Hipersensibilidades e autoimunidade na pele', 'capa: pula a chamada e junta o título quebrado');
+assert.equal(context.resolveProcessedMaterialTitle('Aula 8.pdf', '## Página 1\n\nImunologia da pele\nA arquitetura celular.', '', '', ['', 'Aula 8', 'Imunologia cutânea']), 'Imunologia cutânea', 'a primeira sugestão válida vence');
+assert.equal(context.resolveProcessedMaterialTitle('Cópia de Osso como órgão.pdf', '## Página 1\n\nOsso como órgão', '', '', ['Cópia de Osso como órgão']), 'Osso como órgão', 'sem alternativa, usa o título do material sem "Cópia de"');
 console.log('  [PASS] Título do material vem do próprio conteúdo');
 console.log('🎉 Testes de alocação de material concluídos!\n');
