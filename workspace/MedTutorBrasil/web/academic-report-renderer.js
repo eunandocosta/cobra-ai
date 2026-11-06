@@ -258,9 +258,40 @@
     const title = match[2].trim();
     const numbering = title.match(/^(\d+(?:\.\d+)*)\s+(.+)$/);
     const level = numbering ? Math.min(4, numbering[1].split('.').length + 1) : Math.min(4, Math.max(2, match[1].length));
-    const content = numbering ? `${numbering[1]} ${numbering[2]}` : title;
+    const text = sentenceCaseHeading(numbering ? numbering[2] : title);
     const style = level === 2 ? 'report-heading-primary' : level === 3 ? 'report-heading-secondary' : 'report-heading-tertiary';
-    return `<h${level} class="academic-report-heading ${style}">${inline(content, options)}</h${level}>`;
+    const number = numbering ? `<span class="report-heading-number">${numbering[1]}</span> ` : '';
+    return `<h${level} class="academic-report-heading ${style}">${number}${inline(text, options)}</h${level}>`;
+  }
+
+  // "1 INTRODUÇÃO" vira "1 Introdução". Siglas de até 3 letras (SUS, IAM, HIV)
+  // ficam em maiúsculas; títulos que já têm minúsculas não mudam.
+  const LOWERCASE_WORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos', 'a', 'o', 'as', 'os', 'ao', 'aos', 'à', 'às', 'para', 'com', 'por', 'sem', 'um', 'uma', 'ou']);
+  function sentenceCaseHeading(value) {
+    const text = String(value || '');
+    if (/\p{Ll}/u.test(text) || !/\p{Lu}{2,}/u.test(text)) return text;
+    let first = true;
+    return text.replace(/\p{L}+/gu, word => {
+      const lower = word.toLocaleLowerCase('pt-BR');
+      let result = lower;
+      if (word.length <= 3 && !LOWERCASE_WORDS.has(lower)) result = word;
+      else if (first) result = lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1);
+      first = false;
+      return result;
+    });
+  }
+
+  // Blocos citados com rótulo viram quadros: "> **Em resumo:** ..." e
+  // "> **Na prática:** ..." (também "Correlação/Aplicação clínica").
+  function renderQuote(text, options) {
+    const match = text.match(/^\s*(?:\*\*|__)?\s*(em resumo|na pr[aá]tica|correla[cç][aã]o cl[ií]nica|aplica[cç][aã]o cl[ií]nica)\s*:?\s*(?:\*\*|__)?\s*:?\s*([\s\S]*)$/i);
+    if (match && match[2].trim()) {
+      const isSummary = /^em resumo$/i.test(match[1].trim());
+      const kind = isSummary ? 'report-summary' : 'report-clinic';
+      const label = isSummary ? 'Em resumo' : 'Na prática';
+      return `<aside class="report-callout ${kind}"><span class="report-callout-label">${label}</span><p>${inline(match[2].trim(), options)}</p></aside>`;
+    }
+    return `<blockquote class="academic-report-quote"><p>${inline(text, options)}</p></blockquote>`;
   }
 
   function renderList(lines, start, options) {
@@ -360,7 +391,7 @@
       if (/^\s*>/.test(line)) {
         const quote = [];
         while (i < lines.length && /^\s*>/.test(lines[i])) quote.push(lines[i++].replace(/^\s*>\s?/, '').trim());
-        html.push(`<blockquote class="academic-report-quote"><p>${inline(quote.join(' '), options)}</p></blockquote>`);
+        html.push(renderQuote(quote.join(' '), options));
         continue;
       }
       if (/^!\[[^\]]*\]\(https?:\/\/[^\s)]+(?:\s+"[^"]*")?\)$/.test(line.trim())) {

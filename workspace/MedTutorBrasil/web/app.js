@@ -11568,6 +11568,56 @@ ${cleanText}
       return `${window.location.origin}/`;
     }
 
+    // Cabeçalho do relatório (modelo editorial): marca pequena, título grande e
+    // uma linha com disciplina, estudante, data e arquivo de origem.
+    function buildMedTutorReportHeaderHtml({ title = '', subject = '', student = '', date = '', source = '' } = {}) {
+      const meta = [['Disciplina', subject], ['Estudante', student], ['Emitido em', date], ['Fonte', source]]
+        .filter(([, value]) => String(value || '').trim())
+        .map(([label, value]) => `<span><b>${label}</b> ${escapeHtml(String(value).trim())}</span>`)
+        .join('');
+      const cleanTitle = typeof renderMedicalMathAndSymbols === 'function' ? renderMedicalMathAndSymbols(title) : title;
+      return `<header class="report-cover">
+        <div class="report-cover-brand medtutor-report-brand">MedTutor Brasil · Relatório de estudo</div>
+        <h1 class="report-cover-title">${escapeHtml(cleanTitle)}</h1>
+        ${meta ? `<div class="report-cover-meta">${meta}</div>` : ''}
+      </header>`;
+    }
+
+    // Relatórios salvos antes do modelo novo guardam o cabeçalho antigo (tabela
+    // ABNT). Ao exibir, troca pelo cabeçalho novo e liga o estilo editorial.
+    function applyModernReportLayout(root) {
+      if (!root?.querySelectorAll) return;
+      root.querySelectorAll('.academic-article-container').forEach(container => {
+        container.classList.add('report-modern');
+        const legacy = container.querySelector(':scope > .academic-header-block');
+        if (!legacy || container.querySelector(':scope > .report-cover')) return;
+        const metaValue = pattern => [...legacy.querySelectorAll('.abnt-meta-item')]
+          .find(item => pattern.test(item.querySelector('strong')?.textContent || ''))
+          ?.querySelector('span')?.textContent || '';
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = buildMedTutorReportHeaderHtml({
+          title: legacy.querySelector('h1')?.textContent || '',
+          subject: metaValue(/disciplina/i),
+          student: metaValue(/estudante|autor/i),
+          date: metaValue(/data/i)
+        });
+        legacy.replaceWith(wrapper.firstElementChild);
+      });
+    }
+
+    (function watchReaderForModernReportLayout() {
+      if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+      const attach = () => {
+        const reader = document.getElementById('readerModalContent');
+        if (!reader || reader.dataset.modernReportWatch) return;
+        reader.dataset.modernReportWatch = 'true';
+        applyModernReportLayout(reader);
+        new MutationObserver(() => applyModernReportLayout(reader)).observe(reader, { childList: true });
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach, { once: true });
+      else attach();
+    })();
+
     function getMedTutorReportPrintFooterHtml() {
       const siteUrl = getMedTutorReportSiteUrl();
       return `<footer class="academic-report-print-footer" aria-label="Rodapé do relatório">
@@ -13259,32 +13309,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         `;
 
         const fullHtml = `
-          <div class="academic-article-container" id="academicArticlePrintArea">
-            <div class="academic-header-block abnt-header-block">
-              <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
-              
-              <table class="academic-header-columns-table abnt-header-table">
-                <tbody>
-                  <tr>
-                    <td class="abnt-header-col abnt-col-left">
-                      <div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subjectName)}</span></div>
-                      <div class="abnt-meta-item"><strong>MÓDULO / CICLO:</strong> <span>${escapeHtml(cycleStr || 'Graduação Médica')} • ${escapeHtml(periodStr)}</span></div>
-                      <div class="abnt-meta-item"><strong>MATRIZ CURRICULAR:</strong> <span>Diretrizes Curriculares Nacionais (MEC)</span></div>
-                    </td>
-                    <td class="abnt-header-col abnt-col-right">
-                      <div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div>
-                      <div class="abnt-meta-item"><strong>DIRETRIZ CLÍNICA:</strong> <span>${guidelinesOrg}</span></div>
-                      <div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${cleanDate}</span></div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <h1 class="academic-title abnt-title">${escapeHtml(typeof renderMedicalMathAndSymbols === 'function' ? renderMedicalMathAndSymbols(contentTitle) : contentTitle)}</h1>
-              <div class="academic-subtitle-badge abnt-nature-badge">
-                DOCUMENTO FORMAL DE ESTUDO & CONDUTA CLÍNICA (DIRETRIZES SUS / CFM / ENARE / PADRÃO ABNT NBR 14724)
-              </div>
-            </div>
+          <div class="academic-article-container report-modern" id="academicArticlePrintArea">
+            ${buildMedTutorReportHeaderHtml({ title: contentTitle, subject: subjectName, student: studentName, date: cleanDate, source: materialName })}
             ${scientificToolbarHtml}
             <div class="academic-body-content">
               ${bodyHtml}
@@ -15226,32 +15252,8 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
         `;
 
         const fullHtml = `
-          <div class="academic-article-container" id="academicArticlePrintArea">
-            <div class="academic-header-block abnt-header-block">
-              <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
-              
-              <table class="academic-header-columns-table abnt-header-table">
-                <tbody>
-                  <tr>
-                    <td class="abnt-header-col abnt-col-left">
-                      <div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subjectName)}</span></div>
-                      <div class="abnt-meta-item"><strong>MÓDULO / CICLO:</strong> <span>${escapeHtml(cycleStr)} • ${escapeHtml(periodStr)}</span></div>
-                      <div class="abnt-meta-item"><strong>MATRIZ CURRICULAR:</strong> <span>Diretrizes Curriculares Nacionais (MEC)</span></div>
-                    </td>
-                    <td class="abnt-header-col abnt-col-right">
-                      <div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div>
-                      <div class="abnt-meta-item"><strong>DIRETRIZ CLÍNICA:</strong> <span>${guidelinesOrg}</span></div>
-                      <div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${cleanDate}</span></div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <h1 class="academic-title abnt-title">${escapeHtml(contentTitle)}</h1>
-              <div class="academic-subtitle-badge abnt-nature-badge">
-                DOCUMENTO DE ESTUDO: FUNDAMENTOS → MECANISMOS → CONSEQUÊNCIAS → APLICAÇÃO CLÍNICA
-              </div>
-            </div>
+          <div class="academic-article-container report-modern" id="academicArticlePrintArea">
+            ${buildMedTutorReportHeaderHtml({ title: contentTitle, subject: subjectName, student: studentName, date: cleanDate, source: materialName })}
             ${scientificToolbarHtml}
             <div class="academic-body-content">
               ${sectionsHtml}
@@ -31804,22 +31806,8 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
 
       // Folha de rosto textual: identidade MedTutor sem faixas, logotipos ou adereços.
       content.innerHTML = `
-        <div class="academic-article-container academic-report-container" style="padding: 0; max-width: 100%; margin: 0 auto; color: #000; background: #fff;">
-          <div class="academic-header-block abnt-header-block">
-            <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
-            <h1 class="academic-title">${escapeHtml(title)}</h1>
-            <table class="academic-header-columns-table abnt-header-table">
-              <tbody><tr>
-                <td class="abnt-header-col abnt-col-left">
-                  <div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subject)}</span></div>
-                </td>
-                <td class="abnt-header-col abnt-col-right">
-                  <div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div>
-                  <div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${escapeHtml(currentDate)}</span></div>
-                </td>
-              </tr></tbody>
-            </table>
-          </div>
+        <div class="academic-article-container academic-report-container report-modern">
+          ${buildMedTutorReportHeaderHtml({ title, subject, student: studentName, date: currentDate })}
           <div class="academic-body-content report-body-content">
             ${interleavedBodyHtml}
           </div>
@@ -31863,15 +31851,8 @@ Utilize formatação rica, tabelas em Markdown e tópicos bem delineados para fa
       const studentName = (typeof currentUser !== 'undefined' && currentUser?.name) ? currentUser.name : 'Estudante de Medicina';
       const currentDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
       content.innerHTML = `
-        <div class="academic-article-container academic-report-container">
-          <div class="academic-header-block abnt-header-block">
-            <div class="academic-institution abnt-institution medtutor-report-brand">MedTutor Brasil</div>
-            <h1 class="academic-title">${escapeHtml(title)}</h1>
-            <table class="academic-header-columns-table abnt-header-table"><tbody><tr>
-              <td class="abnt-header-col abnt-col-left"><div class="abnt-meta-item"><strong>DISCIPLINA:</strong> <span>${escapeHtml(subject)}</span></div></td>
-              <td class="abnt-header-col abnt-col-right"><div class="abnt-meta-item"><strong>ESTUDANTE / AUTOR:</strong> <span>${escapeHtml(studentName)}</span></div><div class="abnt-meta-item"><strong>DATA DE EMISSÃO:</strong> <span>${escapeHtml(currentDate)}</span></div></td>
-            </tr></tbody></table>
-          </div>
+        <div class="academic-article-container academic-report-container report-modern">
+          ${buildMedTutorReportHeaderHtml({ title, subject, student: studentName, date: currentDate })}
           ${readerBodyWithFigures}
           ${getMedTutorReportPrintFooterHtml()}
         </div>

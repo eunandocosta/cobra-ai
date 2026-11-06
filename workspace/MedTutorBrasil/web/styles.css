@@ -12323,3 +12323,255 @@
     #readerModal .academic-article-container .academic-report-table tr,
     .academic-article-container .academic-report-table tr { break-inside: avoid !important; page-break-inside: avoid !important; }
   }
+
+  /* ==========================================================================
+     MODELO EDITORIAL DO RELATÓRIO (tela e impressão)
+     Substitui o visual ABNT: título grande, linha de metadados, seções com
+     número em destaque, tabelas limpas e quadros "Em resumo" / "Na prática".
+     O prefixo :is(#readerModalContent, body) dá a especificidade necessária
+     para vencer as regras antigas de impressão com !important.
+     ========================================================================== */
+  :root {
+    --report-ink: #1f2937;
+    --report-muted: #6b7280;
+    --report-accent: #0f766e;
+    --report-rule: #d1d5db;
+    --report-soft: #f0fdfa;
+    --report-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --report-sans: Inter, "Plus Jakarta Sans", Arial, sans-serif;
+  }
+
+  :is(#readerModalContent, body) .report-modern,
+  :is(#readerModalContent, body) .report-modern * {
+    font-family: var(--report-serif) !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern {
+    color: var(--report-ink) !important;
+    background: #fff !important;
+    font-size: 11pt !important;
+    line-height: 1.55 !important;
+    padding: 2.2cm 2cm 2cm 2.2cm !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-cover {
+    display: block !important;
+    margin: 0 0 16pt !important;
+    padding: 0 0 10pt !important;
+    border: 0 !important;
+    border-bottom: 1.5pt solid var(--report-accent) !important;
+    background: transparent !important;
+    text-align: left !important;
+    break-after: avoid;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-cover-brand {
+    margin: 0 !important;
+    color: var(--report-accent) !important;
+    font: 600 8pt/1.4 var(--report-sans) !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    text-align: left !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-cover-title {
+    margin: 6pt 0 8pt !important;
+    color: var(--report-ink) !important;
+    font-family: var(--report-serif) !important;
+    font-size: 22pt !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.01em !important;
+    text-align: left !important;
+    text-transform: none !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-cover-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4pt 14pt !important;
+    color: var(--report-muted) !important;
+    font: 9pt/1.4 var(--report-sans) !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-cover-meta span,
+  :is(#readerModalContent, body) .report-modern .report-cover-meta b {
+    font-family: var(--report-sans) !important;
+    font-size: 9pt !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-cover-meta b {
+    color: var(--report-ink) !important;
+    font-weight: 600 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-paragraph,
+  :is(#readerModalContent, body) .report-modern .academic-body-content p,
+  :is(#readerModalContent, body) .report-modern p {
+    margin: 0 0 8pt !important;
+    color: var(--report-ink) !important;
+    font-size: 11pt !important;
+    line-height: 1.55 !important;
+    text-align: justify !important;
+    text-indent: 0 !important;
+    hyphens: auto;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-heading,
+  :is(#readerModalContent, body) .report-modern .academic-body-content h2,
+  :is(#readerModalContent, body) .report-modern .academic-body-content h3,
+  :is(#readerModalContent, body) .report-modern .academic-body-content h4 {
+    color: var(--report-ink) !important;
+    border: 0 !important;
+    background: transparent !important;
+    text-transform: none !important;
+    text-align: left !important;
+    text-indent: 0 !important;
+    font-style: normal !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-heading-primary,
+  :is(#readerModalContent, body) .report-modern .academic-body-content h2 {
+    margin: 18pt 0 6pt !important;
+    font-size: 14pt !important;
+    font-weight: 700 !important;
+    line-height: 1.3 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-heading-secondary,
+  :is(#readerModalContent, body) .report-modern .academic-body-content h3 {
+    margin: 12pt 0 4pt !important;
+    color: #374151 !important;
+    font-size: 11.5pt !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-heading-tertiary,
+  :is(#readerModalContent, body) .report-modern .academic-body-content h4 {
+    margin: 10pt 0 3pt !important;
+    color: #374151 !important;
+    font-size: 11pt !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-heading-number {
+    margin-right: 4pt !important;
+    color: var(--report-accent) !important;
+    font-weight: 700 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-list {
+    margin: 0 0 8pt !important;
+    padding-left: 16pt !important;
+    font-size: 11pt !important;
+    line-height: 1.55 !important;
+    text-align: left !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-list-alineas { list-style-type: disc !important; }
+  :is(#readerModalContent, body) .report-modern .report-list-numbered { list-style-type: decimal !important; }
+  :is(#readerModalContent, body) .report-modern .academic-report-list > li { margin: 2pt 0 !important; padding-left: 2pt !important; font-size: 11pt !important; }
+  :is(#readerModalContent, body) .report-modern .academic-report-list > li::marker { color: var(--report-accent); }
+  :is(#readerModalContent, body) .report-modern .report-list-subalineas > li::before { content: "– "; color: var(--report-muted); }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-table {
+    margin: 6pt 0 12pt !important;
+    border-collapse: collapse !important;
+    font-size: 9pt !important;
+    line-height: 1.4 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-table th,
+  :is(#readerModalContent, body) .report-modern .academic-report-table td {
+    padding: 5pt 7pt !important;
+    border: 0 !important;
+    border-bottom: 0.5pt solid var(--report-rule) !important;
+    color: var(--report-ink) !important;
+    background: #fff !important;
+    font-family: var(--report-sans) !important;
+    font-size: 9pt !important;
+    line-height: 1.4 !important;
+    text-align: left !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-table th {
+    border-bottom: 1pt solid #9ca3af !important;
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-table td * ,
+  :is(#readerModalContent, body) .report-modern .academic-report-table th * {
+    font-family: var(--report-sans) !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-figure figcaption {
+    color: var(--report-muted) !important;
+    font: 8.5pt/1.4 var(--report-sans) !important;
+    text-align: left !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-callout {
+    display: block !important;
+    margin: 8pt 0 12pt !important;
+    padding: 8pt 12pt !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-callout p { margin: 0 !important; font-size: 10.5pt !important; text-align: left !important; }
+
+  :is(#readerModalContent, body) .report-modern .report-callout-label {
+    display: block !important;
+    margin-bottom: 2pt !important;
+    font: 600 7.5pt/1.4 var(--report-sans) !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-summary {
+    border: 0 !important;
+    border-left: 3pt solid var(--report-accent) !important;
+    background: var(--report-soft) !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-summary .report-callout-label { color: var(--report-accent) !important; }
+
+  :is(#readerModalContent, body) .report-modern .report-clinic {
+    border: 1pt solid #fcd34d !important;
+    border-radius: 4pt !important;
+    background: #fffbeb !important;
+  }
+
+  :is(#readerModalContent, body) .report-modern .report-clinic .report-callout-label { color: #b45309 !important; }
+
+  :is(#readerModalContent, body) .report-modern .academic-report-quote {
+    margin: 8pt 0 !important;
+    padding: 2pt 0 2pt 10pt !important;
+    border: 0 !important;
+    border-left: 2pt solid var(--report-rule) !important;
+    color: #374151 !important;
+  }
+
+  @media print {
+    @page { size: A4 portrait; margin: 2.2cm 2cm 2cm 2.2cm; }
+
+    :is(#readerModalContent, body) .report-modern {
+      padding: 0 !important;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+
+    :is(#readerModalContent, body) .report-modern .academic-report-print-footer,
+    :is(#readerModalContent, body) .report-modern .academic-report-print-footer * {
+      color: var(--report-muted) !important;
+      font-family: var(--report-sans) !important;
+      font-size: 8pt !important;
+    }
+  }

@@ -76,7 +76,7 @@ Conclusão A → conclusão B.
 const reportHtml = AcademicReportRenderer.render(reportMarkdown, { allowedImageUrls: ['https://storage.example.org/material/figura.png'] });
 const reportNormalized = AcademicReportRenderer.normalize(reportMarkdown);
 const serverNormalizedReport = normalizeReportMarkdownForPrint(reportMarkdown);
-assert.match(reportHtml, /class="academic-report-heading report-heading-primary">1 INTRODUÇÃO<\/h2>/);
+assert.match(reportHtml, /class="academic-report-heading report-heading-primary"><span class="report-heading-number">1<\/span> Introdução<\/h2>/);
 assert.match(reportHtml, /Texto de relatório que continua na linha seguinte sem depender de br\./);
 assert.match(reportHtml, /class="academic-report-list report-list-alineas"/);
 assert.match(reportHtml, /report-list-subalineas/);
@@ -84,7 +84,7 @@ assert.match(reportHtml, /report-list-subalineas"><li>Subalínea descritiva<\/li
 assert.match(reportHtml, /class="academic-report-table"/);
 assert.match(reportNormalized, /\*\*Explicação:\*\* descrição muito longa/);
 assert.match(serverNormalizedReport, /\*\*Explicação:\*\* descrição muito longa/);
-assert.match(reportHtml, /2\.1\.1 Via TRIF \(<em>interna<\/em>\)/);
+assert.match(reportHtml, /2\.1\.1<\/span> Via TRIF \(<em>interna<\/em>\)/);
 assert.match(reportHtml, /TLR3 e TLR4/);
 assert.match(reportHtml, /Conclusão A leva a conclusão B\./);
 assert.match(reportHtml, /<figure class="academic-report-figure"><img src="https:\/\/storage\.example\.org\/material\/figura\.png"/);
@@ -110,7 +110,7 @@ const reportStyles = readFileSync(require.resolve('../web/styles.css'), 'utf8');
 const appSource = readFileSync(require.resolve('../web/app.js'), 'utf8');
 const reportService = readFileSync(require.resolve('../src/modules/relatorios/relatorios.service.js'), 'utf8');
 assert.match(appSource, /const contentTitle = window\.AcademicReportRenderer\?\.extractReportTitle\(markdownText, cleanTitle, subjectName\)/);
-assert.match(appSource, /<h1 class="academic-title abnt-title">\$\{escapeHtml\(typeof renderMedicalMathAndSymbols === 'function' \? renderMedicalMathAndSymbols\(contentTitle\) : contentTitle\)\}<\/h1>/);
+assert.match(appSource, /buildMedTutorReportHeaderHtml\(\{ title: contentTitle, subject: subjectName, student: studentName, date: cleanDate, source: materialName \}\)/);
 assert.match(appSource, /title: contentTitle,[\s\S]*?markdown: `# \$\{contentTitle\}/);
 assert.match(reportService, /TÍTULO EDITORIAL:[\s\S]*?Não copie o nome do arquivo/);
 assert.match(reportService, /title: generatedTitle/);
@@ -140,4 +140,13 @@ console.log('Padrão tipográfico, cabeçalho MedTutor, títulos no Word e rodap
 assert.match(appSource, /function printWithDocumentTitle\(title\)[\s\S]*?document\.title = cleanTitle;[\s\S]*?window\.print\(\);/);
 assert.match(appSource, /async function printAcademicReport\(\)[\s\S]*?printWithDocumentTitle\(reportTitle\);/);
 assert.doesNotMatch(appSource.slice(appSource.indexOf('async function printAcademicReport'), appSource.indexOf('function downloadActiveReportAsWord')), /\n\s*window\.print\(\);/);
+// Modelo editorial: quadros "Em resumo"/"Na prática", títulos sem caixa alta e cabeçalho novo.
+const callouts = AcademicReportRenderer.render('## 1 CORRELAÇÃO CLÍNICA DO SUS\n\n> **Em resumo:** O cerebelo coordena.\n\n> **Na prática:** Lesões são ipsilaterais.\n\n> Citação comum.');
+assert.match(callouts, /report-heading-number">1<\/span> Correlação clínica do SUS/);
+assert.match(callouts, /<aside class="report-callout report-summary"><span class="report-callout-label">Em resumo<\/span><p>O cerebelo coordena\.<\/p><\/aside>/);
+assert.match(callouts, /<aside class="report-callout report-clinic"><span class="report-callout-label">Na prática<\/span>/);
+assert.match(callouts, /<blockquote class="academic-report-quote"><p>Citação comum\.<\/p><\/blockquote>/);
+assert.match(reportService, /> \*\*Em resumo:\*\*/);
+assert.match(appSource, /function applyModernReportLayout\(root\)[\s\S]*?container\.classList\.add\('report-modern'\)/);
+assert.match(reportStyles, /:is\(#readerModalContent, body\) \.report-modern \.report-cover-title \{[^}]*font-size: 22pt !important;/);
 console.log('Nome do PDF impresso igual ao título do relatório validado.');
