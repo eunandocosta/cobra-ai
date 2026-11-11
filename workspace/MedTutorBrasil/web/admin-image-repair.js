@@ -1,6 +1,6 @@
-// FERRAMENTA TEMPORÁRIA (somente conta admin): repara as imagens já gravadas
-// antes da correção de figuras. Para remover: apagar este arquivo, a tag
-// <script> dele no index.html e o item #adminImageRepairMenuEntry do menu.
+// Reparo de descrições das figuras (somente conta admin). Descreve com IA as
+// figuras guardadas que ainda não têm análise: para todo o acervo (menu do
+// admin) ou para um material (botão "Descrever figuras" na lista da matéria).
 (function attachAdminImageRepair() {
   'use strict';
 
@@ -13,9 +13,10 @@
   const needsAnalysis = image => /^https?:\/\//i.test(String(image?.imageUrl || image?.thumbnailUrl || ''))
     && !image?.visualAnalysisCompleted && !image?.hiddenFromFigures;
 
-  function collectWork() {
+  function collectWork(materialId = null) {
     const materials = (Array.isArray(chatDriveMaterials) ? chatDriveMaterials : [])
-      .filter(material => Array.isArray(material?.clinicalImages) && material.clinicalImages.length);
+      .filter(material => Array.isArray(material?.clinicalImages) && material.clinicalImages.length)
+      .filter(material => !materialId || String(material.id) === String(materialId));
     const work = materials.map(material => ({
       material,
       pending: material.clinicalImages.map((image, index) => ({ image, index })).filter(item => needsAnalysis(item.image))
@@ -167,7 +168,7 @@
     return { unlinked, relinked };
   }
 
-  async function run() {
+  async function run(materialId = null) {
     if (!await isAdmin()) {
       appAlert('Esta ferramenta é exclusiva da conta admin.', { title: 'Acesso restrito' });
       return;
@@ -178,11 +179,11 @@
     // Depois de recarregar, os materiais chegam da nuvem alguns segundos
     // depois; contar antes disso dava "0 materiais".
     ui.text.textContent = 'Aguardando os materiais carregarem da nuvem…';
-    let plan = collectWork();
+    let plan = collectWork(materialId);
     for (let waited = 0; !plan.images && waited < 90 && !stop; waited++) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       ui.text.textContent = `Aguardando os materiais carregarem da nuvem… ${waited + 1} s`;
-      plan = collectWork();
+      plan = collectWork(materialId);
     }
     if (stop) return;
     if (!plan.images) {
@@ -191,15 +192,16 @@
     }
     const low = plan.pendingPages * ESTIMATE_BRL_PER_PAGE.low;
     const high = plan.pendingPages * ESTIMATE_BRL_PER_PAGE.high;
+    const scope = materialId ? 'Somente este material. ' : '';
     ui.text.textContent = plan.pendingPages
-      ? `${plan.materials} material(is), ${plan.images} imagem(ns) guardada(s). ${plan.pendingPages} página(s) ainda sem descrição serão analisadas em lotes de ${PAGES_PER_BATCH} (Gemini 3.5 Flash). Custo estimado: ${brl(low)} a ${brl(high)}. Capas e slides só de texto serão ocultados como figura (os arquivos não são apagados).`
-      : `${plan.materials} material(is), ${plan.images} imagem(ns). Nenhuma página pendente de análise. Você ainda pode religar as questões às figuras.`;
+      ? `${scope}${plan.materials} material(is), ${plan.images} imagem(ns) guardada(s). ${plan.pendingPages} página(s) ainda sem descrição serão analisadas em lotes de ${PAGES_PER_BATCH} (Gemini 3.5 Flash). Custo estimado: ${brl(low)} a ${brl(high)}. Capas e slides só de texto serão ocultados como figura (os arquivos não são apagados).`
+      : `${scope}${plan.materials} material(is), ${plan.images} imagem(ns). Nenhuma página pendente de análise. Você ainda pode religar as questões às figuras.`;
     ui.start.disabled = false;
     ui.start.textContent = plan.pendingPages ? `Começar (${plan.pendingPages} páginas)` : 'Religar questões';
     await new Promise(resolve => ui.start.addEventListener('click', resolve, { once: true }));
     ui.start.disabled = true;
     ui.start.hidden = true;
-    plan = collectWork();
+    plan = collectWork(materialId);
     ui.close.textContent = 'Parar';
 
     let done = 0;
@@ -304,5 +306,9 @@
     console.info('[Reparo de imagens] Resultado', { done, hidden, failed, spent, ...links });
   }
 
-  window.runAdminImageRepair = run;
+  // Quantas figuras do material ainda não têm descrição (usado para mostrar o botão).
+  window.adminImageRepairPendingCount = material => (Array.isArray(material?.clinicalImages) ? material.clinicalImages : [])
+    .filter(needsAnalysis).length;
+  window.runAdminImageRepair = () => run(null);
+  window.runAdminImageRepairForMaterial = materialId => run(String(materialId || '') || null);
 })();
