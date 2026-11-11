@@ -13179,13 +13179,15 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       // Legenda do apêndice com o que se sabe da figura: título da análise
       // visual ou o título da própria página/slide. Nunca uma descrição inventada.
       materialFigureLabel(figure) {
-        return String(figure?.analyzedTitle || figure?.pageTitle || 'Imagem do material original').trim();
+        return String(figure?.analyzedTitle || figure?.pageTitle || (figure?.page ? `Figura da página ${figure.page} do material` : 'Figura do material original')).trim();
       },
 
+      // Figura sem título nem texto da página continua no apêndice, com a
+      // indicação de que não há descrição do conteúdo, em vez de sumir.
       materialFigureCaption(figure) {
         const where = figure?.page ? `Página ${figure.page} do material` : 'Material original';
         const label = String(figure?.analyzedTitle || figure?.pageTitle || '').trim();
-        return label ? `${where} — ${label}` : where;
+        return label ? `${where} — ${label}` : `${where} (sem descrição do conteúdo)`;
       },
 
       renderMaterialFiguresHtml(figures = []) {

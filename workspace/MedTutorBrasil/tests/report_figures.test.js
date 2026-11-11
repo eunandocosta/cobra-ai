@@ -93,3 +93,9 @@ assert.match(appSource, /const appendixFigures = reportFigures\.filter\(figure =
 assert.doesNotMatch(appSource, /\*Figura \$\{index \+ 1\}\$\{figure\.page/, 'apêndice não renumera "Figura 1" de novo');
 console.log('  [PASS] Apêndice só com as figuras não usadas, com legenda pela página');
 console.log('🎉 Testes das figuras dos relatórios concluídos!\n');
+
+// Figura sem descrição continua no apêndice, com legenda explicando a falta de descrição.
+assert.match(appSource, /\(sem descrição do conteúdo\)`;/, 'figura sem descrição tem legenda própria no apêndice');
+assert.match(appSource, /const appendixFigures = reportFigures\.filter\(figure => !usedFigureUrls\.has\(figure\.url\)\);/);
+assert.doesNotMatch(appSource.slice(appSource.indexOf('materialFigureLabel(figure) {'), appSource.indexOf('renderMaterialFiguresHtml(figures = [])')), /hiddenFromFigures|filter\(/, 'o apêndice não descarta figuras sem descrição');
+console.log('  [PASS] Figuras sem descrição continuam no apêndice');
