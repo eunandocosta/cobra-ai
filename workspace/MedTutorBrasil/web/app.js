@@ -964,6 +964,7 @@
         const user = firebaseAuth?.currentUser;
         const uid = user?.uid || '';
         if (!uid || this.authMode !== 'firebase' || !this.authStateResolved) {
+          this.adminMenuIsAdmin = false;
           entry.hidden = true;
           document.querySelectorAll('.admin-menu-entry').forEach(item => { item.hidden = true; });
           if (divider) divider.hidden = true;
@@ -974,6 +975,7 @@
 
         if (!force && this.adminMenuStatusUid === uid && Date.now() - this.adminMenuCheckedAt < 60000) return;
         if (this.adminMenuStatusUid && this.adminMenuStatusUid !== uid) {
+          this.adminMenuIsAdmin = false;
           entry.hidden = true;
           document.querySelectorAll('.admin-menu-entry').forEach(item => { item.hidden = true; });
           if (divider) divider.hidden = true;
@@ -994,6 +996,8 @@
           }
           if (firebaseAuth?.currentUser?.uid === requestedUid && this.currentUser?.uid === requestedUid) {
             entry.hidden = !isAdmin;
+            // Guarda o resultado para as telas que mostram ações só de admin.
+            this.adminMenuIsAdmin = isAdmin;
             // Outros itens exclusivos do admin seguem a mesma confirmação.
             document.querySelectorAll('.admin-menu-entry').forEach(item => { item.hidden = !isAdmin; });
             if (divider) divider.hidden = !isAdmin;
@@ -27653,6 +27657,10 @@ Para cada material, retorne um objeto no JSON com:
                 <button class="btn-outline-action primary" style="padding: 4px 10px; font-size: 11px; font-weight: 700;" onclick="closeModals(); openAcademicReportForMaterial('${safeMatId}', '${safeSubj}', '${safeName}')" title="Gerar e Ler Relatório exclusivo deste arquivo">
                   📄 Relatório Acadêmico
                 </button>
+                ${MedTutorAuthService?.adminMenuIsAdmin === true && typeof window.adminImageRepairPendingCount === 'function' && window.adminImageRepairPendingCount(m) > 0 ? `
+                <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px; border-color: var(--neon); color: var(--neon);" onclick="window.runAdminImageRepairForMaterial && window.runAdminImageRepairForMaterial('${safeMatId}')" title="Somente admin: gera a descrição das figuras deste material que ainda não têm">
+                  🛠️ Descrever figuras <span style="font-size: 9px; opacity: .8;">ADM</span>
+                </button>` : ''}
                 <button class="btn-outline-action" style="padding: 4px 8px; font-size: 11px;" onclick="closeModals(); openGenerateStudyModal('${safeName}', '${safeSubj}')" title="Gerar Quiz e Flashcard direcionados deste slide">
                   ⚡ Quizzes &amp; Cards
                 </button>
