@@ -22,6 +22,16 @@ function isAcceptableRewrite(original, rewritten, validators) {
   return validators.isValidStem(clean) && !validators.hasUnresolvedContext(clean);
 }
 
+// A resposta pode vir com cercas de markdown ou vírgula sobrando; trata os dois casos.
+function parseRewriteJson(text) {
+  const raw = String(text || '').replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim();
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return JSON.parse(raw.replace(/,\s*([}\]])/g, '$1'));
+  }
+}
+
 async function rewriteVagueQuestionStems(questions, deps) {
   const { genAI, materialText, subject, modelOptions, generateWithFallback, validators } = deps;
   const list = Array.isArray(questions) ? questions : [];
@@ -44,16 +54,24 @@ Retorne JSON: {"reescritas":[{"indice":0,"pergunta":"enunciado completo terminad
 
   try {
     const generated = await generateWithFallback(genAI, modelOptions, prompt);
-    const parsed = JSON.parse(generated.result.response.text());
+    const parsed = parseRewriteJson(generated.result.response.text());
     const next = list.slice();
-    (Array.isArray(parsed?.reescritas) ? parsed.reescritas : []).forEach(item => {
+    let accepted = 0;
+    const rejected = [];
+    const items = Array.isArray(parsed?.reescritas) ? parsed.reescritas : [];
+    items.forEach(item => {
       const index = Number(item?.indice);
       const target = targets.find(entry => entry.index === index);
       const rewritten = String(item?.pergunta || '').replace(/\s+/g, ' ').trim();
       if (target && isAcceptableRewrite(target.question, rewritten, validators)) {
         next[index] = { ...next[index], pergunta: rewritten };
+        accepted++;
+      } else {
+        rejected.push({ indice: item?.indice, motivo: target ? 'reescrita_nao_aceita' : 'indice_desconhecido' });
       }
     });
+    console.info(`[Quiz Engine] Enunciados genéricos: ${targets.length} identificado(s), ${accepted} reescrito(s).`, rejected.length ? rejected : '');
+    if (!items.length) console.warn('[Quiz Engine] A IA não devolveu reescritas para os enunciados genéricos.');
     return next;
   } catch (error) {
     console.warn('[Quiz Engine] Reescrita de enunciados genéricos indisponível; mantidos como estão.', error?.message || error);
@@ -61,4 +79,4 @@ Retorne JSON: {"reescritas":[{"indice":0,"pergunta":"enunciado completo terminad
   }
 }
 
-module.exports = { isVagueQuestionStem, isAcceptableRewrite, rewriteVagueQuestionStems };
+module.exports = { isVagueQuestionStem, isAcceptableRewrite, parseRewriteJson, rewriteVagueQuestionStems };

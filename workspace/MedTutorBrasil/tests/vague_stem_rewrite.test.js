@@ -38,3 +38,16 @@ assert.equal(isVagueQuestionStem('Quais neurotransmissores participam da via nig
   assert.equal(failing[0].pergunta, questions[0].pergunta, 'se a IA falhar, a pergunta original é mantida');
   console.log('  [PASS] Enunciado genérico é reescrito pela IA, com gabarito mantido, e sem reescrita quando a IA falha');
 })().catch(error => { console.error(error); process.exit(1); });
+
+// A resposta da IA pode vir com cercas de markdown ou com vírgula sobrando.
+(async () => {
+  const { parseRewriteJson } = require('../src/modules/quizzes/vague-stem.rewrite');
+  assert.deepEqual(parseRewriteJson('```json\n{"reescritas":[{"indice":0,"pergunta":"x"}],}\n```'), { reescritas: [{ indice: 0, pergunta: 'x' }] });
+  const questions = [{ pergunta: 'Quais os neurotransmissores envolvidos?', gabarito: 'A' }];
+  const out = await rewriteVagueQuestionStems(questions, {
+    genAI: {}, materialText: '', subject: '', modelOptions: {}, validators,
+    generateWithFallback: async () => ({ result: { response: { text: () => '```json\n{"reescritas":[{"indice":0,"pergunta":"Quais neurotransmissores atuam na via nigroestriatal dos núcleos da base?"}]}\n```' } } })
+  });
+  assert.equal(out[0].pergunta, 'Quais neurotransmissores atuam na via nigroestriatal dos núcleos da base?', 'resposta com cercas de markdown é aceita');
+  console.log('  [PASS] Resposta da IA com cercas de markdown é aceita na reescrita');
+})().catch(error => { console.error(error); process.exit(1); });
