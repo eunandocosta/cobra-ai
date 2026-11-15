@@ -32,3 +32,10 @@ assert.strictEqual(dependsOnMaterialImage('Qual achado é observado na tomografi
 assert.strictEqual(removeUnsupportedVisualLocator('Qual achado é observado na tomografia de crânio de um paciente com cefaleia?'),
   'Qual achado é observado na tomografia de crânio de um paciente com cefaleia?', 'exame clínico não é descartado');
 console.log('✅ Enunciados que dependem de imagem do material são descartados; exames clínicos continuam.');
+
+// Referências por número/letra/seta e "primeira imagem clínica integrada" dependem de imagem.
+assert.strictEqual(removeUnsupportedVisualLocator('Qual é a estrutura anatômica identificada pelo número 2?'), null, 'pergunta que aponta por número depende da imagem');
+assert.strictEqual(removeUnsupportedVisualLocator('Qual estrutura neuroanatômica está em destaque na primeira imagem clínica integrada extraída do material?'), null, 'primeira imagem integrada do material não se sustenta sozinha');
+assert.strictEqual(removeUnsupportedVisualLocator('Qual é o neurotransmissor liberado pela via nigroestriatal?'),
+  'Qual é o neurotransmissor liberado pela via nigroestriatal?', 'pergunta de conteúdo continua válida');
+console.log('✅ Perguntas que apontam para imagem por número, letra ou posição também são descartadas.');

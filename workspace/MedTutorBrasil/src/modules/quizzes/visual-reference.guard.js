@@ -15,7 +15,11 @@ const MATERIAL_IMAGE_PATTERNS = [
   // "visualizadas na representação", "observadas nas figuras", "mostradas no diagrama"
   new RegExp(`\\b(?:visualizad|identificad|observad|mostrad|apresentad|representad|exibid|localizad|indicad)[oa]s?\\s+(?:na|no|nas|nos|em)\\s+(?:representa[çc][aã]o|figura|prancha|diagrama|esquema|slide|ilustra[çc][aã]o)s?\\b`, 'i'),
   // "na representação virtual", "nas imagens do material"
-  new RegExp(`\\b(?:na|no|nas|nos)\\s+(?:representa[çc][aã]o|${MATERIAL_IMAGE_NOUN})\\s+(?:virtual|do material|extra[ií]d[oa]s?)\\b`, 'i')
+  new RegExp(`\\b(?:na|no|nas|nos)\\s+(?:representa[çc][aã]o|${MATERIAL_IMAGE_NOUN})\\s+(?:virtual|do material|extra[ií]d[oa]s?)\\b`, 'i'),
+  // "identificada pelo número 2", "assinalada com a letra B", "indicada pela seta"
+  new RegExp(`\\b(?:identificad|indicad|apontad|destacad|assinalad|marcad|mostrad)[oa]s?\\s+(?:pel[oa]s?|com\\s+(?:a|o)?|por)\\s+(?:n[úu]mero|letra|seta|c[oó]digo|asterisco|n[ºo°])\\s*[A-Za-z0-9]*`, 'i'),
+  // "primeira imagem clínica integrada", "imagem extraída do material"
+  new RegExp(`\\b(?:primeir[ao]|segund[ao]|terceir[ao]|quart[ao]|[úu]ltim[ao])\\s+imagem\\b|\\bimagem\\s+(?:cl[ií]nica\\s+)?(?:integrad|extra[ií]d|enviad)[ao]?s?\\b`, 'i')
 ];
 const dependsOnMaterialImage = value => MATERIAL_IMAGE_PATTERNS.some(pattern => pattern.test(String(value || '')));
 
