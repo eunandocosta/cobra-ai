@@ -20,3 +20,8 @@ assert.match(app, /function closeQuizPrintModal\(\) \{[\s\S]*?quizPrintState\.so
 // Quiz continua imprimindo as questões da matéria, como antes.
 assert.match(app, /if \(quizPrintState\.source === 'flashcards'\) return getFlashcardPrintItems\(\);\s*let list = \(typeof getFilteredQuestions/, 'quiz mantém o filtro de questões');
 console.log('  [PASS] Botão "Imprimir Flashcards" na aba de flashcards, com linhas para resposta, da matéria selecionada');
+
+// A área de impressão só é limpa quando o diálogo fecha; prazo curto deixava o PDF em branco.
+assert.doesNotMatch(app, /window\.print\(\);\s*setTimeout\(cleanupPrint, 3000\);/, 'a limpeza não ocorre 3 s após abrir o diálogo');
+assert.match(app, /window\.print\(\);\s*\/\/ O conteúdo só sai[\s\S]*?setTimeout\(cleanupPrint, 600000\);/, 'limpeza feita pelo afterprint, com rede de segurança longa');
+console.log('  [PASS] Área de impressão permanece até o diálogo fechar, sem PDF em branco');

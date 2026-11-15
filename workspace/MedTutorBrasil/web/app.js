@@ -20227,7 +20227,10 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       setTimeout(() => {
         window.print();
-        setTimeout(cleanupPrint, 3000);
+        // O conteúdo só sai da tela quando o diálogo fecha (afterprint). Um
+        // prazo curto apagava a área antes de o Safari montar a folha, e o PDF
+        // saía em branco. O prazo longo é só uma rede de segurança.
+        setTimeout(cleanupPrint, 600000);
       }, 300);
     }
 
