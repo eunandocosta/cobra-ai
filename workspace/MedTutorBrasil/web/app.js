@@ -19897,13 +19897,25 @@ Retorne EXCLUSIVAMENTE um JSON:
      * IMPRESSÃO DE QUIZZES (MÚLTIPLA ESCOLHA & DISCURSIVO COM LINHAS)
      * ========================================================= */
     let quizPrintState = {
+      source: 'quiz',      // 'quiz' | 'flashcards' (flashcards saem sempre com linhas para resposta)
       format: 'multiple', // 'multiple' | 'discursive'
       discursiveLines: 5,  // Pelo menos 5 linhas
       includeHeader: true,
       includeKey: true
     };
 
+    // Flashcards da matéria selecionada: frente como enunciado e verso como resposta de referência.
+    function getFlashcardPrintItems() {
+      const list = typeof getFilteredQuestions === 'function' ? getFilteredQuestions() : [];
+      return list.map(item => {
+        const front = String(item.flashcard?.front || item.front || item.question || item.pergunta || '').trim();
+        const back = String(item.flashcard?.back || item.back || item.answer || item.reference_answer || item.explanation || '').trim();
+        return { ...item, question: front, explanation: back, quizOptions: [], flashcardOnly: true };
+      }).filter(item => item.question);
+    }
+
     function getActiveQuizPrintQuestions() {
+      if (quizPrintState.source === 'flashcards') return getFlashcardPrintItems();
       let list = (typeof getFilteredQuestions === 'function' ? getFilteredQuestions() : []).filter(item => !item.flashcardOnly);
       if (typeof isSuperQuestionsFilterActive !== 'undefined' && isSuperQuestionsFilterActive) {
         list = list.filter(q => q.isStarred);
@@ -19912,10 +19924,22 @@ Retorne EXCLUSIVAMENTE um JSON:
       return list;
     }
 
+    function openFlashcardPrintModal() {
+      quizPrintState.source = 'flashcards';
+      quizPrintState.format = 'discursive';
+      openQuizPrintModal();
+    }
+
     function openQuizPrintModal() {
       const modal = document.getElementById('quizPrintModal');
       if (!modal) return;
+      const isFlashcards = quizPrintState.source === 'flashcards';
+      if (!isFlashcards) quizPrintState.source = 'quiz';
       const questions = getActiveQuizPrintQuestions();
+      const titleEl = document.getElementById('quizPrintModalTitle');
+      if (titleEl) titleEl.textContent = isFlashcards ? 'Imprimir Flashcards para Resposta Escrita' : 'Imprimir Quiz / Avaliação Formativa';
+      const multipleCard = document.getElementById('quizPrintFormatMultiple');
+      if (multipleCard) multipleCard.style.display = isFlashcards ? 'none' : '';
 
       const subjectLabel = document.getElementById('quizPrintSubjectLabel');
       const countBadge = document.getElementById('quizPrintCountBadge');
@@ -19941,6 +19965,10 @@ Retorne EXCLUSIVAMENTE um JSON:
     function closeQuizPrintModal() {
       const modal = document.getElementById('quizPrintModal');
       if (modal) modal.classList.remove('active');
+      // Volta ao modo de quiz para os próximos botões de impressão.
+      quizPrintState.source = 'quiz';
+      const multipleCard = document.getElementById('quizPrintFormatMultiple');
+      if (multipleCard) multipleCard.style.display = '';
     }
 
     function handleQuizPrintBackdrop(event) {
@@ -19950,7 +19978,7 @@ Retorne EXCLUSIVAMENTE um JSON:
     }
 
     function selectQuizPrintFormat(format) {
-      quizPrintState.format = format === 'discursive' ? 'discursive' : 'multiple';
+      quizPrintState.format = (quizPrintState.source === 'flashcards' || format === 'discursive') ? 'discursive' : 'multiple';
       const cardMultiple = document.getElementById('quizPrintFormatMultiple');
       const cardDiscursive = document.getElementById('quizPrintFormatDiscursive');
       const discursiveOptions = document.getElementById('quizPrintDiscursiveOptions');
@@ -20007,7 +20035,7 @@ Retorne EXCLUSIVAMENTE um JSON:
           <div class="quiz-print-header">
             <div class="quiz-print-header-institution">Faculdade de Medicina • MedTutor Brasil</div>
             <div class="quiz-print-header-subtitle">SISTEMA INTELIGENTE DE FORMAÇÃO MÉDICA E AVALIAÇÃO FORMATIVA</div>
-            <h1 class="quiz-print-header-title">${isDiscursive ? 'Caderno de Questões Discursivas' : 'Avaliação Formativa & Simulado Clínico'}</h1>
+            <h1 class="quiz-print-header-title">${quizPrintState.source === 'flashcards' ? 'Caderno de Flashcards para Resposta Escrita' : (isDiscursive ? 'Caderno de Questões Discursivas' : 'Avaliação Formativa & Simulado Clínico')}</h1>
             <div class="quiz-print-header-subject">Eixo Curricular: ${escapeHtml(subject)} • Conteúdo: ${escapeHtml(slideTitle)}</div>
 
             <table class="quiz-print-header-meta-table">
@@ -20117,7 +20145,7 @@ Retorne EXCLUSIVAMENTE um JSON:
         html += `
           <div class="quiz-print-key-section">
             <div class="quiz-print-key-header">
-              <div style="font-size: 9pt; font-weight: 700; color: #059669; letter-spacing: 1px; text-transform: uppercase;">GABARITO OFICIAL & RESOLUÇÃO COMENTADA</div>
+              <div style="font-size: 9pt; font-weight: 700; color: #059669; letter-spacing: 1px; text-transform: uppercase;">${quizPrintState.source === 'flashcards' ? 'RESPOSTAS DE REFERÊNCIA DOS FLASHCARDS' : 'GABARITO OFICIAL & RESOLUÇÃO COMENTADA'}</div>
               <h2 style="font-size: 13pt; font-weight: 800; color: #0f172a; margin: 4pt 0 2pt 0; text-transform: uppercase;">Caderno de Respostas e Critérios de Correção</h2>
               <div style="font-size: 8.5pt; color: #475569;">Disciplina: ${escapeHtml(subject)} • Total de Questões: ${questions.length}</div>
             </div>
