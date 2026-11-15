@@ -22,3 +22,13 @@ assert.strictEqual(removeUnsupportedVisualLocator('Compare as estruturas observa
   'Descarta referência visual no meio da pergunta que não pode ser removida com segurança');
 
 console.log('✅ Referências visuais ausentes são removidas somente quando o enunciado permanece autossuficiente.');
+
+// Perguntas que dependem de imagem do material são descartadas, não só limpas.
+const { dependsOnMaterialImage } = require('../src/modules/quizzes/visual-reference.guard');
+const fromCard = 'Quais estruturas anatômicas são visualizadas na representação virtual das imagens extraídas do material em relação aos núcleos da base?';
+assert.strictEqual(removeUnsupportedVisualLocator(fromCard), null, 'pergunta do cartão "representação virtual das imagens extraídas" é descartada');
+assert.strictEqual(removeUnsupportedVisualLocator('Quais estruturas são observadas nas figuras enviadas pelo estudante?'), null, 'figuras enviadas pelo estudante não sustentam o cartão');
+assert.strictEqual(dependsOnMaterialImage('Qual achado é observado na tomografia de crânio de um paciente com cefaleia?'), false, 'exame clínico descrito no enunciado continua válido');
+assert.strictEqual(removeUnsupportedVisualLocator('Qual achado é observado na tomografia de crânio de um paciente com cefaleia?'),
+  'Qual achado é observado na tomografia de crânio de um paciente com cefaleia?', 'exame clínico não é descartado');
+console.log('✅ Enunciados que dependem de imagem do material são descartados; exames clínicos continuam.');

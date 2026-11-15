@@ -10689,11 +10689,23 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return addressesStudent || startsWithUnresolvedPronoun || (whyContrast && !domainAnchor);
     }
 
+    // Mesma regra do servidor (visual-reference.guard.js): enunciado que depende
+    // de imagem do material não vira cartão nem questão.
+    function dependsOnMaterialImage(value) {
+      const noun = '(?:imagens|figuras|representa[çc][aã]o(?:es)?|pranchas?|diagramas?|esquemas?|slides|ilustra[çc][aã](?:o|oes|ões)|fotos)';
+      return [
+        new RegExp(`\\b${noun}\\s+(?:\\S+\\s+){0,4}?(?:extra[ií]d[oa]s?|do material|do slide|da aula|do arquivo|enviad[oa]s?|originais?)\\b`, 'i'),
+        new RegExp(`\\b(?:visualizad|identificad|observad|mostrad|apresentad|representad|exibid|localizad|indicad)[oa]s?\\s+(?:na|no|nas|nos|em)\\s+(?:representa[çc][aã]o|figura|prancha|diagrama|esquema|slide|ilustra[çc][aã]o)s?\\b`, 'i'),
+        new RegExp(`\\b(?:na|no|nas|nos)\\s+(?:representa[çc][aã]o|${noun})\\s+(?:virtual|do material|extra[ií]d[oa]s?)\\b`, 'i')
+      ].some(pattern => pattern.test(String(value || '')));
+    }
+
     function removeUnsupportedVisualLocator(stem) {
       const locator = /\b(?:figura|fig\.?|imagem|prancha|tabela|quadro|diagrama|esquema|slide|p[aá]gina)\s*(?:(?:n[º°o.]?\s*)?\d+|abaixo|acima|anterior|seguinte|a seguir|anexa?|do material)\b/i;
       const prepositionalLocator = /\b(?:n[oa]|em|conforme|segundo)\s+(?:a|o)?\s*(?:figura|fig\.?|imagem|prancha|diagrama|esquema|slide|p[aá]gina)\b/i;
       const hasLocator = value => locator.test(String(value || '')) || prepositionalLocator.test(String(value || ''));
       let clean = String(stem || '').replace(/\s+/g, ' ').trim();
+      if (dependsOnMaterialImage(clean)) return null;
       if (!hasLocator(clean)) return clean;
       const resource = '(?:figura|fig\\.?|imagem|prancha|tabela|quadro|diagrama|esquema|slide|p[aá]gina)';
       const suffixPatterns = [
