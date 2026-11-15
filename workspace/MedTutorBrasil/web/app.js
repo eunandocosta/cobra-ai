@@ -10696,7 +10696,9 @@ ${options.materialName ? `\nTítulo do Material: ${options.materialName}` : ''}`
       return [
         new RegExp(`\\b${noun}\\s+(?:\\S+\\s+){0,4}?(?:extra[ií]d[oa]s?|do material|do slide|da aula|do arquivo|enviad[oa]s?|originais?)\\b`, 'i'),
         new RegExp(`\\b(?:visualizad|identificad|observad|mostrad|apresentad|representad|exibid|localizad|indicad)[oa]s?\\s+(?:na|no|nas|nos|em)\\s+(?:representa[çc][aã]o|figura|prancha|diagrama|esquema|slide|ilustra[çc][aã]o)s?\\b`, 'i'),
-        new RegExp(`\\b(?:na|no|nas|nos)\\s+(?:representa[çc][aã]o|${noun})\\s+(?:virtual|do material|extra[ií]d[oa]s?)\\b`, 'i')
+        new RegExp(`\\b(?:na|no|nas|nos)\\s+(?:representa[çc][aã]o|${noun})\\s+(?:virtual|do material|extra[ií]d[oa]s?)\\b`, 'i'),
+        new RegExp(`\\b(?:identificad|indicad|apontad|destacad|assinalad|marcad|mostrad)[oa]s?\\s+(?:pel[oa]s?|com\\s+(?:a|o)?|por)\\s+(?:n[úu]mero|letra|seta|c[oó]digo|asterisco|n[ºo°])\\s*[A-Za-z0-9]*`, 'i'),
+        new RegExp(`\\b(?:primeir[ao]|segund[ao]|terceir[ao]|quart[ao]|[úu]ltim[ao])\\s+imagem\\b|\\bimagem\\s+(?:cl[ií]nica\\s+)?(?:integrad|extra[ií]d|enviad)[ao]?s?\\b`, 'i')
       ].some(pattern => pattern.test(String(value || '')));
     }
 
