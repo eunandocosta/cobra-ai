@@ -5031,10 +5031,66 @@
         font-family: Arial, Helvetica, "Segoe UI", sans-serif !important;
       }
 
+      /* Cabeçalho de origem (repetido em cada página, via thead) e marca d'água fixa. */
+      .quiz-print-running-header,
+      .quiz-print-watermark {
+        display: none !important;
+      }
+
+      body.printing-quiz .quiz-print-layout {
+        display: table !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+        border: 0 !important;
+      }
+
+      body.printing-quiz .quiz-print-layout thead { display: table-header-group !important; }
+      body.printing-quiz .quiz-print-layout tbody { display: table-row-group !important; }
+      body.printing-quiz .quiz-print-layout td { padding: 0 !important; border: 0 !important; vertical-align: top !important; }
+
+      body.printing-quiz .quiz-print-running-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        gap: 10pt !important;
+        white-space: nowrap !important;
+        padding-bottom: 3pt !important;
+        margin-bottom: 10pt !important;
+        border-bottom: 0.5pt solid #cbd5e1 !important;
+        color: #475569 !important;
+        font-family: Arial, Helvetica, "Segoe UI", sans-serif !important;
+        font-size: 7.5pt !important;
+        line-height: 1.3 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      body.printing-quiz .quiz-print-watermark {
+        display: block !important;
+        position: fixed !important;
+        top: 42% !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 2 !important;
+        text-align: center !important;
+        transform: rotate(-35deg) !important;
+        pointer-events: none !important;
+        white-space: nowrap !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      body.printing-quiz .quiz-print-watermark span {
+        font-family: Arial, Helvetica, "Segoe UI", sans-serif !important;
+        font-size: 58pt !important;
+        font-weight: 800 !important;
+        color: rgba(15, 23, 42, 0.08) !important;
+        letter-spacing: 0.04em !important;
+      }
+
       body.printing-quiz #quizPrintArea {
         position: static !important;
-        background: #ffffff !important;
-        padding: 1.2cm 1.5cm !important;
+        background: transparent !important;
+        padding: 0 1.5cm 1.2cm !important;
         margin: 0 !important;
         display: block !important;
         opacity: 1 !important;
