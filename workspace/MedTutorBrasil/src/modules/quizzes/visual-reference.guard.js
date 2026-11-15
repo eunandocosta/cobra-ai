@@ -4,12 +4,28 @@ const VISUAL_LOCATOR_PATTERN = /\b(?:figura|fig\.?|imagem|prancha|tabela|quadro|
 const VISUAL_PREPOSITION_PATTERN = /\b(?:n[oa]|em|conforme|segundo)\s+(?:a|o)?\s*(?:figura|fig\.?|imagem|prancha|diagrama|esquema|slide|p[aá]gina)\b/i;
 const hasVisualLocator = value => VISUAL_LOCATOR_PATTERN.test(String(value || '')) || VISUAL_PREPOSITION_PATTERN.test(String(value || ''));
 
+// Enunciados que dependem de uma imagem do próprio material (figura, prancha,
+// slide ou "representação virtual" extraída do arquivo) não se sustentam sozinhos
+// no cartão. "Imagem" no singular fica de fora de propósito: é usada em casos
+// clínicos ("achado na imagem de tomografia") que descrevem o exame no próprio texto.
+const MATERIAL_IMAGE_NOUN = '(?:imagens|figuras|representa[çc][aã]o(?:es)?|pranchas?|diagramas?|esquemas?|slides|ilustra[çc][aã](?:o|oes|ões)|fotos)';
+const MATERIAL_IMAGE_PATTERNS = [
+  // "imagens extraídas do material", "figuras enviadas", "pranchas do slide"
+  new RegExp(`\\b${MATERIAL_IMAGE_NOUN}\\s+(?:\\S+\\s+){0,4}?(?:extra[ií]d[oa]s?|do material|do slide|da aula|do arquivo|enviad[oa]s?|originais?)\\b`, 'i'),
+  // "visualizadas na representação", "observadas nas figuras", "mostradas no diagrama"
+  new RegExp(`\\b(?:visualizad|identificad|observad|mostrad|apresentad|representad|exibid|localizad|indicad)[oa]s?\\s+(?:na|no|nas|nos|em)\\s+(?:representa[çc][aã]o|figura|prancha|diagrama|esquema|slide|ilustra[çc][aã]o)s?\\b`, 'i'),
+  // "na representação virtual", "nas imagens do material"
+  new RegExp(`\\b(?:na|no|nas|nos)\\s+(?:representa[çc][aã]o|${MATERIAL_IMAGE_NOUN})\\s+(?:virtual|do material|extra[ií]d[oa]s?)\\b`, 'i')
+];
+const dependsOnMaterialImage = value => MATERIAL_IMAGE_PATTERNS.some(pattern => pattern.test(String(value || '')));
+
 /**
  * Remove referências editoriais sem vínculo garantido com o recurso exibido
  * junto da questão. Devolve null quando a retirada deixa o enunciado incompleto.
  */
 function removeUnsupportedVisualLocator(stem) {
   let clean = String(stem || '').replace(/\s+/g, ' ').trim();
+  if (dependsOnMaterialImage(clean)) return null;
   if (!hasVisualLocator(clean)) return clean;
 
   const resource = '(?:figura|fig\\.?|imagem|prancha|tabela|quadro|diagrama|esquema|slide|p[aá]gina)';
@@ -30,4 +46,4 @@ function removeUnsupportedVisualLocator(stem) {
   return null;
 }
 
-module.exports = { removeUnsupportedVisualLocator, hasVisualLocator };
+module.exports = { removeUnsupportedVisualLocator, hasVisualLocator, dependsOnMaterialImage };
