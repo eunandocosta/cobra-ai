@@ -20207,15 +20207,36 @@ Retorne EXCLUSIVAMENTE um JSON:
 
       html += '</div>';
 
-      printArea.innerHTML = html;
+      // Cabeçalho de origem e marca d'água repetidos em todas as páginas (fixos na impressão).
+      const printTitle = `Questionário: ${subject}`;
+      const generatedAt = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      // O cabeçalho vai no thead de uma tabela: o navegador o repete no topo de
+      // cada página e empurra o conteúdo para baixo, sem sobrepor texto.
+      const runningHeader = `
+        <div class="quiz-print-running-header" aria-hidden="true">
+          <span>Gerado na plataforma MedTutor Brasil</span>
+          <span>${escapeHtml(printTitle)} • ${generatedAt}</span>
+        </div>
+      `;
+      printArea.innerHTML = `
+        <table class="quiz-print-layout">
+          <thead><tr><td>${runningHeader}</td></tr></thead>
+          <tbody><tr><td>${html}</td></tr></tbody>
+        </table>
+        <div class="quiz-print-watermark" aria-hidden="true"><span>MedTutor Brasil</span></div>
+      `;
       closeQuizPrintModal();
       document.body.classList.add('printing-quiz');
+      // O nome sugerido para o PDF é o título do documento durante a impressão.
+      const previousDocumentTitle = document.title;
+      document.title = printTitle;
 
       if (typeof showToast === 'function') {
         showToast('🖨️ Abrindo diálogo de impressão / PDF...');
       }
 
       const cleanupPrint = () => {
+        document.title = previousDocumentTitle;
         document.body.classList.remove('printing-quiz');
         if (printArea) {
           printArea.innerHTML = '';

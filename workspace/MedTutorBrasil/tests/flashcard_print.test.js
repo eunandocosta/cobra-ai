@@ -25,3 +25,15 @@ console.log('  [PASS] Botão "Imprimir Flashcards" na aba de flashcards, com lin
 assert.doesNotMatch(app, /window\.print\(\);\s*setTimeout\(cleanupPrint, 3000\);/, 'a limpeza não ocorre 3 s após abrir o diálogo');
 assert.match(app, /window\.print\(\);\s*\/\/ O conteúdo só sai[\s\S]*?setTimeout\(cleanupPrint, 600000\);/, 'limpeza feita pelo afterprint, com rede de segurança longa');
 console.log('  [PASS] Área de impressão permanece até o diálogo fechar, sem PDF em branco');
+
+// Nome do PDF, cabeçalho de origem e marca d'água nas impressões de quiz e flashcards.
+const styles = fs.readFileSync(path.join(__dirname, '..', 'web', 'styles.css'), 'utf8');
+assert.match(app, /const printTitle = `Questionário: \$\{subject\}`;/, 'nome do documento é "Questionário: [Matéria]"');
+assert.match(app, /document\.title = printTitle;/, 'o PDF sai com esse nome');
+assert.match(app, /document\.title = previousDocumentTitle;/, 'o título do app volta depois da impressão');
+assert.match(app, /Gerado na plataforma MedTutor Brasil/, 'cabeçalho informa que o documento foi gerado na plataforma');
+assert.match(app, /class="quiz-print-watermark"/, 'marca d\'água na impressão');
+assert.match(app, /<thead><tr><td>\$\{runningHeader\}<\/td><\/tr><\/thead>/, 'cabeçalho no thead, repetido em todas as páginas');
+assert.match(styles, /body\.printing-quiz \.quiz-print-layout thead \{ display: table-header-group !important; \}/, 'thead se repete em cada página impressa');
+assert.match(styles, /body\.printing-quiz \.quiz-print-watermark \{[\s\S]*?position: fixed !important;/, 'marca d\'água fixa em todas as páginas');
+console.log('  [PASS] Impressão com nome "Questionário: [Matéria]", cabeçalho de origem e marca d\'água em todas as páginas');
