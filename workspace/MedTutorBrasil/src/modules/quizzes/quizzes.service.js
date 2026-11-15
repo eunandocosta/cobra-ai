@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { runWithAiLimit } = require('../../shared/ai-limiter');
 const { GENERAL_FLASH_MODELS, generateContentWithFallback } = require('../../shared/gemini-model-fallback');
 const { removeUnsupportedVisualLocator } = require('./visual-reference.guard');
+const { rewriteVagueQuestionStems } = require('./vague-stem.rewrite');
 
 function questionTokenSet(value) {
   return new Set(String(value || '')
@@ -1022,7 +1023,16 @@ ${previousQuestionAnswers.map((item, index) => `${index + 1}. Pergunta: ${item.q
       const result = generated.result;
       const quizModel = generated.modelName;
       const responseText = result.response.text();
-      const questoes = JSON.parse(responseText);
+      const questoesBrutas = JSON.parse(responseText);
+      // Enunciados genéricos são reescritos antes da validação (em vez de descartados).
+      const questoes = await rewriteVagueQuestionStems(questoesBrutas, {
+        genAI,
+        materialText,
+        subject: payload.subject || payload.disciplina || payload.targetSubject || '',
+        modelOptions: { generationConfig: { temperature: 0.1, responseMimeType: 'application/json' } },
+        generateWithFallback: (ai, options, prompt) => generateContentWithFallback(ai, options, prompt, GENERAL_FLASH_MODELS, (model, requestPayload) => runWithAiLimit(() => model.generateContent(requestPayload))),
+        validators: { isValidStem: isSharedQuestionStemValid, hasUnresolvedContext: hasUnresolvedQuestionContext }
+      });
       const pendingByIndex = new Map(authoredQuestionsMissingFromDeck.map(source => [source.index, source.question]));
       const usedSourceIndexes = new Set();
       const validationDiagnostics = {
