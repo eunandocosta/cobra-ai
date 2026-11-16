@@ -37,3 +37,9 @@ assert.match(app, /<thead><tr><td>\$\{runningHeader\}<\/td><\/tr><\/thead>/, 'ca
 assert.match(styles, /body\.printing-quiz \.quiz-print-layout thead \{ display: table-header-group !important; \}/, 'thead se repete em cada página impressa');
 assert.match(styles, /body\.printing-quiz \.quiz-print-watermark \{[\s\S]*?position: fixed !important;/, 'marca d\'água fixa em todas as páginas');
 console.log('  [PASS] Impressão com nome "Questionário: [Matéria]", cabeçalho de origem e marca d\'água em todas as páginas');
+
+// Botão "Desenvolver" em cada contexto da Pergunta com Contexto.
+assert.match(app, /onclick="developDerivedContextBox\('\$\{boxId\}'\)"/, 'cada caixa de contexto tem o botão Desenvolver');
+assert.match(app, /async function developDerivedContextBox\(boxId\) \{[\s\S]*?contexts: \[note\]/, 'a IA recebe o texto escrito nessa caixa');
+assert.match(app, /textarea\.value = text;/, 'o caso desenvolvido substitui o texto para revisão');
+console.log('  [PASS] Botão "Desenvolver" em cada contexto da Pergunta com Contexto');

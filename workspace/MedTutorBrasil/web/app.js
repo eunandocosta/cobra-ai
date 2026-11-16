@@ -18276,9 +18276,14 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
           </label>
           <textarea class="derived-context-textarea" placeholder="Ex: Paciente gestante de 28 semanas com alergia grave a penicilina, ou atendimento em UBS sem tomógrafo disponível..." style="width: 100%; min-height: 56px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; color: var(--text-primary); resize: vertical; font-family: inherit; line-height: 1.4;" onkeydown="if((event.ctrlKey || event.metaKey) && event.key === 'Enter'){ event.preventDefault(); submitDerivedQuestionWithContext(); }"></textarea>
         </div>
-        <button class="btn-outline-action danger" type="button" onclick="removeDerivedContextBox('${boxId}')" title="Remover este contexto" style="padding: 6px 9px; align-self: center; margin-top: 16px;">
-          🗑️
-        </button>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-self: center;">
+          <button class="btn-outline-action primary derived-develop-btn" type="button" onclick="developDerivedContextBox('${boxId}')" title="A IA desenvolve este contexto em um caso clínico completo, baseado no que foi escrito" style="padding: 6px 9px; font-size: 11.5px; font-weight: 700;">
+            ✨ Desenvolver
+          </button>
+          <button class="btn-outline-action danger" type="button" onclick="removeDerivedContextBox('${boxId}')" title="Remover este contexto" style="padding: 6px 9px;">
+            🗑️
+          </button>
+        </div>
       `;
 
       container.appendChild(box);
@@ -18286,6 +18291,57 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       if (txt) {
         if (initialText) txt.value = initialText;
         txt.focus();
+      }
+    }
+
+    // Desenvolver: a IA pega o que o estudante escreveu nesta caixa e devolve um
+    // caso clínico completo (vinheta e enunciado), que substitui o texto para revisão.
+    async function developDerivedContextBox(boxId) {
+      const box = document.getElementById(boxId);
+      const textarea = box?.querySelector('.derived-context-textarea');
+      const button = box?.querySelector('.derived-develop-btn');
+      const note = String(textarea?.value || '').trim();
+      if (!textarea || note.length < 5) {
+        if (typeof showToast === 'function') showToast('⚠️ Escreva ao menos uma ideia de contexto antes de desenvolver.');
+        return;
+      }
+      const item = activeDerivedQuestionState?.item;
+      if (!item) {
+        if (typeof showToast === 'function') showToast('⚠️ Pergunta de referência não encontrada.');
+        return;
+      }
+      if (button) { button.disabled = true; button.innerHTML = '⏳ Desenvolvendo...'; }
+      try {
+        const response = await fetch('/api/quizzes/gerar-derivada', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalQuestion: item.vignette || item.question || item.pergunta || item.flashcard?.front || '',
+            originalExplanation: item.tripartite?.correctReason || item.explanation || item.answer || item.flashcard?.back || '',
+            contexts: [note],
+            subject: item.subject || 'Clínica Médica',
+            topic: item.topic || item.disease || item.flashcardTitle || '',
+            studentMistake: activeDerivedQuestionState?.studentMistake || ''
+          })
+        });
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.error || errData?.details || `Erro do servidor (${response.status})`);
+        }
+        const resData = await response.json();
+        const developed = resData?.question && typeof resData.question === 'object' ? resData.question : resData;
+        const text = [developed.vignette, developed.question].filter(Boolean).join('\n\n').trim();
+        if (!text) throw new Error('A IA não devolveu um caso desenvolvido.');
+        textarea.value = text;
+        textarea.dataset.developedFrom = note;
+        const label = box.querySelector('.derived-box-label');
+        if (label && !label.textContent.includes('desenvolvido')) label.textContent += ' (desenvolvido pela IA: revise)';
+        if (typeof showToast === 'function') showToast('✨ Contexto desenvolvido. Revise e gere a pergunta.');
+      } catch (error) {
+        console.warn('[Pergunta com contexto] Não foi possível desenvolver o contexto:', error);
+        if (typeof showToast === 'function') showToast(`⚠️ Não foi possível desenvolver: ${error.message || 'erro desconhecido'}`);
+      } finally {
+        if (button) { button.disabled = false; button.innerHTML = '✨ Desenvolver'; }
       }
     }
 
