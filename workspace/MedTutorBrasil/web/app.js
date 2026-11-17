@@ -18378,6 +18378,9 @@ REQUISITO: CONTINUE em Markdown fluído exatamente a partir do ponto onde parou 
       }
 
       const btnSubmit = document.getElementById('btnSubmitDerivedQuestion');
+      // Durante a geração, um clique fora da janela não a fecha (o resultado chegaria sem aviso).
+      const derivedModal = document.getElementById('derivedQuestionModal');
+      if (derivedModal) derivedModal.dataset.busy = 'true';
       if (btnSubmit) {
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '⏳ Gerando Pergunta com Novo Contexto...';
@@ -18483,6 +18486,7 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = '⚡ Gerar Pergunta com Novo Contexto';
       }
+      if (derivedModal) delete derivedModal.dataset.busy;
 
       if (newQuestionData && (typeof newQuestionData.question === 'string' || typeof newQuestionData.pergunta === 'string')) {
         const safeDerivedStem = removeUnsupportedVisualLocator(newQuestionData.question || newQuestionData.pergunta);
@@ -18565,7 +18569,8 @@ Retorne EXCLUSIVAMENTE um JSON com os campos: question, vignette, quizOptions (a
         
         sharedQuestionsBank.unshift(newQuestionData);
         saveSharedQuestionsBank();
-        
+        console.info('[Pergunta com contexto] Pergunta salva no banco:', newQuestionData.id, newQuestionData.subject);
+
         if (typeof syncAllDataToFirebaseCloud === 'function') {
           syncAllDataToFirebaseCloud();
         }
