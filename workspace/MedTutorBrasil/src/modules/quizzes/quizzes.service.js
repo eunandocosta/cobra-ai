@@ -1736,6 +1736,9 @@ Retorne EXCLUSIVAMENTE um objeto JSON estruturado conforme o esquema solicitado.
           generationConfig: {
             temperature: 0.25,
             topP: 0.9,
+            // Uma questão derivada cabe em poucos milhares de tokens. Sem limite, uma
+            // resposta descontrolada chegava a 360 mil caracteres e quebrava o JSON.
+            maxOutputTokens: 2048,
             responseMimeType: "application/json",
             responseSchema: derivedQuestionSchema
           }

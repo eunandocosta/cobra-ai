@@ -85,3 +85,12 @@ const quizzesController = require('../src/modules/quizzes/quizzes.controller');
   console.error('❌ Falha nos testes de Pergunta Derivada:', err);
   process.exit(1);
 });
+
+// A resposta da pergunta derivada tem limite de tamanho (evita JSON cortado por resposta descontrolada).
+{
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const svc = fs.readFileSync(path.join(__dirname, '..', 'src', 'modules', 'quizzes', 'quizzes.service.js'), 'utf8');
+  require('node:assert/strict').match(svc, /temperature: 0\.25,\s*topP: 0\.9,[\s\S]*?maxOutputTokens: 2048,/, 'pergunta derivada tem maxOutputTokens');
+  console.log('  [PASS] Pergunta derivada com limite de tamanho da resposta');
+}
