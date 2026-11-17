@@ -43,3 +43,9 @@ assert.match(app, /onclick="developDerivedContextBox\('\$\{boxId\}'\)"/, 'cada c
 assert.match(app, /async function developDerivedContextBox\(boxId\) \{[\s\S]*?contexts: \[note\]/, 'a IA recebe o texto escrito nessa caixa');
 assert.match(app, /textarea\.value = text;/, 'o caso desenvolvido substitui o texto para revisão');
 console.log('  [PASS] Botão "Desenvolver" em cada contexto da Pergunta com Contexto');
+
+// Pergunta com contexto: clique fora não fecha a janela durante a geração.
+assert.match(html, /id="derivedQuestionModal" onclick="if \(!this\.dataset\.busy\) closeModals\(event\)"/, 'clique fora não fecha a janela durante a geração');
+assert.match(app, /derivedModal\.dataset\.busy = 'true';/, 'marca a geração em andamento');
+assert.match(app, /if \(derivedModal\) delete derivedModal\.dataset\.busy;/, 'libera a janela ao terminar');
+console.log('  [PASS] Janela de pergunta com contexto não fecha durante a geração');
